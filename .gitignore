@@ -3,6 +3,14 @@
 .DS_Store
 .claude/
 
+# Env files — defense in depth on top of each app's own .gitignore.
+# Never commit a real .env/.env.local anywhere in this tree; only the
+# .example templates are meant to be tracked.
+.env
+.env.local
+.env.*.local
+!.env*.example
+
 # Supabase CLI local state (project link cache, function build output) —
 # machine-local, not meant for source control.
 **/supabase/.temp/
