@@ -1,0 +1,777 @@
+# CLAUDE.md
+
+Guidance for Claude Code (and any other agent) working in this repo.
+
+## What this is
+
+TheraHOME WEB is the browser counterpart to `TheraHOME APP` (the Expo/React
+Native companion app for TheraHOME's rehab devices — TheraNECK+/PRO,
+TheraBACK+/PRO). **This directory is currently empty — nothing has been
+scaffolded yet.** This file is a pre-build plan: what to build, in what
+order, and how it should relate to the mobile app and its shared backend.
+
+The long-term vision is a single Vietnamese-language web app with three
+surfaces, matching three HTML prototypes in the design project (see below):
+
+- **Admin** (`TheraHOME Admin.html`) — internal operations dashboard.
+- **Customer Care / CSKH** (`TheraHOME Customer Care.html`) — where a human
+  specialist handles the `chat/human` threads the mobile app already sends
+  messages into (see "Relationship to the mobile app" below).
+- **Web App** (`TheraHOME Web App.html`) — a public, customer-facing web
+  version of the same experience the mobile app provides. **Out of scope for
+  now.**
+
+**This phase builds Admin + Customer Care only.** The public Web App surface
+is deliberately deferred — see the access-gate design below for how the
+current login flow is built to extend to it later without being reworked.
+
+## Source of truth is a Claude Design project, not this checkout
+
+Same arrangement as `TheraHOME APP`: the visual/functional spec lives in the
+Claude Design project **"TheraHome Design"** (projectId
+`d030fe5f-c127-4d8b-8242-ea2ecf0aa2e7`), reachable through the `DesignSync`
+MCP tool / `/design-sync` skill. It is a static, no-build HTML/JSX web
+prototype (React 18 UMD + Babel Standalone via CDN) — not meant to run as-is,
+just translated screen-by-screen.
+
+Relevant files in that project, **none of which are pulled into this repo
+yet**:
+
+- `TheraHOME Admin.html`, `TheraHOME Customer Care.html` — the two surfaces
+  this phase implements. `TheraHOME Web App.html` also exists there, for the
+  later public phase.
+- A shared design-system bundle: `_ds/.../_ds_bundle.js`, `styles.css`, and
+  token files (`tokens/colors.css`, `tokens/radius-shadow.css`,
+  `tokens/spacing.css`, `tokens/typography.css`).
+- JSX sources: `admin-shared.jsx`, `admin.jsx`, `data.js`, `icons-extra.jsx`
+  (Admin), and `care.jsx` (Customer Care), plus the shared files above.
+
+**First real implementation step**: pull these via `DesignSync`/
+`/design-sync` before writing any screen — don't hand-guess markup/tokens
+from this doc. `TheraHOME APP/.design-reference/` shows the pattern this repo
+should follow: keep a frozen, read-only copy of what was translated (e.g.
+under a `.design-reference/` dir here too) so future design changes can be
+diffed rather than re-guessed.
+
+## Stack (planned)
+
+- **Next.js (App Router)** + **TypeScript** (`strict: true`) — matches the
+  mobile app's TS-strict convention. Chosen over a plain Vite SPA for room to
+  grow (the later public Web App surface benefits from routing/SSR
+  conventions Next already provides).
+- **Backend**: the **same Supabase project as the mobile app**,
+  `nyjvtvmllwbyfokldgtj` (Singapore / `ap-southeast-1`, org "TheraHOME").
+  Do not create a second project — Admin/CSKH need to read and write the
+  same `orders`, `chat_threads`, `chat_messages`, etc. that the mobile app
+  already uses. Reuse the same env-var pattern as `TheraHOME APP/.env`
+  (Supabase URL + publishable anon key — safe to commit, RLS is what
+  actually protects data).
+- **Auth**: Google OAuth via Supabase Auth's **web redirect flow**
+  (`supabase.auth.signInWithOAuth({ provider: 'google', options: {
+  redirectTo } })`, then Supabase's own callback handling) — simpler than the
+  mobile app's `expo-web-browser` session dance, since this runs in a real
+  browser natively. This needs **its own** Google Cloud OAuth client (see
+  Manual setup below) — the mobile app's client won't have the right
+  redirect URI registered.
+- **Design tokens**: no hand-written CSS values — port the design system's
+  token CSS files into whatever the chosen styling approach is (CSS
+  variables / Tailwind theme / etc., decide at scaffold time), the same way
+  `TheraHOME APP/src/theme/` ported the same tokens once for React Native.
+  Never hardcode a hex value.
+
+## Auth & access flow (planned)
+
+Google login alone is not enough to get in — same two-step shape as the
+mobile app's `login.tsx` → `activate.tsx`, and **the same underlying
+mechanism**, not a separate concept:
+
+1. **Welcome screen** — animated/dynamic landing, then a **"Đăng nhập với
+   Google"** entry point (mirror `TheraHOME APP/app/(onboarding)/login.tsx`'s
+   visual approach: full-bleed backdrop, brand mark, single Google button).
+2. **Google sign-in** — Supabase Auth web redirect flow (see Stack above).
+3. **Contact-verification gate** — after Google login, the user enters a
+   **phone number or email**, checked against what's already in the
+   database. This is **exactly the mobile app's pattern**
+   (`activate_orders_by_contact`-style lookup against a matching Supabase
+   table/RPC) — it is *not* a separate "employee login" or "staff auth"
+   system. The reason to build it this way: this is the same gate the public
+   Web App surface will use for ordinary customers once that phase ships
+   (very likely against the mobile app's own `orders` table at that point).
+   Right now the table backing this lookup simply only contains the two
+   admin/CSKH contacts this phase needs — the mechanism itself is already
+   general.
+   - Needs a new Supabase table (working name, e.g. `web_access_contacts` —
+     avoid "staff"/"employee" naming, it will hold ordinary customer
+     contacts too once the public phase ships) with at least `phone`,
+     `email`, and a roles column (e.g. `text[]`, values like `admin`,
+     `cskh`; a future public-customer row would simply have no such role).
+     Like `orders`, this needs **no direct client RLS access** — look it up
+     only through a `SECURITY DEFINER` RPC callable by `authenticated`,
+     mirroring `activate_orders_by_contact`/`lookup_order_by_code`, so a
+     client can't `select *` the whole contact list.
+   - **Provisioned admins**: `khanha1k59@gmail.com` / `0395581037` and
+     `hoankenny2002@gmail.com` / `0328552894`. Migration preserves any
+     existing roles on these rows and ensures `admin` is present.
+   - No match → access-denied state. No self-serve path — rows are added
+     manually for this phase (an actual signup/provisioning flow is public
+     Web App scope, not this one).
+   - A contact row is bound to exactly one `auth.users` identity through
+     `claimed_by_user_id`. The RPC rejects a second Google account trying to
+     reuse the same phone/email. Existing staff rows are backfilled to the
+     Google identity whose email matches the allow-listed email.
+   - Match → session carries whatever role(s) that row has. If it has both
+     `admin` and `cskh` (as the seed row does), the app shows **one app
+     shell with an Admin ⇄ CSKH switcher** in the nav, not two separate
+     logins or a strict per-account role split.
+
+## Relationship to the mobile app / shared backend
+
+Same Supabase project as `TheraHOME APP` — a schema change here is visible
+there and vice versa. The concrete integration point for the Customer Care
+surface:
+
+- `chat_threads` (`kind='human'`) / `chat_messages` — the mobile app's
+  `app/chat/human.tsx` already sends real messages into these tables and
+  reads replies via Realtime, but per `TheraHOME APP/CLAUDE.md`, **no client
+  exists yet that can reply as a specialist** (client-side RLS only allows
+  inserting `sender_type='user'` rows — `specialist` rows need a
+  service-role context). The CSKH surface built here is that missing client:
+  it inserts `chat_messages` rows with `sender_type='specialist'` into a
+  user's open `kind='human'` thread.
+- `specialist-presence` Realtime channel — the mobile app's
+  `useSpecialistPresence()` hook (`TheraHOME APP/src/hooks/useChat.ts`)
+  shows an "online" badge only while something calls
+  `channel.track({ role: 'specialist' })` on this channel. The CSKH surface
+  should track presence on this channel while a specialist is actively
+  staffing it, so the mobile app's existing indicator lights up for real
+  instead of always showing offline.
+- Admin surface data (orders, products, program content, etc.) reads/writes
+  tables mobile already defines — see `TheraHOME APP/CLAUDE.md`'s Supabase
+  schema section for the full list before designing any Admin screen's
+  queries, to avoid inventing a parallel shape for data that already exists.
+
+## Planned folder structure
+
+Nothing below exists yet — this is the proposed shape for the first
+scaffold, not a description of current state:
+
+```
+app/
+  (auth)/
+    welcome/            animated welcome screen + Google sign-in entry
+    verify/             the phone/email contact-verification gate
+  admin/                Admin surface routes
+  care/                 Customer Care (CSKH) surface routes, incl. chat
+  layout.tsx            root layout: session gate (redirect to (auth) until
+                        both Google session AND contact-verification pass)
+
+src/
+  lib/
+    supabase.ts          Supabase client (browser + server as needed)
+    webAccess.ts          the contact-verification lookup (calls the RPC
+                        described above), session/role helpers
+  theme/ or design tokens  ported from the design system's token CSS files
+  components/            shared UI, following the design system's component
+                        breakdown once pulled via DesignSync
+
+.design-reference/       frozen copies of pulled design source, read-only,
+                        never imported — same convention as
+                        TheraHOME APP/.design-reference/
+```
+
+## Manual setup needed (external dashboard actions)
+
+Same three-step shape as `TheraHOME APP/CLAUDE.md`, but this needs its **own**
+OAuth client — the mobile app's client is configured for its own redirect
+scheme and won't work here:
+
+1. Create a **new** OAuth client in Google Cloud Console (Web application
+   type) for this web app's own redirect URI (Supabase's standard callback:
+   `https://nyjvtvmllwbyfokldgtj.supabase.co/auth/v1/callback`, plus
+   whatever local-dev URL Next.js runs on, both registered as authorized
+   redirect URIs).
+2. This can reuse the **same Google Cloud project** as mobile, and the
+   **same Supabase Google provider config** — Supabase allows only one
+   Google provider per project, so if the mobile app's client ID/secret is
+   already set there, this app's redirect URI just needs to be added to
+   that *same* Google Cloud OAuth client rather than creating a second
+   provider entry. Confirm this against the mobile app's actual Google
+   Cloud client before assuming a second client is even needed.
+
+## Status / next steps
+
+- [x] Pull `TheraHOME Admin.html`, `TheraHOME Customer Care.html`, and the
+      shared design-system bundle via `DesignSync` into `.design-reference/`
+      (also pulled: `admin.jsx`, `admin-shared.jsx`, `care.jsx`, `data.js`,
+      `icons-extra.jsx`, and the four token CSS files + `_ds_bundle.js`).
+      **Known gap in the design source itself** (not a pull error):
+      `admin-shared.jsx` references a `StaffAccountsView` component (the
+      "Tài khoản nội bộ" sub-tab under Admin → User) that is never actually
+      defined anywhere in the project — `SAMPLE_STAFF`/`STAFF_ROLE_META`
+      data exists but the view was never built. Design it fresh when that
+      tab gets built, or ask the user for direction first.
+      `TheraHOME Web App.html` and its `web-*.jsx` sources also exist in the
+      design project (confirmed via `list_files`) but weren't pulled this
+      round — out of scope until the later public-web-app phase.
+- [x] Scaffold the Next.js project (TypeScript strict, App Router, no
+      Tailwind — design tokens ported to `src/design-tokens/tokens.css` and
+      imported from `app/globals.css`, matching how the mobile app ported
+      the same tokens into `src/theme/`). Route skeleton in place and
+      verified with `next build` + `next dev`: `/` (redirects to
+      `/welcome`), `/welcome`, `/verify`, `/admin`, `/care` — all currently
+      placeholder UI, not the real translated screens.
+      `.design-reference/**` is excluded from ESLint (it's frozen prototype
+      source relying on script-tag globals like `React`/`IconX`, never
+      meant to be linted/compiled as part of this app).
+- [x] Migrated the contact-verification table + `SECURITY DEFINER` RPC in
+      the shared Supabase project (`web_access_contacts` +
+      `lookup_web_access_contact(p_phone, p_email)`, migrations
+      `create_web_access_contacts` / `seed_web_access_contacts`); seeded the
+      `khanha1k59@gmail.com` / `0856239030` row with `admin`+`cskh` roles.
+      No client RLS policies on the table (same pattern as `orders`);
+      `EXECUTE` revoked from `public`/`anon`, granted only to
+      `authenticated`. Verified via direct SQL: matches by email, by plain
+      phone, and by `+84`-prefixed phone (normalized through the existing
+      `normalize_phone_vn`); a non-matching contact correctly returns null.
+      `get_advisors` after the migration shows only the same INFO/WARN
+      classes already present on `orders` and its RPCs (`rls_enabled_no_policy`,
+      `authenticated_security_definer_function_executable`) — no new
+      findings.
+- [x] Wired Google OAuth (web redirect flow, `src/lib/googleAuth.ts`) and
+      the contact-verification gate (`src/lib/webAccess.ts`'s
+      `verifyWebAccessContact`, called from `/verify`) for real.
+      `/welcome`'s button triggers `signInWithOAuth` → Google → back to
+      `/verify`, which waits for the session (`onAuthStateChange`), then
+      looks up the entered phone/email and routes to `/admin` or `/care`
+      based on the roles returned. `/admin` and `/care` are now wrapped in
+      `src/components/AccessGate.tsx`, which re-checks session + the
+      granted roles (cached client-side after a successful verify) and
+      shows an Admin ⇄ CSKH switcher + sign-out when an account holds both
+      roles — as `khanha1k59@gmail.com` does. The Google Cloud OAuth client
+      + Supabase provider dashboard steps below are **done** and verified
+      working end to end via Supabase's `auth_logs`/`auth.users` (real
+      `/authorize` → Google → `/callback` → session round trips recorded for
+      `khanha1k59@gmail.com`).
+      **Known simplification**: the granted roles are cached in
+      `localStorage`, not a server-verified cookie — this is a client-side
+      routing convenience, not a security boundary. Real data access on
+      `/admin`/`/care` still has to go through the authenticated Supabase
+      session + RLS on whatever tables those screens end up reading: don't
+      rely on the `localStorage` flag for anything sensitive. Revisit with
+      a proper server-side session (e.g. `@supabase/ssr` + middleware) if
+      this ever needs to be a hard security boundary rather than a UX one.
+- [x] Built the Admin shell and screens — translated `admin.jsx` +
+      `admin-shared.jsx`'s views into `src/components/views/` (Dashboard,
+      Lộ trình → `RoutineView`, Sản Phẩm → `ProductsView`, Thông báo →
+      `NotificationsAdminView`, Cộng đồng → `CommunityView`, User →
+      `UsersView`, AI Prompts → `AIPromptsView`) plus shared primitives
+      under `src/components/ui/` (`Icon`, `Modal`, `Toast`, `TableShell`,
+      `primitives.tsx`) and mock data ported to `src/lib/mockData.ts` /
+      `src/lib/adminMockData.ts`. `admin.jsx`'s and `care.jsx`'s
+      near-identical sidebar+topbar shells were unified into one
+      parameterized `src/components/shell/AppShell.tsx` rather than kept as
+      two duplicate copies — it also folds the Admin ⇄ CSKH switcher into
+      the existing sidebar footer (via `useWebAccess()` from
+      `AccessGate.tsx`, which now also exposes the real signed-in email
+      instead of the design's hardcoded `admin@therahome.vn` placeholder).
+      **`StaffAccountsView`** (the "Tài khoản nội bộ" sub-tab, referenced in
+      `admin-shared.jsx` but never defined there — see the design-gap note
+      above) is now implemented in `src/components/views/UsersView.tsx`,
+      styled to match the rest but **not a translation of anything in the
+      source** — revisit if the real design ever ships one.
+      `next build` + `next lint` both pass clean.
+- [x] Built the Customer Care shell — `care.jsx` → `ChatView` (in
+      `src/components/views/ChatView.tsx`) + reused `NotificationsAdminView`
+      and `UsersView role="care"` (read-only mode).
+- [x] **Rewired every Admin/CSKH screen from mock data to real Supabase
+      queries** (`src/lib/db.ts`), on the same shared project as the mobile
+      app. What this took, beyond just swapping imports:
+      - **`current_web_roles()`** (migration `web_admin_role_helper_and_columns`) —
+        SECURITY DEFINER helper used inside RLS policies to check the caller's
+        `web_access_contacts` roles by email; same class of
+        `authenticated_security_definer_function_executable` advisor WARN as
+        every other RPC in this project, already accepted there.
+      - **New RLS policies** (migration `web_admin_rls_policies`) extending —
+        not replacing — the mobile app's existing policies: admin-only CRUD on
+        `products`/`program_phases`/`program_days`/`store_categories`/
+        `store_items`/`web_access_contacts`; admin+cskh SELECT-all on
+        `profiles`/`user_programs`/`user_program_days`/`pain_logs`/
+        `notifications`/`chat_threads`/`chat_messages`; admin-only moderation
+        on `community_posts`/`post_comments`; a second `chat_messages` INSERT
+        policy for `sender_type='specialist'` (the mobile app's own policy
+        only ever allowed `sender_type='user'`, so specialist replies were
+        never possible before this). Verified with `get_advisors` (no new
+        finding classes) and by simulating both an admin and a random
+        authenticated JWT via `set local request.jwt.claims` — admin can
+        read/write cross-user data and random users get exactly what
+        `current_web_roles()` returning `{}` implies (none of the new access).
+      - **New columns**: `profiles.app_role` + `profiles.locked` (the mock
+        UsersView's phân quyền/khóa concepts had no real column before),
+        `community_posts.pinned`, `web_access_contacts.disabled` (also wired
+        into `lookup_web_access_contact` so a disabled contact can't pass the
+        login gate).
+      - **Two mock-only features dropped rather than faked**: "Thêm người
+        dùng" in UsersView (app users only come from real Google sign-up in
+        the mobile app, not an admin form) and "Lên lịch" (schedule-for-later)
+        in Notifications (no scheduled-jobs table/worker exists).
+      - **Notifications ⇒ real model shift**: the real `notifications` table
+        is per-user rows, not a broadcast log, so composing one now fans out
+        to one row per targeted user (`sendNotificationBroadcast`), and the
+        admin list groups rows back into "campaigns" by
+        `(type, title, body, created_at)` for display
+        (`fetchNotificationCampaigns`).
+      - **UserDrawer's pain trend** now reads that specific user's own
+        `pain_logs` (real, personalized) instead of the mock's generic
+        per-product illustrative curve — a genuine improvement, not just a
+        like-for-like swap.
+      - **Chat** reads/writes real `chat_threads`/`chat_messages`, subscribes
+        to Realtime on `chat_messages` (already in the `supabase_realtime`
+        publication) for live updates, and tracks Presence on
+        `specialist-presence` while the CSKH Chat tab is mounted — closing
+        the gap the mobile app's `useSpecialistPresence()` was built for but
+        never had a real client on the other end of.
+      - **Dashboard's WeekChart** is a real per-weekday computation (fraction
+        of active `user_programs` with a `user_program_days` row completed
+        that weekday), not illustrative mock numbers.
+      - **AI Prompts stayed local-only** at this point — there was no
+        `ai_prompts` table in the schema yet, so there was nothing real to
+        wire it to. Wired for real later — see the 2026-08-19 entry below.
+      - `next build` + `next lint` both pass clean; the live dev server
+        (already running the real `khanha1k59@gmail.com` session) picked up
+        every change via Fast Refresh without a restart.
+- [x] **Added "Tài khoản TheraHOME" to Admin** — manages the mobile app's
+      new admin-issued, password-based login method (App Review, staff,
+      partners, testers; see `TheraHOME APP/CLAUDE.md`'s "TheraHOME-issued
+      accounts" section for the full design). `src/components/views/TheraAccountsView.tsx`
+      reads/writes `profiles.account_type <> 'normal'` — most fields go
+      straight through the authenticated client + RLS (same as
+      `updateAppUser`), and only account creation / password resets call
+      the new `admin-manage-account` Edge Function (needs the service role
+      for `auth.admin.*`). Admin-only nav item — not added to `NAV_CARE`,
+      since these rows carry a password.
+- [x] **Community expansion (reports, challenges)** — mirrors the mobile
+      app's Community expansion (see `TheraHOME APP/CLAUDE.md`'s "Community
+      expansion" section for the full picture). New "Báo cáo" page
+      (`src/components/views/ReportsView.tsx`, Admin + CSKH per
+      `content_reports`' RLS) — hide/delete reported content, lock the
+      author's account, resolve/dismiss. New "Thử thách" sub-tab inside
+      `CommunityView.tsx` — create/end challenges, see participant/
+      completion counts. Also fixed two bugs found while touching
+      `CommunityView.tsx`: the "Badge" field on official posts was captured
+      but silently never persisted (replaced with a proper content-type
+      dropdown feeding the existing `tag` column), and `TableShell`'s
+      search/filter inputs were decorative — extended `TableShell` itself
+      with optional controlled `searchValue`/`onSearchChange`/
+      `filterValue`/`onFilterChange` props (benefits every view that uses
+      it, not just Community/Reports).
+- [x] **AI Prompts wired for real (2026-08-19)** — added `ai_prompts`
+      (singleton system-prompt row) + `ai_suggested_replies` tables
+      (`TheraHOME APP/supabase/migrations/202608192000_ai_assistant_admin.sql`).
+      `AIPromptsView.tsx` now does real fetch-on-mount + save via new
+      `db.ts` functions (`fetchAIPrompt`/`updateAIPrompt`/
+      `fetchAISuggestedReplies`/`addAISuggestedReply`/
+      `deleteAISuggestedReply`) instead of local `useState` + toast-only
+      fake saves. Critically, the mobile app's `chat-ai-reply` Edge
+      Function was also changed to read `ai_prompts.system_prompt` live on
+      every request (service-role client, bypasses RLS) instead of a
+      hardcoded constant — so edits made here take effect immediately with
+      no redeploy, which is what makes this wiring actually meaningful
+      rather than just cosmetic. `ai_suggested_replies` backs the AI chat's
+      empty-state suggestion chips on mobile (previously a hardcoded
+      3-string array) — the "Phản hồi mẫu" card's add/delete actions are
+      real now. Also switched `chat-ai-reply` from the Anthropic API to
+      Groq's free tier (no paid API key was available) — see
+      `TheraHOME APP/CLAUDE.md`'s Edge Functions section for the provider
+      details; nothing on the WEB side needed to change for that part.
+- [x] **Community pin discoverability + editable notification content
+      (2026-08-22)** — CSKH reported never seeing the pin-post control on
+      `/care`. It existed (`togglePin`, gated on `it.official`) but lived
+      in a column with an empty `""` header and rendered as a bare
+      unlabeled icon, invisible unless you already knew it was there;
+      `pinOnly` mode also rendered an always-empty "Thao tác" column with
+      nothing under its header, adding to the "is this broken?" read.
+      Fixed in `CommunityView.tsx`: the pin column now has a real "Ghim"
+      header and a labeled pill button ("Ghim"/"Đã ghim", not just an
+      icon); the "Thao tác" column is omitted entirely in `pinOnly` mode
+      instead of rendering empty. No RPC/RLS change needed — the backend
+      (`set_official_post_pinned`) already allowed both `admin` and `cskh`
+      roles; this was purely a frontend visibility bug.
+      Separately: composing a post with "Gửi thông báo đến người dùng"
+      checked used to push the post's own title/`text.slice(0,180)`
+      verbatim with no way to write a shorter/different push blurb. Added
+      editable "Tiêu đề thông báo"/"Nội dung thông báo" fields (shown only
+      once the checkbox is checked, prefilled from the post's title/text
+      on first check but never overwritten after that) — `createOfficialPost`
+      in `db.ts` now takes optional `notifyTitle`/`notifyBody` and falls
+      back to the post's own title/text when left blank. `next build` +
+      `next lint` both pass clean.
+- [x] **"Đăng nhập bằng tài khoản TheraHOME" replaces Google as the primary
+      staff login (2026-08-23)** — WEB admin/cskh access no longer has to go
+      through Google + the `/verify` contact-check. `/welcome` now offers
+      three entry points: Google and Apple (both OAuth, unchanged flow into
+      `/verify`) and a new "Đăng nhập bằng tài khoản TheraHOME" button
+      (`/thera-login`, username/password, no OAuth). Reuses the exact
+      mechanism `TheraHOME APP` already built for mobile-only admin-issued
+      accounts (`profiles.account_type`, the `admin-manage-account` Edge
+      Function) rather than inventing a second one — see
+      `TheraHOME APP/CLAUDE.md`'s "TheraHOME-issued accounts" section and
+      migration `202608230900_thera_accounts_web_roles_and_admin_seed.sql`.
+      Concretely:
+      - `current_web_roles()` (the single role source read by every RLS
+        policy, `admin-manage-account`, and mobile's `useWebRoles`/
+        `useIsStaff`) now has a second fallback branch: if the signed-in
+        user's own `profiles` row has `account_type='admin'` →
+        `{admin,cskh}`, `'cskh'` → `{cskh}` (gated on not-locked/not-expired),
+        on top of the pre-existing `web_access_contacts` lookup. One change,
+        threads through everywhere automatically.
+      - New `resolve_thera_login_email(p_username)` SQL RPC (security
+        definer, granted to `anon`) — TheraHOME accounts log in with a
+        plain username, not a real email; Supabase Auth still needs an
+        email-shaped identifier, so every such account actually has a
+        synthetic `<username>@thera.local` address under the hood
+        (`profiles.username` holds the real typed value). The RPC only ever
+        resolves `account_type <> 'normal'` rows, never ordinary users, to
+        limit the enumeration surface. `src/lib/theraAccountAuth.ts`'s
+        `signInWithTheraAccount()` calls it then `signInWithPassword`.
+      - Because `current_web_roles()` resolves straight from `account_type`
+        once a session exists, `/thera-login` skips `/verify` entirely —
+        it just pushes to `/admin`, and the unchanged `AccessGate` self-
+        corrects to `/care` for a cskh-only account.
+      - **Exactly one seeded admin account**: `TheraHOME` / `TheraHOME@/123`
+        (`account_type='admin'`), created directly in the migration (SQL
+        insert into `auth.users`/`auth.identities` using `pgcrypto`'s
+        `crypt()`, since there was no existing admin session yet to call
+        the Edge Function through the normal path). A partial unique index
+        (`profiles_single_admin_idx`, on `(true) where account_type='admin'`)
+        makes "exactly one" a hard DB invariant, not just a UI rule; the
+        `admin-manage-account` Edge Function's `ACCOUNT_TYPES` whitelist
+        also excludes `'admin'` from creation. **The password lives only in
+        that migration file and this note — never re-committed elsewhere.**
+      - The two previously-Google-based admin contacts (`khanha1k59@gmail.com`,
+        `hoankenny2002@gmail.com`) had their `web_access_contacts.roles`
+        cleared to `{}` by the same migration — they're ordinary (roleless)
+        contacts now, not deleted, matching this file's existing
+        "future ordinary customer contact" shape.
+      - `src/lib/appleAuth.ts` mirrors `googleAuth.ts` exactly
+        (`signInWithOAuth({provider:'apple', ...})`) but Apple Sign-In
+        itself needs its own manual Apple Developer + Supabase-dashboard
+        setup (Services ID, Key, redirect URIs) before it actually works —
+        not something completable from this repo alone, same caveat as
+        Google's existing "Manual setup needed" section.
+      - **`TheraAccountsView.tsx` (Admin → "Tài khoản TheraHOME")**: gained
+        a creatable `cskh` type ("Chăm sóc khách hàng") alongside the
+        existing admin_issued/review/staff/partner/tester — `'admin'` stays
+        excluded from the creatable list for the reason above. The create
+        form's "Username / Email" field is now plain "Username" (no more
+        email framing — `admin-manage-account` derives the synthetic email
+        itself), plus a "Nhập lại Password" confirm field and a show/hide
+        eye-icon toggle on both password fields (new `Icon` `"eye-off"`
+        case). The one seeded admin row can't have its type changed or be
+        locked/deleted from this screen — losing it has no recovery path
+        short of re-running the seed migration.
+      - `cskh` accounts skip the Edge Function's patient-catalog
+        provisioning block entirely (no `user_access_contacts`/
+        `user_programs` rows) — they aren't patients; see
+        `TheraHOME APP/CLAUDE.md`'s `isStaffAccount` RootNavigator gate for
+        how mobile grants them app access a different way.
+      - `next build`/`npm run lint`/`npx tsc --noEmit` all pass clean.
+- [x] **Fixed `<div>` inside `<tbody>` hydration error, TableShell-wide
+      (2026-08-23)** — reported from creating a TheraHOME account, but the
+      root cause was in the shared `TableShell` component, not that one
+      screen: `TableShell` puts its entire `children` prop inside
+      `<tbody>`, and four views (`TheraAccountsView.tsx`, `UsersView.tsx`,
+      `CommunityView.tsx` twice — challenges and posts) were passing their
+      modals as trailing children alongside the `<tr>` rows, landing every
+      `Modal`'s backdrop `<div>` inside `<tbody>` — invalid HTML, and a
+      hydration mismatch since the browser silently relocates it out of
+      the table on the client while SSR keeps it where React put it.
+      `TableShell` gained a `modals?: ReactNode` prop, rendered as a
+      sibling after `</table>` instead of inside it; all four call sites
+      moved their modal JSX there. Checked every other `<tbody>` user in
+      the codebase (`RoutineView.tsx`, `UpsaleNotificationsView.tsx`) —
+      both already render modals as proper siblings outside `</tbody>`,
+      not affected. `next build`/`next lint`/`tsc` all clean.
+- [x] **Fixed account creation actually failing: `admin-manage-account` had
+      no CORS/`OPTIONS` handling (2026-08-23)** — the `<tbody>` fix above
+      resolved the console warning, but creating a TheraHOME account still
+      silently failed. Root cause was different and pre-existing:
+      `admin-manage-account` (unlike `dispatch-push` and every other
+      browser-called function) never had `corsHeaders` or an `OPTIONS`
+      short-circuit — confirmed via `query_logs` against `function_edge_logs`,
+      which showed the browser's CORS preflight getting `OPTIONS | 405`
+      every time, so the real `POST` never even left the browser. This
+      likely predates every change made to this function this session —
+      per this file's earlier notes, no `admin-manage-account`-created
+      account existed in the database until now, meaning this code path
+      had apparently never been successfully exercised from a browser
+      before. Fixed by adding the same `corsHeaders` +
+      `if (req.method === "OPTIONS") return new Response("ok", {headers: corsHeaders})`
+      pattern every other function already uses, applied to all response
+      paths via `jsonResponse`. Redeployed (v15); verified the preflight
+      directly with `curl -X OPTIONS` (200, was 405), and confirmed the
+      seeded `therahome` admin profile is still valid
+      (`account_type='admin'`, not locked, no expiry) so
+      `current_web_roles()` grants it through the function's admin check.
+      Also grabbed a local copy at
+      `TheraHOME APP/supabase/functions/admin-manage-account/index.ts` —
+      this function had never had one before, unlike every other function
+      in this project.
+- [ ] (Later, separate phase) Design and build the public Web App surface
+      (`TheraHOME Web App.html` / `web-*.jsx` in the design project, not yet
+      pulled), extending the same contact-verification gate to real
+      customer contacts instead of the admin/CSKH-only seed data.
+- [x] **Modal backdrop-click bug fixed, pin-with-display-info flow, Admin
+      nav trimmed (2026-08-23)** — three related changes from the same
+      request, alongside a larger mobile-app-side pass (see
+      `TheraHOME APP/CLAUDE.md`'s matching entry for the "Gợi ý cho bạn"
+      article card / feed truncation / store-prefetch / local-reminder
+      half of this same request).
+      - **Root-caused "tạo tài khoản TheraHOME đang làm dở là bị thoát ra"**
+        (the create-account form silently closing mid-edit) to
+        `Modal.tsx`'s backdrop: `onClick={onClose}` on the backdrop plus
+        `stopPropagation` on the content div looks correct for a normal
+        click, but a click/drag that *starts* inside a field (e.g.
+        selecting text in the "Ghi chú" textarea) and *releases* outside
+        the modal's bounds still resolves the synthetic click's target to
+        the backdrop — `stopPropagation` never runs because the event
+        never actually bubbles up from inside the content div in that
+        case. Fixed with the standard robust pattern (used by most modal
+        libraries): track whether the *mousedown* itself started on the
+        backdrop in a ref, and only close on `click` if both the mousedown
+        and the click resolved to the backdrop element directly
+        (`e.target === e.currentTarget`). This is the shared `Modal`
+        component every modal in the app uses, so the fix isn't specific
+        to account creation.
+      - **Pinning an official post now asks what to actually show**, per
+        request ("cskh khi tích chọn 1 bài để ghim cần phải chọn thêm
+        thông tin hiển thị"). `community_posts` gained 3 nullable columns
+        — `pinned_title`, `pinned_content`, `pinned_thumbnail_url` — and
+        `set_official_post_pinned` (the existing SECURITY DEFINER RPC that
+        already enforces "only one official post pinned at a time") now
+        takes 3 more optional params and sets them alongside `pinned`
+        (only when pinning — unpinning leaves them as-is, they're just
+        inert while unpinned). The old 2-arg overload was dropped rather
+        than left alongside the new 5-arg one — PostgREST resolves an RPC
+        call by matching the JSON body's keys against parameter names, and
+        with the 3 new params all defaulted, a call passing only
+        `p_post_id`/`p_pinned` would otherwise match *both* overloads
+        ("function is not unique"). `CommunityView.tsx`'s `togglePin` now
+        branches: unpinning still calls the RPC directly with no prompt,
+        but pinning opens a new `PinDisplayModal` first — prefilled from
+        the post's own title/text/image (a sensible starting point,
+        editable), with an optional thumbnail upload
+        (`uploadPostThumbnail`, reusing the mobile app's `community-images`
+        Storage bucket under the signed-in staff account's own
+        `auth.uid()` — its existing RLS already permits that, no bucket
+        change needed) or a pasted URL as a fallback. Both `admin` and
+        `cskh` go through this same modal — `CommunityView`'s `pinOnly`
+        prop (used by `/care`) only hides the *other* moderation actions
+        (edit/hide/delete), pinning was already available to both roles
+        via the RPC's own role check.
+      - **Removed "Cộng đồng" from Admin's sidebar** (`NAV_ADMIN` in
+        `adminMockData.ts`, the `community` case in `app/admin/page.tsx`,
+        and the matching quick-link in `DashboardView.tsx`) — per explicit
+        request. `NAV_CARE` (CSKH's nav) keeps it unchanged: CSKH's
+        `CommunityView` usage was already scoped via `pinOnly` and is
+        where the new pin-with-display-info flow above actually lives, so
+        removing it there would have broken the very feature this request
+        also asked for.
+      `next build`/`npm run lint`/`tsc` all clean after every step;
+      re-verified via `get_advisors` that the two new/changed RPCs show
+      only the same class of expected "SECURITY DEFINER callable by
+      authenticated" advisory every other self-scoped RPC in this project
+      already shows (e.g. `complete_day`, `touch_last_login`) — not a new
+      class of issue.
+- [x] **Full admin review, requested after account creation "filled
+      everything but couldn't create" (2026-08-23)** — the Modal fix two
+      entries above turned out to only cover part of it. Diagnosed with
+      `query_logs`: the account-creation `POST` was reaching
+      `admin-manage-account` and getting a genuine **401**, not the earlier
+      CORS 405. Reproduced directly with `curl` (signed in as the seeded
+      `therahome` admin, called the function with a real access token +
+      apikey header) — that call succeeded (reached "Unknown action" for a
+      bogus action, proving the auth/role check itself is fine), which
+      ruled out the function and pointed at the browser-side session
+      instead. Two real bugs found, both fixed:
+      - **`db.ts`'s `createTheraAccount`/`resetTheraAccountPassword` were
+        silently discarding the actual failure reason.**
+        `supabase.functions.invoke()` sets `error` to a `FunctionsHttpError`
+        for any non-2xx response, and that error's `.message` is *always*
+        the same hardcoded string ("Edge Function returned a non-2xx status
+        code") — never the JSON body the function actually sent back
+        (`"username_already_registered"`, `"invalid_username"`, or, in this
+        case, `"Missing Authorization header"`). The real body only exists
+        on `error.context` (the raw `Response`), which nothing was reading.
+        So every distinct failure reason from this function — including a
+        stale/expired session, indistinguishable from a real validation
+        error — collapsed into the same generic "Không thể tạo tài khoản."
+        toast. Fixed with a shared `invokeAdminManageAccount()` helper that
+        reads `error.context.clone().json()` and throws the real message
+        when present, falling back to the generic error only if the body
+        genuinely isn't JSON.
+      - **A stale session had no visible symptom until an action failed.**
+        Supabase access tokens expire (~1h); if a background refresh
+        silently fails (revoked refresh token, or a backgrounded tab having
+        its refresh timer throttled long enough to matter — plausible for
+        a long, many-field form like account creation), supabase-js fires
+        `SIGNED_OUT` on its own, but `AccessGate` only ever checked the
+        session *once*, on mount — nothing reflected the session going bad
+        afterward, so the UI kept rendering as if signed in until the next
+        action failed with a bare auth error. Fixed by adding an
+        `onAuthStateChange` listener in `AccessGate` that redirects to
+        `/welcome` the moment `SIGNED_OUT` fires, turning a confusing
+        silent failure into an ordinary re-login prompt — this is a page
+        wide fix, not specific to account creation. `TheraAccountsView`
+        also special-cases the "Missing Authorization header" message
+        specifically (now reachable thanks to the `db.ts` fix) with a clear
+        toast + immediate sign-out, as defense in depth for the narrow
+        window before the proactive listener catches it.
+      - **Found the same backdrop-click bug fixed in `Modal.tsx` earlier,
+        duplicated in `UsersView.tsx`'s `UserDrawer`** — a hand-rolled
+        overlay (predates `Modal.tsx`) with the identical
+        `onClick={onClose}` + child `stopPropagation()` pattern, same
+        mousedown-tracking fix applied.
+      - **Read through every other admin/CSKH view**
+        (AIPromptsView/ChatView/DashboardView/NotificationsAdminView/
+        ProductsView/ReportsView/RoutineView/UpsaleNotificationsView, plus
+        re-checking CommunityView/TheraAccountsView) looking for the same
+        two bug classes (swallowed edge-function errors, hand-rolled
+        backdrop-click overlays) and anything else obviously broken —
+        `admin-manage-account` was the only function with response-parsing
+        logic to get wrong (the three `dispatch-push` call sites are
+        deliberately fire-and-forget), and `UserDrawer` was the only
+        duplicated backdrop pattern. Nothing else stood out.
+      `next build`/`npm run lint`/`tsc` all clean after every step.
+    - **CSKH's "Cộng đồng" tab (`CommunityView.tsx`, rendered `pinOnly` from
+      `app/care/page.tsx`) split into two genuinely separate lists instead
+      of one filterable list (2026-08-24)**: previously a `TableShell`
+      dropdown filter (`AUTHOR_FILTERS`: "Tất cả"/"Bài của
+      TheraHOME"/"Bài của người dùng") mixed both kinds of post in one
+      table by default. Replaced with a second row of pill-tabs (same
+      visual pattern as the existing "Bài viết"/"Thử thách" `subTab`
+      switcher just above it) — "Từ TheraHOME" / "Khác" — backed by new
+      `authorTab` state; there's no "all" option anymore, matching the
+      explicit "tách ra, đừng để trong cùng 1 danh sách" (separate them,
+      don't keep them in one list) request. The underlying data/filter
+      predicate was already correct (`it.official`, from
+      `community_posts.is_official`) — only the UI and default state
+      changed. The "Đăng bài viết mới" action button and the table
+      subtitle are now conditional on `authorTab === "official"`, since
+      composing a new official post doesn't make sense while browsing the
+      "Khác" (regular app-user posts) list.
+    - **Investigated, deliberately left unchanged: CSKH's Chat list only
+      shows patients who have opened the mobile Chat tab at least once**
+      (`fetchChatThreads()`, `db.ts:886-931`, filters `chat_threads` where
+      `kind='human'` — a thread already exists with zero messages the
+      moment a patient opens `chat/human.tsx` in the app, shown here as
+      "Chưa có tin nhắn", so this is "never opened chat," not "hasn't sent
+      a message yet"). Confirmed this isn't a one-line query fix either:
+      RLS on `chat_threads` gives admin/cskh `SELECT`/`UPDATE` on every
+      row but no `INSERT` for a `user_id` that isn't their own
+      (`"own chat_threads"` policy requires `user_id = auth.uid()`), so
+      CSKH has no way to proactively start a thread with a patient who's
+      never opened Chat even if the list itself were widened. Asked the
+      user whether to build this (new RLS + a "browse all patients" UI) —
+      confirmed **not** wanted; current behavior is correct as-is.
+
+## Market content (VN/UK/ML) vs. UI language, separated for real (2026-08-24)
+
+Large cross-repo pass — see `TheraHOME APP/CLAUDE.md`'s entry of the same
+name for the full data-model reasoning (per-market columns on
+`program_days`, `group_key`-grouped `store_items`/`store_categories`,
+`target_markets` on `community_posts`, `language` on
+`system_notification_templates`, language variant columns on
+`upsell_campaigns`). This entry covers the WEB-side admin UI changes only.
+
+Removed the global market `<select>` from `AppShell.tsx` (`therahome:
+admin-market` localStorage key and all) — its only consumer was
+`ProductsView`, and the whole point of this pass was to stop making staff
+pick one country and edit it in isolation. New shared `PillTabs`
+(`src/components/ui/primitives.tsx`) — same pill-button convention already
+used ad hoc throughout Admin (product switcher, `subTab` rows) — is what
+every new market/language tab switcher below is built from, instead of
+each view hand-rolling its own.
+
+- **`ProductsView.tsx`** fully rewritten: was market-scoped (`{ market }`
+  prop from the removed selector, one flat list per market). Now lists
+  `group_key`-grouped products/categories (one row per conceptual
+  product, not per market-row) via new `fetchStoreCategoryGroups()`; the
+  edit modal has VN/UK/ML tabs and creates/updates up to 3
+  `store_items`/`store_categories` rows at once (`saveStoreItemGroup`/
+  `saveStoreCategoryGroup` in `db.ts`), all 3 required before save. The
+  old single-market `createStoreCategory`/`createStoreItem`/
+  `updateStoreItem`/`deleteStoreItem` functions were removed (only this
+  view used them); `fetchStoreCategories(market)` itself is unchanged and
+  still used by `RoutineView.tsx` for its VN product-link lookup.
+- **`RoutineView.tsx`**: day-edit modal's Video/Support-tools fields
+  became 3 tabbed sets (VN/UK/ML), all-3-required-or-all-empty (a rest day
+  can have no video at all, but can't have it for only some markets).
+  `ProgramDay.video`/`.supportToolsUrl` (`mockData.ts`) changed shape from
+  a single string to a new `MarketContent { vn, us, malay }` type.
+- **`CommunityView.tsx`**: "Đăng bài viết mới" compose modal gained a
+  VN/UK/ML checkbox row (VN always included via the existing title/text
+  fields; checking UK/ML reveals its own required title+text pair and
+  adds it to the post's `target_markets`) — per explicit clarification,
+  this is optional/targeted, not "always fill 3" like Products/Routine.
+- **`NotificationsAdminView.tsx`**: template edit modal gained VN/EN/MS
+  tabs; `SystemNotificationTemplate` reshaped from one flat
+  `{title,body}` per key to `byLanguage: Partial<Record<...>>` grouping
+  the now-multiple `(template_key, language)` rows per key.
+- **`UpsaleNotificationsView.tsx`**: each scheduled day in the compose
+  form gained its own VN/EN/MS tabs (optional per language) —
+  `dispatch-upsell-campaigns` (redeployed) resolves each recipient's
+  `profiles.language` and sends their matching variant at send time,
+  falling back to the base VN/default text.
+
+`npx tsc --noEmit`/`npm run lint`/`npm run build` all clean throughout and
+at the end of the pass.
+
+## Market/language pass — closing the push-notification gap (2026-08-24)
+
+Follow-up to the previous entry's acknowledged gap: `dispatch-push`'s
+`broadcast` mode (used by `createOfficialPost`'s optional "Gửi thông báo")
+sent one flat message to every user regardless of the post's own
+`target_markets` — a UK-only article's push notification was reaching VN
+users too, who couldn't even see the linked post. See `TheraHOME
+APP/CLAUDE.md`'s entry of the same name for the edge function's side of
+this fix (now filters recipients by `profiles.language`-derived market and
+optionally personalizes text per language, redeployed).
+
+`createOfficialPost` (`db.ts`) now passes the post's own
+`targetMarkets`/`titleUs`/`titleMalay` through to `dispatch-push`, plus 4
+new optional inputs (`notifyTitleUs`/`notifyBodyUs`/`notifyTitleMalay`/
+`notifyBodyMalay`) giving the push blurb the same "defaults to the post's
+own market content, editable" relationship the existing VN
+`notifyTitle`/`notifyBody` already had. `CommunityView.tsx`'s compose
+modal's notification section reuses the same `PillTabs` VN/UK/ML switcher
+already added to the post-content section above it (only shown once a
+market checkbox is checked) — UK/ML notification text is optional, falls
+back to that market's own post title/text when left blank.
+
+`npx tsc --noEmit`/`npm run lint`/`npm run build` all clean.
+
+## Current shared app-access rule
+
+The mobile app no longer activates access through `orders`. After Google
+login it calls `claim_user_access_contact(p_contact)`: the normalized
+phone/email must match at least one `orders` row, belongs to one account,
+and one account owns one contact. The order is only checked, never activated
+or mutated. An enabled, pre-provisioned `admin` or `cskh` contact in
+`web_access_contacts` bypasses the purchase check and is bound to the first
+Google identity that claims the exact contact. Both mobile and web call this
+same RPC. A successful claim provisions every current product program, while database
+triggers provision products/days added later. Admin's app-user list reads
+`user_access_contacts`, so an OAuth login alone is not counted as an active
+app user. The migration is stored in
+`TheraHOME APP/supabase/migrations/202608180001_unique_contact_catalog_access.sql`.
+
+## Running the app
+
+```
+npm install
+npm run dev
+```
+
+`.env.local` holds `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+(same values as `TheraHOME APP/.env`, same Supabase project) — safe to keep
+committed, RLS is what actually protects data, not key secrecy.

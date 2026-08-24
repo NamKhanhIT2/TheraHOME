@@ -1,0 +1,96 @@
+/*
+ * Ported from the Claude Design project's design-system token files
+ * (_ds/therahome-design-system-78705102-7711-4081-808f-084fa4b60e16/tokens/*.css).
+ * See TheraHOME WEB/.design-reference/ for the frozen originals — this file
+ * is the ported copy actually used by the app, same convention as the
+ * mobile app's src/theme/. Re-port by hand if the design tokens change
+ * upstream; don't import .design-reference/ at runtime.
+ */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2") format("woff2");
+}
+
+:root {
+  /* colors */
+  --color-primary: #007fd9;
+  --color-primary-dark: #0066ad;
+  --color-primary-light: #4da3e8;
+  --color-primary-tint-10: #e5f2fc;
+  --color-primary-tint-05: #f2f8fd;
+  --bg-app: #eef3fb;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f6f8fc;
+  --bg-dark-nav: #007fd9;
+  --text-primary: #16213a;
+  --text-secondary: #6b7480;
+  --text-muted: #a0a8b4;
+  --text-on-primary: #ffffff;
+  --accent-orange: #ffb648;
+  --accent-orange-tint: #fff1dc;
+  --accent-teal: #4fd1c5;
+  --accent-yellow: #ffd23f;
+  --accent-purple: #8b7cf6;
+  --success: #34c759;
+  --success-tint: #e7f9ec;
+  --warning: #ff9f43;
+  --warning-tint: #fff3e4;
+  --error: #ff4d4f;
+  --error-tint: #ffebec;
+  --border-light: #e7ecf3;
+  --border-input: #dce3ee;
+  --divider: #eef1f6;
+  --overlay-scrim: rgba(22, 33, 58, 0.45);
+
+  /* typography */
+  --font-family: "Inter", "SF Pro Text", system-ui, sans-serif;
+  --text-display-size: 28px;
+  --text-display-lh: 34px;
+  --text-display-weight: 700;
+  --text-h1-size: 22px;
+  --text-h1-lh: 28px;
+  --text-h1-weight: 700;
+  --text-h2-size: 18px;
+  --text-h2-lh: 24px;
+  --text-h2-weight: 600;
+  --text-body-size: 15px;
+  --text-body-lh: 22px;
+  --text-body-weight: 400;
+  --text-body-strong-size: 15px;
+  --text-body-strong-lh: 22px;
+  --text-body-strong-weight: 600;
+  --text-caption-size: 13px;
+  --text-caption-lh: 18px;
+  --text-caption-weight: 400;
+  --text-caption-sm-size: 11px;
+  --text-caption-sm-lh: 16px;
+  --text-caption-sm-weight: 500;
+  --text-button-size: 16px;
+  --text-button-lh: 20px;
+  --text-button-weight: 600;
+
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --screen-margin: 20px;
+
+  /* radius / shadow */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 999px;
+  --shadow-card: 0 4px 16px rgba(22, 33, 58, 0.06);
+  --shadow-fab: 0 6px 18px rgba(0, 127, 217, 0.35);
+  --shadow-nav: 0 -2px 12px rgba(22, 33, 58, 0.06);
+}

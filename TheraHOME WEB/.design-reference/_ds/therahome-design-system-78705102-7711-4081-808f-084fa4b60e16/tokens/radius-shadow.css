@@ -1,0 +1,6 @@
+:root{
+--radius-sm:8px;--radius-md:14px;--radius-lg:20px;--radius-xl:28px;--radius-full:999px;
+--shadow-card:0 4px 16px rgba(22,33,58,0.06);
+--shadow-fab:0 6px 18px rgba(0,127,217,0.35);
+--shadow-nav:0 -2px 12px rgba(22,33,58,0.06);
+}

@@ -1,0 +1,10 @@
+# Root-level ignores — each app also has its own .gitignore for
+# framework-specific build output (node_modules, .expo, .next, etc).
+.DS_Store
+.claude/
+
+# Supabase CLI local state (project link cache, function build output) —
+# machine-local, not meant for source control.
+**/supabase/.temp/
+**/supabase/.branches/
+**/.temp/

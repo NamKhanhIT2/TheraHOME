@@ -1,0 +1,13 @@
+@font-face{font-family:"Inter";font-style:normal;font-weight:400 800;font-display:swap;src:url("https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2") format("woff2");}
+:root{
+--font-family:"Inter","SF Pro Text",system-ui,sans-serif;
+--text-display-size:28px;--text-display-lh:34px;--text-display-weight:700;
+--text-h1-size:22px;--text-h1-lh:28px;--text-h1-weight:700;
+--text-h2-size:18px;--text-h2-lh:24px;--text-h2-weight:600;
+--text-body-size:15px;--text-body-lh:22px;--text-body-weight:400;
+--text-body-strong-size:15px;--text-body-strong-lh:22px;--text-body-strong-weight:600;
+--text-caption-size:13px;--text-caption-lh:18px;--text-caption-weight:400;
+--text-caption-sm-size:11px;--text-caption-sm-lh:16px;--text-caption-sm-weight:500;
+--text-button-size:16px;--text-button-lh:20px;--text-button-weight:600;
+}
+body{font-family:var(--font-family);}
