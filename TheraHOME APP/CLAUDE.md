@@ -2714,6 +2714,26 @@ blank.
 and WEB's `npx tsc --noEmit`/`npm run lint`/`npm run build` all clean.
 `npx expo export --platform ios` bundles cleanly.
 
+## Website domain is configurable, not hardcoded (2026-08-24)
+
+`therahomeai.com` was hardcoded in 5 places (`mockData.ts`'s `landingPage`/
+`privacyPolicy`, `help.tsx`'s support-email mailto link ×2, `legalContent.ts`'s
+community-guidelines text, and `i18n.ts`'s `viewAllWebsite` copy in all 3
+languages) — changing the domain later would have meant hunting through all
+of them individually. Centralized into one source of truth: `mockData.ts`
+now derives `websiteDomain`/`landingPage`/`privacyPolicy`/`supportEmail`
+from `EXPO_PUBLIC_WEBSITE_DOMAIN` (new env var, defaults to
+`'therahomeai.com'` if unset — same pattern as the existing Supabase env
+vars, added to `.env`/`.env.example`). Every other call site now imports
+from there instead of hardcoding the string; `i18n.ts`'s `viewAllWebsite`
+became a `{domain}`-templated key (was baked directly into the translated
+sentence) with the value passed in from `store.tsx`. Changing the domain
+going forward is a one-line env var edit, no code change. `introVideo`
+(a fixed YouTube link) and the support hotline phone number were left
+as-is — not TheraHOME's own domain. WEB has no hardcoded product domain
+anywhere in its real source (only `.design-reference`'s frozen copy, which
+is never imported — see that section above).
+
 ## Manual setup still needed (external dashboard actions — nothing here can do these)
 
 **Google sign-in** — until all three are done, tapping "Đăng nhập với Google"

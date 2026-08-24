@@ -8,6 +8,7 @@ import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
 import { OnlineIndicator } from '@/components/AssistantBubble';
 import { useI18n } from '@/lib/i18n';
+import { supportEmail } from '@/lib/mockData';
 
 const AI_ASSISTANT_IMAGE = require('../../assets/ai-assistant.png');
 const SPECIALIST_IMAGE = require('../../assets/therahome-specialist.png');
@@ -85,13 +86,13 @@ export default function HelpSupportScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => Linking.openURL('mailto:support@therahomeai.com')}
+            onPress={() => Linking.openURL(`mailto:${supportEmail}`)}
             style={[styles.contactRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
           >
             <Icon name="external-link" size={20} color={theme.colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportEmail')}</Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>support@therahomeai.com</Text>
+              <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{supportEmail}</Text>
             </View>
           </Pressable>
         </View>

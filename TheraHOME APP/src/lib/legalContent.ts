@@ -4,6 +4,8 @@
 // filled in and reviewed by counsel before any App Store / Play Store submission.
 // See CLAUDE.md.
 
+import { supportEmail } from './mockData';
+
 export type LegalDocKey = 'terms' | 'privacy' | 'security' | 'community';
 
 export interface LegalDoc {
@@ -199,7 +201,7 @@ Tuỳ mức độ vi phạm, chúng tôi có thể:
 \t• Ẩn hoặc gỡ bỏ nội dung vi phạm mà không cần báo trước.
 \t• Nhắc nhở thành viên vi phạm.
 \t• Tạm khoá hoặc chấm dứt quyền truy cập tài khoản đối với vi phạm nghiêm trọng hoặc lặp lại.
-Quyết định xử lý là quyết định cuối cùng của đội ngũ quản trị TheraHOME. Nếu bạn cho rằng nội dung của mình bị xử lý nhầm, vui lòng liên hệ đội ngũ hỗ trợ qua mục Chat với Chuyên gia TheraHOME hoặc email support@therahomeai.com.
+Quyết định xử lý là quyết định cuối cùng của đội ngũ quản trị TheraHOME. Nếu bạn cho rằng nội dung của mình bị xử lý nhầm, vui lòng liên hệ đội ngũ hỗ trợ qua mục Chat với Chuyên gia TheraHOME hoặc email ${supportEmail}.
 6. Nội dung do bạn đăng tải
 Bạn vẫn là chủ sở hữu nội dung mình đăng và có thể xoá bất kỳ lúc nào. Bằng việc đăng tải, bạn cấp cho TheraHOME quyền hiển thị nội dung đó trong phạm vi hoạt động của Ứng dụng — chi tiết tại Mục 5, 6 của Chính sách quyền riêng tư.
 7. Thay đổi quy định

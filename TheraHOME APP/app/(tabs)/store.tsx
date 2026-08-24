@@ -3,7 +3,7 @@ import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
-import { landingPage } from '@/lib/mockData';
+import { landingPage, websiteDomain } from '@/lib/mockData';
 import { useStoreCategories } from '@/hooks/useStore';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { Icon } from '@/components/icons/Icon';
@@ -133,7 +133,7 @@ export default function StoreScreen() {
           ))}
 
           <ScalePressable onPress={() => setPendingUrl(landingPage)} style={styles.footerLink}>
-            <Text style={[theme.type.caption, { color: theme.colors.primary }]}>{t('viewAllWebsite')}</Text>
+            <Text style={[theme.type.caption, { color: theme.colors.primary }]}>{t('viewAllWebsite', { domain: websiteDomain })}</Text>
           </ScalePressable>
           </Reanimated.View>
         )}

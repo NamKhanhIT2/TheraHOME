@@ -114,5 +114,12 @@ export function localizedArticles(language: 'vi' | 'en' | 'ms'): Article[] {
 }
 
 export const introVideo = 'https://www.youtube.com/watch?v=DHuAzpoV0XQ';
-export const landingPage = 'https://therahomeai.com';
-export const privacyPolicy = 'https://therahomeai.com/privacy';
+
+// The marketing/e-commerce domain — configurable via env so it can change
+// (rebrand, new TLD, ...) without a code change, instead of being baked in
+// at every call site. `EXPO_PUBLIC_*` vars are read at build time like the
+// existing Supabase ones (see .env.example).
+export const websiteDomain = process.env.EXPO_PUBLIC_WEBSITE_DOMAIN ?? 'therahomeai.com';
+export const landingPage = `https://${websiteDomain}`;
+export const privacyPolicy = `https://${websiteDomain}/privacy`;
+export const supportEmail = `support@${websiteDomain}`;
