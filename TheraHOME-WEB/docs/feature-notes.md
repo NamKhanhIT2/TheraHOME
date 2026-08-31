@@ -719,3 +719,18 @@ WebP/JPEG re-encode, original kept on failure; 15MB pre-check / 5MB
 post-compression cap). Mobile's Store tab and Home's pinned card were
 loading multi-MB admin originals. Previously-uploaded images stay heavy
 until re-uploaded through admin.
+
+## Public /privacy and /terms pages (2026-08-31)
+
+App Store Connect requires a publicly reachable privacy-policy URL, so the
+web app now serves the mobile app's legal documents at
+https://ad.therahomeai.com/privacy and /terms — static server-rendered
+pages (app/privacy, app/terms → src/components/LegalPage.tsx), no auth,
+outside every AccessGate. Content lives in src/lib/appLegalContent.ts, a
+copy of TheraHOME-APP/src/lib/legalContent.ts (source of truth — keep in
+sync; header comments in both files say so). Compared against
+workoutinc.net's policies before publishing: ours already covers
+everything theirs does plus third-party-AI processing and cross-border
+transfer, so nothing was borrowed. Deployed via the normal Vercel push;
+verified live (200 + section 5.1 present). The legal entity placeholders
+("[Tên pháp nhân…]") still need filling before App Store submission.
