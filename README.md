@@ -3,7 +3,7 @@
 Companion software for TheraHOME's physical rehab devices (neck/back
 support). Two apps sharing one Supabase backend:
 
-- **`TheraHOME APP/`** — the patient-facing mobile app (Expo / React
+- **`TheraHOME-APP/`** — the patient-facing mobile app (Expo / React
   Native). Onboarding, device activation, a guided daily program, Store,
   Community, chat, notifications.
 - **`TheraHOME-WEB/`** — the Admin/CSKH dashboard (Next.js). Manages the
@@ -18,7 +18,7 @@ webhook secret).
 ## Getting started
 
 ```bash
-cd "TheraHOME APP" && npm install && npx expo start
+cd "TheraHOME-APP" && npm install && npx expo start
 cd TheraHOME-WEB && npm install && npm run dev
 ```
 

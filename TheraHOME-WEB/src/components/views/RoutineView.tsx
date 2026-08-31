@@ -7,12 +7,13 @@
 // mock version never needed, since the real `products.category` column has
 // a NOT NULL check constraint.
 import { Fragment, useEffect, useState } from "react";
-import type { Product, ProgramDay, MarketContent } from "@/lib/mockData";
+import type { Product, ProgramDay, ProgramPhase, MarketContent } from "@/lib/mockData";
 import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updateProductInfo, createProgramDay, updateProgramDay, deleteProgramDay } from "@/lib/db";
 import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
+import { PhaseContentModal } from "@/components/views/PhaseContentModal";
 
 type DayModalState = "new" | number | null;
 type MarketKey = "vn" | "us" | "malay";
@@ -41,6 +42,7 @@ export function RoutineView() {
   const [infoName, setInfoName] = useState("");
   const [infoLink, setInfoLink] = useState("");
   const [dayModal, setDayModal] = useState<DayModalState>(null);
+  const [phaseContentTarget, setPhaseContentTarget] = useState<ProgramPhase | null>(null);
   const [dayMarketTab, setDayMarketTab] = useState<MarketKey>("vn");
   const [phase, setPhase] = useState("");
   const [type, setType] = useState<"train" | "rest">("train");
@@ -198,6 +200,19 @@ export function RoutineView() {
               <span style={{ color: "var(--text-muted)" }}>Chưa có link</span>
             )}
           </div>
+        </div>
+      </SectionCard>
+      <SectionCard title="Giai đoạn · Quiz & Upsell">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {product.phases.map((ph) => (
+            <div key={ph.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--bg-card-alt)" }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)" }}>{ph.name}</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>Ngày {ph.range[0]}–{ph.range[1]}</div>
+              </div>
+              <GhostBtn onClick={() => setPhaseContentTarget(ph)}>Quản lý Quiz &amp; Upsell</GhostBtn>
+            </div>
+          ))}
         </div>
       </SectionCard>
       <SectionCard title={"Lịch trình " + product.totalDays + " ngày"} action={<PrimaryBtn icon="plus" onClick={openNewDay}>Thêm ngày mới</PrimaryBtn>}>
@@ -367,6 +382,9 @@ export function RoutineView() {
             style={inputStyle}
           />
         </Modal>
+      ) : null}
+      {phaseContentTarget ? (
+        <PhaseContentModal phase={phaseContentTarget} onClose={() => setPhaseContentTarget(null)} />
       ) : null}
     </div>
   );

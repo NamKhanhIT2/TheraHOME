@@ -1,5 +1,5 @@
 // "Đăng nhập bằng tài khoản TheraHOME" — the same profiles.account_type
-// mechanism as TheraHOME APP's mobile-only admin-issued accounts, extended
+// mechanism as TheraHOME-APP's mobile-only admin-issued accounts, extended
 // here to also cover WEB admin/cskh login directly (no Google, no
 // /verify contact-check step — current_web_roles() resolves roles from
 // account_type as soon as the session exists, see migration

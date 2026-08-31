@@ -5,6 +5,7 @@
 // CLAUDE.md) — only the shapes remain, now populated from Supabase.
 
 export interface ProgramPhase {
+  id: string;
   name: string;
   range: [number, number];
 }

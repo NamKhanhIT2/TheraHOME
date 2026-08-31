@@ -50,7 +50,11 @@ export const USER_ROLE_OPTIONS: [string, string][] = [
 ];
 
 export type SampleUserRole = "user" | "collaborator" | "restricted";
-export type SampleUserStatus = "active" | "paused" | "inactive";
+// "unactivated": signed in but hasn't claimed a contact yet (see
+// TheraHOME-APP/CLAUDE.md's activation pass — activation is opt-in now,
+// no longer required to use the app) — distinct from "inactive", which
+// implies they once had an active program and lost it.
+export type SampleUserStatus = "active" | "paused" | "inactive" | "unactivated";
 
 export interface SampleUser {
   id: string | number;
@@ -58,12 +62,18 @@ export interface SampleUser {
   avatarColor?: string;
   contact: string;
   area: string;
-  day: number;
-  adherence: number;
+  /** null when the user has no activated program yet — render as N/A. */
+  day: number | null;
+  adherence: number | null;
   status: SampleUserStatus;
   joined: string;
   role: SampleUserRole;
   locked: boolean;
+  /** profiles.email/phone directly — editable by admin/cskh via
+   * admin_update_user_contact, distinct from `contact` above (the claimed
+   * user_access_contacts value, read-only, used for order matching). */
+  email: string | null;
+  phone: string | null;
 }
 
 export const ROLE_META: Record<SampleUserRole, [string, string, string]> = {
@@ -72,25 +82,9 @@ export const ROLE_META: Record<SampleUserRole, [string, string, string]> = {
   restricted: ["Hạn chế", "#B9860B", "rgba(185,134,11,0.12)"],
 };
 
-export type StaffRole = "admin" | "care";
-
-export const STAFF_ROLE_META: Record<StaffRole, [string, string, string, string]> = {
-  admin: ["Admin", "#8B2FC9", "rgba(139,47,201,0.12)", "Toàn quyền quản trị hệ thống"],
-  care: ["Chăm sóc khách hàng", "var(--color-primary)", "var(--color-primary-tint-10)", "Chat, Thông báo, xem User (chỉ xem)"],
-};
-
-export interface StaffMember {
-  id: string | number;
-  name: string;
-  email: string;
-  role: StaffRole;
-  status: "active" | "disabled";
-  joined: string;
-}
-
 // Tài khoản TheraHOME — accounts an Admin issues directly (email+password
 // via Supabase Auth, no OAuth), extending profiles rather than a separate
-// table. See TheraHOME APP/supabase/migrations/202608181200_theraccount_columns_and_guard.sql.
+// table. See TheraHOME-APP/supabase/migrations/202608181200_theraccount_columns_and_guard.sql.
 // 'admin' and 'cskh' are the two web-staff types (see current_web_roles()'s
 // account_type fallback branch, migration
 // 202608230900_thera_accounts_web_roles_and_admin_seed.sql) — 'admin' is a
@@ -123,7 +117,7 @@ export const ACCOUNT_TYPE_META: Record<TheraAccountType, string> = {
   cskh: "Chăm sóc khách hàng",
 };
 
-// Matches TheraHOME APP's ReportReason (src/hooks/useCommunity.ts).
+// Matches TheraHOME-APP's ReportReason (src/hooks/useCommunity.ts).
 export const REPORT_REASON_META: Record<string, string> = {
   spam: "Spam",
   inappropriate: "Nội dung không phù hợp",

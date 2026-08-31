@@ -5,7 +5,7 @@
 // src/lib/db.ts (profiles.account_type <> 'normal'); account creation and
 // password resets go through the admin-manage-account Edge Function (needs
 // the service role to call auth.admin.* — see that function's source and
-// TheraHOME APP/CLAUDE.md). Everything else (edit fields, lock/unlock) goes
+// TheraHOME-APP/CLAUDE.md). Everything else (edit fields, lock/unlock) goes
 // straight through the authenticated client + RLS, same as UsersView.
 import { Fragment, useEffect, useState } from "react";
 import {

@@ -1,6 +1,6 @@
 // Real Supabase queries for the Admin/CSKH surfaces, replacing the mock
 // data in mockData.ts / adminMockData.ts. Same project as the mobile app
-// (nyjvtvmllwbyfokldgtj) — see CLAUDE.md and TheraHOME APP/CLAUDE.md's
+// (nyjvtvmllwbyfokldgtj) — see CLAUDE.md and TheraHOME-APP/CLAUDE.md's
 // Supabase schema section for the underlying tables. RLS for the
 // admin/cskh-only reads and writes here comes from the
 // `web admin ...`/`web admin cskh ...` policies added alongside
@@ -12,8 +12,6 @@ import type { Product, ProgramPhase, ProgramDay, MarketContent, StoreCategory, S
 import type {
   SampleUser,
   SampleUserRole,
-  StaffMember,
-  StaffRole,
   ChatThread,
   ChatMessage,
   TheraAccount,
@@ -121,7 +119,7 @@ export async function fetchRoutineProducts(): Promise<Product[]> {
   return (products ?? []).map((p): Product => {
     const productPhases: ProgramPhase[] = (phases ?? [])
       .filter((ph) => ph.product_id === p.id)
-      .map((ph) => ({ name: ph.name, range: [ph.day_start, ph.day_end] }));
+      .map((ph) => ({ id: ph.id, name: ph.name, range: [ph.day_start, ph.day_end] }));
     const phaseNameById = new Map((phases ?? []).map((ph) => [ph.id, ph.name]));
     const productDays: ProgramDay[] = (days ?? [])
       .filter((d) => d.product_id === p.id)
@@ -245,7 +243,7 @@ export async function fetchStoreCategories(market: AdminMarket = "VN"): Promise<
 // "product"/"category group" in Admin is up to 3 store_categories/
 // store_items rows (VN/US/MALAY) sharing one group_key, edited together
 // instead of one market at a time behind the old global market selector.
-// See TheraHOME APP/CLAUDE.md's "Market content vs. UI language" entry.
+// See TheraHOME-APP/CLAUDE.md's "Market content vs. UI language" entry.
 // ---------------------------------------------------------------------------
 
 const MARKETS: AdminMarket[] = ["VN", "US", "MALAY"];
@@ -398,12 +396,227 @@ export async function deleteStoreItemGroup(groupKey: string) {
 
 export async function uploadStoreItemImage(itemId: string, file: File) {
   if (!file.type.startsWith("image/")) throw new Error("invalid_image_type");
-  if (file.size > 5 * 1024 * 1024) throw new Error("image_too_large");
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const safeExtension = ["jpg", "jpeg", "png", "webp"].includes(extension) ? extension : "jpg";
+  if (file.size > 15 * 1024 * 1024) throw new Error("image_too_large");
+  // Downscaled before upload (see downscaleImage) — mobile's Store tab
+  // renders these as small cards, multi-MB originals just load slowly.
+  const blob = await downscaleImage(file);
+  if (blob.size > 5 * 1024 * 1024) throw new Error("image_too_large");
+  const safeExtension = IMAGE_EXTENSIONS[blob.type] ?? "jpg";
   const path = `${itemId}/${Date.now()}.${safeExtension}`;
-  const { error } = await supabase.storage.from("store-images").upload(path, file, {
-    contentType: file.type || "image/jpeg",
+  const { error } = await supabase.storage.from("store-images").upload(path, blob, {
+    contentType: blob.type || "image/jpeg",
+    upsert: false,
+  });
+  if (error) throw error;
+  return supabase.storage.from("store-images").getPublicUrl(path).data.publicUrl;
+}
+
+// ---------------------------------------------------------------------------
+// Phase quiz + post-quiz promo (cross-sell / IAP unlock) — see
+// TheraHOME-APP/CLAUDE.md's "Quiz + phase unlock" entry for the full picture.
+// ---------------------------------------------------------------------------
+
+export interface QuizLanguageContent {
+  question: string;
+  options: string[];
+  correctIndex: number;
+}
+
+export interface QuizQuestionAdmin {
+  id: string;
+  sortOrder: number;
+  vi: QuizLanguageContent;
+  en: QuizLanguageContent;
+  ms: QuizLanguageContent;
+}
+
+const EMPTY_QUIZ_LANGUAGE: QuizLanguageContent = { question: "", options: ["", "", "", ""], correctIndex: 0 };
+
+export async function fetchQuizQuestions(phaseId: string): Promise<QuizQuestionAdmin[]> {
+  const { data, error } = await supabase
+    .from("quiz_questions")
+    .select("id, sort_order, content")
+    .eq("phase_id", phaseId)
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const content = row.content as unknown as Partial<Record<"vi" | "en" | "ms", QuizLanguageContent>>;
+    return {
+      id: row.id,
+      sortOrder: row.sort_order,
+      vi: content.vi ?? EMPTY_QUIZ_LANGUAGE,
+      en: content.en ?? EMPTY_QUIZ_LANGUAGE,
+      ms: content.ms ?? EMPTY_QUIZ_LANGUAGE,
+    };
+  });
+}
+
+export async function saveQuizQuestion(
+  phaseId: string,
+  question: { id: string | null; sortOrder: number; vi: QuizLanguageContent; en: QuizLanguageContent; ms: QuizLanguageContent }
+) {
+  const content = { vi: question.vi, en: question.en, ms: question.ms };
+  if (question.id) {
+    const { error } = await supabase.from("quiz_questions").update({ sort_order: question.sortOrder, content }).eq("id", question.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("quiz_questions").insert({ phase_id: phaseId, sort_order: question.sortOrder, content });
+    if (error) throw error;
+  }
+}
+
+export async function deleteQuizQuestion(id: string) {
+  const { error } = await supabase.from("quiz_questions").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export interface PhasePromoAdmin {
+  crossSellImageUrl: string;
+  crossSellBadge: string;
+  crossSellTitle: string;
+  crossSellDescription: string;
+  crossSellCtaUrl: string;
+  crossSellVideoUrl: string;
+  unlockImageUrl: string;
+  unlockDescription: string;
+  unlockVideoUrl: string;
+  appleProductId: string;
+  // Paywall-screen content (mobile app/paywall/[phaseId].tsx) — mobile falls
+  // back to built-in defaults per field when left empty. `unlockBenefits` is
+  // edited as one-per-line text and stored as a jsonb string array.
+  unlockBadge: string;
+  unlockTitle: string;
+  unlockSubtitle: string;
+  unlockBenefits: string;
+  unlockPackageName: string;
+  unlockPackageDesc: string;
+  unlockPriceLabel: string;
+}
+
+const EMPTY_PHASE_PROMO: PhasePromoAdmin = {
+  crossSellImageUrl: "",
+  crossSellBadge: "",
+  crossSellTitle: "",
+  crossSellDescription: "",
+  crossSellCtaUrl: "",
+  crossSellVideoUrl: "",
+  unlockImageUrl: "",
+  unlockDescription: "",
+  unlockVideoUrl: "",
+  appleProductId: "",
+  unlockBadge: "",
+  unlockTitle: "",
+  unlockSubtitle: "",
+  unlockBenefits: "",
+  unlockPackageName: "",
+  unlockPackageDesc: "",
+  unlockPriceLabel: "",
+};
+
+export async function fetchPhasePromo(phaseId: string): Promise<PhasePromoAdmin> {
+  const { data, error } = await supabase
+    .from("phase_promos")
+    .select(
+      "cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label"
+    )
+    .eq("phase_id", phaseId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return EMPTY_PHASE_PROMO;
+  return {
+    crossSellImageUrl: data.cross_sell_image_url ?? "",
+    crossSellBadge: data.cross_sell_badge ?? "",
+    crossSellTitle: data.cross_sell_title ?? "",
+    crossSellDescription: data.cross_sell_description ?? "",
+    crossSellCtaUrl: data.cross_sell_cta_url ?? "",
+    crossSellVideoUrl: data.cross_sell_video_url ?? "",
+    unlockImageUrl: data.unlock_image_url ?? "",
+    unlockDescription: data.unlock_description ?? "",
+    unlockVideoUrl: data.unlock_video_url ?? "",
+    appleProductId: data.apple_product_id ?? "",
+    unlockBadge: data.unlock_badge ?? "",
+    unlockTitle: data.unlock_title ?? "",
+    unlockSubtitle: data.unlock_subtitle ?? "",
+    unlockBenefits: Array.isArray(data.unlock_benefits) ? (data.unlock_benefits as string[]).join("\n") : "",
+    unlockPackageName: data.unlock_package_name ?? "",
+    unlockPackageDesc: data.unlock_package_desc ?? "",
+    unlockPriceLabel: data.unlock_price_label ?? "",
+  };
+}
+
+export async function savePhasePromo(phaseId: string, promo: PhasePromoAdmin) {
+  const { error } = await supabase.from("phase_promos").upsert(
+    {
+      phase_id: phaseId,
+      cross_sell_image_url: promo.crossSellImageUrl || null,
+      cross_sell_badge: promo.crossSellBadge || null,
+      cross_sell_title: promo.crossSellTitle || null,
+      cross_sell_description: promo.crossSellDescription || null,
+      cross_sell_cta_url: promo.crossSellCtaUrl || null,
+      cross_sell_video_url: promo.crossSellVideoUrl || null,
+      unlock_image_url: promo.unlockImageUrl || null,
+      unlock_description: promo.unlockDescription || null,
+      unlock_video_url: promo.unlockVideoUrl || null,
+      apple_product_id: promo.appleProductId || null,
+      unlock_badge: promo.unlockBadge || null,
+      unlock_title: promo.unlockTitle || null,
+      unlock_subtitle: promo.unlockSubtitle || null,
+      unlock_benefits: (() => {
+        const lines = promo.unlockBenefits.split("\n").map((l) => l.trim()).filter(Boolean);
+        return lines.length ? lines : null;
+      })(),
+      unlock_package_name: promo.unlockPackageName || null,
+      unlock_package_desc: promo.unlockPackageDesc || null,
+      unlock_price_label: promo.unlockPriceLabel || null,
+    },
+    { onConflict: "phase_id" }
+  );
+  if (error) throw error;
+}
+
+// Downscale/transcode an image in the browser before upload — admins tend to
+// drop multi-MB originals in, which the mobile paywall then has to download
+// and decode at full size (slow hero load). Longest edge capped at `maxDim`;
+// PNG keeps alpha via WebP (or stays PNG on browsers whose canvas can't
+// encode WebP, e.g. Safari), everything else goes to JPEG. Any failure falls
+// back to the original file rather than blocking the upload.
+async function downscaleImage(file: File, maxDim = 1600): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const alreadySmall = scale >= 1 && (file.type === "image/jpeg" || file.type === "image/webp");
+    if (alreadySmall) return file;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const preferredType = file.type === "image/png" ? "image/webp" : "image/jpeg";
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, preferredType, 0.82));
+    // toBlob silently falls back to PNG when it can't encode the requested
+    // type — only keep the result if it actually got smaller than the input.
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file;
+  }
+}
+
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+export async function uploadPhasePromoImage(phaseId: string, kind: "cross-sell" | "unlock", file: File) {
+  if (!file.type.startsWith("image/")) throw new Error("invalid_image_type");
+  if (file.size > 15 * 1024 * 1024) throw new Error("image_too_large");
+  const blob = await downscaleImage(file);
+  if (blob.size > 5 * 1024 * 1024) throw new Error("image_too_large");
+  const safeExtension = IMAGE_EXTENSIONS[blob.type] ?? "jpg";
+  const path = `phase-promos/${phaseId}/${kind}-${Date.now()}.${safeExtension}`;
+  const { error } = await supabase.storage.from("store-images").upload(path, blob, {
+    contentType: blob.type || "image/jpeg",
     upsert: false,
   });
   if (error) throw error;
@@ -415,41 +628,92 @@ export async function uploadStoreItemImage(itemId: string, file: File) {
 // App users (profiles + user_programs)
 // ---------------------------------------------------------------------------
 
+// Sourced from `profiles` (every real user), not `user_access_contacts` —
+// activation is opt-in now (see TheraHOME-APP/CLAUDE.md's activation pass),
+// so a signed-in user who never claimed a contact still needs to show up
+// here for admin/CSKH to see, just with status "unactivated" and N/A stats.
+// `account_type` filters out staff/TheraHOME-issued rows (see TheraAccountsView),
+// which aren't patients and are managed there instead.
 export async function fetchAppUsers(): Promise<SampleUser[]> {
-  const [{ data: contacts, error: cErr }, { data: profiles, error: pErr }, { data: programs, error: upErr }] = await Promise.all([
+  const [{ data: profiles, error: pErr }, { data: contacts, error: cErr }, { data: programs, error: upErr }] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, email, phone, treatment_area, app_role, locked, created_at, account_type").is("deleted_at", null),
     supabase.from("user_access_contacts").select("user_id, contact_value"),
-    supabase.from("profiles").select("id, full_name, email, phone, treatment_area, app_role, locked, created_at").is("deleted_at", null),
-    supabase.from("user_programs").select("user_id, current_day, adherence_pct, product_id"),
+    supabase.from("user_programs").select("user_id, current_day, adherence_pct"),
   ]);
-  if (cErr) throw cErr;
   if (pErr) throw pErr;
+  if (cErr) throw cErr;
   if (upErr) throw upErr;
 
-  const programByUser = new Map((programs ?? []).map((p) => [p.user_id, p]));
-  const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  const contactByUser = new Map((contacts ?? []).map((c) => [c.user_id, c.contact_value]));
+  const programCountByUser = new Map<string, number>();
+  const firstProgramByUser = new Map<string, { current_day: number; adherence_pct: number }>();
+  for (const program of programs ?? []) {
+    programCountByUser.set(program.user_id, (programCountByUser.get(program.user_id) ?? 0) + 1);
+    if (!firstProgramByUser.has(program.user_id)) firstProgramByUser.set(program.user_id, program);
+  }
 
-  return (contacts ?? []).flatMap((contact): SampleUser[] => {
-    const p = profileById.get(contact.user_id);
-    if (!p) return [];
-    const program = programByUser.get(p.id);
-    return [{
-      id: p.id,
-      name: p.full_name || p.email || "Người dùng",
-      contact: contact.contact_value,
-      area: p.treatment_area || "Chưa cập nhật",
-      day: program?.current_day ?? 0,
-      adherence: program ? Math.round(Number(program.adherence_pct)) : 0,
-      status: program ? "active" : "inactive",
-      joined: new Date(p.created_at).toLocaleDateString("vi-VN"),
-      role: p.app_role as SampleUserRole,
-      locked: p.locked,
-    }];
-  });
+  return (profiles ?? [])
+    .filter((p) => !p.account_type || p.account_type === "normal")
+    .map((p): SampleUser => {
+      const program = firstProgramByUser.get(p.id);
+      const activated = (programCountByUser.get(p.id) ?? 0) > 0;
+      return {
+        id: p.id,
+        name: p.full_name || p.email || "Người dùng",
+        contact: contactByUser.get(p.id) ?? p.email ?? p.phone ?? "N/A",
+        area: p.treatment_area || "N/A",
+        day: program?.current_day ?? null,
+        adherence: program ? Math.round(Number(program.adherence_pct)) : null,
+        status: p.locked ? "inactive" : activated ? "active" : "unactivated",
+        joined: new Date(p.created_at).toLocaleDateString("vi-VN"),
+        role: p.app_role as SampleUserRole,
+        locked: p.locked,
+        email: p.email,
+        phone: p.phone,
+      };
+    });
 }
 
 export async function updateAppUser(id: string, patch: { app_role?: SampleUserRole; locked?: boolean }) {
   const { error } = await supabase.from("profiles").update(patch).eq("id", id);
   if (error) throw error;
+}
+
+// Narrow admin/cskh contact edit — goes through admin_update_user_contact
+// (SECURITY DEFINER, gated on current_web_roles()) rather than a direct
+// `profiles` UPDATE, since cskh has no general UPDATE-any RLS policy on
+// that table and shouldn't gain one just for this.
+export async function updateUserContact(userId: string, patch: { email: string | null; phone: string | null }) {
+  const { error } = await supabase.rpc("admin_update_user_contact", {
+    p_user_id: userId,
+    p_email: patch.email,
+    p_phone: patch.phone,
+  });
+  if (error) throw error;
+}
+
+export interface UserOrderRow {
+  orderId: string;
+  productId: string;
+  productName: string;
+  status: string;
+  orderDate: string;
+  activatedAt: string | null;
+}
+
+// `orders` has no client RLS at all (by design) — reachable only through
+// admin_fetch_user_orders, which matches by this user's claimed contact.
+export async function fetchUserOrders(userId: string): Promise<UserOrderRow[]> {
+  const { data, error } = await supabase.rpc("admin_fetch_user_orders", { p_user_id: userId });
+  if (error) throw error;
+  return (data ?? []).map((r: { order_id: string; product_id: string; product_name: string; order_status: string; order_date: string; activated_at: string | null }) => ({
+    orderId: r.order_id,
+    productId: r.product_id,
+    productName: r.product_name,
+    status: r.order_status,
+    orderDate: r.order_date,
+    activatedAt: r.activated_at,
+  }));
 }
 
 export async function fetchUserPainTrend(id: string): Promise<number[]> {
@@ -458,31 +722,108 @@ export async function fetchUserPainTrend(id: string): Promise<number[]> {
   return (data ?? []).map((r) => r.score).reverse();
 }
 
-// ---------------------------------------------------------------------------
-// Staff / internal accounts (web_access_contacts)
-// ---------------------------------------------------------------------------
-
-export async function fetchStaff(): Promise<StaffMember[]> {
-  const { data, error } = await supabase.from("web_access_contacts").select("id, email, phone, roles, disabled, created_at").order("created_at");
-  if (error) throw error;
-  return (data ?? []).map((r) => ({
-    id: r.id,
-    name: r.email ?? r.phone ?? "—",
-    email: r.email ?? r.phone ?? "—",
-    role: (r.roles?.includes("admin") ? "admin" : "care") as StaffRole,
-    status: r.disabled ? "disabled" : "active",
-    joined: new Date(r.created_at).toLocaleDateString("vi-VN"),
-  }));
+export interface UserProgramPhase {
+  id: string;
+  name: string;
+  dayStart: number;
+  dayEnd: number;
+  /** True when this phase has an `apple_product_id` configured — i.e. it's
+   * behind the in-app paywall, not just the day-by-day sequential unlock. */
+  requiresPayment: boolean;
+  /** True when this user already has a non-revoked `phase_purchases` row for
+   * this phase (real IAP or admin-granted) — the paywall is already lifted. */
+  purchased: boolean;
 }
 
-export async function createStaffContact(input: { name: string; email: string; role: StaffRole }) {
-  const roles = input.role === "admin" ? ["admin"] : ["cskh"];
-  const { error } = await supabase.from("web_access_contacts").insert({ email: input.email, roles });
+export interface UserProgramRow {
+  userProgramId: string;
+  productId: string;
+  productName: string;
+  currentDay: number;
+  totalDays: number;
+  streak: number;
+  adherencePct: number;
+  currentPhaseId: string | null;
+  currentPhaseName: string | null;
+  /** Every phase of this product's roadmap, for the "move to phase" select. */
+  phases: UserProgramPhase[];
+}
+
+// Powers UserDrawer's "Sản phẩm sở hữu" section — one row per product the
+// user has activated (today the claim RPC provisions every catalog product
+// at once, but this reads per-row so it stays correct if that ever changes
+// to per-product ownership).
+export async function fetchUserPrograms(userId: string): Promise<UserProgramRow[]> {
+  const [{ data: programs, error: upErr }, { data: products, error: prErr }, { data: phases, error: phErr }, { data: promos, error: promoErr }, { data: purchases, error: purchErr }] = await Promise.all([
+    supabase.from("user_programs").select("id, product_id, current_day, streak, adherence_pct").eq("user_id", userId),
+    supabase.from("products").select("id, name, total_days"),
+    supabase.from("program_phases").select("id, product_id, name, day_start, day_end").order("sort_order"),
+    supabase.from("phase_promos").select("phase_id, apple_product_id"),
+    supabase.from("phase_purchases").select("phase_id").eq("user_id", userId).is("revoked_at", null),
+  ]);
+  if (upErr) throw upErr;
+  if (prErr) throw prErr;
+  if (phErr) throw phErr;
+  if (promoErr) throw promoErr;
+  if (purchErr) throw purchErr;
+
+  const paymentGatedPhaseIds = new Set((promos ?? []).filter((p) => !!p.apple_product_id).map((p) => p.phase_id));
+  const purchasedPhaseIds = new Set((purchases ?? []).map((p) => p.phase_id));
+  const productById = new Map((products ?? []).map((p) => [p.id, p]));
+  const phasesByProduct = new Map<string, UserProgramPhase[]>();
+  for (const ph of phases ?? []) {
+    const list = phasesByProduct.get(ph.product_id) ?? [];
+    list.push({
+      id: ph.id,
+      name: ph.name,
+      dayStart: ph.day_start,
+      dayEnd: ph.day_end,
+      requiresPayment: paymentGatedPhaseIds.has(ph.id),
+      purchased: purchasedPhaseIds.has(ph.id),
+    });
+    phasesByProduct.set(ph.product_id, list);
+  }
+
+  return (programs ?? []).map((p) => {
+    const product = productById.get(p.product_id);
+    const productPhases = phasesByProduct.get(p.product_id) ?? [];
+    const currentPhase = productPhases.find((ph) => p.current_day >= ph.dayStart && p.current_day <= ph.dayEnd);
+    return {
+      userProgramId: p.id,
+      productId: p.product_id,
+      productName: product?.name ?? p.product_id,
+      currentDay: p.current_day,
+      totalDays: product?.total_days ?? p.current_day,
+      streak: p.streak,
+      adherencePct: Math.round(Number(p.adherence_pct)),
+      currentPhaseId: currentPhase?.id ?? null,
+      currentPhaseName: currentPhase?.name ?? null,
+      phases: productPhases,
+    };
+  });
+}
+
+// Moves a user to a different phase of their own roadmap — goes through
+// admin_set_user_phase (SECURITY DEFINER) rather than a direct
+// `user_programs` UPDATE, since neither admin nor cskh has an UPDATE RLS
+// policy on that table today; the RPC also reconciles user_program_days'
+// per-day status so the mobile app's day-by-day view stays consistent, and
+// if the target phase is payment-gated (phase_promos.apple_product_id set),
+// grants an admin_granted phase_purchases row so the paywall is actually
+// lifted too — otherwise roadmap.tsx would immediately re-lock every day
+// just moved into.
+export async function setUserProgramPhase(userProgramId: string, phaseId: string) {
+  const { error } = await supabase.rpc("admin_set_user_phase", { p_user_program_id: userProgramId, p_phase_id: phaseId });
   if (error) throw error;
 }
 
-export async function toggleStaffDisabled(id: string, disabled: boolean) {
-  const { error } = await supabase.from("web_access_contacts").update({ disabled }).eq("id", id);
+// Revokes one specific product's access — deletes the user_programs row
+// (cascades to user_program_days/pain_logs via existing FKs). Safe to do
+// without it silently coming back: provision_new_product_for_claimed_users
+// only fires on a *new* products row insert, it never re-scans/reconciles
+// existing products for existing users.
+export async function deleteUserProgram(userProgramId: string) {
+  const { error } = await supabase.from("user_programs").delete().eq("id", userProgramId);
   if (error) throw error;
 }
 
@@ -646,11 +987,13 @@ export interface PinnedDisplay {
   thumbnailUrl: string | null;
 }
 
-export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: boolean; hidden: boolean; imageUrl: string | null; pinnedDisplay: PinnedDisplay })[]> {
+export type PostModerationStatus = "pending" | "approved" | "rejected";
+
+export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay })[]> {
   const [{ data: posts, error: postErr }, { data: comments, error: commentErr }] = await Promise.all([
     supabase
       .from("community_posts")
-      .select("id, is_official, author_name, title, tag, text, image_url, likes_count, comments_count, pinned, hidden, pinned_title, pinned_content, pinned_thumbnail_url")
+      .select("id, is_official, author_name, title, tag, text, image_url, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url")
       .order("created_at", { ascending: false }),
     supabase.from("post_comments").select("id, post_id, author_name, text, created_at, hidden").order("created_at"),
   ]);
@@ -658,7 +1001,7 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: 
   if (commentErr) throw commentErr;
 
   return (posts ?? []).map(
-    (p): CommunityPost & { pinned: boolean; hidden: boolean; imageUrl: string | null; pinnedDisplay: PinnedDisplay } => ({
+    (p): CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay } => ({
       id: p.id,
       official: p.is_official,
       name: p.author_name || "TheraHOME",
@@ -670,12 +1013,22 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: 
       comments: p.comments_count,
       pinned: p.pinned,
       hidden: p.hidden,
+      status: (p.status as PostModerationStatus) ?? "approved",
       pinnedDisplay: { title: p.pinned_title, content: p.pinned_content, thumbnailUrl: p.pinned_thumbnail_url },
       commentsList: (comments ?? [])
         .filter((c) => c.post_id === p.id)
         .map((c): CommunityComment => ({ name: c.author_name || "Người dùng", text: c.text, time: new Date(c.created_at).toLocaleDateString("vi-VN"), idKey: c.id })),
     })
   );
+}
+
+// CSKH/Admin moderation: approve or reject a member post (see the
+// community_post_moderation migration — pending posts are invisible to
+// other members until approved; the status change itself notifies the
+// author via a DB trigger).
+export async function setCommunityPostStatus(idKey: string, status: PostModerationStatus) {
+  const { error } = await supabase.from("community_posts").update({ status }).eq("id", idKey);
+  if (error) throw error;
 }
 
 // Official posts are authored by Admin or CSKH via the staff-only RPC. They
@@ -766,22 +1119,23 @@ export async function setOfficialPostPinned(idKey: string, pinned: boolean, disp
 }
 
 // Reuses the `community-images` bucket the mobile app already uploads post
-// photos into (see TheraHOME APP/CLAUDE.md) rather than a new bucket — its
+// photos into (see TheraHOME-APP/CLAUDE.md) rather than a new bucket — its
 // RLS (`(storage.foldername(name))[1] = auth.uid()`, public reads) already
 // permits any authenticated user, including a signed-in admin/cskh account,
 // to write under their own uid, so no policy change was needed.
 export async function uploadPostThumbnail(postId: string, file: File) {
   if (!file.type.startsWith("image/")) throw new Error("invalid_image_type");
-  if (file.size > 5 * 1024 * 1024) throw new Error("image_too_large");
+  if (file.size > 15 * 1024 * 1024) throw new Error("image_too_large");
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("not_signed_in");
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const safeExtension = ["jpg", "jpeg", "png", "webp"].includes(extension) ? extension : "jpg";
+  const blob = await downscaleImage(file);
+  if (blob.size > 5 * 1024 * 1024) throw new Error("image_too_large");
+  const safeExtension = IMAGE_EXTENSIONS[blob.type] ?? "jpg";
   const path = `${user.id}/pinned-${postId}-${Date.now()}.${safeExtension}`;
-  const { error } = await supabase.storage.from("community-images").upload(path, file, {
-    contentType: file.type || "image/jpeg",
+  const { error } = await supabase.storage.from("community-images").upload(path, blob, {
+    contentType: blob.type || "image/jpeg",
     upsert: false,
   });
   if (error) throw error;
@@ -802,7 +1156,7 @@ export async function hideCommunityComment(idKey: string, hidden: boolean) {
 
 // ---------------------------------------------------------------------------
 // Content reports (content_reports) — Admin moderation queue for both posts
-// and comments. See TheraHOME APP's community_moderation_and_notifications
+// and comments. See TheraHOME-APP's community_moderation_and_notifications
 // migration.
 // ---------------------------------------------------------------------------
 
@@ -990,7 +1344,7 @@ export interface SystemNotificationTemplateCopy {
 // instead of 27 flat rows. A language with no row yet (not every template
 // has been translated) is simply absent from byLanguage; the edge
 // functions/mobile client fall back to 'vi' or a hardcoded copy in that
-// case — see TheraHOME APP/CLAUDE.md.
+// case — see TheraHOME-APP/CLAUDE.md.
 export interface SystemNotificationTemplate {
   templateKey: SystemNotificationTemplateKey;
   byLanguage: Partial<Record<NotificationLanguage, SystemNotificationTemplateCopy>>;

@@ -3,7 +3,7 @@
 
 // Real data: community_posts / post_comments (see src/lib/db.ts). likes_count
 // / comments_count are trigger-maintained server-side (see
-// TheraHOME APP/CLAUDE.md), so mutations here reload from the DB rather than
+// TheraHOME-APP/CLAUDE.md), so mutations here reload from the DB rather than
 // adjusting counts locally.
 import { Fragment, useEffect, useState } from "react";
 import type { CommunityPost } from "@/lib/mockData";
@@ -15,12 +15,14 @@ import {
   updateCommunityPost,
   deleteCommunityPost,
   deleteCommunityComment,
+  setCommunityPostStatus,
   fetchChallenges,
   createChallenge,
   setChallengeActive,
   type Challenge,
   type PinnedDisplay,
   type AdminMarket,
+  type PostModerationStatus,
 } from "@/lib/db";
 import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, Avatar, PillTabs } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
@@ -28,7 +30,7 @@ import { TableShell } from "@/components/ui/TableShell";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 
-type PinnedPost = CommunityPost & { pinned: boolean; hidden: boolean; imageUrl: string | null; pinnedDisplay: PinnedDisplay };
+type PinnedPost = CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay };
 
 type AuthorTab = "official" | "users";
 const AUTHOR_TABS: Array<[AuthorTab, string]> = [
@@ -359,6 +361,15 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
       pushToast("Không thể ghim bài viết");
     }
   }
+  async function moderate(it: PinnedPost, status: PostModerationStatus) {
+    try {
+      await setCommunityPostStatus(String(it.id), status);
+      pushToast(status === "approved" ? "Đã duyệt bài viết — tác giả sẽ nhận thông báo" : "Đã từ chối bài viết — tác giả sẽ nhận thông báo");
+      reload();
+    } catch {
+      pushToast("Không thể cập nhật trạng thái duyệt");
+    }
+  }
   async function toggleHidden(it: PinnedPost) {
     try {
       await updateCommunityPost(String(it.id), { hidden: !it.hidden });
@@ -433,7 +444,12 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
     const matchesAuthor = authorTab === "official" ? it.official : !it.official;
     return matchesQuery && matchesAuthor;
   });
-  const sorted = [...filtered].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  // Pinned first (official tab); pending-review first (user tab) so new
+  // member posts waiting on CSKH sit at the top of the moderation queue.
+  const sorted = [...filtered].sort(
+    (a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.status === "pending" ? 1 : 0) - (a.status === "pending" ? 1 : 0),
+  );
+  const pendingCount = items.filter((it) => !it.official && it.status === "pending").length;
   const commentPost = items.find((it) => it.id === commentsFor);
 
   const postModal = modal !== null ? (
@@ -606,6 +622,7 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
             }}
           >
             {l}
+            {k === "users" && pendingCount > 0 ? ` · ${pendingCount} chờ duyệt` : ""}
           </button>
         ))}
       </div>
@@ -613,7 +630,7 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
       subtitle={
         authorTab === "official"
           ? "Bài viết do TheraHOME đăng — ghim bài quan trọng lên đầu Trang chủ/Cộng đồng của app."
-          : "Bài chia sẻ từ người dùng app — kiểm duyệt bình luận và ẩn/xoá nếu cần."
+          : "Bài chia sẻ từ người dùng app — bài mới cần được duyệt trước khi hiển thị với cộng đồng; kiểm duyệt bình luận và ẩn/xoá nếu cần."
       }
       action={authorTab === "official" ? <PrimaryBtn icon="plus" onClick={openNew}>Đăng bài viết mới</PrimaryBtn> : undefined}
       searchPlaceholder="Tìm theo nội dung..."
@@ -675,6 +692,16 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
                 <Badge color="#8A93A3" bg="rgba(138,147,163,0.12)">Đã ẩn</Badge>
               </span>
             ) : null}
+            {!it.official && it.status === "pending" ? (
+              <span style={{ marginLeft: 8 }}>
+                <Badge color="#B9860B" bg="rgba(185,134,11,0.12)">Chờ duyệt</Badge>
+              </span>
+            ) : null}
+            {!it.official && it.status === "rejected" ? (
+              <span style={{ marginLeft: 8 }}>
+                <Badge color="var(--error)" bg="rgba(220,60,60,0.10)">Không duyệt</Badge>
+              </span>
+            ) : null}
           </td>
           <td style={{ padding: "14px 20px", color: "var(--text-secondary)" }}>{it.likes}</td>
           <td style={{ padding: "14px 20px" }}>
@@ -685,6 +712,16 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           {!pinOnly ? (
             <td style={{ padding: "14px 20px" }}>
               <div style={{ display: "flex", gap: 10 }}>
+                {!it.official && it.status !== "approved" ? (
+                  <button onClick={() => moderate(it, "approved")} title="Duyệt bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                    <Icon name="check" size={16} color="var(--success, #2BB673)" />
+                  </button>
+                ) : null}
+                {!it.official && it.status === "pending" ? (
+                  <button onClick={() => moderate(it, "rejected")} title="Từ chối bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                    <Icon name="x" size={16} color="var(--error)" />
+                  </button>
+                ) : null}
                 <button onClick={() => openEdit(it)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                   <Icon name="pencil" size={16} color="var(--color-primary)" />
                 </button>

@@ -52,6 +52,7 @@ const STATUS_PILL_MAP = {
   active: ["Hoạt động", "#1E9E5E", "rgba(30,158,94,0.12)"],
   paused: ["Tạm dừng", "#B9860B", "rgba(185,134,11,0.12)"],
   inactive: ["Ngừng", "#8A93A3", "rgba(138,147,163,0.12)"],
+  unactivated: ["Chưa kích hoạt", "#6B7A99", "rgba(107,122,153,0.12)"],
 } as const;
 
 export function StatusPill({ status }: { status: keyof typeof STATUS_PILL_MAP }) {
@@ -85,10 +86,11 @@ export function PrimaryBtn({ children, onClick, icon, disabled }: { children: Re
   );
 }
 
-export function GhostBtn({ children, onClick, color }: { children: ReactNode; onClick?: () => void; color?: string }) {
+export function GhostBtn({ children, onClick, color, disabled }: { children: ReactNode; onClick?: () => void; color?: string; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
         border: "1px solid var(--border-input)",
         background: "none",
@@ -98,7 +100,8 @@ export function GhostBtn({ children, onClick, color }: { children: ReactNode; on
         fontFamily: "var(--font-family)",
         fontSize: 12.5,
         fontWeight: 600,
-        cursor: "pointer",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       {children}

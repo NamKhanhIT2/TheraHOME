@@ -1,7 +1,7 @@
 "use client";
 
 // Content moderation queue — content_reports (posts + comments reported
-// from the mobile app's overflow menus, see TheraHOME APP's
+// from the mobile app's overflow menus, see TheraHOME-APP's
 // useReportContent hook). Actions: hide (soft), delete (hard, reuses the
 // same functions CommunityView uses), lock the author's account (reuses
 // profiles.locked via updateAppUser, same mechanism UsersView's "Khóa tài
