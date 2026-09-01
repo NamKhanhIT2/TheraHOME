@@ -145,6 +145,26 @@ export function PillTabs<T extends string>({ options, value, onChange }: { optio
   );
 }
 
+/** Top-row market dropdown ("Thị trường: VN ▾") for views that manage each
+ * market's content separately (Products, Routine). Generic over the market
+ * key type the caller uses ("VN"|"US"|"MALAY" vs "vn"|"us"|"malay"). */
+export function MarketSelect<T extends string>({ options, value, onChange }: { options: Array<[T, string]>; value: T; onChange: (value: T) => void }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>
+      Thị trường:
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        style={{ ...inputStyle, width: "auto", padding: "8px 10px", fontWeight: 700, color: "var(--text-primary)", background: "#fff", cursor: "pointer" }}
+      >
+        {options.map(([key, label]) => (
+          <option key={key} value={key}>{label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function SectionCard({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div style={{ background: "#fff", borderRadius: 16, padding: 22, boxShadow: "var(--shadow-card)" }}>

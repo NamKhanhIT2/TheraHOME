@@ -399,12 +399,13 @@ export async function uploadStoreItemImage(itemId: string, file: File) {
   if (file.size > 15 * 1024 * 1024) throw new Error("image_too_large");
   // Downscaled before upload (see downscaleImage) — mobile's Store tab
   // renders these as small cards, multi-MB originals just load slowly.
-  const blob = await downscaleImage(file);
+  const blob = await downscaleImage(file, 512);
   if (blob.size > 5 * 1024 * 1024) throw new Error("image_too_large");
   const safeExtension = IMAGE_EXTENSIONS[blob.type] ?? "jpg";
   const path = `${itemId}/${Date.now()}.${safeExtension}`;
   const { error } = await supabase.storage.from("store-images").upload(path, blob, {
     contentType: blob.type || "image/jpeg",
+    cacheControl: "31536000",
     upsert: false,
   });
   if (error) throw error;
@@ -617,6 +618,7 @@ export async function uploadPhasePromoImage(phaseId: string, kind: "cross-sell" 
   const path = `phase-promos/${phaseId}/${kind}-${Date.now()}.${safeExtension}`;
   const { error } = await supabase.storage.from("store-images").upload(path, blob, {
     contentType: blob.type || "image/jpeg",
+    cacheControl: "31536000",
     upsert: false,
   });
   if (error) throw error;
@@ -1130,12 +1132,13 @@ export async function uploadPostThumbnail(postId: string, file: File) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("not_signed_in");
-  const blob = await downscaleImage(file);
+  const blob = await downscaleImage(file, 640);
   if (blob.size > 5 * 1024 * 1024) throw new Error("image_too_large");
   const safeExtension = IMAGE_EXTENSIONS[blob.type] ?? "jpg";
   const path = `${user.id}/pinned-${postId}-${Date.now()}.${safeExtension}`;
   const { error } = await supabase.storage.from("community-images").upload(path, blob, {
     contentType: blob.type || "image/jpeg",
+    cacheControl: "31536000",
     upsert: false,
   });
   if (error) throw error;

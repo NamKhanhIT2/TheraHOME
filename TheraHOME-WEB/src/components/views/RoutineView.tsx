@@ -9,8 +9,10 @@
 import { Fragment, useEffect, useState } from "react";
 import type { Product, ProgramDay, ProgramPhase, MarketContent } from "@/lib/mockData";
 import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updateProductInfo, createProgramDay, updateProgramDay, deleteProgramDay } from "@/lib/db";
-import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs } from "@/components/ui/primitives";
+import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs, MarketSelect } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { HeaderAccessory } from "@/components/shell/HeaderAccessory";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 import { PhaseContentModal } from "@/components/views/PhaseContentModal";
@@ -31,6 +33,10 @@ function isMarketContentComplete(content: MarketContent): boolean {
 
 export function RoutineView() {
   const [products, setProducts] = useState<Product[] | null>(null);
+  // Top-row market dropdown — the day table shows the selected market's
+  // video/support links; the day modal still edits all 3 (all-or-none rule
+  // below), just opened at the selected market's tab.
+  const [viewMarket, setViewMarket] = useState<MarketKey>("vn");
   const [storeLinks, setStoreLinks] = useState<Record<string, string>>({});
   const [productId, setProductId] = useState<string | null>(null);
   const [newProductOpen, setNewProductOpen] = useState(false);
@@ -48,6 +54,8 @@ export function RoutineView() {
   const [type, setType] = useState<"train" | "rest">("train");
   const [video, setVideo] = useState<MarketContent>(EMPTY_MARKET_CONTENT);
   const [supportToolsUrl, setSupportToolsUrl] = useState<MarketContent>(EMPTY_MARKET_CONTENT);
+  const [deleteDayConfirm, setDeleteDayConfirm] = useState<number | null>(null);
+  const [deletingDay, setDeletingDay] = useState(false);
 
   function reload(selectId?: string) {
     Promise.all([fetchRoutineProducts(), fetchStoreCategories()])
@@ -109,7 +117,7 @@ export function RoutineView() {
   function openNewDay() {
     if (!product) return;
     setDayModal("new");
-    setDayMarketTab("vn");
+    setDayMarketTab(viewMarket);
     setPhase(product.phases[0]?.name ?? "");
     setType("train");
     setVideo(EMPTY_MARKET_CONTENT);
@@ -117,7 +125,7 @@ export function RoutineView() {
   }
   function openEditDay(d: ProgramDay) {
     setDayModal(d.id);
-    setDayMarketTab("vn");
+    setDayMarketTab(viewMarket);
     setPhase(d.phase);
     setType(d.type);
     setVideo(d.video);
@@ -146,13 +154,18 @@ export function RoutineView() {
       pushToast("Không thể lưu ngày tập");
     }
   }
-  async function deleteDay(id: number) {
-    if (!product) return;
+  async function confirmDeleteDay() {
+    if (!product || deleteDayConfirm === null) return;
     try {
-      await deleteProgramDay(product.id, id);
+      setDeletingDay(true);
+      await deleteProgramDay(product.id, deleteDayConfirm);
+      setDeleteDayConfirm(null);
+      pushToast("Đã xoá Ngày " + deleteDayConfirm);
       reload(product.id);
     } catch {
       pushToast("Không thể xoá ngày tập");
+    } finally {
+      setDeletingDay(false);
     }
   }
 
@@ -160,9 +173,13 @@ export function RoutineView() {
   if (!product) return <div style={{ color: "var(--text-secondary)" }}>Chưa có sản phẩm nào trong Lộ trình.</div>;
 
   const dayList = [...product.days].sort((a, b) => a.id - b.id);
+  const viewMarketLabel = MARKET_TABS.find(([key]) => key === viewMarket)?.[1] ?? "VN";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <HeaderAccessory>
+        <MarketSelect options={MARKET_TABS} value={viewMarket} onChange={setViewMarket} />
+      </HeaderAccessory>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {products.map((p) => (
@@ -240,15 +257,15 @@ export function RoutineView() {
                   )}
                 </td>
                 <td style={{ padding: "10px 8px" }}>
-                  {d.video.vn ? (
-                    <a href={d.video.vn} target="_blank" rel="noopener" style={{ fontSize: 13 }}>Xem video (VN) ↗</a>
+                  {d.video[viewMarket] ? (
+                    <a href={d.video[viewMarket]} target="_blank" rel="noopener" style={{ fontSize: 13 }}>Xem video ({viewMarketLabel}) ↗</a>
                   ) : (
                     <span style={{ color: "var(--text-muted)" }}>—</span>
                   )}
                 </td>
                 <td style={{ padding: "10px 8px" }}>
-                  {d.supportToolsUrl.vn ? (
-                    <a href={d.supportToolsUrl.vn} target="_blank" rel="noopener" style={{ fontSize: 13 }}>Mở link (VN) ↗</a>
+                  {d.supportToolsUrl[viewMarket] ? (
+                    <a href={d.supportToolsUrl[viewMarket]} target="_blank" rel="noopener" style={{ fontSize: 13 }}>Mở link ({viewMarketLabel}) ↗</a>
                   ) : (
                     <span style={{ color: "var(--text-muted)" }}>—</span>
                   )}
@@ -258,7 +275,7 @@ export function RoutineView() {
                     <button onClick={() => openEditDay(d)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                       <Icon name="pencil" size={16} color="var(--color-primary)" />
                     </button>
-                    <button onClick={() => deleteDay(d.id)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                    <button onClick={() => setDeleteDayConfirm(d.id)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                       <Icon name="trash-2" size={16} color="var(--error)" />
                     </button>
                   </div>
@@ -385,6 +402,16 @@ export function RoutineView() {
       ) : null}
       {phaseContentTarget ? (
         <PhaseContentModal phase={phaseContentTarget} onClose={() => setPhaseContentTarget(null)} />
+      ) : null}
+      {deleteDayConfirm !== null ? (
+        <ConfirmModal
+          title="Xoá ngày tập"
+          message={`Xoá Ngày ${deleteDayConfirm} khỏi lộ trình ${product.name}? Nội dung của cả 3 thị trường cho ngày này sẽ bị xoá và không thể hoàn tác.`}
+          confirmLabel="Xoá vĩnh viễn"
+          busy={deletingDay}
+          onConfirm={confirmDeleteDay}
+          onCancel={() => setDeleteDayConfirm(null)}
+        />
       ) : null}
     </div>
   );

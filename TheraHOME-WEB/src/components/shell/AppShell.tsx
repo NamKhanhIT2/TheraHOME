@@ -11,6 +11,7 @@ import { useState, type ReactNode } from "react";
 import { useWebAccess } from "@/components/AccessGate";
 import { pushToast, ToastHost } from "@/components/ui/Toast";
 import { Icon } from "@/components/ui/Icon";
+import { HEADER_ACCESSORY_SLOT_ID } from "@/components/shell/HeaderAccessory";
 import type { NavItem } from "@/lib/adminMockData";
 
 export function AppShell({
@@ -114,7 +115,12 @@ export function AppShell({
       </div>
       <div style={{ flex: 1, overflowY: "auto" }}>
         <div style={{ position: "sticky", top: 0, background: "var(--bg-app)", zIndex: 5, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "22px 32px 16px" }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}>{item.label}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}>{item.label}</div>
+            {/* Views portal controls in here via <HeaderAccessory> (e.g. the
+                market dropdown next to "Sản Phẩm"/"Lộ trình"). */}
+            <div id={HEADER_ACCESSORY_SLOT_ID} style={{ display: "flex", alignItems: "center", gap: 12 }} />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--border-input)", borderRadius: 10, padding: "8px 12px", width: 240 }}>
               <Icon name="search" size={15} color="var(--text-muted)" />
