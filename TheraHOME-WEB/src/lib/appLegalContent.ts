@@ -87,10 +87,7 @@ TheraHOME là ứng dụng thể dục và chăm sóc sức khoẻ (fitness & we
 2.2 Dữ liệu thu thập tự động
 \t• Dữ liệu sử dụng: tính năng bạn truy cập, thời gian sử dụng, số ngày liên tiếp hoàn thành chương trình.
 \t• Dữ liệu thiết bị và nhật ký kỹ thuật: loại thiết bị, hệ điều hành, phiên bản ứng dụng, mã định danh thiết bị, nhật ký lỗi phục vụ khắc phục sự cố.
-2.3 Dữ liệu từ Apple Health / HealthKit (nếu bạn chủ động bật đồng bộ)
-Nếu bạn cho phép, Ứng dụng có thể đọc hoặc ghi một số dữ liệu sức khoẻ và vận động thông qua HealthKit của Apple (ví dụ số bước đi, hoạt động vận động) để cá nhân hoá lộ trình tập luyện. Dữ liệu HealthKit chỉ được dùng cho mục đích quản lý sức khoẻ, thể chất và cải thiện trải nghiệm của bạn trong Ứng dụng.
-Chúng tôi cam kết: không bao giờ sử dụng dữ liệu thu được qua HealthKit cho mục đích quảng cáo, không bán hoặc chia sẻ dữ liệu này cho nhà môi giới dữ liệu (data broker), mạng quảng cáo hoặc bên thứ ba nhằm mục đích quảng cáo, đúng theo yêu cầu của Apple đối với các ứng dụng sử dụng HealthKit.
-2.4 Dữ liệu từ bên thứ ba
+2.3 Dữ liệu từ bên thứ ba
 Nếu bạn đăng nhập bằng tài khoản Apple/Google, chúng tôi nhận một số thông tin cơ bản (tên, email) theo phạm vi bạn cho phép tại thời điểm đăng nhập.
 3. Mục đích sử dụng dữ liệu
 \t• Tạo và quản lý tài khoản, xác thực đăng nhập.
@@ -116,7 +113,7 @@ Tính năng Trợ lý AI sử dụng dịch vụ mô hình ngôn ngữ của bê
 \t• Thời điểm gửi: dữ liệu chỉ được gửi khi bạn chủ động nhắn tin trong Trợ lý AI, và chỉ sau khi bạn đã đọc và đồng ý với thông báo hiển thị ở lần đầu mở tính năng này.
 \t• Mục đích: duy nhất để tạo câu trả lời cho bạn; không dùng cho quảng cáo; không bán cho bên thứ ba.
 \t• Khuyến cáo: không chia sẻ thông tin nhạy cảm (giấy tờ tuỳ thân, tài chính, tình trạng bệnh lý chi tiết) trong cuộc trò chuyện. Câu trả lời của Trợ lý AI chỉ mang tính tham khảo về tập luyện, không phải tư vấn y tế.
-Dữ liệu sức khoẻ/HealthKit không được chia sẻ cho bất kỳ bên thứ ba nào ngoài mục đích cung cấp dịch vụ sức khoẻ/thể chất cho chính bạn, trừ khi bạn đồng ý rõ ràng cho mục đích khác (ví dụ nghiên cứu y khoa).
+Dữ liệu tập luyện và cảm nhận cơ thể của bạn không được chia sẻ cho bất kỳ bên thứ ba nào ngoài mục đích cung cấp dịch vụ cho chính bạn, trừ khi bạn đồng ý rõ ràng cho mục đích khác.
 6. Nội dung công khai trong mục Cộng đồng
 Bài viết, bình luận, huy hiệu thành tích bạn chia sẻ trong mục Cộng đồng có thể hiển thị công khai với người dùng khác trong Ứng dụng. Vui lòng cân nhắc trước khi chia sẻ thông tin nhạy cảm. Bạn có thể xoá nội dung mình đã đăng bất kỳ lúc nào.
 7. Thời gian lưu trữ dữ liệu
