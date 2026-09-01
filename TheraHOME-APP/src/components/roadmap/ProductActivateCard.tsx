@@ -40,6 +40,9 @@ export function ProductActivateCard({ productId }: { productId: string }) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['user_programs', userId] }),
         queryClient.invalidateQueries({ queryKey: ['default_product_for_contact', userId] }),
+        // First activation also binds the contact to the account (see the
+        // RPC) — refresh anything keyed on it.
+        queryClient.invalidateQueries({ queryKey: ['user_access_contact', userId] }),
       ]);
     } catch (e) {
       const message = e instanceof Error ? e.message : '';

@@ -6,7 +6,6 @@ import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, usePrimaryProducts, useProducts } from '@/hooks/usePrograms';
 import { useRequestDay } from '@/hooks/useRequestDay';
-import { useAccessContact } from '@/hooks/useAccessContact';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
 import { usePhasePurchases } from '@/hooks/usePhasePurchase';
 import { useQuizResolvedMap } from '@/hooks/useQuiz';
@@ -37,7 +36,6 @@ export default function RoadmapScreen() {
   // not the effective state itself.
   const [collapsedOverrides, setCollapsedOverrides] = useState<Record<string, boolean>>({});
 
-  const contactQuery = useAccessContact(userId);
   const productsQuery = useProducts();
   const programsQuery = useActivatedPrograms(userId);
   const defaultProductQuery = useDefaultProductId(userId);
@@ -82,18 +80,16 @@ export default function RoadmapScreen() {
   // spinner for queries that are actively fetching, otherwise an upstream
   // error can leave this screen spinning forever.
   const isLoading =
-    contactQuery.isLoading || productsQuery.isLoading || programsQuery.isLoading || (!!selectedProduct && daysQuery.isLoading);
-  const loadError =
-    contactQuery.error ?? productsQuery.error ?? programsQuery.error ?? (selectedProduct ? daysQuery.error : null);
+    productsQuery.isLoading || programsQuery.isLoading || (!!selectedProduct && daysQuery.isLoading);
+  const loadError = productsQuery.error ?? programsQuery.error ?? (selectedProduct ? daysQuery.error : null);
   // Stable reference (not a fresh `?? []` array each render) so the memos
   // below that key off `days` don't recompute every render.
   const days = useMemo(() => daysQuery.data ?? [], [daysQuery.data]);
   const focusFadeStyle = useTabFocusFade();
-  // Global gate: no claimed contact at all → the one "enter your contact"
-  // card. With a contact, the dropdown always shows; each not-yet-activated
-  // device gets its own per-product unlock card instead (per-product
-  // activation model, 2026-09-01).
-  const hasAccess = !!contactQuery.data;
+  // No global gate anymore (per explicit request): the device dropdown
+  // always shows — even for a brand-new account with nothing activated —
+  // and each not-yet-activated device renders its own inline phone/email
+  // card (the RPC binds the first redeemed contact to the account).
 
   // Phase-level IAP gating layered on top of the calendar-based unlock: a
   // phase only appears here if admin configured an `apple_product_id` for
@@ -165,29 +161,7 @@ export default function RoadmapScreen() {
           </Text>
         </Reanimated.View>
 
-        {!isLoading && !loadError && !hasAccess ? (
-          <Reanimated.View entering={fadeUpEntering(60)} style={{ marginTop: 16 }}>
-            <Pressable
-              onPress={() => router.push('/activate')}
-              style={[styles.lockedCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}
-            >
-              <View style={[styles.lockedIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-                <Icon name="lock" size={22} color={theme.colors.primary} />
-              </View>
-              <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center', marginTop: 4 }]}>
-                {t('unlockRoadmapTitle')}
-              </Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, lineHeight: 19 }]}>
-                {t('unlockRoadmapHint')}
-              </Text>
-              <Button style={{ width: '100%', marginTop: 16 }} onPress={() => router.push('/activate')}>
-                {t('enterActivationCode')}
-              </Button>
-            </Pressable>
-          </Reanimated.View>
-        ) : null}
-
-        {!loadError && hasAccess && selectedProduct ? (
+        {!loadError && selectedProduct ? (
           <Reanimated.View entering={fadeUpEntering(70)} style={{ marginTop: 12 }}>
             <ProductDropdown
               product={selectedProduct}
@@ -210,7 +184,6 @@ export default function RoadmapScreen() {
             <Button
               style={{ marginTop: 16, minWidth: 132 }}
               onPress={() => {
-                void contactQuery.refetch();
                 void productsQuery.refetch();
                 void programsQuery.refetch();
                 if (selectedProduct) void daysQuery.refetch();
@@ -219,7 +192,7 @@ export default function RoadmapScreen() {
               Thử lại
             </Button>
           </View>
-        ) : hasAccess && selectedProduct && !program ? (
+        ) : selectedProduct && !program ? (
           // Device not yet activated for this account — the activation
           // input sits INLINE in the card (per explicit request, no detour
           // to /activate): redeem the contact CSKH registered for THIS
@@ -227,7 +200,7 @@ export default function RoadmapScreen() {
           <Reanimated.View entering={fadeUpEntering(90)} style={{ marginTop: 16 }}>
             <ProductActivateCard key={selectedProduct.id} productId={selectedProduct.id} />
           </Reanimated.View>
-        ) : hasAccess && selectedProduct ? (
+        ) : selectedProduct ? (
           <View style={{ marginTop: 8 }}>
             {days.map((d, index) => {
               const nextDay = days[index + 1];
