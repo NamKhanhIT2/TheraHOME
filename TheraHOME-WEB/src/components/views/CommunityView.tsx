@@ -643,7 +643,7 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           {pinning ? <PinDisplayModal post={pinning} onClose={() => setPinning(null)} onConfirm={confirmPin} /> : null}
         </Fragment>
       }
-      columns={pinOnly ? ["Ghim", "Tác giả", "Nội dung", "Lượt thích", "Bình luận"] : ["Ghim", "Tác giả", "Nội dung", "Lượt thích", "Bình luận", "Thao tác"]}
+      columns={["Ghim", "Tác giả", "Nội dung", "Lượt thích", "Bình luận", "Thao tác"]}
     >
       {sorted.map((it) => (
         <tr key={it.id} style={{ borderTop: "1px solid var(--divider)", background: it.pinned ? "var(--color-primary-tint-10)" : "none" }}>
@@ -709,31 +709,40 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
               {it.comments}
             </button>
           </td>
-          {!pinOnly ? (
-            <td style={{ padding: "14px 20px" }}>
-              <div style={{ display: "flex", gap: 10 }}>
-                {!it.official && it.status !== "approved" ? (
-                  <button onClick={() => moderate(it, "approved")} title="Duyệt bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
-                    <Icon name="check" size={16} color="var(--success, #2BB673)" />
-                  </button>
-                ) : null}
-                {!it.official && it.status === "pending" ? (
-                  <button onClick={() => moderate(it, "rejected")} title="Từ chối bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
-                    <Icon name="x" size={16} color="var(--error)" />
-                  </button>
-                ) : null}
+          {/* Moderation (duyệt/từ chối/ẩn user posts) shows for BOTH Admin
+              and CSKH — RLS grants cskh post updates and the pending queue
+              is CSKH's job. Edit/delete (and touching official posts) stay
+              Admin-only (`pinOnly` is the CSKH variant; post deletes are
+              admin-only in RLS anyway). */}
+          <td style={{ padding: "14px 20px" }}>
+            <div style={{ display: "flex", gap: 10 }}>
+              {!it.official && it.status !== "approved" ? (
+                <button onClick={() => moderate(it, "approved")} title="Duyệt bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                  <Icon name="check" size={16} color="var(--success, #2BB673)" />
+                </button>
+              ) : null}
+              {!it.official && it.status === "pending" ? (
+                <button onClick={() => moderate(it, "rejected")} title="Từ chối bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                  <Icon name="x" size={16} color="var(--error)" />
+                </button>
+              ) : null}
+              {!pinOnly ? (
                 <button onClick={() => openEdit(it)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                   <Icon name="pencil" size={16} color="var(--color-primary)" />
                 </button>
+              ) : null}
+              {!pinOnly || !it.official ? (
                 <button onClick={() => toggleHidden(it)} title={it.hidden ? "Hiện lại" : "Ẩn bài viết"} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                   <Icon name="eye" size={16} color={it.hidden ? "var(--text-muted)" : "var(--text-secondary)"} />
                 </button>
+              ) : null}
+              {!pinOnly ? (
                 <button onClick={() => removePost(it.id)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                   <Icon name="trash-2" size={16} color="var(--error)" />
                 </button>
-              </div>
-            </td>
-          ) : null}
+              ) : null}
+            </div>
+          </td>
         </tr>
       ))}
       </TableShell>
