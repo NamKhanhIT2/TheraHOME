@@ -2683,3 +2683,16 @@ the technical-safeguards write-up) where the legally required *privacy
 policy* ('privacy' — "Chính sách quyền riêng tư") belongs. Both now link
 'privacy'; the paywall footer label became "Quyền riêng tư"/"Privacy"/
 "Privasi". The security doc remains available in Profile → Pháp lý only.
+
+## Removed the dev/test notification feature entirely (2026-09-01)
+
+Per explicit request: the "Thử thông báo bài viết" button in
+notifications-settings (already __DEV__-gated, now gone completely), its
+handler, `scheduleTestBlogNotification` (pushNotifications.ts), and the
+whole local AsyncStorage test-inbox subsystem in useNotifications.ts
+(`createTestBlogInboxNotification`, TEST_PREFIX rows and their special
+branches in read/markRead/markAllRead/delete — the inbox is now purely
+server rows). The five test* i18n keys were dropped in all three
+languages. `officialArticles.ts` stays — despite its TEST_BLOG_* naming
+it is the real content behind the official profile's article list and
+the article detail screen.

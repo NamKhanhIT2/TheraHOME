@@ -5,14 +5,12 @@ import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
-import { registerForPushNotifications, scheduleDailyReminder, scheduleEveningReminder, scheduleTestBlogNotification } from '@/lib/pushNotifications';
+import { registerForPushNotifications, scheduleDailyReminder, scheduleEveningReminder } from '@/lib/pushNotifications';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
 import { useAppStore } from '@/store/useAppStore';
-import { createTestBlogInboxNotification } from '@/hooks/useNotifications';
-import { useQueryClient } from '@tanstack/react-query';
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
   const hour = Math.floor(index / 2);
@@ -98,7 +96,6 @@ export default function NotificationsSettingsScreen() {
   const userId = session?.user.id;
   const profileQuery = useProfile(userId);
   const updateProfile = useUpdateProfile(userId);
-  const queryClient = useQueryClient();
   const currentDay = useActivatedPrograms(userId).data?.[0]?.currentDay;
 
   const [remind, setRemindState] = useState(false);
@@ -166,22 +163,6 @@ export default function NotificationsSettingsScreen() {
     setRemindEveningTimeState(v);
     updateProfile.mutate({ evening_reminder_time: v }, { onError: () => setRemindEveningTimeState(previous) });
     if (remindEvening) void scheduleEveningReminder(true, v, language).catch(() => Alert.alert(t('notificationError')));
-  }
-
-  async function sendTestBlogNotification() {
-    if (!userId) return;
-    const granted = await registerForPushNotifications(userId);
-    if (!granted) {
-      Alert.alert(t('permissionRequired'), t('permissionSettingsMessage'), [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('openSettings'), onPress: () => void Linking.openSettings() },
-      ]);
-      return;
-    }
-    await createTestBlogInboxNotification(userId, t('testBlogNotificationTitle'), t('testBlogNotificationBody'));
-    await queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
-    await scheduleTestBlogNotification(language);
-    Alert.alert(t('testNotificationScheduled'));
   }
 
   if (profileQuery.isPending) {
@@ -253,18 +234,6 @@ export default function NotificationsSettingsScreen() {
             isLast
           />
         </View>
-        {__DEV__ ? (
-          <Pressable
-            onPress={() => void sendTestBlogNotification()}
-            style={[styles.testButton, { backgroundColor: theme.colors.primaryTint10, borderColor: theme.colors.primary, borderRadius: theme.radius.md }]}
-          >
-            <Icon name="book" size={19} color={theme.colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.primaryDark }]}>{t('testNotification')}</Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('testNotificationHint')}</Text>
-            </View>
-          </Pressable>
-        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
@@ -283,14 +252,6 @@ const styles = StyleSheet.create({
   },
   card: {
     overflow: 'hidden',
-  },
-  testButton: {
-    marginTop: 16,
-    borderWidth: 1,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   row: {
     flexDirection: 'row',

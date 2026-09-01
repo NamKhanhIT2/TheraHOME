@@ -7,9 +7,7 @@
 // community_moderation_and_notifications migration. See CLAUDE.md.
 import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
-import { TEST_BLOG_ARTICLE_ID } from '@/lib/officialArticles';
 
 export type NotificationType =
   | 'schedule' | 'inactivity' | 'ad' | 'blog' | 'chat' | 'streak_milestone'
@@ -48,41 +46,10 @@ export interface NotificationRow {
   postImageUrl: string | null;
 }
 
-const TEST_PREFIX = 'local-test-blog-';
 const NOTIFICATION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-const testStorageKey = (userId: string) => `therahome:test-notifications:${userId}`;
 
 function retentionCutoff() {
   return new Date(Date.now() - NOTIFICATION_RETENTION_MS).toISOString();
-}
-
-async function readLocalNotifications(userId: string): Promise<NotificationRow[]> {
-  const raw = await AsyncStorage.getItem(testStorageKey(userId));
-  if (!raw) return [];
-  try {
-    const stored = JSON.parse(raw) as NotificationRow[];
-    const active = stored.filter((row) => row.createdAt >= retentionCutoff());
-    if (active.length !== stored.length) await writeLocalNotifications(userId, active);
-    return active;
-  } catch { return []; }
-}
-
-async function writeLocalNotifications(userId: string, rows: NotificationRow[]) {
-  await AsyncStorage.setItem(testStorageKey(userId), JSON.stringify(rows));
-}
-
-export async function createTestBlogInboxNotification(userId: string, title: string, body: string) {
-  const rows = await readLocalNotifications(userId);
-  const notification: NotificationRow = {
-    id: `${TEST_PREFIX}${Date.now()}`,
-    type: 'blog', title, body, read: false,
-    createdAt: new Date().toISOString(),
-    relatedDayNumber: null, relatedProductId: null,
-    relatedArticleId: TEST_BLOG_ARTICLE_ID, relatedPostId: null, relatedCommentId: null, relatedParentCommentId: null, relatedChatThreadId: null, destination: 'community_post',
-    actorId: null, actorName: 'TheraHOME', actorAvatarUrl: null, actorIsOfficial: true,
-    reactionType: null, groupActorIds: [], secondActorName: null, postImageUrl: null,
-  };
-  await writeLocalNotifications(userId, [notification, ...rows].slice(0, 10));
 }
 
 interface RawNotification {
@@ -174,8 +141,7 @@ export function useNotifications(userId: string | undefined) {
         secondActorName: r.second_actor_name,
         postImageUrl: r.community_posts?.image_url ?? null,
       }));
-      const localRows = await readLocalNotifications(userId!);
-      return [...localRows, ...remoteRows].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return remoteRows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
     enabled: !!userId,
   });
@@ -185,11 +151,6 @@ export function useMarkNotificationRead(userId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      if (id.startsWith(TEST_PREFIX)) {
-        const rows = await readLocalNotifications(userId!);
-        await writeLocalNotifications(userId!, rows.map((row) => row.id === id ? { ...row, read: true } : row));
-        return;
-      }
       const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
       if (error) throw error;
     },
@@ -212,8 +173,6 @@ export function useMarkAllNotificationsRead(userId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const localRows = await readLocalNotifications(userId!);
-      await writeLocalNotifications(userId!, localRows.map((row) => ({ ...row, read: true })));
       const { error } = await supabase
         .from('notifications')
         .update({ read: true })
@@ -238,11 +197,6 @@ export function useDeleteNotification(userId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      if (id.startsWith(TEST_PREFIX)) {
-        const rows = await readLocalNotifications(userId!);
-        await writeLocalNotifications(userId!, rows.filter((row) => row.id !== id));
-        return;
-      }
       const { error } = await supabase.from('notifications').delete().eq('id', id).eq('user_id', userId!);
       if (error) throw error;
     },

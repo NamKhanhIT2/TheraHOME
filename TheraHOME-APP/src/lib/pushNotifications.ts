@@ -13,7 +13,6 @@ import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/lib/i18n';
 import type { AppLanguage } from '@/store/useAppStore';
-import { TEST_BLOG_ARTICLE_ID } from '@/lib/officialArticles';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -259,19 +258,3 @@ export async function backfillTodaysReminders(
   await backfillTodayReminderIfDue('evening', eveningEnabled, eveningTime, eveningCopy.title, eveningCopy.body, 'roadmap');
 }
 
-/** Development/test notification for validating the blog → Community deep link
- * without requiring the future admin push sender. */
-export async function scheduleTestBlogNotification(language: AppLanguage): Promise<void> {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: translate(language, 'testBlogNotificationTitle'),
-      body: translate(language, 'testBlogNotificationBody'),
-      sound: 'ting.wav',
-      data: { type: 'blog', articleId: TEST_BLOG_ARTICLE_ID },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: 3,
-    },
-  });
-}
