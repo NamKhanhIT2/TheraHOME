@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/theme';
 import { supabase } from '@/lib/supabase';
@@ -18,11 +18,22 @@ const BENEFIT_KEYS = ['benefitFullRoadmap', 'benefitDailySync'] as const;
 // already fully signed in and onboarded — activation is opt-in, not part of
 // the sign-up flow anymore, so this screen no longer needs to sign anyone
 // out on cancel or worry about `router.back()` having nowhere to go.
+//
+// Two modes (per-product activation model, 2026-09-01):
+//  * no params — first-time claim: binds the contact to this account and
+//    unlocks every product CSKH listed that contact for
+//    (claim_user_access_contact).
+//  * productId/productName params (from a locked device card on the
+//    Roadmap) — unlocks ONLY that product, matching the contact against
+//    that product's own CSKH activation list (activate_product_by_contact),
+//    so a second device registered under a different phone/email can be
+//    redeemed without touching the account's main contact.
 export default function ActivationScreen() {
   const theme = useTheme();
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const { session } = useSession();
+  const { productId, productName } = useLocalSearchParams<{ productId?: string; productName?: string }>();
   const userId = session?.user.id;
   const [contact, setContact] = useState('');
   const [contactError, setContactError] = useState('');
@@ -39,17 +50,26 @@ export default function ActivationScreen() {
     setSubmitting(true);
     setContactError('');
     try {
-      const { data, error } = await supabase.rpc('claim_user_access_contact', {
-        p_contact: contact.trim(),
-      });
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        setContactError('Không thể xác nhận thông tin này. Vui lòng kiểm tra lại.');
-        return;
+      if (productId) {
+        const { error } = await supabase.rpc('activate_product_by_contact', {
+          p_product_id: productId,
+          p_contact: contact.trim(),
+        });
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.rpc('claim_user_access_contact', {
+          p_contact: contact.trim(),
+        });
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          setContactError('Không thể xác nhận thông tin này. Vui lòng kiểm tra lại.');
+          return;
+        }
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['user_access_contact', userId] }),
         queryClient.invalidateQueries({ queryKey: ['user_programs', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['default_product_for_contact', userId] }),
       ]);
       router.back();
     } catch (e) {
@@ -58,8 +78,10 @@ export default function ActivationScreen() {
         setContactError('Số điện thoại/email này đã được sử dụng bởi một tài khoản khác.');
       } else if (message.includes('account_already_has_contact')) {
         setContactError('Tài khoản này đã liên kết với một số điện thoại/email khác.');
+      } else if (message.includes('activation_contact_not_found')) {
+        setContactError('Số điện thoại/email này chưa được đăng ký kích hoạt cho sản phẩm này. Vui lòng liên hệ CSKH.');
       } else if (message.includes('order_contact_not_found')) {
-        setContactError('Không tìm thấy đơn hàng với số điện thoại/email này. Vui lòng kiểm tra lại.');
+        setContactError('Số điện thoại/email này chưa được đăng ký kích hoạt. Vui lòng liên hệ CSKH để được thêm vào danh sách.');
       } else if (message.includes('invalid_contact')) {
         setContactError('Số điện thoại/email không đúng định dạng.');
       } else {
@@ -81,8 +103,13 @@ export default function ActivationScreen() {
         <Text style={[theme.type.display, { color: theme.colors.textPrimary, textAlign: 'center' }]}>
           {t('confirmOrderInfo')}
         </Text>
+        {productName ? (
+          <Text style={[theme.type.bodyStrong, { color: theme.colors.primary, textAlign: 'center', marginTop: 8 }]}>
+            {t('activateForProduct')} {productName}
+          </Text>
+        ) : null}
         <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 }]}>
-          {t('confirmOrderInfoHint')}
+          {productId ? t('productLockedHint') : t('confirmOrderInfoHint')}
         </Text>
 
         <View style={styles.benefitList}>

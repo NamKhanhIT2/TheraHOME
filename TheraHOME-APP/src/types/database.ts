@@ -1288,6 +1288,7 @@ export type Database = {
           group_key: string
           has_trial: boolean
           id: string
+          is_primary: boolean
           market: string
           sort_order: number
           title: string
@@ -1296,6 +1297,7 @@ export type Database = {
           group_key?: string
           has_trial?: boolean
           id: string
+          is_primary?: boolean
           market?: string
           sort_order?: number
           title: string
@@ -1304,6 +1306,7 @@ export type Database = {
           group_key?: string
           has_trial?: boolean
           id?: string
+          is_primary?: boolean
           market?: string
           sort_order?: number
           title?: string
@@ -1722,6 +1725,13 @@ export type Database = {
         Returns: {
           product_id: string
           user_program_id: string
+        }[]
+      }
+      activate_product_by_contact: {
+        Args: { p_contact: string; p_product_id: string }
+        Returns: {
+          product_id: string
+          product_name: string
         }[]
       }
       admin_fetch_user_orders: {

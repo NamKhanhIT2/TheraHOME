@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
-import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, useProducts } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, usePrimaryProductIds, useProducts } from '@/hooks/usePrograms';
 import { useAccessContact } from '@/hooks/useAccessContact';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
 import { usePhasePurchases } from '@/hooks/usePhasePurchase';
@@ -38,13 +38,26 @@ export default function RoadmapScreen() {
   const productsQuery = useProducts();
   const programsQuery = useActivatedPrograms(userId);
   const defaultProductQuery = useDefaultProductId(userId);
+  const primaryIdsQuery = usePrimaryProductIds();
   const activatedPrograms = programsQuery.data ?? [];
-  const catalogProducts = productsQuery.data ?? [];
+  // Memoized (not a fresh `?? []` per render) — feeds the dropdownProducts
+  // memo below.
+  const catalogProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
+  // The dropdown lists every device in a PRIMARY store group ("nhóm sản
+  // phẩm chính"), activated or not — a not-yet-activated device shows a
+  // per-product unlock card instead of its days. Falls back to the full
+  // catalog while the flag data loads (or if admin flagged nothing yet).
+  const dropdownProducts = useMemo(() => {
+    const primaryIds = primaryIdsQuery.data;
+    if (!primaryIds || primaryIds.length === 0) return catalogProducts;
+    const filtered = catalogProducts.filter((p) => primaryIds.includes(p.id));
+    return filtered.length ? filtered : catalogProducts;
+  }, [catalogProducts, primaryIdsQuery.data]);
   // Prefer the product the user actually ordered over just "first activated
   // program" — only kicks in when they haven't explicitly picked one via
   // the dropdown yet (`selectedProductId` always wins once set).
   const effectiveProductId =
-    selectedProductId ?? defaultProductQuery.data ?? activatedPrograms[0]?.productId ?? catalogProducts[0]?.id;
+    selectedProductId ?? defaultProductQuery.data ?? activatedPrograms[0]?.productId ?? dropdownProducts[0]?.id;
   const selectedProduct = catalogProducts.find((p) => p.id === effectiveProductId);
   const program = activatedPrograms.find((p) => p.productId === effectiveProductId);
 
@@ -68,7 +81,11 @@ export default function RoadmapScreen() {
   // below that key off `days` don't recompute every render.
   const days = useMemo(() => daysQuery.data ?? [], [daysQuery.data]);
   const focusFadeStyle = useTabFocusFade();
-  const hasActivatedProgram = !!contactQuery.data && activatedPrograms.length > 0;
+  // Global gate: no claimed contact at all → the one "enter your contact"
+  // card. With a contact, the dropdown always shows; each not-yet-activated
+  // device gets its own per-product unlock card instead (per-product
+  // activation model, 2026-09-01).
+  const hasAccess = !!contactQuery.data;
 
   // Phase-level IAP gating layered on top of the calendar-based unlock: a
   // phase only appears here if admin configured an `apple_product_id` for
@@ -137,7 +154,7 @@ export default function RoadmapScreen() {
           </Text>
         </Reanimated.View>
 
-        {!isLoading && !loadError && !hasActivatedProgram ? (
+        {!isLoading && !loadError && !hasAccess ? (
           <Reanimated.View entering={fadeUpEntering(60)} style={{ marginTop: 16 }}>
             <Pressable
               onPress={() => router.push('/activate')}
@@ -159,11 +176,11 @@ export default function RoadmapScreen() {
           </Reanimated.View>
         ) : null}
 
-        {!loadError && hasActivatedProgram && selectedProduct ? (
+        {!loadError && hasAccess && selectedProduct ? (
           <Reanimated.View entering={fadeUpEntering(70)} style={{ marginTop: 12 }}>
             <ProductDropdown
               product={selectedProduct}
-              products={catalogProducts}
+              products={dropdownProducts}
               onSelect={selectProduct}
             />
           </Reanimated.View>
@@ -191,7 +208,35 @@ export default function RoadmapScreen() {
               Thử lại
             </Button>
           </View>
-        ) : hasActivatedProgram && selectedProduct ? (
+        ) : hasAccess && selectedProduct && !program ? (
+          // Device not yet activated for this account — its roadmap stays
+          // hidden until the user redeems the contact CSKH registered for
+          // THIS device (entering one contact never unlocks everything).
+          <Reanimated.View entering={fadeUpEntering(90)} style={{ marginTop: 16 }}>
+            <View style={[styles.lockedCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
+              <View style={[styles.lockedIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
+                <Icon name="lock" size={22} color={theme.colors.primary} />
+              </View>
+              <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center', marginTop: 4 }]}>
+                {t('productLockedTitle')}
+              </Text>
+              <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, lineHeight: 19 }]}>
+                {t('productLockedHint')}
+              </Text>
+              <Button
+                style={{ width: '100%', marginTop: 16 }}
+                onPress={() =>
+                  router.push({
+                    pathname: '/activate',
+                    params: { productId: selectedProduct.id, productName: selectedProduct.name },
+                  })
+                }
+              >
+                {t('enterActivationCode')}
+              </Button>
+            </View>
+          </Reanimated.View>
+        ) : hasAccess && selectedProduct ? (
           <View style={{ marginTop: 8 }}>
             {days.map((d, index) => {
               const nextDay = days[index + 1];

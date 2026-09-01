@@ -266,13 +266,17 @@ export interface StoreItemGroup {
 
 export interface StoreCategoryGroup {
   groupKey: string;
+  /** "Nhóm sản phẩm chính" — device groups whose items feed the mobile
+   * Roadmap dropdown; false = accessory ("nhóm phụ"). One flag per group,
+   * mirrored onto all 3 market rows. */
+  isPrimary: boolean;
   byMarket: Record<AdminMarket, { id: string; title: string; hasTrial: boolean } | null>;
   items: StoreItemGroup[];
 }
 
 export async function fetchStoreCategoryGroups(): Promise<StoreCategoryGroup[]> {
   const [{ data: cats, error: cErr }, { data: items, error: iErr }] = await Promise.all([
-    supabase.from("store_categories").select("id, title, has_trial, sort_order, market, group_key").order("sort_order"),
+    supabase.from("store_categories").select("id, title, has_trial, sort_order, market, group_key, is_primary").order("sort_order"),
     supabase.from("store_items").select("id, category_id, name, description, price_text, accent_color_key, external_link, preview_url, image_url, market, group_key").order("sort_order"),
   ]);
   if (cErr) throw cErr;
@@ -293,6 +297,7 @@ export async function fetchStoreCategoryGroups(): Promise<StoreCategoryGroup[]> 
       })
     ) as StoreCategoryGroup["byMarket"];
 
+    const isPrimary = rowsForGroup.some((c) => c.is_primary);
     const categoryIdsInGroup = new Set(rowsForGroup.map((c) => c.id));
     const itemGroupKeysHere = [...new Set((items ?? []).filter((it) => categoryIdsInGroup.has(it.category_id)).map((it) => it.group_key))];
     const itemGroups: StoreItemGroup[] = itemGroupKeysHere.map((itemGroupKey): StoreItemGroup => {
@@ -311,14 +316,19 @@ export async function fetchStoreCategoryGroups(): Promise<StoreCategoryGroup[]> 
       return { groupKey: itemGroupKey, accent: accentFromKey(rows[0]?.accent_color_key), byMarket: itemByMarket };
     });
 
-    return { groupKey, byMarket, items: itemGroups };
+    return { groupKey, isPrimary, byMarket, items: itemGroups };
   });
 }
 
 /** Creates/updates all 3 market rows of one category group in one call —
  * `groupKey: "new"` mints a fresh group. Each market gets its own row id;
- * a market with no existing row is inserted, an existing one is updated. */
-export async function saveStoreCategoryGroup(groupKey: string | "new", byMarket: Record<AdminMarket, { title: string; hasTrial: boolean }>): Promise<string> {
+ * a market with no existing row is inserted, an existing one is updated.
+ * `isPrimary` (nhóm chính/phụ) is one value per group, written to all rows. */
+export async function saveStoreCategoryGroup(
+  groupKey: string | "new",
+  byMarket: Record<AdminMarket, { title: string; hasTrial: boolean }>,
+  isPrimary: boolean
+): Promise<string> {
   const finalGroupKey = groupKey === "new" ? `group-${Date.now()}` : groupKey;
   const { data: existing, error: existingErr } = await supabase.from("store_categories").select("id, market").eq("group_key", finalGroupKey);
   if (existingErr) throw existingErr;
@@ -328,12 +338,12 @@ export async function saveStoreCategoryGroup(groupKey: string | "new", byMarket:
     const fields = byMarket[market];
     const existingId = existingIdByMarket.get(market);
     if (existingId) {
-      const { error } = await supabase.from("store_categories").update({ title: fields.title, has_trial: fields.hasTrial }).eq("id", existingId);
+      const { error } = await supabase.from("store_categories").update({ title: fields.title, has_trial: fields.hasTrial, is_primary: isPrimary }).eq("id", existingId);
       if (error) throw error;
     } else {
       const { error } = await supabase
         .from("store_categories")
-        .insert({ id: `${finalGroupKey}-${market.toLowerCase()}`, title: fields.title, has_trial: fields.hasTrial, market, group_key: finalGroupKey });
+        .insert({ id: `${finalGroupKey}-${market.toLowerCase()}`, title: fields.title, has_trial: fields.hasTrial, is_primary: isPrimary, market, group_key: finalGroupKey });
       if (error) throw error;
     }
   }
@@ -410,6 +420,85 @@ export async function uploadStoreItemImage(itemId: string, file: File) {
   });
   if (error) throw error;
   return supabase.storage.from("store-images").getPublicUrl(path).data.publicUrl;
+}
+
+// ---------------------------------------------------------------------------
+// Kích hoạt (per-product activation contacts) — CSKH manually lists the
+// phone/email allowed to activate each product; the mobile app's
+// claim_user_access_contact / activate_product_by_contact RPCs match against
+// these rows. See migration 202609011000_per_product_activation.sql.
+// ---------------------------------------------------------------------------
+
+export interface ActivationProduct {
+  id: string;
+  name: string;
+}
+
+export async function fetchActivationProducts(): Promise<ActivationProduct[]> {
+  const { data, error } = await supabase.from("products").select("id, name").order("id");
+  if (error) throw error;
+  return (data ?? []).map((p) => ({ id: p.id, name: p.name }));
+}
+
+export interface ActivationContact {
+  id: string;
+  productId: string;
+  contactValue: string;
+  contactType: "email" | "phone";
+  claimedByUserId: string | null;
+  claimedByName: string | null;
+  claimedAt: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export async function fetchProductActivationContacts(): Promise<ActivationContact[]> {
+  const { data, error } = await supabase
+    .from("product_activation_contacts")
+    .select("id, product_id, contact_value, contact_type, claimed_by_user_id, claimed_at, note, created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const rows = data ?? [];
+  const userIds = [...new Set(rows.map((r) => r.claimed_by_user_id).filter(Boolean))] as string[];
+  const nameById = new Map<string, string>();
+  if (userIds.length) {
+    const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
+    for (const p of profiles ?? []) nameById.set(p.id, p.full_name ?? "");
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    productId: r.product_id,
+    contactValue: r.contact_value,
+    contactType: r.contact_type as "email" | "phone",
+    claimedByUserId: r.claimed_by_user_id,
+    claimedByName: r.claimed_by_user_id ? nameById.get(r.claimed_by_user_id) || null : null,
+    claimedAt: r.claimed_at,
+    note: r.note,
+    createdAt: r.created_at,
+  }));
+}
+
+/** The DB trigger canonicalizes contact_type/normalized_value; the values
+ * passed here just have to satisfy the NOT NULL columns. If the contact
+ * already belongs to a signed-up account, a second DB trigger immediately
+ * unlocks this product for that account. */
+export async function addProductActivationContact(productId: string, contact: string): Promise<void> {
+  const trimmed = contact.trim();
+  const isEmail = trimmed.includes("@");
+  const digits = trimmed.replace(/\D/g, "");
+  const normalized = isEmail ? trimmed.toLowerCase() : digits.startsWith("84") ? "0" + digits.slice(2) : digits;
+  const { error } = await supabase.from("product_activation_contacts").insert({
+    product_id: productId,
+    contact_value: trimmed,
+    contact_type: isEmail ? "email" : "phone",
+    normalized_value: normalized,
+  });
+  if (error) throw error;
+}
+
+export async function deleteProductActivationContact(id: string): Promise<void> {
+  const { error } = await supabase.from("product_activation_contacts").delete().eq("id", id);
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------

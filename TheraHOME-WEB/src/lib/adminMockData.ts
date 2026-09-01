@@ -16,6 +16,8 @@ export const NAV_ADMIN: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "grid" },
   { id: "exercises", label: "Lộ trình", icon: "route" },
   { id: "products", label: "Sản Phẩm", icon: "box" },
+  // Per-product activation contacts, CSKH-managed — cũng có mặt ở NAV_CARE.
+  { id: "activation", label: "Kích hoạt", icon: "shield" },
   {
     id: "notifications",
     label: "Thông báo",
@@ -37,6 +39,7 @@ export const NAV_ADMIN: NavItem[] = [
 
 export const NAV_CARE: NavItem[] = [
   { id: "chat", label: "Chat", icon: "message-circle" },
+  { id: "activation", label: "Kích hoạt", icon: "shield" },
   { id: "community", label: "Cộng đồng", icon: "message-square" },
   { id: "reports", label: "Báo cáo", icon: "flag" },
   { id: "notifications", label: "Mẫu hệ thống", icon: "bell" },

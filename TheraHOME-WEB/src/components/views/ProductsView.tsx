@@ -91,6 +91,7 @@ export function ProductsView() {
   const [categoryModal, setCategoryModal] = useState<CategoryModalState>(null);
   const [categoryTab, setCategoryTab] = useState<AdminMarket>("VN");
   const [categoryFields, setCategoryFields] = useState<Record<AdminMarket, { title: string; hasTrial: boolean }>>(emptyCategoryFields());
+  const [categoryIsPrimary, setCategoryIsPrimary] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [itemModal, setItemModal] = useState<ItemModalState>(null);
   const [itemTab, setItemTab] = useState<AdminMarket>("VN");
@@ -116,6 +117,7 @@ export function ProductsView() {
   function openNewCategory() {
     setCategoryTab(viewMarket);
     setCategoryFields(emptyCategoryFields());
+    setCategoryIsPrimary(false);
     setCategoryError(null);
     setCategoryModal({ groupKey: "new" });
   }
@@ -127,6 +129,7 @@ export function ProductsView() {
       if (row) fields[code] = { title: row.title, hasTrial: row.hasTrial };
     }
     setCategoryFields(fields);
+    setCategoryIsPrimary(group.isPrimary);
     setCategoryError(null);
     setCategoryModal({ groupKey: group.groupKey });
   }
@@ -143,7 +146,7 @@ export function ProductsView() {
     try {
       setSaving(true);
       setCategoryError(null);
-      await saveStoreCategoryGroup(categoryModal.groupKey, categoryFields);
+      await saveStoreCategoryGroup(categoryModal.groupKey, categoryFields, categoryIsPrimary);
       setCategoryModal(null);
       pushToast("Đã lưu nhóm sản phẩm");
       reload();
@@ -240,6 +243,18 @@ export function ProductsView() {
           title={group.byMarket[viewMarket]?.title.trim() || `${primaryLabel(group.byMarket)} (chưa có tên ${MARKET_LABEL[viewMarket]})`}
           action={
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  padding: "3px 9px",
+                  borderRadius: 999,
+                  color: group.isPrimary ? "var(--color-primary)" : "var(--text-muted)",
+                  background: group.isPrimary ? "var(--color-primary-tint-10)" : "rgba(138,147,163,0.12)",
+                }}
+              >
+                {group.isPrimary ? "Nhóm chính" : "Nhóm phụ"}
+              </span>
               <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{marketCompleteness(group.byMarket)}</span>
               <GhostBtn onClick={() => openEditCategory(group)}>Sửa nhóm</GhostBtn>
               <PrimaryBtn icon="plus" onClick={() => openNewItem(group.groupKey)}>Thêm sản phẩm</PrimaryBtn>
@@ -311,6 +326,33 @@ export function ProductsView() {
             </Fragment>
           }
         >
+          <FieldLabel>Loại nhóm (chung cho cả 3 thị trường)</FieldLabel>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {([[true, "Nhóm chính"], [false, "Nhóm phụ"]] as const).map(([value, label]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setCategoryIsPrimary(value)}
+                style={{
+                  flex: 1,
+                  border: categoryIsPrimary === value ? "none" : "1px solid var(--border-input)",
+                  background: categoryIsPrimary === value ? "var(--color-primary)" : "none",
+                  color: categoryIsPrimary === value ? "#fff" : "var(--text-primary)",
+                  borderRadius: 10,
+                  padding: "9px 0",
+                  fontFamily: "var(--font-family)",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: -6, marginBottom: 14, fontSize: 12, color: "var(--text-muted)" }}>
+            Nhóm chính = thiết bị có lộ trình; sản phẩm trong nhóm chính hiển thị ở danh sách chọn thiết bị trên tab Lộ trình của mobile app. Nhóm phụ = phụ kiện, chỉ hiện trong Cửa hàng.
+          </div>
           <PillTabs options={MARKET_TABS} value={categoryTab} onChange={setCategoryTab} />
           <FieldLabel>Tên nhóm sản phẩm</FieldLabel>
           <input

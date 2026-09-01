@@ -50,6 +50,27 @@ export function useProducts() {
   });
 }
 
+/** Product ids that belong to a PRIMARY store group ("nhóm sản phẩm
+ * chính", admin-managed on store_categories.is_primary) — the Roadmap's
+ * device dropdown lists exactly these, whether or not the user has
+ * activated them. Any market's row counts, so a device stays listed while
+ * its UK/ML store content is still being filled in. */
+export function usePrimaryProductIds() {
+  return useQuery({
+    queryKey: ['primary_product_ids'],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('store_items')
+        .select('product_id, store_categories!inner(is_primary)')
+        .eq('store_categories.is_primary', true)
+        .not('product_id', 'is', null);
+      if (error) throw error;
+      return [...new Set((data ?? []).map((row) => row.product_id as string))];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export interface ActivatedProgram {
   userProgramId: string;
   productId: string;
