@@ -1,6 +1,6 @@
 // Ported verbatim from the Claude Design prototype's `legal-content.js`.
 // NOTE: this is explicitly an UNREVIEWED DRAFT per its own header — it contains
-// bracketed placeholders (e.g. "[Tên pháp nhân vận hành TheraHOME]") that must be
+// bracketed placeholders (e.g. "Công ty H-COMMERCE GLOBAL COMPANY LIMITED") that must be
 // filled in and reviewed by counsel before any App Store / Play Store submission.
 // See CLAUDE.md.
 
@@ -19,9 +19,8 @@ export const legalContent: Record<LegalDocKey, LegalDoc> = {
     text: `ĐIỀU KHOẢN SỬ DỤNG
 Ứng dụng TheraHOME
 Cập nhật lần cuối: 20/08/2026
-Tài liệu này là bản dự thảo tổng hợp dựa trên yêu cầu công khai hiện hành của Apple App Store và Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân của Việt Nam, nhằm mục đích tham khảo. Đây không phải là tư vấn pháp lý. Trước khi công bố hoặc nộp lên App Store, vui lòng nhờ luật sư/chuyên gia pháp lý rà soát lại, đặc biệt các phần liên quan tới dữ liệu sức khoẻ, thương mại điện tử và các thị trường ngoài Việt Nam mà ứng dụng hoạt động.
 1. Chấp nhận điều khoản
-Bằng việc tạo tài khoản hoặc sử dụng ứng dụng TheraHOME ("Ứng dụng") do [Tên pháp nhân vận hành TheraHOME — điền trước khi công bố] ("chúng tôi") cung cấp, bạn xác nhận đã đọc, hiểu và đồng ý bị ràng buộc bởi các Điều khoản sử dụng này cùng Chính sách quyền riêng tư. Nếu không đồng ý, vui lòng không sử dụng Ứng dụng.
+Bằng việc tạo tài khoản hoặc sử dụng ứng dụng TheraHOME ("Ứng dụng") do Công ty H-COMMERCE GLOBAL COMPANY LIMITED ("chúng tôi") cung cấp, bạn xác nhận đã đọc, hiểu và đồng ý bị ràng buộc bởi các Điều khoản sử dụng này cùng Chính sách quyền riêng tư. Nếu không đồng ý, vui lòng không sử dụng Ứng dụng.
 2. Đối tượng sử dụng
 Ứng dụng dành cho người từ đủ 16 tuổi trở lên. Người dùng dưới 16 tuổi chỉ được sử dụng dưới sự đồng ý và giám sát của cha mẹ/người giám hộ hợp pháp.
 3. Miễn trừ trách nhiệm y tế — vui lòng đọc kỹ
@@ -48,7 +47,7 @@ Nếu Ứng dụng cung cấp gói nâng cấp hoặc nội dung trả phí thô
 \t• Bạn có thể quản lý hoặc huỷ gói bất kỳ lúc nào trong Cài đặt của thiết bị (Cài đặt → [Tên bạn] → Đăng ký).
 \t• Yêu cầu hoàn tiền cho giao dịch qua App Store được xử lý bởi Apple theo chính sách của Apple, không phải bởi chúng tôi.
 8. Sở hữu trí tuệ
-Toàn bộ nội dung, thương hiệu, giao diện, mã nguồn của TheraHOME (trừ nội dung do người dùng đăng tải) thuộc quyền sở hữu của [Tên pháp nhân vận hành TheraHOME] hoặc các bên cấp phép. Bạn không được sao chép, phân phối lại hoặc khai thác thương mại khi chưa có sự cho phép bằng văn bản.
+Toàn bộ nội dung, thương hiệu, giao diện, mã nguồn của TheraHOME (trừ nội dung do người dùng đăng tải) thuộc quyền sở hữu của Công ty H-COMMERCE GLOBAL COMPANY LIMITED hoặc các bên cấp phép. Bạn không được sao chép, phân phối lại hoặc khai thác thương mại khi chưa có sự cho phép bằng văn bản.
 9. Hành vi bị cấm
 \t• Sử dụng Ứng dụng cho mục đích trái pháp luật.
 \t• Cố gắng truy cập trái phép hệ thống, can thiệp mã nguồn, gây ảnh hưởng tới hoạt động của Ứng dụng.
@@ -57,23 +56,22 @@ Toàn bộ nội dung, thương hiệu, giao diện, mã nguồn của TheraHOME
 10. Chấm dứt sử dụng
 Chúng tôi có quyền tạm ngưng hoặc chấm dứt quyền truy cập của bạn nếu vi phạm Điều khoản này. Bạn có thể ngừng sử dụng và xoá tài khoản bất kỳ lúc nào.
 11. Giới hạn trách nhiệm
-Trong phạm vi tối đa pháp luật cho phép, [Tên pháp nhân vận hành TheraHOME] không chịu trách nhiệm đối với thiệt hại gián tiếp, ngẫu nhiên phát sinh từ việc sử dụng hoặc không thể sử dụng Ứng dụng, bao gồm nhưng không giới hạn ở việc tự ý áp dụng bài tập không phù hợp với tình trạng sức khoẻ cá nhân mà không tham khảo ý kiến chuyên môn theo khuyến cáo tại Mục 3.
+Trong phạm vi tối đa pháp luật cho phép, Công ty H-COMMERCE GLOBAL COMPANY LIMITED không chịu trách nhiệm đối với thiệt hại gián tiếp, ngẫu nhiên phát sinh từ việc sử dụng hoặc không thể sử dụng Ứng dụng, bao gồm nhưng không giới hạn ở việc tự ý áp dụng bài tập không phù hợp với tình trạng sức khoẻ cá nhân mà không tham khảo ý kiến chuyên môn theo khuyến cáo tại Mục 3.
 12. Luật áp dụng và giải quyết tranh chấp
 Điều khoản này được điều chỉnh bởi pháp luật Việt Nam. Mọi tranh chấp phát sinh sẽ được ưu tiên giải quyết thông qua thương lượng; nếu không đạt được thoả thuận, tranh chấp sẽ được đưa ra cơ quan tài phán có thẩm quyền tại Việt Nam.
 13. Thay đổi Điều khoản
 Chúng tôi có thể cập nhật Điều khoản này theo thời gian. Việc tiếp tục sử dụng Ứng dụng sau khi thay đổi có hiệu lực đồng nghĩa bạn chấp nhận các thay đổi đó.
 14. Liên hệ
-\t• [Tên pháp nhân vận hành TheraHOME] — [Địa chỉ đăng ký kinh doanh]
-\t• Email hỗ trợ: [email hỗ trợ, ví dụ: support@therahome.vn]`,
+\t• Công ty H-COMMERCE GLOBAL COMPANY LIMITED — Tầng 11, toà RoxCenter, số 136 Hồ Tùng Mậu, Phú Diễn, Hà Nội
+\t• Email hỗ trợ: support@therahomeai.com`,
   },
   privacy: {
     title: 'Chính sách quyền riêng tư',
     text: `CHÍNH SÁCH QUYỀN RIÊNG TƯ
 Ứng dụng TheraHOME
-Cập nhật lần cuối: [Ngày ban hành / cập nhật gần nhất]
-Tài liệu này là bản dự thảo tổng hợp dựa trên yêu cầu công khai hiện hành của Apple App Store và Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân của Việt Nam, nhằm mục đích tham khảo. Đây không phải là tư vấn pháp lý. Trước khi công bố hoặc nộp lên App Store, vui lòng nhờ luật sư/chuyên gia pháp lý rà soát lại, đặc biệt các phần liên quan tới dữ liệu sức khoẻ, thương mại điện tử và các thị trường ngoài Việt Nam mà ứng dụng hoạt động.
+Cập nhật lần cuối: 01/09/2026
 1. Giới thiệu
-Chính sách này áp dụng cho ứng dụng TheraHOME (sau đây gọi là "Ứng dụng") do [Tên pháp nhân vận hành TheraHOME — điền trước khi công bố] (sau đây gọi là "chúng tôi") phát triển và vận hành, nhằm giải thích chúng tôi thu thập, sử dụng, chia sẻ và bảo vệ dữ liệu cá nhân của bạn như thế nào khi bạn sử dụng Ứng dụng. Khi tạo tài khoản hoặc sử dụng Ứng dụng, bạn đồng ý với các nội dung trong Chính sách này.
+Chính sách này áp dụng cho ứng dụng TheraHOME (sau đây gọi là "Ứng dụng") do Công ty H-COMMERCE GLOBAL COMPANY LIMITED (sau đây gọi là "chúng tôi") phát triển và vận hành, nhằm giải thích chúng tôi thu thập, sử dụng, chia sẻ và bảo vệ dữ liệu cá nhân của bạn như thế nào khi bạn sử dụng Ứng dụng. Khi tạo tài khoản hoặc sử dụng Ứng dụng, bạn đồng ý với các nội dung trong Chính sách này.
 TheraHOME là ứng dụng thể dục và chăm sóc sức khoẻ (fitness & wellness) tại nhà, không phải ứng dụng y tế. Vì Ứng dụng xử lý một số dữ liệu bạn tự cung cấp về cảm nhận cơ thể (mức độ khó chịu, tiến độ tập luyện), chúng tôi áp dụng các biện pháp bảo vệ chặt chẽ hơn mức thông thường cho các dữ liệu này, được mô tả xuyên suốt Chính sách.
 2. Dữ liệu chúng tôi thu thập
 2.1 Dữ liệu bạn cung cấp trực tiếp
@@ -128,7 +126,7 @@ Theo quy định pháp luật về bảo vệ dữ liệu cá nhân, bạn có c
 \t• Quyền yêu cầu hạn chế, phản đối việc xử lý dữ liệu.
 \t• Quyền khiếu nại, tố cáo, khởi kiện theo quy định pháp luật.
 8.1 Cách xoá tài khoản ngay trong Ứng dụng
-Bạn có thể tự xoá tài khoản trực tiếp trong Ứng dụng tại: Hồ sơ → Cài đặt → Quản lý tài khoản → Xoá tài khoản, không cần liên hệ bộ phận hỗ trợ. Khi xác nhận xoá, toàn bộ dữ liệu cá nhân gắn với tài khoản sẽ được xoá hoặc ẩn danh hoá theo Mục 7. Nếu gặp khó khăn, bạn có thể liên hệ [email hỗ trợ, ví dụ: support@therahome.vn].
+Bạn có thể tự xoá tài khoản trực tiếp trong Ứng dụng tại: Hồ sơ → Cài đặt → Quản lý tài khoản → Xoá tài khoản, không cần liên hệ bộ phận hỗ trợ. Khi xác nhận xoá, toàn bộ dữ liệu cá nhân gắn với tài khoản sẽ được xoá hoặc ẩn danh hoá theo Mục 7. Nếu gặp khó khăn, bạn có thể liên hệ support@therahomeai.com.
 9. Bảo mật dữ liệu
 Chúng tôi áp dụng các biện pháp kỹ thuật và tổ chức phù hợp để bảo vệ dữ liệu cá nhân khỏi truy cập, sử dụng, tiết lộ trái phép. Chi tiết các biện pháp bảo mật được trình bày trong Chính sách bảo mật thông tin riêng của chúng tôi.
 10. Trẻ em
@@ -139,18 +137,17 @@ Trong trường hợp máy chủ lưu trữ hoặc nhà cung cấp dịch vụ c
 Chúng tôi có thể cập nhật Chính sách này theo thời gian. Khi có thay đổi quan trọng, chúng tôi sẽ thông báo trong Ứng dụng hoặc qua email trước khi thay đổi có hiệu lực.
 13. Liên hệ
 Nếu có câu hỏi về Chính sách này hoặc muốn thực hiện quyền của mình đối với dữ liệu cá nhân, vui lòng liên hệ:
-\t• [Tên pháp nhân vận hành TheraHOME — điền trước khi công bố]
-\t• Địa chỉ: [Địa chỉ đăng ký kinh doanh]
-\t• Email bảo vệ dữ liệu cá nhân: [email bảo vệ dữ liệu, ví dụ: privacy@therahome.vn]`,
+\t• Công ty H-COMMERCE GLOBAL COMPANY LIMITED
+\t• Địa chỉ: Tầng 11, toà RoxCenter, số 136 Hồ Tùng Mậu, Phú Diễn, Hà Nội
+\t• Email bảo vệ dữ liệu cá nhân: support@therahomeai.com`,
   },
   security: {
     title: 'Chính sách bảo mật thông tin',
     text: `CHÍNH SÁCH BẢO MẬT THÔNG TIN
 Ứng dụng TheraHOME
-Cập nhật lần cuối: [Ngày ban hành / cập nhật gần nhất]
-Tài liệu này là bản dự thảo tổng hợp dựa trên yêu cầu công khai hiện hành của Apple App Store và Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân của Việt Nam, nhằm mục đích tham khảo. Đây không phải là tư vấn pháp lý. Trước khi công bố hoặc nộp lên App Store, vui lòng nhờ luật sư/chuyên gia pháp lý rà soát lại, đặc biệt các phần liên quan tới dữ liệu sức khoẻ, thương mại điện tử và các thị trường ngoài Việt Nam mà ứng dụng hoạt động.
+Cập nhật lần cuối: 01/09/2026
 1. Mục tiêu và phạm vi
-Chính sách này mô tả các biện pháp kỹ thuật và tổ chức mà [Tên pháp nhân vận hành TheraHOME — điền trước khi công bố] áp dụng để bảo vệ dữ liệu cá nhân, đặc biệt là dữ liệu sức khoẻ, khỏi truy cập, sử dụng, tiết lộ, sửa đổi hoặc phá huỷ trái phép, phù hợp với Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân.
+Chính sách này mô tả các biện pháp kỹ thuật và tổ chức mà Công ty H-COMMERCE GLOBAL COMPANY LIMITED áp dụng để bảo vệ dữ liệu cá nhân, đặc biệt là dữ liệu sức khoẻ, khỏi truy cập, sử dụng, tiết lộ, sửa đổi hoặc phá huỷ trái phép, phù hợp với Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân.
 2. Biện pháp kỹ thuật
 \t• Mã hoá dữ liệu khi truyền tải (HTTPS/TLS) giữa Ứng dụng và máy chủ.
 \t• Mã hoá dữ liệu nhạy cảm khi lưu trữ, bao gồm mật khẩu (băm một chiều) và dữ liệu sức khoẻ.
@@ -176,7 +173,7 @@ Dữ liệu được lưu trữ trên hạ tầng có kiểm soát truy cập v�
 6. Trách nhiệm của người dùng
 Người dùng có trách nhiệm bảo vệ mật khẩu tài khoản, không chia sẻ thông tin đăng nhập, và thông báo ngay cho chúng tôi nếu nghi ngờ tài khoản bị truy cập trái phép.
 7. Báo cáo lỗ hổng bảo mật
-Nếu bạn phát hiện lỗ hổng bảo mật trong Ứng dụng, vui lòng báo cho chúng tôi qua [email báo lỗ hổng bảo mật, ví dụ: security@therahome.vn]. Chúng tôi cam kết tiếp nhận, xác minh và xử lý các báo cáo hợp lệ trong thời gian sớm nhất.
+Nếu bạn phát hiện lỗ hổng bảo mật trong Ứng dụng, vui lòng báo cho chúng tôi qua support@therahomeai.com. Chúng tôi cam kết tiếp nhận, xác minh và xử lý các báo cáo hợp lệ trong thời gian sớm nhất.
 8. Rà soát và cập nhật
 Chính sách này được rà soát định kỳ và cập nhật khi có thay đổi về hệ thống, quy định pháp luật hoặc yêu cầu từ nền tảng phân phối ứng dụng (Apple App Store, Google Play).`,
   },
@@ -184,7 +181,7 @@ Chính sách này được rà soát định kỳ và cập nhật khi có thay 
     title: 'Quy định cộng đồng',
     text: `QUY ĐỊNH CỘNG ĐỒNG
 Mục Cộng đồng — Ứng dụng TheraHOME
-Cập nhật lần cuối: [Ngày ban hành / cập nhật gần nhất]
+Cập nhật lần cuối: 01/09/2026
 Mục Cộng đồng là nơi các thành viên TheraHOME chia sẻ hành trình tập luyện, động viên lẫn nhau và trao đổi kinh nghiệm. Quy định này áp dụng cho mọi bài viết, bình luận, hình ảnh và tương tác trong mục Cộng đồng, cùng với Điều khoản sử dụng và Chính sách quyền riêng tư.
 1. Tinh thần chung
 Cộng đồng TheraHOME được xây dựng trên sự tôn trọng và hỗ trợ lẫn nhau giữa những người đang trên hành trình chăm sóc cơ thể. Hãy chia sẻ như bạn muốn được đối xử: chân thành, tích cực và tôn trọng trải nghiệm của người khác.
