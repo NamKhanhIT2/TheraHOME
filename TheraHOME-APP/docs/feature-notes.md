@@ -2706,3 +2706,27 @@ images and `apple_product_id` stay shared. `usePhasePromo` resolves the
 viewer's language with per-field VN fallback (queryKey now includes
 language); `PhaseUnlockPromo`/paywall components are unchanged. Authored
 from the WEB Admin's Quiz & Upsell editor (VN/EN/MS tabs).
+
+## Discomfort check-in restored + accessible-days hero + market dropdown names (2026-09-01)
+
+Three per-explicit-request changes, mobile only (needs a new TestFlight
+build):
+- **Check-in restored**: `useRequestDay` is back (deleted 2026-08-31) —
+  tapping TODAY's day on Roadmap or Home's "Bắt đầu" shows
+  `PainScaleModal` first; confirming inserts/updates that day's
+  `pain_logs` row (the chart's new-entry point again) then opens the
+  day. Pure logging under the calendar-unlock mechanic — completion is
+  still only `mark_day_watched`. A failed lookup/insert opens the day
+  anyway (never blocks the workout). Copy was already the compliant
+  "khó chịu"/discomfort wording — no medical terms reintroduced.
+- **Home hero "Ngày N/X"**: X is now the count of days in phases the
+  user can actually reach — IAP-locked unpurchased phases excluded
+  (…/14 while phase 3 locked, …/28 after unlock), the same
+  `usePhaseLockRequirements`+`usePhasePurchases` rule Roadmap uses, so
+  the two stay in sync. N is capped at X.
+- **Dropdown names per market**: `usePrimaryProductIds` grew into
+  `usePrimaryProducts` — also returns each device's store-item name for
+  the viewer's market (VN fallback), so the Home/Roadmap device
+  dropdowns show whatever admin filled per market in the Sản Phẩm tab
+  instead of the single-language `products.name`. Home's dropdown now
+  also filters to primary-group devices like Roadmap's.

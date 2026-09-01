@@ -4,13 +4,15 @@ import { router } from 'expo-router';
 import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
-import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, usePrimaryProductIds, useProducts } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, usePrimaryProducts, useProducts } from '@/hooks/usePrograms';
+import { useRequestDay } from '@/hooks/useRequestDay';
 import { useAccessContact } from '@/hooks/useAccessContact';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
 import { usePhasePurchases } from '@/hooks/usePhasePurchase';
 import { useQuizResolvedMap } from '@/hooks/useQuiz';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ProductDropdown } from '@/components/ProductDropdown';
+import { PainScaleModal } from '@/components/PainScaleModal';
 import { PathNode } from '@/components/PathNode';
 import { PhaseFooter } from '@/components/roadmap/PhaseFooter';
 import { Icon } from '@/components/icons/Icon';
@@ -38,27 +40,32 @@ export default function RoadmapScreen() {
   const productsQuery = useProducts();
   const programsQuery = useActivatedPrograms(userId);
   const defaultProductQuery = useDefaultProductId(userId);
-  const primaryIdsQuery = usePrimaryProductIds();
+  const primaryQuery = usePrimaryProducts();
+  const requestDayGate = useRequestDay();
   const activatedPrograms = programsQuery.data ?? [];
   // Memoized (not a fresh `?? []` per render) — feeds the dropdownProducts
   // memo below.
   const catalogProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   // The dropdown lists every device in a PRIMARY store group ("nhóm sản
   // phẩm chính"), activated or not — a not-yet-activated device shows a
-  // per-product unlock card instead of its days. Falls back to the full
-  // catalog while the flag data loads (or if admin flagged nothing yet).
+  // per-product unlock card instead of its days. Names come from the
+  // viewer's market's store item row (admin fills them per market in the
+  // Sản Phẩm tab). Falls back to the full catalog while the flag data
+  // loads (or if admin flagged nothing yet).
   const dropdownProducts = useMemo(() => {
-    const primaryIds = primaryIdsQuery.data;
-    if (!primaryIds || primaryIds.length === 0) return catalogProducts;
-    const filtered = catalogProducts.filter((p) => primaryIds.includes(p.id));
-    return filtered.length ? filtered : catalogProducts;
-  }, [catalogProducts, primaryIdsQuery.data]);
+    const info = primaryQuery.data;
+    if (!info || info.ids.length === 0) return catalogProducts;
+    const filtered = catalogProducts.filter((p) => info.ids.includes(p.id));
+    const base = filtered.length ? filtered : catalogProducts;
+    return base.map((p) => ({ ...p, name: info.nameById[p.id] ?? p.name }));
+  }, [catalogProducts, primaryQuery.data]);
   // Prefer the product the user actually ordered over just "first activated
   // program" — only kicks in when they haven't explicitly picked one via
   // the dropdown yet (`selectedProductId` always wins once set).
   const effectiveProductId =
     selectedProductId ?? defaultProductQuery.data ?? activatedPrograms[0]?.productId ?? dropdownProducts[0]?.id;
-  const selectedProduct = catalogProducts.find((p) => p.id === effectiveProductId);
+  const selectedProduct =
+    dropdownProducts.find((p) => p.id === effectiveProductId) ?? catalogProducts.find((p) => p.id === effectiveProductId);
   const program = activatedPrograms.find((p) => p.productId === effectiveProductId);
 
   // Pin the first resolved device as the explicit (persisted) selection so
@@ -279,12 +286,19 @@ export default function RoadmapScreen() {
                       <PathNode
                         day={d}
                         isToday={program ? d.id === program.currentDay : false}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/day/[dayId]',
-                            params: { dayId: String(d.id), productId: program?.productId ?? selectedProduct.id },
-                          })
-                        }
+                        onPress={() => {
+                          // Today's day goes through the discomfort
+                          // check-in gate; anything else (and the no-
+                          // program preview) opens directly.
+                          if (program) {
+                            void requestDayGate.requestDay(d, program.userProgramId, program.productId);
+                          } else {
+                            router.push({
+                              pathname: '/day/[dayId]',
+                              params: { dayId: String(d.id), productId: selectedProduct.id },
+                            });
+                          }
+                        }}
                       />
                     </Reanimated.View>
                   ) : null}
@@ -309,6 +323,14 @@ export default function RoadmapScreen() {
         ) : null}
       </ScrollView>
       </Reanimated.View>
+      {requestDayGate.pendingDay !== null ? (
+        <PainScaleModal
+          dayId={requestDayGate.pendingDay}
+          onCancel={requestDayGate.cancelPain}
+          onConfirm={(value) => void requestDayGate.confirmPain(value)}
+          submitting={requestDayGate.isSubmitting}
+        />
+      ) : null}
     </ScreenContainer>
   );
 }

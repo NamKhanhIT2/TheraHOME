@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -13,7 +13,11 @@ import { fadeUpEntering } from '@/lib/motion';
 import { introVideo } from '@/lib/mockData';
 import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
-import { useActivatedPrograms, useDefaultProductId, usePainLogs, useProducts, useProgramDays } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useDefaultProductId, usePainLogs, usePrimaryProducts, useProducts, useProgramDays } from '@/hooks/usePrograms';
+import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
+import { usePhasePurchases } from '@/hooks/usePhasePurchase';
+import { useRequestDay } from '@/hooks/useRequestDay';
+import { PainScaleModal } from '@/components/PainScaleModal';
 import { useWaterLog, useSetWaterLog } from '@/hooks/useWaterLog';
 import { useProfile } from '@/hooks/useProfile';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -90,6 +94,34 @@ export default function HomeScreen() {
   const painLogsQuery = usePainLogs(chartProgram?.userProgramId);
   const waterQuery = useWaterLog(userId);
   const setWaterMutation = useSetWaterLog(userId);
+  const requestDayGate = useRequestDay();
+  const primaryQuery = usePrimaryProducts();
+
+  // Hero denominator = days the user can actually reach: an IAP-locked,
+  // not-yet-purchased phase's days are excluded (e.g. "…/14" while phase 3
+  // is locked, "…/28" once unlocked) — same phase-hiding rule the Roadmap
+  // applies, so the two stay in sync.
+  const heroDays = useMemo(() => daysQuery.data ?? [], [daysQuery.data]);
+  const heroPhaseIds = useMemo(() => Array.from(new Set(heroDays.map((d) => d.phaseId))), [heroDays]);
+  const lockRequirementsQuery = usePhaseLockRequirements(heroPhaseIds);
+  const purchasesQuery = usePhasePurchases(userId);
+  const accessibleTotalDays = useMemo(() => {
+    const requirements = lockRequirementsQuery.data;
+    const purchased = purchasesQuery.data;
+    if (!requirements || requirements.size === 0) return heroDays.length;
+    return heroDays.filter((d) => !requirements.has(d.phaseId) || purchased?.has(d.phaseId)).length;
+  }, [heroDays, lockRequirementsQuery.data, purchasesQuery.data]);
+
+  // Home's device dropdown mirrors the Roadmap's: primary-group devices
+  // with the viewer's market's store names (VN fallback).
+  const dropdownProducts = useMemo(() => {
+    const catalog = productsQuery.data ?? [];
+    const info = primaryQuery.data;
+    if (!info || info.ids.length === 0) return catalog;
+    const filtered = catalog.filter((p) => info.ids.includes(p.id));
+    const base = filtered.length ? filtered : catalog;
+    return base.map((p) => ({ ...p, name: info.nameById[p.id] ?? p.name }));
+  }, [productsQuery.data, primaryQuery.data]);
 
   // `programsQuery` and `daysQuery` are dependent queries. In TanStack Query
   // v5 a disabled query is still `isPending`, even though it is not fetching.
@@ -142,7 +174,9 @@ export default function HomeScreen() {
   // see roadmap.tsx) — `today` stays null and the hero card below renders
   // an "activate to unlock" prompt instead of day/phase progress.
   const today = program ? (days.find((d) => d.id === program.currentDay) ?? days.find((d) => d.status === 'current') ?? days[days.length - 1] ?? null) : null;
-  const progressPct = today ? Math.round((today.id / program!.product.totalDays) * 100) : 0;
+  const heroTotalDays = accessibleTotalDays || program?.product.totalDays || 0;
+  const heroDayNumber = today ? Math.min(today.id, heroTotalDays) : 0;
+  const progressPct = today && heroTotalDays ? Math.round((heroDayNumber / heroTotalDays) * 100) : 0;
 
   const chartData = painLogsQuery.data ?? [];
   const water = waterQuery.data ?? 0;
@@ -189,8 +223,8 @@ export default function HomeScreen() {
 
         <Animated.View style={[{ marginTop: 12 }, softParallax(3)]}>
           <ProductDropdown
-            product={chartProduct}
-            products={catalogProducts}
+            product={dropdownProducts.find((p) => p.id === chartProduct.id) ?? chartProduct}
+            products={dropdownProducts}
             onSelect={selectProduct}
           />
           <View style={{ marginTop: 8 }}>
@@ -204,7 +238,7 @@ export default function HomeScreen() {
             <>
               <View style={styles.heroTopRow}>
                 <TransitionText
-                  value={t('dayOfTotal', { day: today.id, total: program.product.totalDays })}
+                  value={t('dayOfTotal', { day: heroDayNumber, total: heroTotalDays })}
                   style={[theme.type.h1, { color: '#fff' }]}
                 />
                 <View style={[styles.phasePill, { backgroundColor: 'rgba(255,255,255,0.16)', borderColor: 'rgba(255,255,255,0.4)' }]}>
@@ -228,7 +262,7 @@ export default function HomeScreen() {
                 </Pressable>
                 <Pressable
                   style={[styles.heroBtnFilled, { backgroundColor: '#fff', borderRadius: theme.radius.md }]}
-                  onPress={() => router.push({ pathname: '/day/[dayId]', params: { dayId: String(today.id), productId: program.productId } })}
+                  onPress={() => void requestDayGate.requestDay(today, program.userProgramId, program.productId)}
                 >
                   <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('startToday')}</Text>
                 </Pressable>
@@ -320,7 +354,14 @@ export default function HomeScreen() {
         </Reanimated.View>
       </Animated.ScrollView>
       </Reanimated.View>
-
+      {requestDayGate.pendingDay !== null ? (
+        <PainScaleModal
+          dayId={requestDayGate.pendingDay}
+          onCancel={requestDayGate.cancelPain}
+          onConfirm={(value) => void requestDayGate.confirmPain(value)}
+          submitting={requestDayGate.isSubmitting}
+        />
+      ) : null}
     </ScreenContainer>
   );
 }

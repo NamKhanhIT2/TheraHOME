@@ -50,22 +50,46 @@ export function useProducts() {
   });
 }
 
-/** Product ids that belong to a PRIMARY store group ("nhóm sản phẩm
- * chính", admin-managed on store_categories.is_primary) — the Roadmap's
- * device dropdown lists exactly these, whether or not the user has
- * activated them. Any market's row counts, so a device stays listed while
- * its UK/ML store content is still being filled in. */
-export function usePrimaryProductIds() {
+export interface PrimaryProductsInfo {
+  /** Product ids that belong to a PRIMARY store group ("nhóm sản phẩm
+   * chính", admin-managed on store_categories.is_primary). Any market's
+   * row counts, so a device stays listed while its UK/ML store content is
+   * still being filled in. */
+  ids: string[];
+  /** Display name per product for the VIEWER'S market, straight from the
+   * store item row admin filled for that market in the Sản Phẩm tab (VN
+   * row as fallback) — so the device dropdown shows the market's own
+   * wording instead of the single-language products.name. */
+  nameById: Record<string, string>;
+}
+
+/** The devices the Home/Roadmap dropdowns list, with per-market names —
+ * see PrimaryProductsInfo. */
+export function usePrimaryProducts() {
+  const language = useAppStore((state) => state.language);
+  const market = marketForLanguage(language);
   return useQuery({
-    queryKey: ['primary_product_ids'],
-    queryFn: async (): Promise<string[]> => {
+    queryKey: ['primary_products', market],
+    queryFn: async (): Promise<PrimaryProductsInfo> => {
       const { data, error } = await supabase
         .from('store_items')
-        .select('product_id, store_categories!inner(is_primary)')
+        .select('product_id, name, market, store_categories!inner(is_primary)')
         .eq('store_categories.is_primary', true)
         .not('product_id', 'is', null);
       if (error) throw error;
-      return [...new Set((data ?? []).map((row) => row.product_id as string))];
+      const rows = data ?? [];
+      const ids = [...new Set(rows.map((row) => row.product_id as string))];
+      const nameById: Record<string, string> = {};
+      // VN names first, then the viewer's market rows override them.
+      for (const row of rows) {
+        if (row.market === 'VN' && row.name?.trim()) nameById[row.product_id as string] = row.name.trim();
+      }
+      if (market !== 'VN') {
+        for (const row of rows) {
+          if (row.market === market && row.name?.trim()) nameById[row.product_id as string] = row.name.trim();
+        }
+      }
+      return { ids, nameById };
     },
     staleTime: 5 * 60 * 1000,
   });
