@@ -134,6 +134,10 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
       access_level: accessLevel,
       expires_at: expiresAt,
       onboarding_completed: !onboardingRequired,
+      // Thera-issued accounts never see the country screen (RootNavigator
+      // skips it for them), so mark it done — a false default sent old app
+      // builds to an unregistered /country route (blank screen).
+      country_confirmed: true,
       notes,
       created_by: createdBy,
       locked: false,

@@ -28,8 +28,15 @@ export default function AppEntryScreen() {
 
   const isStaff = profile.accountType === 'admin' || profile.accountType === 'cskh';
   if (isStaff) return <Redirect href="/(staff)/chat" />;
-  if (profile.onboardingCompleted === false) return <Redirect href="/questions" />;
-  if (profile.countryConfirmed === false) return <Redirect href="/country" />;
+  // TheraHOME-issued accounts skip the intake/country screens entirely —
+  // RootNavigator treats them as inApp, so the (onboarding) group (which
+  // holds /questions and /country) is NOT registered for them. Redirecting
+  // there anyway landed on an unregistered route = blank screen (hit by
+  // admin-issued accounts, whose profiles rows default country_confirmed
+  // to false). Mirror RootNavigator's gating exactly.
+  const isTheraIssued = profile.accountType !== 'normal';
+  if (!isTheraIssued && profile.onboardingCompleted === false) return <Redirect href="/questions" />;
+  if (!isTheraIssued && profile.countryConfirmed === false) return <Redirect href="/country" />;
 
   return <Redirect href="/(tabs)/home" />;
 }
