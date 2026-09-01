@@ -23,6 +23,14 @@ export interface PhaseFooterProps {
   nextPhaseName: string | null;
   /** Already verified purchased — hides the unlock card inside the promo. */
   unlocked: boolean;
+  /** Whether the phase's own days have all run their course (done/missed).
+   * When false the quiz row still renders — visibly DISABLED with a
+   * "complete Day N to unlock" hint (per explicit request: the quiz after
+   * day 7/14 should be discoverable before it's reachable) — and the promo
+   * cards stay hidden. */
+  enabled: boolean;
+  /** The phase's last day number — used in the disabled row's hint. */
+  lockedDayNumber: number;
   /** Whether the phase this footer belongs to is currently collapsed — hides
    * the quiz row (whether it's the "take it" prompt or the "completed"
    * state) since that's this phase's own content; the promo cards below
@@ -38,7 +46,7 @@ export interface PhaseFooterProps {
  * `PhaseUnlockPromo` for the phase that follows (see `nextPhaseId` above)
  * always renders once the quiz is resolved (or there was none), regardless
  * of `collapsed` — nothing renders there if there is no next phase. */
-export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId, nextPhaseName, unlocked, collapsed }: PhaseFooterProps) {
+export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId, nextPhaseName, unlocked, enabled, lockedDayNumber, collapsed }: PhaseFooterProps) {
   const theme = useTheme();
   const { t } = useI18n();
   const questionsQuery = usePhaseQuiz(phaseId);
@@ -49,6 +57,25 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId
   const hasQuiz = (questionsQuery.data?.length ?? 0) > 0;
   const quizDone = !hasQuiz || !!attemptQuery.data;
   const promo = nextPhaseId && nextPhaseName ? <PhaseUnlockPromo phaseId={nextPhaseId} phaseName={nextPhaseName} unlocked={unlocked} /> : null;
+
+  // Phase not finished yet: the quiz row shows in a disabled state so the
+  // user can see it coming; promos wait until the phase is actually done.
+  if (!enabled) {
+    if (!hasQuiz || collapsed) return null;
+    return (
+      <View style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, opacity: 0.62 }]}>
+        <View style={[styles.quizIcon, { backgroundColor: theme.colors.bgCardAlt }]}>
+          <Icon name="lock" size={18} color={theme.colors.textMuted} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[theme.type.bodyStrong, { color: theme.colors.textSecondary }]}>{t('quizTitle')}</Text>
+          <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>
+            {t('quizLockedHint', { day: lockedDayNumber })}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (!hasQuiz) return promo;
   if (collapsed) return quizDone ? promo : null;

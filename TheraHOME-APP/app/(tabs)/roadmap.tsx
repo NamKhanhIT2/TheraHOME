@@ -259,7 +259,11 @@ export default function RoadmapScreen() {
                       />
                     </Reanimated.View>
                   ) : null}
-                  {isLastOfPhase && phaseAllDone.get(d.phaseId) ? (
+                  {isLastOfPhase ? (
+                    // Always rendered at a phase's end: enabled (quiz
+                    // prompt + promos) once every day has run its course,
+                    // otherwise a visibly disabled quiz row with a
+                    // "complete Day N to unlock" hint.
                     <Reanimated.View entering={fadeUpEntering(itemDelay + 20)} style={{ marginTop: 14, marginBottom: 6 }}>
                       <PhaseFooter
                         userId={userId}
@@ -269,6 +273,8 @@ export default function RoadmapScreen() {
                         nextPhaseId={nextDay?.phaseId ?? null}
                         nextPhaseName={nextDay?.phase ?? null}
                         unlocked={nextDay ? !lockRequirementsQuery.data?.has(nextDay.phaseId) : true}
+                        enabled={phaseAllDone.get(d.phaseId) ?? false}
+                        lockedDayNumber={d.id}
                         collapsed={collapsed}
                       />
                     </Reanimated.View>
