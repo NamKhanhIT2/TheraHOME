@@ -25,28 +25,36 @@ export default function QuizScreen() {
   const submitAttempt = useSubmitQuizAttempt();
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [result, setResult] = useState<{ score: number; total: number } | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   const questions = questionsQuery.data ?? [];
   const allAnswered = questions.length > 0 && questions.every((q) => answers[q.id] != null);
 
   function selectAnswer(questionId: string, optionIndex: number) {
-    if (result) return;
+    if (submitted) return;
     setAnswers((cur) => ({ ...cur, [questionId]: optionIndex }));
   }
 
+  // Survey/assessment, not a graded test (per explicit request): there is
+  // no right answer and no score — the chosen options are simply recorded
+  // (with the question/option text as the user saw them) for CSKH to read.
   async function handleSubmit() {
     if (!allAnswered || !userId || !program) return;
-    const score = questions.reduce((sum, q) => sum + (answers[q.id] === q.correctIndex ? 1 : 0), 0);
+    const snapshot = Object.fromEntries(
+      questions.map((q) => {
+        const optionIndex = answers[q.id];
+        return [q.id, { question: q.question, answer: q.options[optionIndex] ?? '', optionIndex }];
+      }),
+    );
     try {
       await submitAttempt.mutateAsync({
         userId,
         userProgramId: program.userProgramId,
         phaseId,
-        score,
         totalQuestions: questions.length,
+        answers: snapshot,
       });
-      setResult({ score, total: questions.length });
+      setSubmitted(true);
     } catch {
       // Attempt not saved -- leave answers in place so the user can retry
       // Submit without losing their picks.
@@ -62,14 +70,14 @@ export default function QuizScreen() {
         <View style={styles.loadingBox}>
           <ActivityIndicator color={theme.colors.primary} />
         </View>
-      ) : result ? (
+      ) : submitted ? (
         <Reanimated.View entering={FadeIn.duration(220)} style={styles.resultBody}>
           <View style={[styles.resultIcon, { backgroundColor: theme.colors.successTint }]}>
             <Icon name="clipboard-check" size={30} color={theme.colors.success} />
           </View>
           <Text style={[theme.type.h1, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('quizResultTitle')}</Text>
           <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }]}>
-            {t('quizResultScore', { score: result.score, total: result.total })}
+            {t('quizSurveyThanks')}
           </Text>
           <Button style={{ width: '100%', marginTop: 24 }} onPress={() => router.back()}>
             {t('quizContinue')}

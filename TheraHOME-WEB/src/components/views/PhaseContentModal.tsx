@@ -61,16 +61,10 @@ function QuestionEditor({ draft, onChange, onCancel, onSave, saving }: { draft: 
       <div style={{ marginTop: 10 }}>
         <FieldLabel>Câu hỏi</FieldLabel>
         <input value={content.question} onChange={(e) => updateContent({ question: e.target.value })} style={{ ...inputStyle, marginBottom: 12 }} placeholder="Nhập nội dung câu hỏi..." />
-        <FieldLabel>Đáp án (chọn nút tròn để đánh dấu đáp án đúng)</FieldLabel>
+        <FieldLabel>Các lựa chọn trả lời (khảo sát/đánh giá — không có đáp án đúng/sai)</FieldLabel>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
           {content.options.map((opt, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="radio"
-                checked={content.correctIndex === i}
-                onChange={() => updateContent({ correctIndex: i })}
-                title="Đáp án đúng"
-              />
               <input value={opt} onChange={(e) => updateOption(i, e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder={`Lựa chọn ${i + 1}`} />
               {content.options.length > 2 ? (
                 <button onClick={() => removeOption(i)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
@@ -325,11 +319,11 @@ export function PhaseContentModal({ phase, onClose }: { phase: ProgramPhase; onC
   const [tab, setTab] = useState<ContentTab>("quiz");
 
   return (
-    <Modal title={"Quiz & Upsell · " + phase.name} onClose={onClose} width={520} footer={<GhostBtn onClick={onClose}>Đóng</GhostBtn>}>
+    <Modal title={"Khảo sát & Upsell · " + phase.name} onClose={onClose} width={520} footer={<GhostBtn onClick={onClose}>Đóng</GhostBtn>}>
       <div style={{ marginBottom: 14 }}>
         <PillTabs
           options={[
-            ["quiz", "Câu hỏi Quiz"],
+            ["quiz", "Câu hỏi khảo sát"],
             ["promo", "Nội dung Upsell"],
           ]}
           value={tab}

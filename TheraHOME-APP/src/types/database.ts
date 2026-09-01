@@ -1629,6 +1629,7 @@ export type Database = {
       }
       user_quiz_attempts: {
         Row: {
+          answers: Json
           completed_at: string
           id: string
           phase_id: string
@@ -1638,6 +1639,7 @@ export type Database = {
           user_program_id: string
         }
         Insert: {
+          answers?: Json
           completed_at?: string
           id?: string
           phase_id: string
@@ -1647,6 +1649,7 @@ export type Database = {
           user_program_id: string
         }
         Update: {
+          answers?: Json
           completed_at?: string
           id?: string
           phase_id?: string

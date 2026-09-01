@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
+import type { Json } from '@/types/database';
 
 interface QuizContentEntry {
   question: string;
   options: string[];
+  /** Legacy field from the right/wrong-quiz era — still stored by admin
+   * for old app builds, but surveys ignore it entirely. */
   correctIndex: number;
 }
 
@@ -13,7 +16,6 @@ export interface QuizQuestionRow {
   sortOrder: number;
   question: string;
   options: string[];
-  correctIndex: number;
 }
 
 /** Questions for one phase's quiz, localized to the current UI language
@@ -38,7 +40,6 @@ export function usePhaseQuiz(phaseId: string | undefined) {
           sortOrder: row.sort_order,
           question: localized.question,
           options: localized.options,
-          correctIndex: localized.correctIndex,
         };
       });
     },
@@ -97,17 +98,34 @@ export function useQuizResolvedMap(userId: string | undefined, phaseIds: string[
   });
 }
 
+/** One recorded survey response: the question and chosen option as the
+ * user saw them (their language at the time), keyed by question id. */
+export interface QuizAnswerSnapshot {
+  question: string;
+  answer: string;
+  optionIndex: number;
+}
+
 export function useSubmitQuizAttempt() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: { userId: string; userProgramId: string; phaseId: string; score: number; totalQuestions: number }) => {
+    mutationFn: async (vars: {
+      userId: string;
+      userProgramId: string;
+      phaseId: string;
+      totalQuestions: number;
+      answers: Record<string, QuizAnswerSnapshot>;
+    }) => {
       const { error } = await supabase.from('user_quiz_attempts').upsert(
         {
           user_id: vars.userId,
           user_program_id: vars.userProgramId,
           phase_id: vars.phaseId,
-          score: vars.score,
+          // Surveys have no right answers — score is a legacy column kept
+          // for old app builds; what matters now is `answers`.
+          score: 0,
           total_questions: vars.totalQuestions,
+          answers: vars.answers as unknown as Json,
           completed_at: new Date().toISOString(),
         },
         { onConflict: 'user_id,phase_id' },

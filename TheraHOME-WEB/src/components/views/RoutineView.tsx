@@ -219,7 +219,7 @@ export function RoutineView() {
           </div>
         </div>
       </SectionCard>
-      <SectionCard title="Giai đoạn · Quiz & Upsell">
+      <SectionCard title="Giai đoạn · Khảo sát & Upsell">
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {product.phases.map((ph) => (
             <div key={ph.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--bg-card-alt)" }}>
@@ -227,7 +227,7 @@ export function RoutineView() {
                 <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)" }}>{ph.name}</div>
                 <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>Ngày {ph.range[0]}–{ph.range[1]}</div>
               </div>
-              <GhostBtn onClick={() => setPhaseContentTarget(ph)}>Quản lý Quiz &amp; Upsell</GhostBtn>
+              <GhostBtn onClick={() => setPhaseContentTarget(ph)}>Quản lý Khảo sát &amp; Upsell</GhostBtn>
             </div>
           ))}
         </div>
