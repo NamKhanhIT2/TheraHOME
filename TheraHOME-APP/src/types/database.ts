@@ -766,6 +766,7 @@ export type Database = {
           cross_sell_video_url: string | null
           id: string
           phase_id: string
+          translations: Json
           unlock_badge: string | null
           unlock_benefits: Json | null
           unlock_description: string | null
@@ -789,6 +790,7 @@ export type Database = {
           cross_sell_video_url?: string | null
           id?: string
           phase_id: string
+          translations?: Json
           unlock_badge?: string | null
           unlock_benefits?: Json | null
           unlock_description?: string | null
@@ -812,6 +814,7 @@ export type Database = {
           cross_sell_video_url?: string | null
           id?: string
           phase_id?: string
+          translations?: Json
           unlock_badge?: string | null
           unlock_benefits?: Json | null
           unlock_description?: string | null

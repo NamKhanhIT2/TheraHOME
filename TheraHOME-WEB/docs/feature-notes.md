@@ -734,3 +734,23 @@ everything theirs does plus third-party-AI processing and cross-border
 transfer, so nothing was borrowed. Deployed via the normal Vercel push;
 verified live (200 + section 5.1 present). The legal entity placeholders
 ("[Tên pháp nhân…]") still need filling before App Store submission.
+
+## 3-market coverage audit + phase-promo translations (2026-09-01)
+
+Audit per explicit request ("các tab admin/cskh quản lý được nội dung 3
+thị trường"): Routine/Products (market dropdown + 3-market forms), Quiz
+(vi/en/ms), system notification templates (vi/en/ms), Upsale campaigns
+(vi + optional en/ms with VN fallback) and Community official posts
+(VN + optional US/MALAY variants) were already covered. The one gap was
+`phase_promos` (upsell card + paywall): single-language columns, so
+UK/ML users saw Vietnamese. Fixed via a `translations` jsonb column
+(migration `202609011100_phase_promo_translations`, keys = language →
+snake_case column; images + apple_product_id stay shared) — the
+PhaseContentModal Upsell editor gained VN/EN/MS tabs (empty field =
+falls back to VN; placeholder shows the VN value), db.ts got
+parse/serializePromoTranslations. Mobile merges in `usePhasePromo`.
+Known remaining single-language content, deliberately out of scope:
+`products.name`/`program_phases.name` (mobile hardcodes en/ms for the
+seeded catalog in `src/lib/adminContent.ts` — a renamed/new product
+shows its VN name in all languages) and `articles` (mobile ships static
+vi/en/ms arrays in mockData.ts, no admin tab at all).

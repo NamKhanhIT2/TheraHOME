@@ -560,6 +560,46 @@ export async function deleteQuizQuestion(id: string) {
   if (error) throw error;
 }
 
+/** The translatable text/url fields of a phase promo — everything except
+ * the two images and the Apple product id, which stay shared across
+ * languages. `unlockBenefits` is one-per-line text (like the VN field). */
+export interface PhasePromoTranslation {
+  crossSellBadge: string;
+  crossSellTitle: string;
+  crossSellDescription: string;
+  crossSellCtaUrl: string;
+  crossSellVideoUrl: string;
+  unlockDescription: string;
+  unlockVideoUrl: string;
+  unlockBadge: string;
+  unlockTitle: string;
+  unlockSubtitle: string;
+  unlockBenefits: string;
+  unlockPackageName: string;
+  unlockPackageDesc: string;
+  unlockPriceLabel: string;
+}
+
+export type PhasePromoLang = "en" | "ms";
+const PHASE_PROMO_LANGS: PhasePromoLang[] = ["en", "ms"];
+
+const EMPTY_PHASE_PROMO_TRANSLATION: PhasePromoTranslation = {
+  crossSellBadge: "",
+  crossSellTitle: "",
+  crossSellDescription: "",
+  crossSellCtaUrl: "",
+  crossSellVideoUrl: "",
+  unlockDescription: "",
+  unlockVideoUrl: "",
+  unlockBadge: "",
+  unlockTitle: "",
+  unlockSubtitle: "",
+  unlockBenefits: "",
+  unlockPackageName: "",
+  unlockPackageDesc: "",
+  unlockPriceLabel: "",
+};
+
 export interface PhasePromoAdmin {
   crossSellImageUrl: string;
   crossSellBadge: string;
@@ -581,6 +621,10 @@ export interface PhasePromoAdmin {
   unlockPackageName: string;
   unlockPackageDesc: string;
   unlockPriceLabel: string;
+  /** EN/MS overrides; an empty field falls back to the VN base on mobile.
+   * Stored in phase_promos.translations keyed by language then snake_case
+   * column name (see migration 202609011100_phase_promo_translations). */
+  translations: Record<PhasePromoLang, PhasePromoTranslation>;
 }
 
 const EMPTY_PHASE_PROMO: PhasePromoAdmin = {
@@ -601,18 +645,69 @@ const EMPTY_PHASE_PROMO: PhasePromoAdmin = {
   unlockPackageName: "",
   unlockPackageDesc: "",
   unlockPriceLabel: "",
+  translations: { en: { ...EMPTY_PHASE_PROMO_TRANSLATION }, ms: { ...EMPTY_PHASE_PROMO_TRANSLATION } },
 };
+
+/** DB jsonb keys (snake_case, matching the base columns) <-> admin fields. */
+const PROMO_TRANSLATION_KEYS: Array<[keyof PhasePromoTranslation, string]> = [
+  ["crossSellBadge", "cross_sell_badge"],
+  ["crossSellTitle", "cross_sell_title"],
+  ["crossSellDescription", "cross_sell_description"],
+  ["crossSellCtaUrl", "cross_sell_cta_url"],
+  ["crossSellVideoUrl", "cross_sell_video_url"],
+  ["unlockDescription", "unlock_description"],
+  ["unlockVideoUrl", "unlock_video_url"],
+  ["unlockBadge", "unlock_badge"],
+  ["unlockTitle", "unlock_title"],
+  ["unlockSubtitle", "unlock_subtitle"],
+  ["unlockBenefits", "unlock_benefits"],
+  ["unlockPackageName", "unlock_package_name"],
+  ["unlockPackageDesc", "unlock_package_desc"],
+  ["unlockPriceLabel", "unlock_price_label"],
+];
+
+function parsePromoTranslations(raw: unknown): PhasePromoAdmin["translations"] {
+  const result = { en: { ...EMPTY_PHASE_PROMO_TRANSLATION }, ms: { ...EMPTY_PHASE_PROMO_TRANSLATION } };
+  if (!raw || typeof raw !== "object") return result;
+  for (const lang of PHASE_PROMO_LANGS) {
+    const entry = (raw as Record<string, unknown>)[lang];
+    if (!entry || typeof entry !== "object") continue;
+    for (const [field, dbKey] of PROMO_TRANSLATION_KEYS) {
+      const value = (entry as Record<string, unknown>)[dbKey];
+      if (field === "unlockBenefits") {
+        if (Array.isArray(value)) result[lang][field] = value.filter((v): v is string => typeof v === "string").join("\n");
+      } else if (typeof value === "string") {
+        result[lang][field] = value;
+      }
+    }
+  }
+  return result;
+}
+
+function serializePromoTranslations(translations: PhasePromoAdmin["translations"]): Record<string, Record<string, unknown>> {
+  const result: Record<string, Record<string, unknown>> = {};
+  for (const lang of PHASE_PROMO_LANGS) {
+    const entry: Record<string, unknown> = {};
+    for (const [field, dbKey] of PROMO_TRANSLATION_KEYS) {
+      const value = translations[lang][field].trim();
+      if (!value) continue;
+      entry[dbKey] = field === "unlockBenefits" ? value.split("\n").map((l) => l.trim()).filter(Boolean) : value;
+    }
+    if (Object.keys(entry).length) result[lang] = entry;
+  }
+  return result;
+}
 
 export async function fetchPhasePromo(phaseId: string): Promise<PhasePromoAdmin> {
   const { data, error } = await supabase
     .from("phase_promos")
     .select(
-      "cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label"
+      "cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, translations"
     )
     .eq("phase_id", phaseId)
     .maybeSingle();
   if (error) throw error;
-  if (!data) return EMPTY_PHASE_PROMO;
+  if (!data) return { ...EMPTY_PHASE_PROMO, translations: parsePromoTranslations(null) };
   return {
     crossSellImageUrl: data.cross_sell_image_url ?? "",
     crossSellBadge: data.cross_sell_badge ?? "",
@@ -631,6 +726,7 @@ export async function fetchPhasePromo(phaseId: string): Promise<PhasePromoAdmin>
     unlockPackageName: data.unlock_package_name ?? "",
     unlockPackageDesc: data.unlock_package_desc ?? "",
     unlockPriceLabel: data.unlock_price_label ?? "",
+    translations: parsePromoTranslations(data.translations),
   };
 }
 
@@ -658,6 +754,7 @@ export async function savePhasePromo(phaseId: string, promo: PhasePromoAdmin) {
       unlock_package_name: promo.unlockPackageName || null,
       unlock_package_desc: promo.unlockPackageDesc || null,
       unlock_price_label: promo.unlockPriceLabel || null,
+      translations: serializePromoTranslations(promo.translations),
     },
     { onConflict: "phase_id" }
   );

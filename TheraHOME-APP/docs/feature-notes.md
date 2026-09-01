@@ -2696,3 +2696,13 @@ server rows). The five test* i18n keys were dropped in all three
 languages. `officialArticles.ts` stays — despite its TEST_BLOG_* naming
 it is the real content behind the official profile's article list and
 the article detail screen.
+
+## Phase promo/paywall content now per-language (2026-09-01)
+
+`phase_promos.translations` (jsonb, migration
+`202609011100_phase_promo_translations`) holds optional en/ms overrides
+for every text/url field, keyed language → snake_case column name;
+images and `apple_product_id` stay shared. `usePhasePromo` resolves the
+viewer's language with per-field VN fallback (queryKey now includes
+language); `PhaseUnlockPromo`/paywall components are unchanged. Authored
+from the WEB Admin's Quiz & Upsell editor (VN/EN/MS tabs).

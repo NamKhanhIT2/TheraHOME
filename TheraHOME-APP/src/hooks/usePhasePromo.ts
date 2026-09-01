@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { useAppStore } from '@/store/useAppStore';
 
 /** Which of the given phases require an (unpurchased) IAP unlock — a phase
  * appears in the map only when admin configured an `apple_product_id` for
@@ -47,40 +48,60 @@ export interface PhasePromo {
 
 /** Admin-authored content for the two cards shown once a phase's quiz is
  * done — see `PhaseUnlockPromo`. Null when the phase has no promo configured
- * (e.g. the final phase, or a phase that doesn't lead into an upsell). */
+ * (e.g. the final phase, or a phase that doesn't lead into an upsell).
+ *
+ * Text/url fields resolve through the row's `translations` jsonb for the
+ * viewer's language (en/ms), falling back per-field to the VN base columns
+ * when a translation is missing — same fallback shape as the WEB Admin's
+ * VN/EN/MS Upsell editor promises. Images and apple_product_id are shared. */
 export function usePhasePromo(phaseId: string | undefined) {
+  const language = useAppStore((state) => state.language);
   return useQuery({
-    queryKey: ['phase_promo', phaseId],
+    queryKey: ['phase_promo', phaseId, language],
     queryFn: async (): Promise<PhasePromo | null> => {
       const { data, error } = await supabase
         .from('phase_promos')
         .select(
-          'cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label',
+          'cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, translations',
         )
         .eq('phase_id', phaseId!)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
+      const overrides =
+        language === 'vi'
+          ? null
+          : ((data.translations as Record<string, Record<string, unknown>> | null)?.[language] ?? null);
+      const pick = (base: string | null, key: string): string | null => {
+        const value = overrides?.[key];
+        return typeof value === 'string' && value.trim() ? value : base;
+      };
+      const baseBenefits = Array.isArray(data.unlock_benefits)
+        ? data.unlock_benefits.filter((b): b is string => typeof b === 'string')
+        : null;
+      const overrideBenefits = overrides?.unlock_benefits;
+      const benefits =
+        Array.isArray(overrideBenefits) && overrideBenefits.length
+          ? overrideBenefits.filter((b): b is string => typeof b === 'string')
+          : baseBenefits;
       return {
         crossSellImageUrl: data.cross_sell_image_url,
-        crossSellBadge: data.cross_sell_badge,
-        crossSellTitle: data.cross_sell_title,
-        crossSellDescription: data.cross_sell_description,
-        crossSellCtaUrl: data.cross_sell_cta_url,
-        crossSellVideoUrl: data.cross_sell_video_url,
+        crossSellBadge: pick(data.cross_sell_badge, 'cross_sell_badge'),
+        crossSellTitle: pick(data.cross_sell_title, 'cross_sell_title'),
+        crossSellDescription: pick(data.cross_sell_description, 'cross_sell_description'),
+        crossSellCtaUrl: pick(data.cross_sell_cta_url, 'cross_sell_cta_url'),
+        crossSellVideoUrl: pick(data.cross_sell_video_url, 'cross_sell_video_url'),
         unlockImageUrl: data.unlock_image_url,
-        unlockDescription: data.unlock_description,
-        unlockVideoUrl: data.unlock_video_url,
+        unlockDescription: pick(data.unlock_description, 'unlock_description'),
+        unlockVideoUrl: pick(data.unlock_video_url, 'unlock_video_url'),
         appleProductId: data.apple_product_id,
-        unlockBadge: data.unlock_badge,
-        unlockTitle: data.unlock_title,
-        unlockSubtitle: data.unlock_subtitle,
-        unlockBenefits: Array.isArray(data.unlock_benefits)
-          ? data.unlock_benefits.filter((b): b is string => typeof b === 'string')
-          : null,
-        unlockPackageName: data.unlock_package_name,
-        unlockPackageDesc: data.unlock_package_desc,
-        unlockPriceLabel: data.unlock_price_label,
+        unlockBadge: pick(data.unlock_badge, 'unlock_badge'),
+        unlockTitle: pick(data.unlock_title, 'unlock_title'),
+        unlockSubtitle: pick(data.unlock_subtitle, 'unlock_subtitle'),
+        unlockBenefits: benefits,
+        unlockPackageName: pick(data.unlock_package_name, 'unlock_package_name'),
+        unlockPackageDesc: pick(data.unlock_package_desc, 'unlock_package_desc'),
+        unlockPriceLabel: pick(data.unlock_price_label, 'unlock_price_label'),
       };
     },
     enabled: !!phaseId,
