@@ -994,6 +994,53 @@ export type Database = {
           },
         ]
       }
+      product_activation_contacts: {
+        Row: {
+          claimed_at: string | null
+          claimed_by_user_id: string | null
+          contact_type: string
+          contact_value: string
+          created_at: string
+          disabled: boolean
+          id: string
+          normalized_value: string
+          note: string | null
+          product_id: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          contact_type: string
+          contact_value: string
+          created_at?: string
+          disabled?: boolean
+          id?: string
+          normalized_value: string
+          note?: string | null
+          product_id: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          contact_type?: string
+          contact_value?: string
+          created_at?: string
+          disabled?: boolean
+          id?: string
+          normalized_value?: string
+          note?: string | null
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_activation_contacts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           accent_color_key: string
@@ -1870,6 +1917,10 @@ export type Database = {
         Returns: boolean
       }
       normalize_phone_vn: { Args: { p_phone: string }; Returns: string }
+      provision_product_for_user: {
+        Args: { p_product_id: string; p_user_id: string }
+        Returns: undefined
+      }
       record_local_reminder_notification: {
         Args: { p_body: string; p_destination?: string; p_title: string }
         Returns: string
