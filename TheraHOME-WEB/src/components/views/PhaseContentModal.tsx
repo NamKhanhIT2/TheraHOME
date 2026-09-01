@@ -264,21 +264,35 @@ function PromoTab({ phaseId }: { phaseId: string }) {
       </div>
 
       <div style={{ background: "#fff", borderRadius: 12, padding: 14, boxShadow: "var(--shadow-card)", marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text-primary)", marginBottom: 4 }}>Thẻ mở khoá giai đoạn (hiện trên tab Lộ trình)</div>
+        {isVi ? (
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+            Thẻ &quot;Mở khoá {"{tên giai đoạn}"}&quot; hiện ở cuối giai đoạn trước, dẫn vào màn paywall bên dưới.
+            Chỉ hiển thị khi đã điền Apple Product ID (ở phần paywall) và người dùng chưa mua.
+          </div>
+        ) : null}
+        {isVi ? (
+          <Fragment>
+            <FieldLabel>Ảnh (dùng chung với hero màn paywall, chung 3 ngôn ngữ)</FieldLabel>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              {promo.unlockImageUrl ? <img src={promo.unlockImageUrl} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover" }} /> : null}
+              <input type="file" accept="image/*" onChange={(e) => handleUpload("unlock", e.target.files?.[0])} disabled={uploading === "unlock"} />
+            </div>
+          </Fragment>
+        ) : null}
+        <FieldLabel>Mô tả trên thẻ</FieldLabel>
+        <textarea value={getText("unlockDescription")} onChange={(e) => setText("unlockDescription", e.target.value)} style={{ ...inputStyle, marginBottom: 12, minHeight: 64 }} placeholder={hint("unlockDescription")} />
+        <FieldLabel>Link video giới thiệu</FieldLabel>
+        <input value={getText("unlockVideoUrl")} onChange={(e) => setText("unlockVideoUrl", e.target.value)} style={inputStyle} placeholder={hint("unlockVideoUrl", "https://...")} />
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 12, padding: 14, boxShadow: "var(--shadow-card)", marginBottom: 14 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text-primary)", marginBottom: 4 }}>Màn paywall mở khoá giai đoạn</div>
         {isVi ? (
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
             Bắt buộc qua Apple In-App Purchase — bỏ trống &quot;Apple Product ID&quot; nếu giai đoạn này không cần mua để mở khoá.
             Các trường nội dung để trống sẽ dùng nội dung mặc định trong app.
           </div>
-        ) : null}
-        {isVi ? (
-          <Fragment>
-            <FieldLabel>Ảnh (hero đầu màn paywall, dùng chung 3 ngôn ngữ)</FieldLabel>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              {promo.unlockImageUrl ? <img src={promo.unlockImageUrl} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: "cover" }} /> : null}
-              <input type="file" accept="image/*" onChange={(e) => handleUpload("unlock", e.target.files?.[0])} disabled={uploading === "unlock"} />
-            </div>
-          </Fragment>
         ) : null}
         <FieldLabel>Nhãn (badge) — ví dụ &quot;Nội dung cao cấp&quot;</FieldLabel>
         <input value={getText("unlockBadge")} onChange={(e) => setText("unlockBadge", e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} placeholder={hint("unlockBadge", "Nội dung cao cấp")} />
@@ -294,10 +308,6 @@ function PromoTab({ phaseId }: { phaseId: string }) {
         <input value={getText("unlockPackageDesc")} onChange={(e) => setText("unlockPackageDesc", e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} placeholder={hint("unlockPackageDesc", "Truy cập toàn bộ tính năng Pro")} />
         <FieldLabel>Giá hiển thị dự phòng (khi app chưa lấy được giá từ App Store)</FieldLabel>
         <input value={getText("unlockPriceLabel")} onChange={(e) => setText("unlockPriceLabel", e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} placeholder={hint("unlockPriceLabel", "299.000đ")} />
-        <FieldLabel>Mô tả (dự phòng khi chưa có phụ đề)</FieldLabel>
-        <textarea value={getText("unlockDescription")} onChange={(e) => setText("unlockDescription", e.target.value)} style={{ ...inputStyle, marginBottom: 12, minHeight: 64 }} placeholder={hint("unlockDescription")} />
-        <FieldLabel>Link video giới thiệu</FieldLabel>
-        <input value={getText("unlockVideoUrl")} onChange={(e) => setText("unlockVideoUrl", e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} placeholder={hint("unlockVideoUrl", "https://...")} />
         {isVi ? (
           <Fragment>
             <FieldLabel>Apple Product ID (đã tạo trên App Store Connect, dùng chung 3 ngôn ngữ)</FieldLabel>
