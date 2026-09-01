@@ -147,21 +147,14 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
     return jsonResponse({ error: profileError.message }, 500);
   }
 
-  // 'cskh' accounts are pure staff -- no patient program, so mobile's
-  // RootNavigator grants them app access directly via account_type (see
-  // TheraHOME-APP CLAUDE.md's `isStaffAccount` gate) rather than through the
-  // usual contact+catalog activation. Provisioning fake program data for
-  // them would be unused and misleading, so skip it entirely.
-  //
-  // 'tester'/'staff'/'partner' also skip auto-provisioning (added when the
-  // Roadmap tab's own activation gate shipped -- see roadmap.tsx/activate.tsx):
-  // these three exist to exercise the app as a real customer would,
-  // including the phone/email verification step, so they should hit that
-  // gate like anyone else. Only 'admin_issued' (an admin directly granting
-  // one specific person access, bypassing the purchase check on purpose)
-  // and 'review' (Apple/Google reviewers, who need the full app visible
-  // immediately with no purchase to reference) still get auto-provisioned.
-  if (["cskh", "tester", "staff", "partner"].includes(accountType)) {
+  // ONLY 'review' (Apple/Google reviewers, who need the full app visible
+  // immediately with no purchase to reference) is auto-provisioned with the
+  // whole catalog. Every other type goes through the normal activation gate
+  // (phone/email must be listed in the WEB "Kích hoạt" tab per product) --
+  // per explicit request 2026-09-01: 'cskh' is pure staff (no patient
+  // program at all), and 'admin_issued'/'tester'/'staff'/'partner' should
+  // experience the app exactly as a real customer does.
+  if (accountType !== "review") {
     return jsonResponse({ user_id: userId });
   }
 

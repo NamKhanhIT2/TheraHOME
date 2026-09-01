@@ -2730,3 +2730,15 @@ build):
   dropdowns show whatever admin filled per market in the Sản Phẩm tab
   instead of the single-language `products.name`. Home's dropdown now
   also filters to primary-group devices like Roadmap's.
+
+## Only App Review accounts keep auto-provisioned full catalog (2026-09-01)
+
+Per explicit request: admin-manage-account (v23) now auto-provisions the
+whole catalog ONLY for `review` accounts (Apple reviewers). Every other
+TheraHOME-issued type — `admin_issued` included — goes through the
+per-product activation gate: their phone/email must be listed in the WEB
+"Kích hoạt" tab. Migration `202609011300_only_review_full_catalog` also
+narrows the new-product trigger to `admin`/`review` (+ claimed web
+staff), and revoked the previously auto-granted programs/synthetic
+`@thera.local` access contacts from existing `admin_issued` accounts
+that had never redeemed a real activation contact.
