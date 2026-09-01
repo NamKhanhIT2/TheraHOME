@@ -6,6 +6,7 @@ import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms, useProgramDays, usePainLogs } from '@/hooks/usePrograms';
+import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useCreatePost, friendlyCommunityError, type PostMediaItem, type PostType, type ProgressSnapshot } from '@/hooks/useCommunity';
 import { ProgressShareCard } from '@/components/ProgressShareCard';
 import { Icon } from '@/components/icons/Icon';
@@ -44,6 +45,9 @@ export default function CreatePostScreen() {
   const activeProgram = useActivatedPrograms(userId).data?.[0];
   const daysQuery = useProgramDays(activeProgram?.userProgramId, activeProgram?.productId);
   const painLogs = usePainLogs(activeProgram?.userProgramId).data ?? [];
+  // "Ngày N/X" in the shared snapshot counts only reachable phases — same
+  // source as Home's hero and the Profile header.
+  const progress = useAccessibleProgress(userId, activeProgram);
   const currentPhase = daysQuery.data?.find((d) => d.id === activeProgram?.currentDay)?.phase;
 
   const createPost = useCreatePost(userId);
@@ -61,8 +65,8 @@ export default function CreatePostScreen() {
     (postType === 'progress' || postType === 'exercise') && activeProgram
       ? {
           productName: activeProgram.product.name,
-          dayNumber: activeProgram.currentDay,
-          totalDays: activeProgram.product.totalDays,
+          dayNumber: progress.day,
+          totalDays: progress.totalDays,
           daysCompleted: (daysQuery.data ?? []).filter((d) => d.status === 'done').length,
           streak: activeProgram.streak,
           painBefore: painLogs.length ? painLogs[0] : null,
@@ -85,7 +89,7 @@ export default function CreatePostScreen() {
       selectionLimit: remaining,
     });
     if (!result.canceled && result.assets.length) {
-      setMedia((prev) => [...prev, ...result.assets.map((asset) => ({ uri: asset.uri, mimeType: asset.mimeType ?? null }))]);
+      setMedia((prev) => [...prev, ...result.assets.map((asset) => ({ uri: asset.uri, mimeType: asset.mimeType ?? null, width: asset.width, height: asset.height }))]);
     }
   }
 

@@ -9,6 +9,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
+import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { AvatarImg } from '@/components/AvatarImg';
@@ -34,6 +35,9 @@ export default function ProfileScreen() {
   const profile = useProfile(userId).data;
   const activatedPrograms = useActivatedPrograms(userId).data ?? [];
   const program = activatedPrograms.find((p) => p.productId === selectedProductId) ?? activatedPrograms[0];
+  // "Ngày N/X" synced with the selected roadmap — X counts only reachable
+  // (non-IAP-locked) phases, same as Home's hero.
+  const progress = useAccessibleProgress(userId, program);
 
   async function handleSignOut() {
     // Ends the real Supabase session — the root layout's auth gate reacts to
@@ -51,7 +55,7 @@ export default function ProfileScreen() {
           <Text style={[theme.type.h1, { color: theme.colors.textPrimary }]}>{profile?.fullName ?? t('you')}</Text>
           {program ? (
             <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>
-              {t('day')} {program.currentDay}/{program.product.totalDays} · {program.streak} {t('streakDays')}
+              {t('day')} {progress.day}/{progress.totalDays} · {program.streak} {t('streakDays')}
             </Text>
           ) : null}
         </View>

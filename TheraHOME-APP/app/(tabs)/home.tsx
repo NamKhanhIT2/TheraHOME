@@ -14,8 +14,7 @@ import { introVideo } from '@/lib/mockData';
 import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useDefaultProductId, usePainLogs, usePrimaryProducts, useProducts, useProgramDays } from '@/hooks/usePrograms';
-import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
-import { usePhasePurchases } from '@/hooks/usePhasePurchase';
+import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useRequestDay } from '@/hooks/useRequestDay';
 import { PainScaleModal } from '@/components/PainScaleModal';
 import { useWaterLog, useSetWaterLog } from '@/hooks/useWaterLog';
@@ -97,20 +96,9 @@ export default function HomeScreen() {
   const requestDayGate = useRequestDay();
   const primaryQuery = usePrimaryProducts();
 
-  // Hero denominator = days the user can actually reach: an IAP-locked,
-  // not-yet-purchased phase's days are excluded (e.g. "…/14" while phase 3
-  // is locked, "…/28" once unlocked) — same phase-hiding rule the Roadmap
-  // applies, so the two stay in sync.
-  const heroDays = useMemo(() => daysQuery.data ?? [], [daysQuery.data]);
-  const heroPhaseIds = useMemo(() => Array.from(new Set(heroDays.map((d) => d.phaseId))), [heroDays]);
-  const lockRequirementsQuery = usePhaseLockRequirements(heroPhaseIds);
-  const purchasesQuery = usePhasePurchases(userId);
-  const accessibleTotalDays = useMemo(() => {
-    const requirements = lockRequirementsQuery.data;
-    const purchased = purchasesQuery.data;
-    if (!requirements || requirements.size === 0) return heroDays.length;
-    return heroDays.filter((d) => !requirements.has(d.phaseId) || purchased?.has(d.phaseId)).length;
-  }, [heroDays, lockRequirementsQuery.data, purchasesQuery.data]);
+  // Hero "Ngày N/X" — X counts only reachable (non-IAP-locked) phases;
+  // shared with the Profile header and share snapshot via this hook.
+  const progress = useAccessibleProgress(userId, program);
 
   // Home's device dropdown mirrors the Roadmap's: primary-group devices
   // with the viewer's market's store names (VN fallback).
@@ -174,8 +162,8 @@ export default function HomeScreen() {
   // see roadmap.tsx) — `today` stays null and the hero card below renders
   // an "activate to unlock" prompt instead of day/phase progress.
   const today = program ? (days.find((d) => d.id === program.currentDay) ?? days.find((d) => d.status === 'current') ?? days[days.length - 1] ?? null) : null;
-  const heroTotalDays = accessibleTotalDays || program?.product.totalDays || 0;
-  const heroDayNumber = today ? Math.min(today.id, heroTotalDays) : 0;
+  const heroTotalDays = progress.totalDays;
+  const heroDayNumber = today && heroTotalDays ? Math.min(today.id, heroTotalDays) : 0;
   const progressPct = today && heroTotalDays ? Math.round((heroDayNumber / heroTotalDays) * 100) : 0;
 
   const chartData = painLogsQuery.data ?? [];
