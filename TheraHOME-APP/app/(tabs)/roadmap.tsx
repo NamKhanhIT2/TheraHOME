@@ -1,5 +1,5 @@
 import React, { Fragment, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
@@ -13,6 +13,7 @@ import { useQuizResolvedMap } from '@/hooks/useQuiz';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ProductDropdown } from '@/components/ProductDropdown';
 import { PainScaleModal } from '@/components/PainScaleModal';
+import { ProductActivateCard } from '@/components/roadmap/ProductActivateCard';
 import { PathNode } from '@/components/PathNode';
 import { PhaseFooter } from '@/components/roadmap/PhaseFooter';
 import { Icon } from '@/components/icons/Icon';
@@ -153,7 +154,10 @@ export default function RoadmapScreen() {
   return (
     <ScreenContainer edges={['top']}>
       <Reanimated.View style={[{ flex: 1 }, focusFadeStyle]}>
-      <ScrollView contentContainerStyle={styles.scrollBody}>
+      {/* Keeps the inline activation input above the keyboard (per
+          explicit request); same pattern as the chat screens. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.scrollBody} keyboardShouldPersistTaps="handled">
         <Reanimated.View entering={fadeUpEntering(0)} style={styles.header}>
           <Text style={[theme.type.display, { color: theme.colors.textPrimary }]}>{t('recoveryRoadmap')}</Text>
           <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>
@@ -216,32 +220,12 @@ export default function RoadmapScreen() {
             </Button>
           </View>
         ) : hasAccess && selectedProduct && !program ? (
-          // Device not yet activated for this account — its roadmap stays
-          // hidden until the user redeems the contact CSKH registered for
-          // THIS device (entering one contact never unlocks everything).
+          // Device not yet activated for this account — the activation
+          // input sits INLINE in the card (per explicit request, no detour
+          // to /activate): redeem the contact CSKH registered for THIS
+          // device (entering one contact never unlocks everything).
           <Reanimated.View entering={fadeUpEntering(90)} style={{ marginTop: 16 }}>
-            <View style={[styles.lockedCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
-              <View style={[styles.lockedIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-                <Icon name="lock" size={22} color={theme.colors.primary} />
-              </View>
-              <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center', marginTop: 4 }]}>
-                {t('productLockedTitle')}
-              </Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, lineHeight: 19 }]}>
-                {t('productLockedHint')}
-              </Text>
-              <Button
-                style={{ width: '100%', marginTop: 16 }}
-                onPress={() =>
-                  router.push({
-                    pathname: '/activate',
-                    params: { productId: selectedProduct.id, productName: selectedProduct.name },
-                  })
-                }
-              >
-                {t('enterActivationCode')}
-              </Button>
-            </View>
+            <ProductActivateCard key={selectedProduct.id} productId={selectedProduct.id} />
           </Reanimated.View>
         ) : hasAccess && selectedProduct ? (
           <View style={{ marginTop: 8 }}>
@@ -322,6 +306,7 @@ export default function RoadmapScreen() {
           </View>
         ) : null}
       </ScrollView>
+      </KeyboardAvoidingView>
       </Reanimated.View>
       {requestDayGate.pendingDay !== null ? (
         <PainScaleModal
