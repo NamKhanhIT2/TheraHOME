@@ -207,9 +207,9 @@ export default function RoadmapScreen() {
           </View>
         ) : loadError ? (
           <View style={styles.errorBox}>
-            <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>Chưa thể tải lộ trình</Text>
+            <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('roadmapLoadErrorTitle')}</Text>
             <Text style={[theme.type.caption, styles.errorText, { color: theme.colors.textSecondary }]}>
-              Vui lòng kiểm tra kết nối mạng rồi thử lại.
+              {t('checkNetworkRetry')}
             </Text>
             <Button
               style={{ marginTop: 16, minWidth: 132 }}
@@ -219,7 +219,7 @@ export default function RoadmapScreen() {
                 if (selectedProduct) void daysQuery.refetch();
               }}
             >
-              Thử lại
+              {t('retry')}
             </Button>
           </View>
         ) : selectedProduct && !program ? (

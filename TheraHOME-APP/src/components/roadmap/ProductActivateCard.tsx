@@ -47,13 +47,13 @@ export function ProductActivateCard({ productId }: { productId: string }) {
     } catch (e) {
       const message = e instanceof Error ? e.message : '';
       if (message.includes('contact_already_claimed')) {
-        setError('Số điện thoại/email này đã được sử dụng bởi một tài khoản khác.');
+        setError(t('errContactClaimed'));
       } else if (message.includes('activation_contact_not_found')) {
-        setError('Số điện thoại/email này chưa được đăng ký kích hoạt cho sản phẩm này. Vui lòng liên hệ CSKH.');
+        setError(t('errContactNotRegisteredProduct'));
       } else if (message.includes('invalid_contact')) {
-        setError('Số điện thoại/email không đúng định dạng.');
+        setError(t('errContactFormat'));
       } else {
-        setError('Có lỗi xảy ra, vui lòng thử lại.');
+        setError(t('errGeneric'));
       }
       if (__DEV__) console.warn('activate_product_by_contact failed:', e);
     } finally {

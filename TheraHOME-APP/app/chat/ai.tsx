@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { useAppStore } from '@/store/useAppStore';
 import { useI18n } from '@/lib/i18n';
 
-const GREETING = 'Xin chào! Tôi là Trợ lý AI TheraHOME. Tôi có thể giúp gì cho lộ trình tập luyện của bạn hôm nay?';
+// Localized at render — see t('aiGreeting').
 const AI_ASSISTANT_IMAGE = require('../../assets/ai-assistant.png');
 
 export default function AIChatScreen() {
@@ -132,7 +132,7 @@ export default function AIChatScreen() {
                     { alignSelf: 'flex-start', backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md },
                   ]}
                 >
-                  <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{GREETING}</Text>
+                  <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{t('aiGreeting')}</Text>
                 </View>
               ) : null
             }
@@ -145,7 +145,7 @@ export default function AIChatScreen() {
                     { alignSelf: 'flex-start', backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md },
                   ]}
                 >
-                  <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{GREETING}</Text>
+                  <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{t('aiGreeting')}</Text>
                 </View>
                 <View style={styles.suggestions}>
                   {suggestions.map((s) => (

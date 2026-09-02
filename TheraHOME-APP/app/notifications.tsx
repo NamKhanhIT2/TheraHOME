@@ -9,7 +9,9 @@ import { timeAgo } from '@/lib/timeAgo';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
-import { useI18n, type TranslationKey } from '@/lib/i18n';
+import { translate, useI18n, type TranslationKey } from '@/lib/i18n';
+import type { AppLanguage } from '@/store/useAppStore';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 
 type TimeGroup = 'new' | 'today' | 'earlier';
 type NotificationStyle = { icon: string; color: string; bg: string };
@@ -27,9 +29,9 @@ function timeGroup(notification: NotificationRow, todayStart: number): TimeGroup
   return new Date(notification.createdAt).getTime() >= todayStart ? 'today' : 'earlier';
 }
 
-function fallbackActorName(notification: NotificationRow) {
+function fallbackActorName(notification: NotificationRow, language: AppLanguage) {
   if (notification.actorName) return notification.actorName;
-  if (notification.type === 'chat') return 'Đội ngũ hỗ trợ TheraHOME';
+  if (notification.type === 'chat') return translate(language, 'supportTeamName');
   if (notification.type === 'blog' || notification.type === 'ad') return 'TheraHOME';
   return 'TheraHOME';
 }
@@ -40,7 +42,7 @@ function initials(name: string) {
 
 export default function NotificationInboxScreen() {
   const theme = useTheme();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { session } = useSession();
   const userId = session?.user.id;
   const notificationsQuery = useNotifications(userId);
@@ -158,8 +160,7 @@ export default function NotificationInboxScreen() {
             <View style={[styles.groupCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
               {displayedItems.map((notification, index) => {
                 const notificationStyle = stylesByType[notification.type] ?? stylesByType.schedule;
-                const actorName = fallbackActorName(notification);
-                const avatarSource = notification.actorAvatarUrl ? { uri: notification.actorAvatarUrl } : null;
+                const actorName = fallbackActorName(notification, language);
                 const useBrandAvatar = notification.actorIsOfficial || ['blog', 'ad', 'schedule', 'inactivity', 'streak_milestone'].includes(notification.type);
                 const useSpecialistAvatar = notification.type === 'chat' && !notification.actorAvatarUrl;
                 const isReaction = notification.type === 'post_reaction' || notification.type === 'comment_reaction';
@@ -167,7 +168,7 @@ export default function NotificationInboxScreen() {
                 const bodyText = notification.type === 'schedule' && notification.relatedDayNumber != null ? t('dayUnlockedBody') : notification.body;
                 return <Pressable key={notification.id} onPress={() => openNotification(notification)} style={[styles.row, index < displayedItems.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.divider } : null, { backgroundColor: notification.read ? 'transparent' : theme.colors.primaryTint05 }]}>
                   <View style={styles.avatarWrap}>
-                    {avatarSource ? <Image source={avatarSource} style={styles.avatarImage} /> : useBrandAvatar ? <Image source={THERAHOME_AVATAR} style={styles.avatarImage} /> : useSpecialistAvatar ? <Image source={SPECIALIST_AVATAR} style={styles.avatarImage} /> : <View style={[styles.initialAvatar, { backgroundColor: notificationStyle.bg }]}><Text style={[styles.initials, { color: notificationStyle.color }]}>{initials(actorName)}</Text></View>}
+                    {notification.actorAvatarUrl ? <RemoteImage uri={notification.actorAvatarUrl} contentFit="cover" style={[styles.avatarImage, { backgroundColor: theme.colors.bgCardAlt }]} /> : useBrandAvatar ? <Image source={THERAHOME_AVATAR} style={styles.avatarImage} /> : useSpecialistAvatar ? <Image source={SPECIALIST_AVATAR} style={styles.avatarImage} /> : <View style={[styles.initialAvatar, { backgroundColor: notificationStyle.bg }]}><Text style={[styles.initials, { color: notificationStyle.color }]}>{initials(actorName)}</Text></View>}
                     {reactionEmoji ? (
                       <View style={[styles.actionBadge, styles.reactionBadge]}><Text style={styles.reactionBadgeEmoji}>{reactionEmoji}</Text></View>
                     ) : (
@@ -184,7 +185,7 @@ export default function NotificationInboxScreen() {
                       <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{timeAgo(notification.createdAt, t)}</Text>
                     </View>
                   </View>
-                  {notification.postImageUrl ? <Image source={{ uri: notification.postImageUrl }} style={styles.thumbnail} /> : null}
+                  {notification.postImageUrl ? <RemoteImage uri={notification.postImageUrl} contentFit="cover" style={[styles.thumbnail, { backgroundColor: theme.colors.bgCardAlt }]} /> : null}
                   <Pressable onPress={(event) => { event.stopPropagation(); confirmDelete(notification); }} hitSlop={10} accessibilityLabel={t('deleteNotification')} style={styles.deleteButton}><Icon name="trash-2" size={17} color={theme.colors.textMuted} /></Pressable>
                 </Pressable>;
               })}

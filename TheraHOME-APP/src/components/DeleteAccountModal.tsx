@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/theme';
+import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import { Icon } from '@/components/icons/Icon';
@@ -16,6 +17,7 @@ export interface DeleteAccountModalProps {
  * auth guard back to onboarding. */
 export function DeleteAccountModal({ onCancel }: DeleteAccountModalProps) {
   const theme = useTheme();
+  const { t } = useI18n();
   const selectProduct = useAppStore((s) => s.selectProduct);
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,10 +45,9 @@ export function DeleteAccountModal({ onCancel }: DeleteAccountModalProps) {
           <View style={[styles.iconCircle, { backgroundColor: theme.colors.errorTint }]}>
             <Icon name="lock" size={20} color={theme.colors.error} />
           </View>
-          <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>Xoá tài khoản?</Text>
+          <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('deleteConfirmTitle')}</Text>
           <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }]}>
-            Toàn bộ dữ liệu lộ trình, tiến độ và thông tin cá nhân của bạn sẽ bị xoá vĩnh viễn. Hành động này không
-            thể hoàn tác.
+            {t('deleteConfirmBody')}
           </Text>
           <View style={styles.row}>
             <Pressable
@@ -61,7 +62,7 @@ export function DeleteAccountModal({ onCancel }: DeleteAccountModalProps) {
               disabled={submitting}
               style={[styles.btn, { backgroundColor: theme.colors.error, borderRadius: theme.radius.md, opacity: submitting ? 0.7 : 1 }]}
             >
-              <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>{submitting ? 'Đang xoá...' : 'Xoá'}</Text>
+              <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>{submitting ? t('deleting') : t('deleteAction')}</Text>
             </Pressable>
           </View>
         </Pressable>

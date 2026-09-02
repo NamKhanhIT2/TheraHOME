@@ -135,12 +135,12 @@ export default function HomeScreen() {
             <Icon name={loadError ? 'activity' : 'box'} size={24} color={theme.colors.primary} />
           </View>
           <Text style={[theme.type.h2, styles.stateTitle, { color: theme.colors.textPrimary }]}>
-            {loadError ? 'Chưa thể tải dữ liệu' : 'Chưa có sản phẩm'}
+            {loadError ? t('homeLoadErrorTitle') : t('homeNoProductsTitle')}
           </Text>
           <Text style={[theme.type.caption, styles.stateText, { color: theme.colors.textSecondary }]}>
             {loadError
-              ? 'Vui lòng kiểm tra kết nối mạng rồi thử lại.'
-              : 'Danh mục sản phẩm hiện chưa có dữ liệu để hiển thị.'}
+              ? t('checkNetworkRetry')
+              : t('homeNoCatalog')}
           </Text>
           <Pressable
             onPress={() => {
@@ -150,7 +150,7 @@ export default function HomeScreen() {
             }}
             style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
           >
-            <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>Thử lại</Text>
+            <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>{t('retry')}</Text>
           </Pressable>
         </View>
       </ScreenContainer>
@@ -341,7 +341,7 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/community/[postId]', params: { postId: homeOfficialPost.id } })}
             />
           ) : (
-            <Text style={[theme.type.caption, { color: theme.colors.textMuted, paddingVertical: 8 }]}>Chưa có gợi ý nào từ TheraHOME.</Text>
+            <Text style={[theme.type.caption, { color: theme.colors.textMuted, paddingVertical: 8 }]}>{t('homeNoSuggestions')}</Text>
           )}
         </View>
         </Reanimated.View>

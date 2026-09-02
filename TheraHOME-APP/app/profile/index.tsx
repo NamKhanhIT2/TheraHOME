@@ -1,14 +1,12 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/theme';
-import { privacyPolicy } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { useActivatedPrograms } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useProgramDays } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
@@ -18,7 +16,7 @@ import { useI18n, type TranslationKey } from '@/lib/i18n';
 
 const MENU: { icon: string; labelKey: TranslationKey; route: string }[] = [
   { icon: 'pencil', labelKey: 'editProfile', route: '/profile/edit' },
-  { icon: 'bell', labelKey: 'notifications', route: '/profile/notifications-settings' },
+  { icon: 'bell', labelKey: 'workoutReminders', route: '/profile/notifications-settings' },
   { icon: 'grid', labelKey: 'accountSettings', route: '/profile/account' },
   { icon: 'phone', labelKey: 'helpSupport', route: '/profile/help' },
 ];
@@ -38,6 +36,10 @@ export default function ProfileScreen() {
   // "Ngày N/X" synced with the selected roadmap — X counts only reachable
   // (non-IAP-locked) phases, same as Home's hero.
   const progress = useAccessibleProgress(userId, program);
+  // Days actually watched — replaces the old streak stat box, which just
+  // repeated the "N ngày liên tiếp" already shown under the name.
+  const profileDays = useProgramDays(program?.userProgramId, program?.productId, program?.activatedAt).data ?? [];
+  const sessionsDone = profileDays.filter((day) => day.status === 'done').length;
 
   async function handleSignOut() {
     // Ends the real Supabase session — the root layout's auth gate reacts to
@@ -62,8 +64,8 @@ export default function ProfileScreen() {
 
         <View style={styles.statsRow}>
           <View style={[styles.statBox, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md }]}>
-            <Text style={[theme.type.h1, { color: theme.colors.textPrimary }]}>{program?.streak ?? 0}</Text>
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('streakDays')}</Text>
+            <Text style={[theme.type.h1, { color: theme.colors.textPrimary }]}>{sessionsDone}</Text>
+            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('sessionsDone')}</Text>
           </View>
           <View style={[styles.statBox, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md }]}>
             <Text style={[theme.type.h1, { color: theme.colors.textPrimary }]}>{program?.adherencePct ?? 0}%</Text>
@@ -73,9 +75,11 @@ export default function ProfileScreen() {
 
         <View style={[styles.menuCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
           <Pressable onPress={toggleDarkMode} style={[styles.menuRow, { borderBottomColor: theme.colors.divider, borderBottomWidth: 1 }]}>
-            <Icon name={darkMode ? 'sun' : 'moon'} size={20} color={theme.colors.primary} />
+            <Icon name="moon" size={20} color={theme.colors.primary} />
+            {/* Fixed label + on/off track — the old flipping label ("Chế độ
+                sáng" while dark) read like light mode was the thing enabled. */}
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>
-              {darkMode ? t('lightMode') : t('darkMode')}
+              {t('darkMode')}
             </Text>
             <View style={[styles.toggleTrack, { backgroundColor: darkMode ? theme.colors.primary : theme.colors.borderInput }]}>
               <View style={[styles.toggleThumb, { left: darkMode ? 21 : 3 }]} />
@@ -95,12 +99,12 @@ export default function ProfileScreen() {
         </View>
 
         <Pressable
-          onPress={() => WebBrowser.openBrowserAsync(privacyPolicy)}
+          onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'privacy' } })}
           style={[styles.linkCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
         >
           <Icon name="lock" size={20} color={theme.colors.textSecondary} />
           <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{t('privacy')}</Text>
-          <Icon name="external-link" size={16} color={theme.colors.textMuted} />
+          <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
         </Pressable>
 
         <Pressable onPress={handleSignOut} style={[styles.signOutBtn, { backgroundColor: theme.colors.errorTint, borderRadius: theme.radius.md }]}>

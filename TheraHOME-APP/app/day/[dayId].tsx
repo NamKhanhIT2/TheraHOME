@@ -121,14 +121,13 @@ export default function DayDetailScreen() {
           const completedProgram = d.id >= totalDays;
           const milestone = d.id === 7 || d.id === 14;
           if (!completedProgram && !milestone) return;
-          const achievementLabel = completedProgram ? 'lộ trình đầu tiên' : `${d.id} ngày`;
           Alert.alert(
-            '🎉 Thành tích mới!',
-            `Bạn vừa hoàn thành ${achievementLabel}!\n\nChia sẻ thành tích với cộng đồng?`,
+            t('achievementTitle'),
+            completedProgram ? t('achievementBodyProgram') : t('achievementBodyDays', { days: d.id }),
             [
-              { text: 'Để sau', style: 'cancel' },
+              { text: t('later'), style: 'cancel' },
               {
-                text: 'Chia sẻ',
+                text: t('share'),
                 onPress: () => router.push({
                   pathname: '/community/create',
                   params: completedProgram ? { achievement: 'program' } : { achievement: 'streak', milestone: String(d.id) },
@@ -216,7 +215,7 @@ export default function DayDetailScreen() {
 
         <View style={[styles.videoTip, { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight }]}> 
           <Icon name="sparkles" size={17} color={theme.colors.primary} />
-          <Text style={[theme.type.caption, styles.videoTipText, { color: theme.colors.textSecondary }]}>Mẹo nhỏ: Xem trên Youtube và phát lên Tivi để có những phút giây thư giãn hơn.</Text>
+          <Text style={[theme.type.caption, styles.videoTipText, { color: theme.colors.textSecondary }]}>{t('videoTip')}</Text>
         </View>
 
         <View style={{ gap: 12 }}>
@@ -256,7 +255,7 @@ export default function DayDetailScreen() {
           <Pressable
             onPress={() => {
               if (!supportToolsUrl) {
-                Alert.alert('Chưa có link dụng cụ hỗ trợ', 'TheraHOME chưa cập nhật link dụng cụ hỗ trợ cho ngày tập này.');
+                Alert.alert(t('noToolsTitle'), t('noToolsBody'));
                 return;
               }
               setPendingUrl(supportToolsUrl);

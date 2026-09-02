@@ -62,7 +62,7 @@ export default function ActivationScreen() {
         });
         if (error) throw error;
         if (!data || data.length === 0) {
-          setContactError('Không thể xác nhận thông tin này. Vui lòng kiểm tra lại.');
+          setContactError(t('errContactVerify'));
           return;
         }
       }
@@ -75,17 +75,17 @@ export default function ActivationScreen() {
     } catch (e) {
       const message = e instanceof Error ? e.message : '';
       if (message.includes('contact_already_claimed')) {
-        setContactError('Số điện thoại/email này đã được sử dụng bởi một tài khoản khác.');
+        setContactError(t('errContactClaimed'));
       } else if (message.includes('account_already_has_contact')) {
-        setContactError('Tài khoản này đã liên kết với một số điện thoại/email khác.');
+        setContactError(t('errAccountHasContact'));
       } else if (message.includes('activation_contact_not_found')) {
-        setContactError('Số điện thoại/email này chưa được đăng ký kích hoạt cho sản phẩm này. Vui lòng liên hệ CSKH.');
+        setContactError(t('errContactNotRegisteredProduct'));
       } else if (message.includes('order_contact_not_found')) {
-        setContactError('Số điện thoại/email này chưa được đăng ký kích hoạt. Vui lòng liên hệ CSKH để được thêm vào danh sách.');
+        setContactError(t('errContactNotRegistered'));
       } else if (message.includes('invalid_contact')) {
-        setContactError('Số điện thoại/email không đúng định dạng.');
+        setContactError(t('errContactFormat'));
       } else {
-        setContactError('Có lỗi xảy ra, vui lòng thử lại.');
+        setContactError(t('errGeneric'));
       }
       if (__DEV__) console.warn('confirmContact failed:', e);
     } finally {
