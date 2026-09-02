@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -7,6 +7,9 @@ import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useCatalogProgramDays, useMarkDayWatched } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { PainScaleModal } from '@/components/PainScaleModal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
@@ -33,6 +36,54 @@ export default function DayDetailScreen() {
 
   const daysQuery = useCatalogProgramDays(productId, program?.userProgramId, program?.activatedAt);
   const d = (daysQuery.data ?? []).find((x) => x.id === Number(dayId));
+
+  // Fallback discomfort check-in for entries that BYPASS the Roadmap/Home
+  // gates (notification deep links open this screen directly): if this
+  // openable day has no log yet, ask here. Entries that came through the
+  // gate already inserted a log, so the modal never double-asks.
+  const queryClient = useQueryClient();
+  const [checkInVisible, setCheckInVisible] = useState(false);
+  const [checkInSubmitting, setCheckInSubmitting] = useState(false);
+  const [checkInDone, setCheckInDone] = useState(false);
+  const programDayId = d?.programDayId;
+  const userProgramId = program?.userProgramId;
+  const dayOpenable = !!d && (d.status === 'current' || d.status === 'done' || d.status === 'missed');
+  useEffect(() => {
+    if (checkInDone || !dayOpenable || !userProgramId || !programDayId) return;
+    let cancelled = false;
+    void supabase
+      .from('pain_logs')
+      .select('id')
+      .eq('user_program_id', userProgramId)
+      .eq('program_day_id', programDayId)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled || error) return;
+        if (data) setCheckInDone(true);
+        else setCheckInVisible(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [checkInDone, dayOpenable, userProgramId, programDayId]);
+  async function confirmCheckIn(value: number) {
+    if (!userId || !userProgramId || !programDayId) return;
+    setCheckInSubmitting(true);
+    try {
+      const { error } = await supabase.from('pain_logs').insert({
+        user_id: userId,
+        user_program_id: userProgramId,
+        program_day_id: programDayId,
+        score: value,
+      });
+      if (!error) queryClient.invalidateQueries({ queryKey: ['pain_logs', userProgramId] });
+    } finally {
+      setCheckInSubmitting(false);
+      setCheckInDone(true);
+      setCheckInVisible(false);
+    }
+  }
 
   if (programsQuery.isPending || daysQuery.isPending) {
     return (
@@ -226,6 +277,17 @@ export default function DayDetailScreen() {
         </View>
       </ScrollView>
       {pendingUrl ? <ExternalLinkModal url={pendingUrl} onClose={() => setPendingUrl(null)} /> : null}
+      {checkInVisible && d ? (
+        <PainScaleModal
+          dayId={d.id}
+          onCancel={() => {
+            setCheckInVisible(false);
+            setCheckInDone(true);
+          }}
+          onConfirm={(value) => void confirmCheckIn(value)}
+          submitting={checkInSubmitting}
+        />
+      ) : null}
     </ScreenContainer>
   );
 }

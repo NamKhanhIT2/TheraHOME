@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { useActivatedPrograms, useProgramDays, usePainLogs } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useProgramDays, usePainLogs, usePrimaryProducts } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useCreatePost, friendlyCommunityError, type PostMediaItem, type PostType, type ProgressSnapshot } from '@/hooks/useCommunity';
 import { ProgressShareCard } from '@/components/ProgressShareCard';
@@ -46,8 +46,13 @@ export default function CreatePostScreen() {
   const daysQuery = useProgramDays(activeProgram?.userProgramId, activeProgram?.productId);
   const painLogs = usePainLogs(activeProgram?.userProgramId).data ?? [];
   // "Ngày N/X" in the shared snapshot counts only reachable phases — same
-  // source as Home's hero and the Profile header.
+  // source as Home's hero and the Profile header. The device name follows
+  // the viewer's market's store name (same as the Home/Roadmap dropdowns).
   const progress = useAccessibleProgress(userId, activeProgram);
+  const primaryQuery = usePrimaryProducts();
+  const snapshotProductName = activeProgram
+    ? primaryQuery.data?.nameById[activeProgram.productId] ?? activeProgram.product.name
+    : '';
   const currentPhase = daysQuery.data?.find((d) => d.id === activeProgram?.currentDay)?.phase;
 
   const createPost = useCreatePost(userId);
@@ -64,7 +69,7 @@ export default function CreatePostScreen() {
   const snapshot: ProgressSnapshot | null =
     (postType === 'progress' || postType === 'exercise') && activeProgram
       ? {
-          productName: activeProgram.product.name,
+          productName: snapshotProductName,
           dayNumber: progress.day,
           totalDays: progress.totalDays,
           daysCompleted: (daysQuery.data ?? []).filter((d) => d.status === 'done').length,

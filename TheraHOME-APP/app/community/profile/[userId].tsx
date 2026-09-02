@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
-import { useActivatedPrograms } from '@/hooks/usePrograms';
+import { useActivatedPrograms, usePrimaryProducts } from '@/hooks/usePrograms';
 import { useCommunityPosts, useCommunityProfile, useMyPostSaves } from '@/hooks/useCommunity';
 import { CommunityAvatar } from '@/components/CommunityAvatar';
 import { ProgressShareCard } from '@/components/ProgressShareCard';
@@ -30,6 +30,7 @@ export default function CommunityProfileScreen() {
   const postsQuery = useCommunityPosts(100);
   const savedPostsQuery = useMyPostSaves(ownProfile ? userId : undefined);
   const programsQuery = useActivatedPrograms(ownProfile ? userId : undefined);
+  const primaryQuery = usePrimaryProducts();
   const [tab, setTab] = useState<ProfileTab>('posts');
 
   const profile = profileQuery.data;
@@ -111,7 +112,7 @@ export default function CommunityProfileScreen() {
             {programs.map((program) => (
               <Pressable key={program.userProgramId} onPress={() => router.push('/roadmap')} style={[styles.journeyCard, { backgroundColor: theme.colors.bgCard, borderColor: theme.colors.borderLight }]}> 
                 <View style={[styles.journeyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="dumbbell" size={18} color={theme.colors.primary} /></View>
-                <View style={{ flex: 1 }}><Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{program.product.name}</Text><Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('journeyProgress', { current: program.currentDay, total: program.product.totalDays, streak: program.streak })}</Text><View style={[styles.progressTrack, { backgroundColor: theme.colors.bgCardAlt }]}><View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${Math.min(100, program.adherencePct)}%` }]} /></View></View>
+                <View style={{ flex: 1 }}><Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{primaryQuery.data?.nameById[program.productId] ?? program.product.name}</Text><Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('journeyProgress', { current: program.currentDay, total: program.product.totalDays, streak: program.streak })}</Text><View style={[styles.progressTrack, { backgroundColor: theme.colors.bgCardAlt }]}><View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${Math.min(100, program.adherencePct)}%` }]} /></View></View>
                 <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
               </Pressable>
             ))}
