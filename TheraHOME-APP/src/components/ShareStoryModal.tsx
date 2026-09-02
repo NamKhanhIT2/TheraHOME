@@ -22,8 +22,10 @@ export function ShareStoryModal({ onClose, onSupport, onShare }: ShareStoryModal
           onPress={(e) => e.stopPropagation()}
           style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.space[5] }]}
         >
-          <Pressable onPress={onClose} style={[styles.closeBtn, { backgroundColor: theme.colors.bgCardAlt }]}>
-            <Icon name="x" size={14} color={theme.colors.textSecondary} />
+          {/* hitSlop pads the touch target to ~56pt — the visible 32pt disc
+              alone was below Apple's 44pt minimum and reported hard to hit. */}
+          <Pressable onPress={onClose} hitSlop={12} style={[styles.closeBtn, { backgroundColor: theme.colors.bgCardAlt }]}>
+            <Icon name="x" size={16} color={theme.colors.textSecondary} />
           </Pressable>
           <Text style={[theme.type.h2, { color: theme.colors.textPrimary, marginBottom: 8, paddingRight: 30 }]}>
             {t('shareWithCommunity')}
@@ -58,13 +60,14 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     position: 'absolute',
-    top: 14,
-    right: 14,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   actions: {
     gap: 10,
