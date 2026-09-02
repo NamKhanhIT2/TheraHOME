@@ -39,13 +39,16 @@ export interface PhaseFooterProps {
   collapsed: boolean;
 }
 
-/** Rendered once a phase's own days are all completed. The quiz row (if the
- * phase has one) always exists while expanded — either the "take it" prompt
- * or a persistent "Đã hoàn thành" row once submitted, matching the supplied
- * reference (Quiz 2 stays visible, just marked done, it doesn't disappear).
- * `PhaseUnlockPromo` for the phase that follows (see `nextPhaseId` above)
- * always renders once the quiz is resolved (or there was none), regardless
- * of `collapsed` — nothing renders there if there is no next phase. */
+/** Rendered at every phase end (disabled state while days remain). The
+ * survey row (if the phase has one) always exists while expanded — either
+ * the "take it" prompt or a persistent "Đã hoàn thành" row once submitted.
+ * The two promo cards (`PhaseUnlockPromo`: cross-sell + unlock-next-phase)
+ * appear ONLY after this phase's survey is submitted (per explicit request
+ * — finishing the days alone is not enough; a phase with no survey skips
+ * straight to the cards). Once they appear they render regardless of
+ * `collapsed`, so they stand apart below the collapsed phase — and by then
+ * roadmap.tsx's `currentPhaseId` is null, which collapses phases 1/2 by
+ * default. Nothing renders if there is no next phase. */
 export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId, nextPhaseName, unlocked, enabled, lockedDayNumber, collapsed }: PhaseFooterProps) {
   const theme = useTheme();
   const { t } = useI18n();
@@ -78,27 +81,35 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId
   }
 
   if (!hasQuiz) return promo;
-  if (collapsed) return quizDone ? promo : null;
+
+  // Survey not submitted yet: only the take-survey prompt (while expanded)
+  // — the promo cards stay hidden until the survey is done.
+  if (!quizDone) {
+    if (collapsed) return null;
+    return (
+      <Pressable
+        onPress={() => router.push({ pathname: '/quiz/[phaseId]', params: { phaseId, productId, phaseName } })}
+        style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}
+      >
+        <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
+          <Icon name="clipboard-check" size={19} color={theme.colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('quizTitle')}</Text>
+          <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>{phaseName}</Text>
+        </View>
+        <View style={[styles.quizCta, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md }]}>
+          <Text style={[theme.type.captionSm, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]}>{t('quizTakeQuiz')}</Text>
+        </View>
+      </Pressable>
+    );
+  }
+
+  if (collapsed) return promo;
 
   return (
     <Fragment>
-      {!quizDone ? (
-        <Pressable
-          onPress={() => router.push({ pathname: '/quiz/[phaseId]', params: { phaseId, productId, phaseName } })}
-          style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, marginBottom: promo ? 14 : 0 }]}
-        >
-          <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-            <Icon name="clipboard-check" size={19} color={theme.colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('quizTitle')}</Text>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>{phaseName}</Text>
-          </View>
-          <View style={[styles.quizCta, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md }]}>
-            <Text style={[theme.type.captionSm, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]}>{t('quizTakeQuiz')}</Text>
-          </View>
-        </Pressable>
-      ) : (
+      {(
         <View style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, marginBottom: promo ? 14 : 0 }]}>
           <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
             <Icon name="clipboard-check" size={19} color={theme.colors.primary} />

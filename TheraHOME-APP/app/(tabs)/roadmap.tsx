@@ -106,36 +106,12 @@ export default function RoadmapScreen() {
     return new Set(Array.from(requirements.keys()).filter((id) => !purchased?.has(id)));
   }, [lockRequirementsQuery.data, purchasesQuery.data]);
   const quizResolvedQuery = useQuizResolvedMap(userId, phaseIds);
-  // The phase that should default expanded: normally the one containing the
-  // user's actual current day, but once every day of a phase is done and
-  // its next phase is still hidden behind a not-yet-taken quiz/unpurchased
-  // paywall, `status: 'current'` already sits on that *hidden* next phase's
-  // first day (complete_day advances it regardless of quiz/purchase state)
-  // — falling back to the last still-visible phase in that case is what
-  // actually keeps the just-finished phase (with its quiz prompt) open
-  // instead of collapsing the one thing the user needs to act on next.
-  // But only while that phase's own quiz is still unresolved — once it's
-  // taken, this phase has nothing more to show inline (its promo cards
-  // render unconditionally regardless of collapse, see PhaseFooter), so it
-  // collapses like any other finished phase instead of staying pinned open.
-  const currentPhaseId = useMemo(() => {
-    // Today's day by the calendar — once it's watched its status flips to
-    // 'done' and nothing is 'current' anymore, so fall back to the day
-    // number the program says is today.
-    const currentDay =
-      days.find((d) => d.status === 'current') ?? (program ? days.find((d) => d.id === program.currentDay) : undefined);
-    if (currentDay && !lockedPhaseIds.has(currentDay.phaseId)) return currentDay.phaseId;
-    const visibleDays = days.filter((d) => !lockedPhaseIds.has(d.phaseId));
-    const lastVisiblePhaseId = visibleDays[visibleDays.length - 1]?.phaseId ?? null;
-    if (lastVisiblePhaseId && quizResolvedQuery.data?.get(lastVisiblePhaseId) === false) return lastVisiblePhaseId;
-    return null;
-  }, [days, program, lockedPhaseIds, quizResolvedQuery.data]);
-  // A phase's footer (quiz prompt, then the unlock/cross-sell promo) only
-  // appears once every one of ITS OWN days has run its course — under the
-  // calendar-unlock mechanic that means each non-rest day is either watched
-  // ('done') or already in the past ('missed'); watching is no longer what
-  // moves time forward. A locked future phase's days are 'locked'/'upcoming'
-  // so its footer simply doesn't render yet.
+  // A phase's footer content unlocks once every one of ITS OWN days has run
+  // its course — under the calendar-unlock mechanic that means each
+  // non-rest day is either watched ('done') or already in the past
+  // ('missed'); watching is no longer what moves time forward. A locked
+  // future phase's days are 'locked'/'upcoming' so its footer stays
+  // disabled.
   const phaseAllDone = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const d of days) {
@@ -144,6 +120,33 @@ export default function RoadmapScreen() {
     }
     return map;
   }, [days]);
+  // The phase that should default expanded: normally the one containing the
+  // user's actual current day — but once a phase's days AND its survey are
+  // both finished there is nothing left to act on inside it, so it
+  // collapses by default (per explicit request: when the two promo cards
+  // appear after survey 2, phases 1/2 fold up and the cards stand apart —
+  // PhaseFooter renders them regardless of collapse). While days are done
+  // but the survey isn't, the last visible phase stays open so its
+  // take-survey prompt is on screen.
+  const currentPhaseId = useMemo(() => {
+    const resolved = (phaseId: string) => quizResolvedQuery.data?.get(phaseId) ?? false;
+    // Today's day by the calendar — once it's watched its status flips to
+    // 'done' and nothing is 'current' anymore, so fall back to the day
+    // number the program says is today.
+    const currentDay =
+      days.find((d) => d.status === 'current') ?? (program ? days.find((d) => d.id === program.currentDay) : undefined);
+    if (
+      currentDay &&
+      !lockedPhaseIds.has(currentDay.phaseId) &&
+      !((phaseAllDone.get(currentDay.phaseId) ?? false) && resolved(currentDay.phaseId))
+    ) {
+      return currentDay.phaseId;
+    }
+    const visibleDays = days.filter((d) => !lockedPhaseIds.has(d.phaseId));
+    const lastVisiblePhaseId = visibleDays[visibleDays.length - 1]?.phaseId ?? null;
+    if (lastVisiblePhaseId && quizResolvedQuery.data?.get(lastVisiblePhaseId) === false) return lastVisiblePhaseId;
+    return null;
+  }, [days, program, lockedPhaseIds, phaseAllDone, quizResolvedQuery.data]);
 
   let lastPhase: string | null = null;
 
