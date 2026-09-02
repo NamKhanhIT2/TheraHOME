@@ -26,6 +26,7 @@ import {
 } from "@/lib/db";
 import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, Avatar, PillTabs } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { TableShell } from "@/components/ui/TableShell";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
@@ -379,12 +380,20 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
       pushToast("Không thể cập nhật trạng thái bài viết");
     }
   }
-  async function removePost(id: string | number) {
+  const [deletingPost, setDeletingPost] = useState<{ id: string | number; label: string } | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  async function removePost() {
+    if (!deletingPost) return;
     try {
-      await deleteCommunityPost(String(id));
+      setDeleteBusy(true);
+      await deleteCommunityPost(String(deletingPost.id));
+      setDeletingPost(null);
+      pushToast("Đã xoá bài viết");
       reload();
     } catch {
       pushToast("Không thể xoá bài viết");
+    } finally {
+      setDeleteBusy(false);
     }
   }
   async function removeComment(id: string) {
@@ -641,6 +650,16 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           {postModal}
           {commentsModal}
           {pinning ? <PinDisplayModal post={pinning} onClose={() => setPinning(null)} onConfirm={confirmPin} /> : null}
+          {deletingPost ? (
+            <ConfirmModal
+              title="Xoá bài viết"
+              message={`Xoá vĩnh viễn bài viết "${String(deletingPost.label).slice(0, 80)}"? Bình luận và cảm xúc của bài cũng bị xoá, không thể hoàn tác.`}
+              confirmLabel="Xoá vĩnh viễn"
+              busy={deleteBusy}
+              onConfirm={removePost}
+              onCancel={() => setDeletingPost(null)}
+            />
+          ) : null}
         </Fragment>
       }
       columns={["Ghim", "Tác giả", "Nội dung", "Lượt thích", "Bình luận", "Thao tác"]}
@@ -736,8 +755,14 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
                   <Icon name="eye" size={16} color={it.hidden ? "var(--text-muted)" : "var(--text-secondary)"} />
                 </button>
               ) : null}
-              {!pinOnly ? (
-                <button onClick={() => removePost(it.id)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+              {/* Delete: Admin everywhere; CSKH on user posts (RLS policy
+                  "web cskh delete user posts"). Confirmed via ConfirmModal. */}
+              {!pinOnly || !it.official ? (
+                <button
+                  onClick={() => setDeletingPost({ id: it.id, label: it.title || it.text || it.name })}
+                  title="Xoá bài viết"
+                  style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}
+                >
                   <Icon name="trash-2" size={16} color="var(--error)" />
                 </button>
               ) : null}

@@ -1659,7 +1659,12 @@ export async function fetchChatThreads(): Promise<ChatThread[]> {
 
   const nameByUser = new Map((profiles ?? []).map((p) => [p.id, p.full_name || p.email || "Người dùng"]));
 
-  return Promise.all((threads ?? []).map(async (t) => {
+  // Threads are auto-created the moment a user OPENS the chat screen — one
+  // with zero messages is just that, so it stays out of the CSKH list (per
+  // explicit request) until the user actually sends something.
+  const threadsWithMessages = (threads ?? []).filter((t) => (messages ?? []).some((m) => m.thread_id === t.id));
+
+  return Promise.all(threadsWithMessages.map(async (t) => {
     const msgs = (messages ?? []).filter((m) => m.thread_id === t.id);
     const chatMessages: ChatMessage[] = await Promise.all(msgs.map(async (m) => {
       let imageUrl: string | null = null;
