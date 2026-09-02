@@ -161,9 +161,14 @@ export default function HomeScreen() {
   // No activated program yet (roadmap tab is what actually gates on this —
   // see roadmap.tsx) — `today` stays null and the hero card below renders
   // an "activate to unlock" prompt instead of day/phase progress.
-  const today = program ? (days.find((d) => d.id === program.currentDay) ?? days.find((d) => d.status === 'current') ?? days[days.length - 1] ?? null) : null;
+  const rawToday = program ? (days.find((d) => d.id === program.currentDay) ?? days.find((d) => d.status === 'current') ?? days[days.length - 1] ?? null) : null;
   const heroTotalDays = progress.totalDays;
-  const heroDayNumber = today && heroTotalDays ? Math.min(today.id, heroTotalDays) : 0;
+  const heroDayNumber = rawToday && heroTotalDays ? Math.min(rawToday.id, heroTotalDays) : 0;
+  // Once the calendar advances past the reachable days (phase 3 still
+  // IAP-locked), the raw "today" row belongs to the locked phase — the hero
+  // then anchors on the last REACHABLE day instead, so its phase label and
+  // the "Bắt đầu" button never point into a locked phase.
+  const today = rawToday ? (days.find((d) => d.id === heroDayNumber) ?? rawToday) : null;
   const progressPct = today && heroTotalDays ? Math.round((heroDayNumber / heroTotalDays) * 100) : 0;
 
   const chartData = painLogsQuery.data ?? [];

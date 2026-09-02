@@ -6,6 +6,7 @@ import YoutubePlayer from 'react-native-youtube-iframe';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useCatalogProgramDays, useMarkDayWatched } from '@/hooks/usePrograms';
+import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
@@ -25,6 +26,10 @@ export default function DayDetailScreen() {
 
   const programsQuery = useActivatedPrograms(userId);
   const program = (programsQuery.data ?? []).find((p) => p.productId === productId);
+  // Accessible-days total (IAP-locked phases excluded) — the completion
+  // celebration below must fire at the END THE USER CAN ACTUALLY REACH
+  // (day 14 while phase 3 is locked), not at the nominal day 28.
+  const progress = useAccessibleProgress(userId, program);
 
   const daysQuery = useCatalogProgramDays(productId, program?.userProgramId, program?.activatedAt);
   const d = (daysQuery.data ?? []).find((x) => x.id === Number(dayId));
@@ -61,7 +66,7 @@ export default function DayDetailScreen() {
       {
         onSuccess: (newly) => {
           if (!newly || !d || !program) return;
-          const totalDays = program.product.totalDays;
+          const totalDays = progress.totalDays || program.product.totalDays;
           const completedProgram = d.id >= totalDays;
           const milestone = d.id === 7 || d.id === 14;
           if (!completedProgram && !milestone) return;
