@@ -66,6 +66,10 @@ function PasswordField({ label, value, onChange, placeholder, style }: { label: 
           onChange={(e) => onChange(e.target.value)}
           type={visible ? "text" : "password"}
           placeholder={placeholder}
+          // Admin is CREATING someone else's credentials — without this,
+          // Chrome autofills the admin's own saved login into the form.
+          autoComplete="new-password"
+          name="thera-new-account-password"
           style={{ ...inputStyle, paddingRight: 40 }}
         />
         <button
@@ -142,7 +146,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       <FieldLabel>Tên hiển thị</FieldLabel>
       <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ví dụ: App Review iOS" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Username</FieldLabel>
-      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" style={{ ...inputStyle, marginBottom: 14 }} />
+      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 14 }} />
       <PasswordField label="Password" value={password} onChange={setPassword} placeholder="Tối thiểu 8 ký tự" style={{ marginBottom: 14 }} />
       <PasswordField label="Nhập lại Password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Nhập lại để xác nhận" style={{ marginBottom: 14 }} />
       {confirmPassword && !passwordsMatch ? (
@@ -288,7 +292,7 @@ function ResetPasswordModal({ account, onClose, onReset }: { account: TheraAccou
       }
     >
       <FieldLabel>Mật khẩu mới</FieldLabel>
-      <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Tối thiểu 8 ký tự" style={inputStyle} />
+      <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Tối thiểu 8 ký tự" autoComplete="new-password" name="thera-reset-password" style={inputStyle} />
       <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--text-muted)" }}>
         Admin không thể xem lại mật khẩu cũ — chỉ có thể đặt mật khẩu mới.
       </div>
