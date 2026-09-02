@@ -134,6 +134,10 @@ export function useSubmitQuizAttempt() {
     },
     onSuccess: (_data, vars) => {
       void queryClient.invalidateQueries({ queryKey: ['quiz_attempt', vars.userId, vars.phaseId] });
+      // Roadmap's collapse logic keys off the batched resolved-map — without
+      // refreshing it too, returning from the survey left the phase expanded
+      // and the promo cards hidden until the next cold load.
+      void queryClient.invalidateQueries({ queryKey: ['quiz_resolved_map', vars.userId] });
     },
   });
 }
