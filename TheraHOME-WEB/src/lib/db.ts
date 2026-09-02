@@ -1288,10 +1288,12 @@ export async function createOfficialPost(input: {
     });
   }
 }
-export async function updateCommunityPost(idKey: string, patch: { meta?: string; title?: string; text?: string; pinned?: boolean; hidden?: boolean }) {
+export async function updateCommunityPost(idKey: string, patch: { meta?: string; title?: string; text?: string; pinned?: boolean; hidden?: boolean; imageUrl?: string | null }) {
   const { error } = await supabase
     .from("community_posts")
-    .update({ tag: patch.meta, title: patch.title, text: patch.text, pinned: patch.pinned, hidden: patch.hidden })
+    // undefined keys are stripped by supabase-js, so only fields the caller
+    // actually passed get updated (imageUrl: null clears the image).
+    .update({ tag: patch.meta, title: patch.title, text: patch.text, pinned: patch.pinned, hidden: patch.hidden, image_url: patch.imageUrl })
     .eq("id", idKey);
   if (error) throw error;
 }

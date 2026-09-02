@@ -227,6 +227,10 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
   const [subTab, setSubTab] = useState<"posts" | "challenges">("posts");
   const [items, setItems] = useState<PinnedPost[] | null>(null);
   const [modal, setModal] = useState<string | number | "new" | null>(null);
+  // Edit-modal image fields (per explicit request: CSKH can revise a
+  // published post's image as well as its text).
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [commentsFor, setCommentsFor] = useState<string | number | null>(null);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -284,6 +288,8 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
     setModal(it.id);
     setTitle(it.title || "");
     setText(it.text);
+    setEditImageUrl(it.imageUrl || "");
+    setEditImageFile(null);
     setSendNotification(false);
     setNotifyTitle("");
     setNotifyBody("");
@@ -321,7 +327,10 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
         });
         pushToast(sendNotification ? "Đã đăng bài và gửi thông báo" : "Đã đăng bài viết mới lên Cộng đồng");
       } else if (modal !== null) {
-        await updateCommunityPost(String(modal), { title: title.trim() || undefined, text: text.trim() });
+        const imageUrl = editImageFile
+          ? await uploadPostThumbnail(String(modal), editImageFile)
+          : editImageUrl.trim() || null;
+        await updateCommunityPost(String(modal), { title: title.trim() || undefined, text: text.trim(), imageUrl });
         pushToast("Đã lưu bài viết");
       }
       setModal(null);
@@ -477,6 +486,28 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ví dụ: 5 phút thư giãn cổ vai" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Nội dung (VN)</FieldLabel>
       <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Nội dung bài viết đăng lên Cộng đồng..." style={{ ...inputStyle, minHeight: 100, resize: "vertical", marginBottom: 14 }} />
+      {modal !== "new" ? (
+        <Fragment>
+          <FieldLabel>Ảnh bài viết (tùy chọn)</FieldLabel>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => setEditImageFile(e.target.files?.[0] ?? null)}
+            style={{ ...inputStyle, padding: 8, marginBottom: 10 }}
+          />
+          {editImageFile ? (
+            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Sẵn sàng tải lên: {editImageFile.name}</div>
+          ) : (
+            <Fragment>
+              <FieldLabel>Hoặc dán URL ảnh (xoá trống để gỡ ảnh)</FieldLabel>
+              <input value={editImageUrl} onChange={(e) => setEditImageUrl(e.target.value)} placeholder="https://..." style={{ ...inputStyle, marginBottom: 10 }} />
+              {editImageUrl.trim() ? (
+                <img src={editImageUrl} alt="" style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, border: "1px solid var(--divider)", marginBottom: 8 }} />
+              ) : null}
+            </Fragment>
+          )}
+        </Fragment>
+      ) : null}
       {modal === "new" ? (
         <Fragment>
           <FieldLabel>Cũng hiển thị bản riêng cho</FieldLabel>
@@ -745,8 +776,10 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
                   <Icon name="x" size={16} color="var(--error)" />
                 </button>
               ) : null}
-              {!pinOnly ? (
-                <button onClick={() => openEdit(it)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+              {/* Edit: Admin everywhere; CSKH on official posts (the ones
+                  they publish) — content AND image, per explicit request. */}
+              {!pinOnly || it.official ? (
+                <button onClick={() => openEdit(it)} title="Sửa bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                   <Icon name="pencil" size={16} color="var(--color-primary)" />
                 </button>
               ) : null}
