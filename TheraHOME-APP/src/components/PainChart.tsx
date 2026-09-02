@@ -65,7 +65,9 @@ function smoothPath(pts: [number, number][]): string {
 }
 
 export interface PainChartProps {
-  data: number[];
+  /** Logged check-ins with their real program day — labels come from
+   * `day`, so a first log on day 2 renders as "N2" (see usePainLogs). */
+  data: { day: number; score: number }[];
 }
 
 const RANGE_OPTIONS = [7, 14] as const;
@@ -85,9 +87,9 @@ export function PainChart({ data }: PainChartProps) {
   const total = data.length;
   const windowSize = Math.min(range, total);
   const start = total - windowSize;
-  const windowData = data.slice(start);
+  const windowData = data.slice(start).map((p) => p.score);
   const isEmpty = windowData.length === 0;
-  const labels = windowData.map((_, i) => `N${start + i + 1}`);
+  const labels = data.slice(start).map((p) => `N${p.day}`);
   const scrollable = windowSize > 7;
 
   const H = 130;

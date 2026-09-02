@@ -69,8 +69,8 @@ export default function CreatePostScreen() {
           totalDays: progress.totalDays,
           daysCompleted: (daysQuery.data ?? []).filter((d) => d.status === 'done').length,
           streak: activeProgram.streak,
-          painBefore: painLogs.length ? painLogs[0] : null,
-          painAfter: painLogs.length ? painLogs[painLogs.length - 1] : null,
+          painBefore: painLogs.length ? painLogs[0].score : null,
+          painAfter: painLogs.length ? painLogs[painLogs.length - 1].score : null,
         }
       : null;
 

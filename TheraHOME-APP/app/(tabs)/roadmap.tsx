@@ -247,9 +247,10 @@ export default function RoadmapScreen() {
                         day={d}
                         isToday={program ? d.id === program.currentDay : false}
                         onPress={() => {
-                          // Today's day goes through the discomfort
-                          // check-in gate; anything else (and the no-
-                          // program preview) opens directly.
+                          // Locked/future days don't open at all; openable
+                          // days go through the discomfort check-in gate
+                          // (which skips itself once the day is answered).
+                          if (d.status === 'locked' || d.status === 'upcoming') return;
                           if (program) {
                             void requestDayGate.requestDay(d, program.userProgramId, program.productId);
                           } else {

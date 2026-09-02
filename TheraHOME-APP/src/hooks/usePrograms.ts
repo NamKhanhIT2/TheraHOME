@@ -319,10 +319,18 @@ interface RawPainLog {
 
 /** Pain scores for a program, oldest-first — feeds `PainChart`'s `data` prop
  * the same way the mock's `painLevels` array did. */
+/** One logged check-in, tied to its ACTUAL program day — the chart labels
+ * points by `day`, so a user who first answers on day 2 sees "N2", not a
+ * point renumbered to N1 (which is what the old plain-scores array did). */
+export interface PainLogPoint {
+  day: number;
+  score: number;
+}
+
 export function usePainLogs(userProgramId: string | undefined) {
   return useQuery({
     queryKey: ['pain_logs', userProgramId],
-    queryFn: async (): Promise<number[]> => {
+    queryFn: async (): Promise<PainLogPoint[]> => {
       const { data, error } = await supabase
         .from('pain_logs')
         .select('score, program_days(day_number)')
@@ -331,7 +339,7 @@ export function usePainLogs(userProgramId: string | undefined) {
       return (data as unknown as RawPainLog[])
         .slice()
         .sort((a, b) => (a.program_days?.day_number ?? 0) - (b.program_days?.day_number ?? 0))
-        .map((r) => r.score);
+        .map((r) => ({ day: r.program_days?.day_number ?? 0, score: r.score }));
     },
     enabled: !!userProgramId,
   });
