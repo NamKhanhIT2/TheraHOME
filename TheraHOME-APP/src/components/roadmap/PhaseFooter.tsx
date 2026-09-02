@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { usePhaseQuiz, useQuizAttempt } from '@/hooks/useQuiz';
-import { PhaseUnlockPromo } from '@/components/roadmap/PhaseUnlockPromo';
 import { useI18n } from '@/lib/i18n';
 
 export interface PhaseFooterProps {
@@ -14,15 +13,6 @@ export interface PhaseFooterProps {
    * of this phase. */
   phaseId: string;
   phaseName: string;
-  /** The phase that follows — `phase_promos`/the unlock paywall belong to
-   * *this* phase (it's the one the "Mở khoá Giai đoạn N" card is actually
-   * for), even though the card renders right after the previous phase's
-   * last day since the next phase hasn't started yet. Null when the
-   * completed phase was the product's last one — nothing to unlock. */
-  nextPhaseId: string | null;
-  nextPhaseName: string | null;
-  /** Already verified purchased — hides the unlock card inside the promo. */
-  unlocked: boolean;
   /** Whether the phase's own days have all run their course (done/missed).
    * When false the quiz row still renders — visibly DISABLED with a
    * "complete Day N to unlock" hint (per explicit request: the quiz after
@@ -39,17 +29,13 @@ export interface PhaseFooterProps {
   collapsed: boolean;
 }
 
-/** Rendered at every phase end (disabled state while days remain). The
- * survey row (if the phase has one) always exists while expanded — either
- * the "take it" prompt or a persistent "Đã hoàn thành" row once submitted.
- * The two promo cards (`PhaseUnlockPromo`: cross-sell + unlock-next-phase)
- * appear ONLY after this phase's survey is submitted (per explicit request
- * — finishing the days alone is not enough; a phase with no survey skips
- * straight to the cards). Once they appear they render regardless of
- * `collapsed`, so they stand apart below the collapsed phase — and by then
- * roadmap.tsx's `currentPhaseId` is null, which collapses phases 1/2 by
- * default. Nothing renders if there is no next phase. */
-export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId, nextPhaseName, unlocked, enabled, lockedDayNumber, collapsed }: PhaseFooterProps) {
+/** The phase-end SURVEY row only (the two promo cards moved to the bottom
+ * of the roadmap list — see roadmap.tsx's bottom-promo block, per explicit
+ * request 2026-09-02): disabled with a "complete Day N" hint while days
+ * remain, the take-survey prompt once they're done, and a persistent "Đã
+ * hoàn thành" row after submitting. Hidden entirely while the phase is
+ * collapsed. */
+export function PhaseFooter({ userId, productId, phaseId, phaseName, enabled, lockedDayNumber, collapsed }: PhaseFooterProps) {
   const theme = useTheme();
   const { t } = useI18n();
   const questionsQuery = usePhaseQuiz(phaseId);
@@ -59,10 +45,9 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId
 
   const hasQuiz = (questionsQuery.data?.length ?? 0) > 0;
   const quizDone = !hasQuiz || !!attemptQuery.data;
-  const promo = nextPhaseId && nextPhaseName ? <PhaseUnlockPromo phaseId={nextPhaseId} phaseName={nextPhaseName} unlocked={unlocked} /> : null;
 
-  // Phase not finished yet: the quiz row shows in a disabled state so the
-  // user can see it coming; promos wait until the phase is actually done.
+  // Phase not finished yet: the survey row shows in a disabled state so
+  // the user can see it coming.
   if (!enabled) {
     if (!hasQuiz || collapsed) return null;
     return (
@@ -80,10 +65,9 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId
     );
   }
 
-  if (!hasQuiz) return promo;
+  if (!hasQuiz) return null;
 
-  // Survey not submitted yet: only the take-survey prompt (while expanded)
-  // — the promo cards stay hidden until the survey is done.
+  // Survey not submitted yet: the take-survey prompt (while expanded).
   if (!quizDone) {
     if (collapsed) return null;
     return (
@@ -105,12 +89,12 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId
     );
   }
 
-  if (collapsed) return promo;
+  if (collapsed) return null;
 
   return (
     <Fragment>
       {(
-        <View style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, marginBottom: promo ? 14 : 0 }]}>
+        <View style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, marginBottom: 0 }]}>
           <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
             <Icon name="clipboard-check" size={19} color={theme.colors.primary} />
           </View>
@@ -124,7 +108,6 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, nextPhaseId
           </View>
         </View>
       )}
-      {promo}
     </Fragment>
   );
 }

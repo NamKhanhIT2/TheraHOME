@@ -12,6 +12,7 @@ const phases: Record<string, Localized> = {
   'Giai đoạn 2 · Tăng cường vận động cổ': { en: 'Phase 2 · Improve neck mobility', ms: 'Fasa 2 · Tingkatkan pergerakan leher' },
   'Giai đoạn 2 · Tăng cường sức bền cột sống': { en: 'Phase 2 · Improve spinal endurance', ms: 'Fasa 2 · Tingkatkan daya tahan tulang belakang' },
   'Giai đoạn 3 · Duy trì': { en: 'Phase 3 · Maintain progress', ms: 'Fasa 3 · Kekalkan kemajuan' },
+  'Giai đoạn 3 · Mở rộng toàn diện': { en: 'Phase 3 · Comprehensive expansion', ms: 'Fasa 3 · Peluasan menyeluruh' },
 };
 const categories: Record<string, Localized> = {
   neck: { en: 'Neck support devices', ms: 'Peranti sokongan leher' },

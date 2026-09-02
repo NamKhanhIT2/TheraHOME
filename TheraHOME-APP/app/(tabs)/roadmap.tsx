@@ -13,6 +13,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ProductDropdown } from '@/components/ProductDropdown';
 import { PainScaleModal } from '@/components/PainScaleModal';
 import { ProductActivateCard } from '@/components/roadmap/ProductActivateCard';
+import { PhaseUnlockPromo } from '@/components/roadmap/PhaseUnlockPromo';
 import { PathNode } from '@/components/PathNode';
 import { PhaseFooter } from '@/components/roadmap/PhaseFooter';
 import { Icon } from '@/components/icons/Icon';
@@ -148,6 +149,25 @@ export default function RoadmapScreen() {
     return null;
   }, [days, program, lockedPhaseIds, phaseAllDone, quizResolvedQuery.data]);
 
+  // The promo pair for the bottom-of-list cards: the LAST reachable
+  // (non-IAP-locked) phase must have all days run their course AND its
+  // survey submitted; the cards then advertise the phase that follows it
+  // (usually the locked phase 3). Nothing renders mid-journey or when the
+  // product has no further phase.
+  const bottomPromoPhase = useMemo(() => {
+    const phaseOrder: { id: string; name: string }[] = [];
+    for (const d of days) if (!phaseOrder.some((p) => p.id === d.phaseId)) phaseOrder.push({ id: d.phaseId, name: d.phase });
+    let lastVisibleIdx = -1;
+    for (let i = 0; i < phaseOrder.length; i++) if (!lockedPhaseIds.has(phaseOrder[i].id)) lastVisibleIdx = i;
+    if (lastVisibleIdx < 0) return null;
+    const donePhase = phaseOrder[lastVisibleIdx];
+    const nextPhase = phaseOrder[lastVisibleIdx + 1];
+    if (!nextPhase) return null;
+    if (!(phaseAllDone.get(donePhase.id) ?? false)) return null;
+    if (!(quizResolvedQuery.data?.get(donePhase.id) ?? false)) return null;
+    return nextPhase;
+  }, [days, lockedPhaseIds, phaseAllDone, quizResolvedQuery.data]);
+
   let lastPhase: string | null = null;
 
   return (
@@ -208,15 +228,30 @@ export default function RoadmapScreen() {
             {days.map((d, index) => {
               const nextDay = days[index + 1];
               const isLastOfPhase = !nextDay || nextDay.phaseId !== d.phaseId;
-              // A phase behind the IAP paywall is fully hidden — header and
-              // every one of its days — until purchased; the only visible
-              // sign of it is the unlock promo card on the previous phase's
-              // footer. Once purchased it reappears here like any other
-              // phase (lockedPhaseIds no longer contains it).
-              if (lockedPhaseIds.has(d.phaseId)) return null;
-
               const showPhase = d.phase !== lastPhase;
               lastPhase = d.phase;
+              // A phase behind the IAP paywall keeps a VISIBLE header — in
+              // a disabled (greyed, locked, non-pressable) state, per
+              // explicit request 2026-09-02 — while its days and footer
+              // stay hidden until purchased.
+              if (lockedPhaseIds.has(d.phaseId)) {
+                if (!showPhase) return null;
+                return (
+                  <Reanimated.View key={d.id} entering={fadeUpEntering(140 + staggerDelay(index, 20, 10))}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 18, paddingBottom: 8, opacity: 0.5 }}>
+                      <Text
+                        style={[
+                          theme.type.captionSm,
+                          { color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+                        ]}
+                      >
+                        {d.phase}
+                      </Text>
+                      <Icon name="lock" size={14} color={theme.colors.textMuted} />
+                    </View>
+                  </Reanimated.View>
+                );
+              }
               const itemDelay = 140 + staggerDelay(index, 20, 10);
               const collapsed = collapsedOverrides[d.phaseId] ?? d.phaseId !== currentPhaseId;
               return (
@@ -274,9 +309,6 @@ export default function RoadmapScreen() {
                         productId={selectedProduct.id}
                         phaseId={d.phaseId}
                         phaseName={d.phase}
-                        nextPhaseId={nextDay?.phaseId ?? null}
-                        nextPhaseName={nextDay?.phase ?? null}
-                        unlocked={nextDay ? !lockRequirementsQuery.data?.has(nextDay.phaseId) : true}
                         enabled={phaseAllDone.get(d.phaseId) ?? false}
                         lockedDayNumber={d.id}
                         collapsed={collapsed}
@@ -286,6 +318,19 @@ export default function RoadmapScreen() {
                 </Fragment>
               );
             })}
+            {/* The two promo cards (cross-sell + unlock next phase) sit at
+                the BOTTOM of the list — below the locked phase-3 header —
+                and only once the last reachable phase's days AND survey are
+                both finished (per explicit request 2026-09-02). */}
+            {bottomPromoPhase ? (
+              <Reanimated.View entering={fadeUpEntering(180)} style={{ marginTop: 14 }}>
+                <PhaseUnlockPromo
+                  phaseId={bottomPromoPhase.id}
+                  phaseName={bottomPromoPhase.name}
+                  unlocked={!lockedPhaseIds.has(bottomPromoPhase.id)}
+                />
+              </Reanimated.View>
+            ) : null}
           </View>
         ) : null}
       </ScrollView>
