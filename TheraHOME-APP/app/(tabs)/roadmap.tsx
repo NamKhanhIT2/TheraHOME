@@ -76,6 +76,13 @@ export default function RoadmapScreen() {
     if (!selectedProductId && program) selectProduct(program.productId);
   }, [selectedProductId, program, selectProduct]);
 
+  // Manual expand/collapse taps stick for the session — but only for the
+  // device they were made on: switching devices resets them so every
+  // roadmap opens in its default layout (today's phase expanded).
+  useEffect(() => {
+    setCollapsedOverrides({});
+  }, [effectiveProductId]);
+
   const daysQuery = useCatalogProgramDays(selectedProduct?.id, program?.userProgramId, program?.activatedAt);
   // Dependent queries can be `isPending` while disabled. Only show the
   // spinner for queries that are actively fetching, otherwise an upstream
