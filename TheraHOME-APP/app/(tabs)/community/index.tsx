@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
@@ -319,7 +319,17 @@ export default function CommunityScreen() {
         style={[styles.composer, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.full }]}
       >
         <AvatarImg size={32} uri={profile?.avatarUrl} />
-        <Text style={[theme.type.body, { color: theme.colors.textMuted }]}>{t('shareJourney')}</Text>
+        {/* flex+1-line+capped font scaling: on narrow screens / large
+            system text the placeholder used to overflow the pill and get
+            clipped mid-glyph (device-dependent) — now it ellipsizes. */}
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          maxFontSizeMultiplier={1.2}
+          style={[theme.type.body, { color: theme.colors.textMuted, flex: 1, minWidth: 0 }]}
+        >
+          {t('shareJourney')}
+        </Text>
       </Pressable> : null}
 
       <View style={styles.chipsRow}>
@@ -465,6 +475,11 @@ export default function CommunityScreen() {
         contentContainerStyle={styles.scrollBody}
         viewabilityConfig={viewabilityConfigRef.current}
         onViewableItemsChanged={onViewableItemsChangedRef.current}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={50}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           if (posts.length >= postsLimit && !postsQuery.isFetching) {
@@ -484,7 +499,7 @@ export default function CommunityScreen() {
             {t('noPosts')}
           </Text>
         }
-        ListFooterComponent={postsQuery.isFetching && !postsQuery.isRefetching ? <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 10 }} /> : null}
+        ListFooterComponent={postsQuery.isFetching && !postsQuery.isRefetching ? <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 18 }} /> : null}
       />
       </Reanimated.View>
       </Reanimated.View>
