@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
+import { useProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, usePrimaryProducts, useProducts } from '@/hooks/usePrograms';
 import { useRequestDay } from '@/hooks/useRequestDay';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
@@ -28,6 +29,12 @@ export default function RoadmapScreen() {
   const { t } = useI18n();
   const { session } = useSession();
   const userId = session?.user.id;
+  // App Review accounts get NO day/survey gating (per explicit request
+  // 2026-09-03): every day is tappable and each phase's survey is open
+  // without finishing the phase, so Apple's reviewer can exercise the whole
+  // app in one sitting. The IAP lock on phase 3 deliberately stays — that's
+  // the paywall Apple needs to test.
+  const isReviewAccount = useProfile(userId).data?.accountType === 'review';
   const selectedProductId = useAppStore((state) => state.selectedProductId);
   const selectProduct = useAppStore((state) => state.selectProduct);
   // Collapsed by phaseId — collapsing tucks away both the day list *and*
@@ -294,10 +301,11 @@ export default function RoadmapScreen() {
                         day={d}
                         isToday={program ? d.id === program.currentDay : false}
                         onPress={() => {
-                          // Locked/future days don't open at all; openable
-                          // days go through the discomfort check-in gate
-                          // (which skips itself once the day is answered).
-                          if (d.status === 'locked' || d.status === 'upcoming') return;
+                          // Locked/future days don't open at all (except
+                          // for App Review accounts); openable days go
+                          // through the discomfort check-in gate (which
+                          // skips itself once the day is answered).
+                          if (!isReviewAccount && (d.status === 'locked' || d.status === 'upcoming')) return;
                           if (program) {
                             void requestDayGate.requestDay(d, program.userProgramId, program.productId);
                           } else {
@@ -321,7 +329,7 @@ export default function RoadmapScreen() {
                         productId={selectedProduct.id}
                         phaseId={d.phaseId}
                         phaseName={d.phase}
-                        enabled={phaseAllDone.get(d.phaseId) ?? false}
+                        enabled={isReviewAccount || (phaseAllDone.get(d.phaseId) ?? false)}
                         lockedDayNumber={d.id}
                         collapsed={collapsed}
                       />

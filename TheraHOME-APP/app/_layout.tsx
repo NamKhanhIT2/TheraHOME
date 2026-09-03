@@ -213,6 +213,10 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
 
   useEffect(() => {
     if (!profile || blockedReason) return;
+    // App Review accounts are never blocked or expired (per explicit
+    // request 2026-09-03) — a reviewer hitting a lock screen mid-review is
+    // an instant rejection. Revoke one by deleting the account instead.
+    if (profile.accountType === 'review') return;
     const expired = !!profile.expiresAt && new Date(profile.expiresAt) < new Date();
     if (profile.locked || expired) {
       setBlockedReason(profile.locked ? 'locked' : 'expired');

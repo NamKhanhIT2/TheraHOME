@@ -70,12 +70,16 @@ interface AppState {
 export function detectDeviceLanguage(): AppLanguage {
   try {
     const primary = Intl.DateTimeFormat().resolvedOptions().locale.split('-')[0].toLowerCase();
-    if (primary === 'en') return 'en';
+    if (primary === 'vi') return 'vi';
     if (primary === 'ms') return 'ms';
+    // Any other foreign locale (fr, ko, ja, zh…) reads English far more
+    // likely than Vietnamese — per explicit request 2026-09-03.
+    return 'en';
   } catch {
-    // Intl unavailable or locale unparsable — fall through to the default.
+    // Intl unavailable or locale unparsable — we know nothing about the
+    // device, so fall back to the product's home market.
+    return 'vi';
   }
-  return 'vi';
 }
 
 export const useAppStore = create<AppState>()(

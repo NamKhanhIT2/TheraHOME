@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
+import { useProfile } from '@/hooks/useProfile';
 import type { DayRow } from '@/hooks/usePrograms';
 
 /**
@@ -20,6 +21,11 @@ import type { DayRow } from '@/hooks/usePrograms';
  */
 export function useRequestDay() {
   const { session } = useSession();
+  // App Review accounts open ANY day regardless of the calendar unlock
+  // (per explicit request 2026-09-03) — the server's mark_day_watched has a
+  // matching exemption. Everyone else keeps the locked/upcoming gate.
+  const profile = useProfile(session?.user.id).data;
+  const bypassDayLocks = profile?.accountType === 'review';
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState<{
@@ -33,7 +39,7 @@ export function useRequestDay() {
   }
 
   async function requestDay(day: DayRow, userProgramId: string, productId: string) {
-    if (day.status === 'locked' || day.status === 'upcoming') return;
+    if (!bypassDayLocks && (day.status === 'locked' || day.status === 'upcoming')) return;
     if (!userProgramId) {
       openDay(day.id, productId);
       return;
