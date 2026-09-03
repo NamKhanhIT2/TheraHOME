@@ -144,14 +144,16 @@ export function PathNode({ day, isToday = false, unrestricted = false, onPress }
       <View>
         <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('day')} {day.id}</Text>
         <Text style={[theme.type.caption, { color: isMissed ? theme.colors.error : theme.colors.textMuted }]}>
-          {isToday || isCurrent
+          {isToday || (isCurrent && !unrestricted)
             ? t('today')
             : isDone
               ? t('completed')
               : isMissed
                 ? t('notCompleted')
-                : openOverride
-                  ? t('dayReadyReview')
+                : unrestricted
+                  ? // Review accounts: any not-done day is simply openable —
+                    // "Hôm nay" belongs only to the row isToday points at.
+                    t('dayReadyReview')
                   : isUpcoming
                     ? t('unlockAtMidnight')
                     : isPreview

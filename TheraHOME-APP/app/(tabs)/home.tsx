@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, InteractionManager, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Notifications from 'expo-notifications';
@@ -56,7 +56,10 @@ export default function HomeScreen() {
     // both its catalog query and every product image start loading cold
     // the first time it's opened, which is what made it feel slow right
     // after launch. See CLAUDE.md / useStore.ts.
-    void prefetchStoreCategories(queryClient, language).catch(() => {});
+    const task = InteractionManager.runAfterInteractions(() => {
+      void prefetchStoreCategories(queryClient, language).catch(() => {});
+    });
+    return () => task.cancel();
   }, [queryClient, language]);
   const focusFadeStyle = useTabFocusFade();
   const badgePopStyle = usePopOnChange(unreadCount);
@@ -161,7 +164,15 @@ export default function HomeScreen() {
   // No activated program yet (roadmap tab is what actually gates on this —
   // see roadmap.tsx) — `today` stays null and the hero card below renders
   // an "activate to unlock" prompt instead of day/phase progress.
-  const rawToday = program ? (days.find((d) => d.id === program.currentDay) ?? days.find((d) => d.status === 'current') ?? days[days.length - 1] ?? null) : null;
+  // Anchor on the shared accessible-progress day (review accounts advance
+  // it by actual activity, not the calendar) so the hero, the chart and
+  // the "Bắt đầu" button all tell the same story.
+  const rawToday = program
+    ? (days.find((d) => d.id === (progress.day || program.currentDay)) ??
+       days.find((d) => d.status === 'current') ??
+       days[days.length - 1] ??
+       null)
+    : null;
   const heroTotalDays = progress.totalDays;
   const heroDayNumber = rawToday && heroTotalDays ? Math.min(rawToday.id, heroTotalDays) : 0;
   // Once the calendar advances past the reachable days (phase 3 still

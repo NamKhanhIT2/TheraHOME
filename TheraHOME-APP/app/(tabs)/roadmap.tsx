@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, usePrimaryProducts, useProducts } from '@/hooks/usePrograms';
 import { useRequestDay } from '@/hooks/useRequestDay';
+import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
 import { usePhasePurchases } from '@/hooks/usePhasePurchase';
 import { useQuizResolvedMap } from '@/hooks/useQuiz';
@@ -74,6 +75,10 @@ export default function RoadmapScreen() {
   const selectedProduct =
     dropdownProducts.find((p) => p.id === effectiveProductId) ?? catalogProducts.find((p) => p.id === effectiveProductId);
   const program = activatedPrograms.find((p) => p.productId === effectiveProductId);
+  // Same review-aware "Ngày N" the Home hero and Profile use — keeps the
+  // roadmap's "Hôm nay" marker on the day the reviewer actually reached.
+  const accessibleProgress = useAccessibleProgress(userId, program);
+  const todayMarkerDay = isReviewAccount ? accessibleProgress.day : program?.currentDay;
 
   // Pin the first resolved device as the explicit (persisted) selection so
   // reopening the app always lands on the same roadmap — before this, an
@@ -299,7 +304,7 @@ export default function RoadmapScreen() {
                     <Reanimated.View entering={fadeUpEntering(itemDelay)}>
                       <PathNode
                         day={d}
-                        isToday={program ? d.id === program.currentDay : false}
+                        isToday={program ? d.id === todayMarkerDay : false}
                         unrestricted={isReviewAccount}
                         onPress={() => {
                           // Locked/future days don't open at all (except

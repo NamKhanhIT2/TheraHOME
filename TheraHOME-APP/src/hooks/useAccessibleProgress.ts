@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { useProgramDays, type ActivatedProgram } from '@/hooks/usePrograms';
+import { usePainLogs, useProgramDays, type ActivatedProgram } from '@/hooks/usePrograms';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
 import { usePhasePurchases } from '@/hooks/usePhasePurchase';
+import { useProfile } from '@/hooks/useProfile';
 
 export interface AccessibleProgress {
   /** Calendar day capped at `totalDays` (0 when no program). */
@@ -25,6 +26,10 @@ export function useAccessibleProgress(
   const phaseIds = useMemo(() => Array.from(new Set(days.map((d) => d.phaseId))), [days]);
   const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
   const purchasesQuery = usePhasePurchases(userId);
+  // App Review accounts aren't calendar-gated, so their "Ngày N" follows
+  // actual activity instead of days-since-activation — see below.
+  const isReviewAccount = useProfile(userId).data?.accountType === 'review';
+  const painLogsQuery = usePainLogs(program?.userProgramId);
 
   return useMemo(() => {
     const requirements = lockRequirementsQuery.data;
@@ -34,7 +39,16 @@ export function useAccessibleProgress(
         ? days.length
         : days.filter((d) => !requirements.has(d.phaseId) || purchased?.has(d.phaseId)).length;
     const totalDays = accessible || program?.product.totalDays || 0;
-    const day = program && totalDays ? Math.min(program.currentDay, totalDays) : 0;
+    let day = program && totalDays ? Math.min(program.currentDay, totalDays) : 0;
+    if (isReviewAccount && program && totalDays) {
+      // The furthest day the reviewer actually touched (watched OR did the
+      // discomfort check-in) drives the hero/profile "Ngày N/X" — showing
+      // "Ngày 1" while the chart already has N9's log reads as out of sync.
+      const doneMax = days.reduce((max, d) => (d.status === 'done' && d.id > max ? d.id : max), 0);
+      const logMax = (painLogsQuery.data ?? []).reduce((max, p) => (p.day > max ? p.day : max), 0);
+      const activity = Math.max(doneMax, logMax);
+      day = Math.min(totalDays, Math.max(day, activity + 1));
+    }
     return { day, totalDays };
-  }, [days, lockRequirementsQuery.data, purchasesQuery.data, program]);
+  }, [days, lockRequirementsQuery.data, purchasesQuery.data, program, isReviewAccount, painLogsQuery.data]);
 }
