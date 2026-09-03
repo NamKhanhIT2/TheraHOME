@@ -300,6 +300,7 @@ export default function RoadmapScreen() {
                       <PathNode
                         day={d}
                         isToday={program ? d.id === program.currentDay : false}
+                        unrestricted={isReviewAccount}
                         onPress={() => {
                           // Locked/future days don't open at all (except
                           // for App Review accounts); openable days go

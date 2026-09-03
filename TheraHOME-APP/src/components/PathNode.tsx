@@ -13,6 +13,10 @@ export interface PathNodeProps {
    * nay" label even after it's been watched (the circle still turns into
    * the green check). */
   isToday?: boolean;
+  /** App Review accounts: locked/upcoming days ARE openable for them, so
+   * render those rows as open ("Sẵn sàng để xem", day number instead of a
+   * lock/clock icon, full opacity) rather than contradicting the tap. */
+  unrestricted?: boolean;
   onPress: (id: number) => void;
 }
 
@@ -27,7 +31,7 @@ function stageOf(status: ProgramDay['status']): number {
  * node gets a brief emphasize pop as it becomes current — a lucide icon
  * can't be stroke-drawn like a hand-authored SVG check, so the pop-in is
  * the closest equivalent. */
-export function PathNode({ day, isToday = false, onPress }: PathNodeProps) {
+export function PathNode({ day, isToday = false, unrestricted = false, onPress }: PathNodeProps) {
   const theme = useTheme();
   const { t } = useI18n();
   const reduceMotion = useReduceMotion();
@@ -37,6 +41,7 @@ export function PathNode({ day, isToday = false, onPress }: PathNodeProps) {
   const isUpcoming = day.status === 'upcoming';
   const isLocked = day.status === 'locked';
   const isPreview = day.status === 'preview';
+  const openOverride = unrestricted && (isLocked || isUpcoming);
 
   const previousStatus = useRef(day.status);
   const stage = useSharedValue(stageOf(day.status));
@@ -110,7 +115,7 @@ export function PathNode({ day, isToday = false, onPress }: PathNodeProps) {
   return (
     <Pressable
       onPress={() => onPress(day.id)}
-      style={[styles.row, { opacity: isLocked || isUpcoming ? 0.72 : 1 }]}
+      style={[styles.row, { opacity: (isLocked || isUpcoming) && !openOverride ? 0.72 : 1 }]}
     >
       <View style={[styles.connector, { backgroundColor: theme.colors.borderLight }]} />
       <Reanimated.View style={[styles.connector, connectorAnimatedStyle, { backgroundColor: theme.colors.success, transformOrigin: 'top' }]} />
@@ -128,12 +133,12 @@ export function PathNode({ day, isToday = false, onPress }: PathNodeProps) {
           <Reanimated.View entering={ZoomIn.duration(260).delay(260)}>
             <Icon name="check" size={17} color="#fff" />
           </Reanimated.View>
-        ) : isLocked ? (
+        ) : isLocked && !openOverride ? (
           <Icon name="lock" size={15} color={theme.colors.textMuted} />
-        ) : isUpcoming ? (
+        ) : isUpcoming && !openOverride ? (
           <Icon name="clock" size={15} color={theme.colors.textMuted} />
         ) : (
-          <Text style={{ color: isPreview || isMissed ? theme.colors.primary : '#fff', fontWeight: '700', fontSize: 14 }}>{day.id}</Text>
+          <Text style={{ color: isPreview || isMissed || openOverride ? theme.colors.primary : '#fff', fontWeight: '700', fontSize: 14 }}>{day.id}</Text>
         )}
       </Reanimated.View>
       <View>
@@ -145,11 +150,13 @@ export function PathNode({ day, isToday = false, onPress }: PathNodeProps) {
               ? t('completed')
               : isMissed
                 ? t('notCompleted')
-                : isUpcoming
-                  ? t('unlockAtMidnight')
-                  : isPreview
-                    ? t('preview')
-                    : t('locked')}
+                : openOverride
+                  ? t('dayReadyReview')
+                  : isUpcoming
+                    ? t('unlockAtMidnight')
+                    : isPreview
+                      ? t('preview')
+                      : t('locked')}
         </Text>
       </View>
     </Pressable>
