@@ -229,12 +229,14 @@ docs/                         the split-out detail docs listed at the top of
                               this file
 ```
 
-## Legal content is an unreviewed draft
+## Legal content: entity confirmed, wording not counsel-reviewed
 
-`src/lib/legalContent.ts` (Terms/Privacy/Security, in Vietnamese) was
-authored from a design brief, not by counsel — it has bracketed placeholders
-like `[Tên pháp nhân vận hành TheraHOME]` still unfilled. Do not treat it as
-final copy, and flag it again before any App Store / Play Store submission.
+`src/lib/legalContent.ts` (Terms/Privacy/Security, in Vietnamese) now names
+the confirmed legal entity — "Công ty H-COMMERCE GLOBAL COMPANY LIMITED"
+(owner-confirmed 2026-09-03); no placeholders remain. The wording itself was
+authored from a design brief, not by counsel — recommend a legal review pass
+before any App Store / Play Store submission. Keep the public web copy
+(`TheraHOME-WEB/src/lib/appLegalContent.ts`) in sync with any change.
 
 ## Running the app
 

@@ -2,11 +2,11 @@
 // Source of truth: TheraHOME-APP/src/lib/legalContent.ts — keep the two in
 // sync when either changes (App Store Connect points to the /privacy and
 // /terms pages rendered from this file).
-// Ported verbatim from the Claude Design prototype's `legal-content.js`.
-// NOTE: this is explicitly an UNREVIEWED DRAFT per its own header — it contains
-// bracketed placeholders (e.g. "Công ty H-COMMERCE GLOBAL COMPANY LIMITED") that must be
-// filled in and reviewed by counsel before any App Store / Play Store submission.
-// See CLAUDE.md.
+// Ported from the Claude Design prototype's `legal-content.js`.
+// Legal entity confirmed by the owner 2026-09-03: "Công ty H-COMMERCE GLOBAL
+// COMPANY LIMITED" (no bracketed placeholders remain). The wording itself is
+// still AI-drafted, not counsel-reviewed — worth a legal pass before
+// App Store / Play Store submission.
 
 // Mirrors the mobile app's support address (TheraHOME-APP/src/lib/mockData.ts).
 const supportEmail = 'support@therahomeai.com';
