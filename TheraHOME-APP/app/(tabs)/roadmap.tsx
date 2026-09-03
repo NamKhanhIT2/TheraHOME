@@ -237,15 +237,20 @@ export default function RoadmapScreen() {
               const isLastOfPhase = !nextDay || nextDay.phaseId !== d.phaseId;
               const showPhase = d.phase !== lastPhase;
               lastPhase = d.phase;
-              // A phase behind the IAP paywall keeps a VISIBLE header — in
-              // a disabled (greyed, locked, non-pressable) state, per
-              // explicit request 2026-09-02 — while its days and footer
-              // stay hidden until purchased.
+              // A phase behind the IAP paywall keeps a VISIBLE header in a
+              // greyed/locked state (per explicit request 2026-09-02) while
+              // its days and footer stay hidden until purchased. Tapping it
+              // opens the paywall directly — this is also the discovery path
+              // Apple's reviewer uses to reach the IAP without playing
+              // through 14 days first.
               if (lockedPhaseIds.has(d.phaseId)) {
                 if (!showPhase) return null;
                 return (
                   <Reanimated.View key={d.id} entering={fadeUpEntering(140 + staggerDelay(index, 20, 10))}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 18, paddingBottom: 8, opacity: 0.5 }}>
+                    <Pressable
+                      onPress={() => router.push({ pathname: '/paywall/[phaseId]', params: { phaseId: d.phaseId, phaseName: d.phase } })}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 18, paddingBottom: 8, opacity: 0.5 }}
+                    >
                       <Text
                         style={[
                           theme.type.captionSm,
@@ -255,7 +260,7 @@ export default function RoadmapScreen() {
                         {d.phase}
                       </Text>
                       <Icon name="lock" size={14} color={theme.colors.textMuted} />
-                    </View>
+                    </Pressable>
                   </Reanimated.View>
                 );
               }
