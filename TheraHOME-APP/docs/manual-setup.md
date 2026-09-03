@@ -33,16 +33,42 @@ step — see the function's own error responses):
    touched).
 5. App Store Connect → Users and Access → Sandbox Testers → create a test
    Apple ID to actually complete a purchase without being charged.
-6. **Not done in this pass, do next**: Android/Google Play Billing. Same
-   `react-native-iap` library covers it (its Android API, not the iOS one
-   used here), but needs a Google Play Console product per phase and a
-   separate edge function verifying against the Google Play Developer API
-   instead of Apple's App Store Server API — `usePhasePurchase.ts` and
-   `verify-apple-purchase` are both iOS-only right now (`platform: 'ios'`
-   hardcoded in `phase_purchases`). Also not done: an Apple Server
-   Notifications V2 webhook to catch refunds after the fact (`revoked_at`
+6. Still not done: an Apple Server Notifications V2 webhook (and its
+   Google RTDN counterpart) to catch refunds after the fact (`revoked_at`
    exists on `phase_purchases` but nothing sets it yet) — worth adding
-   once the iOS purchase flow itself is confirmed working end to end.
+   once both purchase flows are confirmed working end to end.
+
+**Google Play Billing (phase unlock, Android)** — code shipped 2026-09-03:
+`verify-google-purchase` (deployed), `google_product_id` on `phase_promos`
+(editable in WEB Admin's Upsell editor next to the Apple field),
+platform-aware `usePhasePurchase`/`usePhaseLockRequirements` (a phase is
+gated per platform by its own product id — apple-only phases are simply
+open on Android and vice versa). Manual steps before purchases verify:
+
+1. Google Play Console **organization** account (H-COMMERCE GLOBAL COMPANY
+   LIMITED — needs a D-U-N-S number; org accounts skip the personal
+   accounts' 12-testers/14-days closed-testing requirement).
+2. Create the app with package name `ai.therahome` (must match
+   `app.json`'s `android.package`; immutable after first upload).
+3. Upload a first AAB to Internal testing (`eas build --platform android
+   --profile production`) — Play only allows creating in-app products
+   after a Billing-enabled build exists.
+4. Monetize → In-app products: create one managed (non-consumable-style)
+   product per gated phase per device (4 today), set prices, activate;
+   paste each id into the phase's "Google Product ID" field on WEB Admin.
+5. Google Cloud service account + Play Console → Users and permissions
+   (view financial data + manage orders), enable the "Google Play Android
+   Developer API", then set 3 Supabase secrets for
+   `verify-google-purchase`: `GOOGLE_SERVICE_ACCOUNT_EMAIL`,
+   `GOOGLE_SERVICE_ACCOUNT_KEY` (the JSON key's `private_key` PEM,
+   real newlines), `GOOGLE_PLAY_PACKAGE_NAME` (= `ai.therahome`).
+   New links can take ~24-36h before the API stops returning 401.
+6. License testers (Settings → License testing) + a closed-testing track:
+   testers install FROM PLAY via the track link (billing is unreliable on
+   side-loaded builds) and pay with the auto-refunding test card.
+7. Firebase project + `google-services.json` (→ `android.googleServicesFile`
+   in app.json) — without it Android remote push silently gets no token;
+   local reminders still work.
 
 **Google sign-in** — until all three are done, tapping "Đăng nhập với Google"
 fails with a friendly Vietnamese error (`login.tsx` catches and displays it)

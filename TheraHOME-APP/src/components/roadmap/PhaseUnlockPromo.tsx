@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -46,7 +46,11 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
   if (isPending || !promo) return null;
 
   const hasCrossSell = !!(promo.crossSellTitle || promo.crossSellDescription);
-  const hasUnlock = !unlocked && !!promo.appleProductId;
+  // Per-platform gate: only show the unlock card when THIS platform's
+  // store product exists — an apple-only phase must not dangle a dead
+  // paywall on Android (and vice versa).
+  const platformProductId = Platform.OS === 'android' ? promo.googleProductId : promo.appleProductId;
+  const hasUnlock = !unlocked && !!platformProductId;
   if (!hasCrossSell && !hasUnlock) return null;
 
   return (

@@ -34,7 +34,7 @@ export default function PaywallScreen() {
   const [purchasedNow, setPurchasedNow] = useState(false);
   const { product, purchase, restore, verifying, restoring, purchaseError, connected } = usePurchasePhase(
     phaseId,
-    promo?.appleProductId ?? null,
+    { apple: promo?.appleProductId ?? null, google: promo?.googleProductId ?? null },
     { onVerified: () => setPurchasedNow(true) },
   );
 

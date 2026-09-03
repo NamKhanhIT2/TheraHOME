@@ -611,6 +611,7 @@ export interface PhasePromoAdmin {
   unlockDescription: string;
   unlockVideoUrl: string;
   appleProductId: string;
+  googleProductId: string;
   // Paywall-screen content (mobile app/paywall/[phaseId].tsx) — mobile falls
   // back to built-in defaults per field when left empty. `unlockBenefits` is
   // edited as one-per-line text and stored as a jsonb string array.
@@ -638,6 +639,7 @@ const EMPTY_PHASE_PROMO: PhasePromoAdmin = {
   unlockDescription: "",
   unlockVideoUrl: "",
   appleProductId: "",
+  googleProductId: "",
   unlockBadge: "",
   unlockTitle: "",
   unlockSubtitle: "",
@@ -702,7 +704,7 @@ export async function fetchPhasePromo(phaseId: string): Promise<PhasePromoAdmin>
   const { data, error } = await supabase
     .from("phase_promos")
     .select(
-      "cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, translations"
+      "cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, google_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, translations"
     )
     .eq("phase_id", phaseId)
     .maybeSingle();
@@ -719,6 +721,7 @@ export async function fetchPhasePromo(phaseId: string): Promise<PhasePromoAdmin>
     unlockDescription: data.unlock_description ?? "",
     unlockVideoUrl: data.unlock_video_url ?? "",
     appleProductId: data.apple_product_id ?? "",
+    googleProductId: data.google_product_id ?? "",
     unlockBadge: data.unlock_badge ?? "",
     unlockTitle: data.unlock_title ?? "",
     unlockSubtitle: data.unlock_subtitle ?? "",
@@ -744,6 +747,7 @@ export async function savePhasePromo(phaseId: string, promo: PhasePromoAdmin) {
       unlock_description: promo.unlockDescription || null,
       unlock_video_url: promo.unlockVideoUrl || null,
       apple_product_id: promo.appleProductId || null,
+      google_product_id: promo.googleProductId || null,
       unlock_badge: promo.unlockBadge || null,
       unlock_title: promo.unlockTitle || null,
       unlock_subtitle: promo.unlockSubtitle || null,
@@ -915,8 +919,9 @@ export interface UserProgramPhase {
   name: string;
   dayStart: number;
   dayEnd: number;
-  /** True when this phase has an `apple_product_id` configured — i.e. it's
-   * behind the in-app paywall, not just the day-by-day sequential unlock. */
+  /** True when this phase has an `apple_product_id` or `google_product_id`
+   * configured — i.e. it's behind the in-app paywall on at least one
+   * platform, not just the day-by-day sequential unlock. */
   requiresPayment: boolean;
   /** True when this user already has a non-revoked `phase_purchases` row for
    * this phase (real IAP or admin-granted) — the paywall is already lifted. */
@@ -946,7 +951,7 @@ export async function fetchUserPrograms(userId: string): Promise<UserProgramRow[
     supabase.from("user_programs").select("id, product_id, current_day, streak, adherence_pct").eq("user_id", userId),
     supabase.from("products").select("id, name, total_days"),
     supabase.from("program_phases").select("id, product_id, name, day_start, day_end").order("sort_order"),
-    supabase.from("phase_promos").select("phase_id, apple_product_id"),
+    supabase.from("phase_promos").select("phase_id, apple_product_id, google_product_id"),
     supabase.from("phase_purchases").select("phase_id").eq("user_id", userId).is("revoked_at", null),
   ]);
   if (upErr) throw upErr;
@@ -955,7 +960,7 @@ export async function fetchUserPrograms(userId: string): Promise<UserProgramRow[
   if (promoErr) throw promoErr;
   if (purchErr) throw purchErr;
 
-  const paymentGatedPhaseIds = new Set((promos ?? []).filter((p) => !!p.apple_product_id).map((p) => p.phase_id));
+  const paymentGatedPhaseIds = new Set((promos ?? []).filter((p) => !!p.apple_product_id || !!p.google_product_id).map((p) => p.phase_id));
   const purchasedPhaseIds = new Set((purchases ?? []).map((p) => p.phase_id));
   const productById = new Map((products ?? []).map((p) => [p.id, p]));
   const phasesByProduct = new Map<string, UserProgramPhase[]>();

@@ -342,7 +342,12 @@ export type Database = {
           image_url: string | null
           is_official: boolean
           likes_count: number
+          media_feed_urls: string[]
+          media_heights: number[]
+          media_poster_urls: string[]
+          media_thumbnail_urls: string[]
           media_urls: string[]
+          media_widths: number[]
           notify_enabled: boolean
           phase_milestone: string | null
           pinned: boolean
@@ -374,7 +379,12 @@ export type Database = {
           image_url?: string | null
           is_official?: boolean
           likes_count?: number
+          media_feed_urls?: string[]
+          media_heights?: number[]
+          media_poster_urls?: string[]
+          media_thumbnail_urls?: string[]
           media_urls?: string[]
+          media_widths?: number[]
           notify_enabled?: boolean
           phase_milestone?: string | null
           pinned?: boolean
@@ -406,7 +416,12 @@ export type Database = {
           image_url?: string | null
           is_official?: boolean
           likes_count?: number
+          media_feed_urls?: string[]
+          media_heights?: number[]
+          media_poster_urls?: string[]
+          media_thumbnail_urls?: string[]
           media_urls?: string[]
+          media_widths?: number[]
           notify_enabled?: boolean
           phase_milestone?: string | null
           pinned?: boolean
@@ -764,6 +779,7 @@ export type Database = {
           cross_sell_image_url: string | null
           cross_sell_title: string | null
           cross_sell_video_url: string | null
+          google_product_id: string | null
           id: string
           phase_id: string
           translations: Json
@@ -788,6 +804,7 @@ export type Database = {
           cross_sell_image_url?: string | null
           cross_sell_title?: string | null
           cross_sell_video_url?: string | null
+          google_product_id?: string | null
           id?: string
           phase_id: string
           translations?: Json
@@ -812,6 +829,7 @@ export type Database = {
           cross_sell_image_url?: string | null
           cross_sell_title?: string | null
           cross_sell_video_url?: string | null
+          google_product_id?: string | null
           id?: string
           phase_id?: string
           translations?: Json
@@ -842,6 +860,8 @@ export type Database = {
         Row: {
           apple_original_transaction_id: string | null
           apple_transaction_id: string | null
+          google_order_id: string | null
+          google_purchase_token: string | null
           id: string
           phase_id: string
           platform: string
@@ -852,6 +872,8 @@ export type Database = {
         Insert: {
           apple_original_transaction_id?: string | null
           apple_transaction_id?: string | null
+          google_order_id?: string | null
+          google_purchase_token?: string | null
           id?: string
           phase_id: string
           platform?: string
@@ -862,6 +884,8 @@ export type Database = {
         Update: {
           apple_original_transaction_id?: string | null
           apple_transaction_id?: string | null
+          google_order_id?: string | null
+          google_purchase_token?: string | null
           id?: string
           phase_id?: string
           platform?: string
@@ -1077,6 +1101,7 @@ export type Database = {
           account_type: string
           app_role: string
           avatar_url: string | null
+          country: string | null
           country_confirmed: boolean
           created_at: string
           created_by: string | null
@@ -1114,6 +1139,7 @@ export type Database = {
           account_type?: string
           app_role?: string
           avatar_url?: string | null
+          country?: string | null
           country_confirmed?: boolean
           created_at?: string
           created_by?: string | null
@@ -1151,6 +1177,7 @@ export type Database = {
           account_type?: string
           app_role?: string
           avatar_url?: string | null
+          country?: string | null
           country_confirmed?: boolean
           created_at?: string
           created_by?: string | null
@@ -1968,12 +1995,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1997,11 +2024,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2022,11 +2049,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2047,11 +2074,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2064,11 +2091,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

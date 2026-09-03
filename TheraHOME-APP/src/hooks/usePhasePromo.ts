@@ -1,11 +1,19 @@
+import { Platform } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 
-/** Which of the given phases require an (unpurchased) IAP unlock — a phase
- * appears in the map only when admin configured an `apple_product_id` for
- * it. Used by the roadmap to force-lock a phase's days even if the normal
- * day-by-day sequential unlock would otherwise mark them reachable. */
+// Payment gating is PER PLATFORM: apple_product_id gates iOS,
+// google_product_id gates Android. A phase with only one of them set is
+// simply not gated on the other platform — no dead paywall while billing
+// rolls out platform by platform.
+const PLATFORM_PRODUCT_COLUMN = Platform.OS === 'android' ? 'google_product_id' : 'apple_product_id';
+
+/** Which of the given phases require an (unpurchased) IAP unlock on THIS
+ * platform — a phase appears in the map only when admin configured this
+ * platform's product id for it. Used by the roadmap to force-lock a
+ * phase's days even if the normal day-by-day sequential unlock would
+ * otherwise mark them reachable. */
 export function usePhaseLockRequirements(phaseIds: string[]) {
   const key = phaseIds.slice().sort().join(',');
   return useQuery({
@@ -14,11 +22,16 @@ export function usePhaseLockRequirements(phaseIds: string[]) {
       if (phaseIds.length === 0) return new Map();
       const { data, error } = await supabase
         .from('phase_promos')
-        .select('phase_id, apple_product_id')
+        .select(`phase_id, ${PLATFORM_PRODUCT_COLUMN}`)
         .in('phase_id', phaseIds)
-        .not('apple_product_id', 'is', null);
+        .not(PLATFORM_PRODUCT_COLUMN, 'is', null);
       if (error) throw error;
-      return new Map(data.map((r) => [r.phase_id, r.apple_product_id as string]));
+      return new Map(
+        (data as { phase_id: string; [column: string]: string | null }[]).map((r) => [
+          r.phase_id,
+          r[PLATFORM_PRODUCT_COLUMN] as string,
+        ]),
+      );
     },
     enabled: phaseIds.length > 0,
   });
@@ -35,6 +48,7 @@ export interface PhasePromo {
   unlockDescription: string | null;
   unlockVideoUrl: string | null;
   appleProductId: string | null;
+  googleProductId: string | null;
   // Paywall-screen content (app/paywall/[phaseId].tsx) — each falls back to
   // an i18n default on the mobile side when admin leaves it unset.
   unlockBadge: string | null;
@@ -62,7 +76,7 @@ export function usePhasePromo(phaseId: string | undefined) {
       const { data, error } = await supabase
         .from('phase_promos')
         .select(
-          'cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, translations',
+          'cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, google_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, translations',
         )
         .eq('phase_id', phaseId!)
         .maybeSingle();
@@ -95,6 +109,7 @@ export function usePhasePromo(phaseId: string | undefined) {
         unlockDescription: pick(data.unlock_description, 'unlock_description'),
         unlockVideoUrl: pick(data.unlock_video_url, 'unlock_video_url'),
         appleProductId: data.apple_product_id,
+        googleProductId: data.google_product_id,
         unlockBadge: pick(data.unlock_badge, 'unlock_badge'),
         unlockTitle: pick(data.unlock_title, 'unlock_title'),
         unlockSubtitle: pick(data.unlock_subtitle, 'unlock_subtitle'),

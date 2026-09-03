@@ -158,8 +158,8 @@ function QuizTab({ phaseId }: { phaseId: string }) {
 
 type PromoLangTab = "vi" | "en" | "ms";
 const PROMO_LANG_TABS: Array<[PromoLangTab, string]> = [["vi", "VN"], ["en", "EN"], ["ms", "MS"]];
-/** Fields editable per language (text/urls). Images + Apple Product ID are
- * shared across languages and only shown on the VN tab. */
+/** Fields editable per language (text/urls). Images + Apple/Google Product
+ * IDs are shared across languages and only shown on the VN tab. */
 type PromoTextKey = keyof PhasePromoTranslation;
 
 function PromoTab({ phaseId }: { phaseId: string }) {
@@ -231,7 +231,7 @@ function PromoTab({ phaseId }: { phaseId: string }) {
       <PillTabs options={PROMO_LANG_TABS} value={langTab} onChange={setLangTab} />
       {!isVi ? (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12, marginTop: -6 }}>
-          Bản dịch cho người dùng {langTab === "en" ? "tiếng Anh (thị trường UK)" : "tiếng Malay (thị trường ML)"}. Trường nào để trống, app sẽ dùng bản VN. Ảnh và Apple Product ID dùng chung — chỉnh ở tab VN.
+          Bản dịch cho người dùng {langTab === "en" ? "tiếng Anh (thị trường UK)" : "tiếng Malay (thị trường ML)"}. Trường nào để trống, app sẽ dùng bản VN. Ảnh và Apple/Google Product ID dùng chung — chỉnh ở tab VN.
         </div>
       ) : null}
       <div style={{ background: "#fff", borderRadius: 12, padding: 14, boxShadow: "var(--shadow-card)", marginBottom: 14 }}>
@@ -262,7 +262,7 @@ function PromoTab({ phaseId }: { phaseId: string }) {
         {isVi ? (
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
             Thẻ &quot;Mở khoá {"{tên giai đoạn}"}&quot; hiện ở cuối giai đoạn trước, dẫn vào màn paywall bên dưới.
-            Chỉ hiển thị khi đã điền Apple Product ID (ở phần paywall) và người dùng chưa mua.
+            Chỉ hiển thị khi đã điền Product ID của nền tảng tương ứng (Apple cho iOS, Google cho Android — ở phần paywall) và người dùng chưa mua.
           </div>
         ) : null}
         {isVi ? (
@@ -305,7 +305,9 @@ function PromoTab({ phaseId }: { phaseId: string }) {
         {isVi ? (
           <Fragment>
             <FieldLabel>Apple Product ID (đã tạo trên App Store Connect, dùng chung 3 ngôn ngữ)</FieldLabel>
-            <input value={promo.appleProductId} onChange={(e) => set("appleProductId", e.target.value)} style={inputStyle} placeholder="com.therahome.phase3_unlock" />
+            <input value={promo.appleProductId} onChange={(e) => set("appleProductId", e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} placeholder="com.therahome.phase3_unlock" />
+            <FieldLabel>Google Product ID (đã tạo trên Google Play Console, dùng chung 3 ngôn ngữ)</FieldLabel>
+            <input value={promo.googleProductId} onChange={(e) => set("googleProductId", e.target.value)} style={inputStyle} placeholder="phase3_unlock" />
           </Fragment>
         ) : null}
       </div>

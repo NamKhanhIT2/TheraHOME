@@ -19,6 +19,7 @@
       }
     },
     "android": {
+      "package": "ai.therahome",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -42,20 +43,21 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "TheraHOME c\u1ea7n quy\u1ec1n truy c\u1eadp th\u01b0 vi\u1ec7n \u1ea3nh \u0111\u1ec3 b\u1ea1n th\u00eam \u1ea3nh v\u00e0o b\u00e0i vi\u1ebft."
+          "photosPermission": "TheraHOME cần quyền truy cập thư viện ảnh để bạn thêm ảnh vào bài viết."
         }
       ],
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/android-icon-monochrome.png",
           "color": "#007FD9",
           "sounds": [
             "./assets/sounds/ting.wav"
           ]
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-image"
     ],
     "extra": {
       "router": {},

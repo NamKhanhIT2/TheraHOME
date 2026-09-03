@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { useIAP, type Purchase } from 'react-native-iap';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -22,17 +23,21 @@ export function usePhasePurchases(userId: string | undefined) {
 }
 
 /** Drives the "Mở khoá ngay" button on `PhaseUnlockPromo` for one specific
- * phase. iOS only for now (Android/Google Play Billing is a follow-up — see
- * CLAUDE.md). Wraps `react-native-iap`'s `useIAP()`: fetches the phase's
- * Apple product so the button can show the real StoreKit price, drives
- * `requestPurchase`, and on success sends the transaction id to
- * `verify-apple-purchase` (server-side verification against Apple, then
- * records `phase_purchases`) before finalizing the transaction. */
+ * phase, on both platforms. Wraps `react-native-iap`'s `useIAP()`: fetches
+ * the phase's product for the CURRENT platform (Apple product id on iOS,
+ * Google Play product id on Android) so the button can show the real store
+ * price, drives `requestPurchase`, and on success verifies server-side —
+ * `verify-apple-purchase` with the StoreKit transaction id, or
+ * `verify-google-purchase` with the Play Billing purchaseToken (NEVER
+ * `purchase.id` on Android: react-native-iap fills it with the orderId or
+ * falls back to the token) — before finalizing the transaction, which on
+ * Android doubles as the acknowledge call. */
 export function usePurchasePhase(
   phaseId: string,
-  appleProductId: string | null,
+  productIds: { apple: string | null; google: string | null },
   opts?: { onVerified?: () => void },
 ) {
+  const sku = Platform.OS === 'android' ? productIds.google : productIds.apple;
   const queryClient = useQueryClient();
   const [verifying, setVerifying] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -50,14 +55,20 @@ export function usePurchasePhase(
       setVerifying(true);
       setPurchaseError(null);
       try {
-        const { data, error } = await supabase.functions.invoke('verify-apple-purchase', {
-          body: { phaseId, transactionId: purchase.id },
-        });
+        const { data, error } =
+          Platform.OS === 'android'
+            ? await supabase.functions.invoke('verify-google-purchase', {
+                body: { phaseId, purchaseToken: purchase.purchaseToken },
+              })
+            : await supabase.functions.invoke('verify-apple-purchase', {
+                body: { phaseId, transactionId: purchase.id },
+              });
         if (error) throw error;
         if (!data?.ok) throw new Error(data?.error ?? 'verify_failed');
         // Only finalize with the platform once our own backend has recorded
-        // the purchase — an unfinished iOS transaction safely replays on the
-        // next app launch if this step never runs (e.g. app killed mid-flow).
+        // the purchase — an unfinished transaction safely replays (iOS) or
+        // stays restorable (Android, where the server has also already
+        // acknowledged it) if this step never runs, e.g. app killed mid-flow.
         await finishTransaction({ purchase, isConsumable: false });
         void queryClient.invalidateQueries({ queryKey: ['phase_purchases'] });
         onVerifiedRef.current?.();
@@ -82,12 +93,12 @@ export function usePurchasePhase(
   });
 
   useEffect(() => {
-    if (connected && appleProductId) {
-      void fetchProducts({ skus: [appleProductId], type: 'in-app' });
+    if (connected && sku) {
+      void fetchProducts({ skus: [sku], type: 'in-app' });
     }
-  }, [connected, appleProductId, fetchProducts]);
+  }, [connected, sku, fetchProducts]);
 
-  const product = products.find((p) => p.id === appleProductId) ?? null;
+  const product = products.find((p) => p.id === sku) ?? null;
 
   // "Khôi phục giao dịch": re-fetch the Apple account's owned purchases and
   // re-run server verification for the one matching this phase's product.
@@ -96,7 +107,7 @@ export function usePurchasePhase(
   // re-rendered — see react-native-iap's useIAP docs), so the match is
   // consumed by the effect below rather than right after the await.
   const restore = useCallback(() => {
-    if (!appleProductId || !connected) return;
+    if (!sku || !connected) return;
     setPurchaseError(null);
     restoreRequestedRef.current = true;
     setRestoring(true);
@@ -118,29 +129,31 @@ export function usePurchasePhase(
         setPurchaseError(e instanceof Error ? e.message : 'restore_failed');
         if (__DEV__) console.warn('getAvailablePurchases failed:', e);
       });
-  }, [appleProductId, connected, getAvailablePurchases]);
+  }, [sku, connected, getAvailablePurchases]);
 
   useEffect(() => {
-    if (!restoreRequestedRef.current || !appleProductId) return;
-    const match = availablePurchases.find((p) => p.productId === appleProductId);
+    if (!restoreRequestedRef.current || !sku) return;
+    const match = availablePurchases.find((p) => p.productId === sku);
     if (!match) return;
     restoreRequestedRef.current = false;
     setRestoring(false);
     void verifyAndFinish(match, finishTransaction);
-  }, [availablePurchases, appleProductId, verifyAndFinish, finishTransaction]);
+  }, [availablePurchases, sku, verifyAndFinish, finishTransaction]);
 
   const purchase = useCallback(() => {
-    if (!appleProductId) return;
+    if (!sku) return;
     setPurchaseError(null);
-    // `requestPurchase` delivers its result via onPurchaseSuccess/
-    // onPurchaseError above, but the promise itself can still reject
-    // synchronously (e.g. IAP native module unavailable, not connected yet)
-    // — without a catch here that becomes an unhandled promise rejection.
-    requestPurchase({ request: { apple: { sku: appleProductId } }, type: 'in-app' }).catch((e: unknown) => {
+    // Both platform keys are passed; the library reads only the current
+    // platform's. `requestPurchase` delivers its result via
+    // onPurchaseSuccess/onPurchaseError above, but the promise itself can
+    // still reject synchronously (e.g. IAP native module unavailable, not
+    // connected yet) — without a catch here that becomes an unhandled
+    // promise rejection.
+    requestPurchase({ request: { apple: { sku }, google: { skus: [sku] } }, type: 'in-app' }).catch((e: unknown) => {
       setPurchaseError(e instanceof Error ? e.message : 'purchase_failed');
       if (__DEV__) console.warn('requestPurchase failed:', e);
     });
-  }, [appleProductId, requestPurchase]);
+  }, [sku, requestPurchase]);
 
   return {
     /** Real StoreKit product (has the localized `displayPrice`), null until fetched. */
