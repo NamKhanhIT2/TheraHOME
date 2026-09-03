@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 import { ExternalLinkModal } from '@/components/ExternalLinkModal';
 import { usePhasePromo } from '@/hooks/usePhasePromo';
 import { useI18n } from '@/lib/i18n';
@@ -29,14 +31,16 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const { data: promo, isPending } = usePhasePromo(phaseId);
 
-  // Warm the OS image cache with both card images (and the paywall's hero)
-  // as soon as the promo row loads, so the roadmap cards and "Mở khoá ngay"
-  // render with the images already local instead of downloading on-screen.
+  // Warm expo-image's DISK cache with both card images (and the paywall's
+  // hero) as soon as the promo row loads. Must be expo-image's prefetch —
+  // RN Image.prefetch fills a different cache the RemoteImage-based cards
+  // and paywall hero never read, which is why the hero used to show a blank
+  // panel for a while on first open.
   const unlockImageUrl = promo?.unlockImageUrl;
   const crossSellImageUrl = promo?.crossSellImageUrl;
   useEffect(() => {
-    if (unlockImageUrl) Image.prefetch(unlockImageUrl).catch(() => {});
-    if (crossSellImageUrl) Image.prefetch(crossSellImageUrl).catch(() => {});
+    const urls = [unlockImageUrl, crossSellImageUrl].filter((u): u is string => !!u);
+    if (urls.length) void ExpoImage.prefetch(urls, { cachePolicy: 'disk' }).catch(() => {});
   }, [unlockImageUrl, crossSellImageUrl]);
 
   if (isPending || !promo) return null;
@@ -50,7 +54,7 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
       {hasCrossSell ? (
         <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
           {promo.crossSellImageUrl ? (
-            <Image source={{ uri: promo.crossSellImageUrl }} style={[styles.image, { borderTopLeftRadius: theme.radius.lg, borderBottomLeftRadius: theme.radius.lg }]} />
+            <RemoteImage uri={promo.crossSellImageUrl} contentFit="cover" style={[styles.image, { borderTopLeftRadius: theme.radius.lg, borderBottomLeftRadius: theme.radius.lg }]} />
           ) : (
             <View style={[styles.image, styles.imagePlaceholder, { backgroundColor: theme.colors.primaryTint10, borderTopLeftRadius: theme.radius.lg, borderBottomLeftRadius: theme.radius.lg }]}>
               <Icon name="sparkles" size={30} color={theme.colors.primary} />
@@ -99,7 +103,7 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
       {hasUnlock ? (
         <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
           {promo.unlockImageUrl ? (
-            <Image source={{ uri: promo.unlockImageUrl }} style={[styles.image, { borderTopLeftRadius: theme.radius.lg, borderBottomLeftRadius: theme.radius.lg }]} />
+            <RemoteImage uri={promo.unlockImageUrl} contentFit="cover" style={[styles.image, { borderTopLeftRadius: theme.radius.lg, borderBottomLeftRadius: theme.radius.lg }]} />
           ) : (
             <View style={[styles.image, styles.imagePlaceholder, { backgroundColor: theme.colors.primaryTint10, borderTopLeftRadius: theme.radius.lg, borderBottomLeftRadius: theme.radius.lg }]}>
               <Icon name="lock" size={30} color={theme.colors.primary} />
@@ -154,7 +158,6 @@ const styles = StyleSheet.create({
   },
   image: {
     width: 108,
-    resizeMode: 'cover',
   },
   imagePlaceholder: {
     alignItems: 'center',

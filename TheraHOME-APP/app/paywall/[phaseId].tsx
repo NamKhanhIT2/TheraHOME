@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
@@ -8,6 +8,7 @@ import { useSession } from '@/hooks/useSession';
 import { usePhasePromo } from '@/hooks/usePhasePromo';
 import { usePhasePurchases, usePurchasePhase } from '@/hooks/usePhasePurchase';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
@@ -84,7 +85,10 @@ export default function PaywallScreen() {
             ]}
           >
             {promo?.unlockImageUrl ? (
-              <Image source={{ uri: promo.unlockImageUrl }} style={styles.heroImage} />
+              // expo-image (disk-cached): shares the cache PhaseUnlockPromo
+              // pre-warms from the roadmap, so the hero is instant on
+              // revisits instead of re-downloading each open.
+              <RemoteImage uri={promo.unlockImageUrl} contentFit="cover" style={styles.heroImage} />
             ) : (
               <View style={styles.heroPlaceholder}>
                 <Icon name="lock" size={48} color={theme.colors.primary} />
@@ -166,21 +170,30 @@ export default function PaywallScreen() {
               {verifying ? t('purchaseVerifying') : t('unlockNow')}
             </Button>
 
-            {/* Footer links */}
+            {/* Footer links — restore first (per request 2026-09-03). Each
+                item can shrink and its label stays on one line with a capped
+                font scale, so all three fit on narrow screens without
+                clipping. */}
             <View style={styles.footerRow}>
-              <Pressable style={styles.footerItem} hitSlop={6} onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'terms' } })}>
-                <Icon name="file-text" size={13} color={theme.colors.textMuted} />
-                <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('terms')}</Text>
-              </Pressable>
-              <View style={[styles.footerDivider, { backgroundColor: theme.colors.borderInput }]} />
               <Pressable style={styles.footerItem} hitSlop={6} onPress={restore} disabled={busy || !connected}>
                 <Icon name="rotate-ccw" size={13} color={theme.colors.textMuted} />
-                <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('restorePurchase')}</Text>
+                <Text style={[theme.type.captionSm, styles.footerLabel, { color: theme.colors.textMuted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.2}>
+                  {t('restorePurchase')}
+                </Text>
+              </Pressable>
+              <View style={[styles.footerDivider, { backgroundColor: theme.colors.borderInput }]} />
+              <Pressable style={styles.footerItem} hitSlop={6} onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'terms' } })}>
+                <Icon name="file-text" size={13} color={theme.colors.textMuted} />
+                <Text style={[theme.type.captionSm, styles.footerLabel, { color: theme.colors.textMuted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.2}>
+                  {t('terms')}
+                </Text>
               </Pressable>
               <View style={[styles.footerDivider, { backgroundColor: theme.colors.borderInput }]} />
               <Pressable style={styles.footerItem} hitSlop={6} onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'privacy' } })}>
                 <Icon name="shield-check" size={13} color={theme.colors.textMuted} />
-                <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('paywallSecurity')}</Text>
+                <Text style={[theme.type.captionSm, styles.footerLabel, { color: theme.colors.textMuted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.2}>
+                  {t('paywallSecurity')}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -211,7 +224,6 @@ const styles = StyleSheet.create({
   heroImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   heroPlaceholder: {
     flex: 1,
@@ -267,13 +279,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 6,
     marginTop: 16,
+    // The three Vietnamese labels need a bit more than the content column's
+    // width — let the row borrow the padding gutter instead of ellipsizing.
+    marginHorizontal: -10,
   },
   footerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  footerLabel: {
+    flexShrink: 1,
   },
   footerDivider: {
     width: 1,
