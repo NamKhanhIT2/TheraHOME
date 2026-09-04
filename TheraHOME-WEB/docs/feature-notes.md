@@ -754,3 +754,48 @@ Known remaining single-language content, deliberately out of scope:
 seeded catalog in `src/lib/adminContent.ts` — a renamed/new product
 shows its VN name in all languages) and `articles` (mobile ships static
 vi/en/ms arrays in mockData.ts, no admin tab at all).
+
+## Auto-draft EN/MS translations on admin authoring (2026-09-04)
+
+Per explicit request: staff writes VN only; on save, empty EN/MS variants
+are machine-drafted (Groq, same account as chat-ai-reply) and stored in the
+SAME slots the app already reads — so an untouched draft simply ships, and
+staff can refine it later in the existing VN/EN/MS tabs. New Edge Function
+`translate-content` (verify_jwt + admin/cskh check against
+web_access_contacts, source in
+TheraHOME-APP/supabase/functions/translate-content/) + `src/lib/translate.ts`
+helper (`translateDrafts` — resolves null on any failure so saving never
+blocks). Wired into: PhaseContentModal (quiz questions + upsell
+translations), CommunityView official-post composer (UK/ML variants no
+longer block publish when empty — they auto-draft, incl. notify blurbs),
+UpsaleNotificationsView (per-day EN/MS, batched 15 days/call). URLs and the
+fallback price label are never auto-translated. Toasts say "đã tự dịch
+nháp" so staff knows to review. Requires GROQ_API_KEY to be set; without it
+everything saves VN-only exactly as before.
+
+## Sửa nhắm thị trường + ghim theo quốc gia + mở tab Cộng đồng cho Admin (2026-09-04)
+
+Ba việc theo yêu cầu:
+
+**1. Bug: bài đăng cho UK vẫn tới người dùng VN.** Composer luôn ép VN vào
+danh sách: `targetMarkets: extraMarkets.length ? ["VN", ...extraMarkets]`
+— nên không có cách nào đăng riêng cho UK/ML. Nay có 3 checkbox VN/UK/ML
+(VN mặc định tick, bỏ tick được); tick đủ 3 => gửi null (mọi thị trường,
+kể cả thị trường thêm sau); bỏ hết => chặn kèm toast. Dữ liệu cũ: 2 bài
+"relax in 5 minutes" (nội dung 100% tiếng Anh) đang là {VN,US} đã đổi về
+{US}. Kiểm chứng bằng cách mô phỏng bộ lọc feed: VN 7 bài, US 9, MALAY 7.
+
+**2. Ghim theo quốc gia.** `set_official_post_pinned` trước đây bỏ ghim MỌI
+bài official khác => một slot ghim toàn cầu, ghim bài UK là VN mất bài
+ghim. Migration `pin_per_market`: chỉ bỏ ghim những bài có thị trường CHỒNG
+LẤN (target_markets NULL = mọi nơi nên vẫn đá tất cả). Giờ VN/UK/ML mỗi
+thị trường giữ được bài ghim riêng. Mobile không cần sửa — feed đã lọc
+theo thị trường trước khi tìm bài pinned. Danh sách bài trên admin nay có
+badge thị trường (trước đó không hiển thị ở đâu cả).
+
+**3. Mở tab "Cộng đồng" cho Admin.** `ChallengesAdminView` đã code xong
+nhưng KHÔNG có đường vào: CommunityView chỉ mount ở CSKH với `pinOnly`,
+mà chế độ đó lại ẩn đúng tab Thử thách; NAV_ADMIN không có mục Cộng đồng.
+Thêm `{ id: "community" }` vào NAV_ADMIN + mount `<CommunityView />`
+(không pinOnly) ở app/admin/page.tsx. Hợp với RLS: policy "web admin
+manage challenges" vốn chỉ cho role admin ghi.

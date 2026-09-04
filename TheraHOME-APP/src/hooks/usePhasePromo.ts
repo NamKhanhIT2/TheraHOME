@@ -9,6 +9,15 @@ import { useAppStore } from '@/store/useAppStore';
 // rolls out platform by platform.
 const PLATFORM_PRODUCT_COLUMN = Platform.OS === 'android' ? 'google_product_id' : 'apple_product_id';
 
+export interface PhaseLockRequirement {
+  /** This platform's store product id. */
+  productId: string;
+  /** False while the store isn't allowed to sell yet (e.g. shipping under
+   * the FREE apps agreement) — the phase stays locked, but every selling
+   * surface (greyed header, promo cards, paywall entry) is hidden. */
+  salesEnabled: boolean;
+}
+
 /** Which of the given phases require an (unpurchased) IAP unlock on THIS
  * platform — a phase appears in the map only when admin configured this
  * platform's product id for it. Used by the roadmap to force-lock a
@@ -18,18 +27,18 @@ export function usePhaseLockRequirements(phaseIds: string[]) {
   const key = phaseIds.slice().sort().join(',');
   return useQuery({
     queryKey: ['phase_promos_lock', key],
-    queryFn: async (): Promise<Map<string, string>> => {
+    queryFn: async (): Promise<Map<string, PhaseLockRequirement>> => {
       if (phaseIds.length === 0) return new Map();
       const { data, error } = await supabase
         .from('phase_promos')
-        .select(`phase_id, ${PLATFORM_PRODUCT_COLUMN}`)
+        .select(`phase_id, sales_enabled, ${PLATFORM_PRODUCT_COLUMN}`)
         .in('phase_id', phaseIds)
         .not(PLATFORM_PRODUCT_COLUMN, 'is', null);
       if (error) throw error;
       return new Map(
-        (data as { phase_id: string; [column: string]: string | null }[]).map((r) => [
+        (data as { phase_id: string; sales_enabled: boolean | null; [column: string]: string | boolean | null }[]).map((r) => [
           r.phase_id,
-          r[PLATFORM_PRODUCT_COLUMN] as string,
+          { productId: r[PLATFORM_PRODUCT_COLUMN] as string, salesEnabled: r.sales_enabled !== false },
         ]),
       );
     },
@@ -58,6 +67,12 @@ export interface PhasePromo {
   unlockPackageName: string | null;
   unlockPackageDesc: string | null;
   unlockPriceLabel: string | null;
+  /** Catalog name of the product this phase belongs to (base `products.name`,
+   * not market-localized) — used to pick the bundled paywall hero. */
+  productName: string | null;
+  /** False = selling paused (free-agreement mode): PhaseUnlockPromo renders
+   * nothing at all for this phase. */
+  salesEnabled: boolean;
 }
 
 /** Admin-authored content for the two cards shown once a phase's quiz is
@@ -76,7 +91,7 @@ export function usePhasePromo(phaseId: string | undefined) {
       const { data, error } = await supabase
         .from('phase_promos')
         .select(
-          'cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, google_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, translations',
+          'cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, google_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, sales_enabled, translations, program_phases(products(name))',
         )
         .eq('phase_id', phaseId!)
         .maybeSingle();
@@ -117,6 +132,9 @@ export function usePhasePromo(phaseId: string | undefined) {
         unlockPackageName: pick(data.unlock_package_name, 'unlock_package_name'),
         unlockPackageDesc: pick(data.unlock_package_desc, 'unlock_package_desc'),
         unlockPriceLabel: pick(data.unlock_price_label, 'unlock_price_label'),
+        productName:
+          (data.program_phases as { products: { name: string } | null } | null)?.products?.name ?? null,
+        salesEnabled: data.sales_enabled !== false,
       };
     },
     enabled: !!phaseId,

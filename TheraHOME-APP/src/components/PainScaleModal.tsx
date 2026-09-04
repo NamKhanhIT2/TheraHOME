@@ -29,8 +29,9 @@ function moodLabelKey(v: number): TranslationKey {
  * React state — so dragging stays smooth no matter how heavy the sibling
  * re-render is (`MoodFace` restarts a bounce/tilt spring on every step).
  * The discrete 0–10 `value` is only committed (and thus only triggers that
- * re-render) when the touch crosses into a new step, throttled slightly so
- * a fast flick across the whole track doesn't fire 10 commits in one frame. */
+ * re-render) immediately when the touch crosses into a new step. MoodFace
+ * is intentionally lightweight, so every one of the 11 stickers can update
+ * without skipping intermediate values during a quick drag. */
 function PainSlider({ value, onChange, color }: { value: number; onChange: (v: number) => void; color: string }) {
   const theme = useTheme();
   const { t } = useI18n();
@@ -40,8 +41,6 @@ function PainSlider({ value, onChange, color }: { value: number; onChange: (v: n
   const lastValueRef = useRef(value);
   lastValueRef.current = value;
   const pctAnim = useRef(new Animated.Value(value / 10)).current;
-  const lastCommitAtRef = useRef(0);
-  const COMMIT_THROTTLE_MS = 40;
 
   // `locationX` is relative to whichever native view actually caught the
   // touch — when a drag starts right on the thumb (an absolutely-positioned
@@ -49,16 +48,13 @@ function PainSlider({ value, onChange, color }: { value: number; onChange: (v: n
   // what snapped the value to ~0 on touch-down and made it jitter mid-drag
   // as the touched view kept changing. `pageX` is always relative to the
   // screen, so it stays consistent regardless of which child is underneath.
-  const updateFromPageX = (pageX: number, isFinal: boolean) => {
+  const updateFromPageX = (pageX: number) => {
     const x = pageX - pageXRef.current;
     const pct = Math.max(0, Math.min(1, x / widthRef.current));
     pctAnim.setValue(pct);
 
     const nextValue = Math.round(pct * 10);
     if (nextValue === lastValueRef.current) return;
-    const now = Date.now();
-    if (!isFinal && now - lastCommitAtRef.current < COMMIT_THROTTLE_MS) return;
-    lastCommitAtRef.current = now;
     lastValueRef.current = nextValue;
     onChange(nextValue);
   };
@@ -68,12 +64,10 @@ function PainSlider({ value, onChange, color }: { value: number; onChange: (v: n
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (e) => updateFromPageX(e.nativeEvent.pageX, false),
-      onPanResponderMove: (e) => updateFromPageX(e.nativeEvent.pageX, false),
-      // Guarantees the exact final position is committed even if the last
-      // move landed inside the throttle window.
-      onPanResponderRelease: (e) => updateFromPageX(e.nativeEvent.pageX, true),
-      onPanResponderTerminate: (e) => updateFromPageX(e.nativeEvent.pageX, true),
+      onPanResponderGrant: (e) => updateFromPageX(e.nativeEvent.pageX),
+      onPanResponderMove: (e) => updateFromPageX(e.nativeEvent.pageX),
+      onPanResponderRelease: (e) => updateFromPageX(e.nativeEvent.pageX),
+      onPanResponderTerminate: (e) => updateFromPageX(e.nativeEvent.pageX),
     }),
   ).current;
 

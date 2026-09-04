@@ -14,6 +14,7 @@ import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { useAppIsActive } from '@/hooks/useAppIsActive';
 import { useVideoPlaybackStore } from '@/store/useVideoPlaybackStore';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 
 // In-feed videos narrower than 4:5 (this includes 9:16) are cropped to a
 // 4:5 "preview" via `cover` rather than shown at their full tall height —
@@ -26,13 +27,32 @@ const DEFAULT_RATIO = 4 / 3;
 
 export interface CommunityVideoPlayerProps {
   uri: string;
+  posterUri?: string | null;
   itemId: string;
   shouldAutoplay: boolean;
   mode: 'single' | 'grid';
   onOpenViewer: () => void;
 }
 
-export function CommunityVideoPlayer({ uri, itemId, shouldAutoplay, mode, onOpenViewer }: CommunityVideoPlayerProps) {
+export function CommunityVideoPlayer({ uri, posterUri, itemId, shouldAutoplay, mode, onOpenViewer }: CommunityVideoPlayerProps) {
+  const theme = useTheme();
+  if (!shouldAutoplay) {
+    return (
+      <Pressable
+        onPress={onOpenViewer}
+        style={mode === 'single'
+          ? [styles.frame, styles.poster, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md, aspectRatio: DEFAULT_RATIO }]
+          : [StyleSheet.absoluteFill, styles.poster, { backgroundColor: theme.colors.bgCardAlt }]}
+      >
+        {posterUri ? <RemoteImage uri={posterUri} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+        <View style={styles.posterPlay}><Icon name="play" size={22} color="#fff" /></View>
+      </Pressable>
+    );
+  }
+  return <ActiveCommunityVideoPlayer uri={uri} itemId={itemId} shouldAutoplay={shouldAutoplay} mode={mode} onOpenViewer={onOpenViewer} />;
+}
+
+function ActiveCommunityVideoPlayer({ uri, itemId, shouldAutoplay, mode, onOpenViewer }: CommunityVideoPlayerProps) {
   const theme = useTheme();
   const appActive = useAppIsActive();
   const soundEnabled = useVideoPlaybackStore((s) => s.soundEnabled);
@@ -122,6 +142,8 @@ export function CommunityVideoPlayer({ uri, itemId, shouldAutoplay, mode, onOpen
 const styles = StyleSheet.create({
   frame: { width: '100%', marginTop: 10, overflow: 'hidden' },
   media: { width: '100%', height: '100%' },
+  poster: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  posterPlay: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0,0,0,0.56)', alignItems: 'center', justifyContent: 'center' },
   loadingOverlay: { alignItems: 'center', justifyContent: 'center' },
   controlsRow: {
     position: 'absolute',

@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { timeAgo } from '@/lib/timeAgo';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 
 const LOGO = require('../../../assets/brandmark-blue.png');
 
@@ -55,7 +56,7 @@ export function ArticleCard({
           </Text>
         </View>
         {thumbnailUrl ? (
-          <Image source={{ uri: thumbnailUrl }} style={[styles.thumb, { borderRadius: theme.radius.md }]} />
+          <RemoteImage uri={thumbnailUrl} contentFit="cover" style={[styles.thumb, { borderRadius: theme.radius.md, backgroundColor: theme.colors.bgCardAlt }]} />
         ) : null}
       </View>
       <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold, marginTop: 10 }]}>

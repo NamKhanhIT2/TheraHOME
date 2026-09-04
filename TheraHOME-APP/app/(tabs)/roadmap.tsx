@@ -172,7 +172,9 @@ export default function RoadmapScreen() {
   // (non-IAP-locked) phase must have all days run their course AND its
   // survey submitted; the cards then advertise the phase that follows it
   // (usually the locked phase 3). Nothing renders mid-journey or when the
-  // product has no further phase.
+  // product has no further phase. Review accounts skip the all-days gate
+  // (they can take the survey early via the same bypass, so the survey
+  // alone reveals the cards — per explicit request 2026-09-03).
   const bottomPromoPhase = useMemo(() => {
     const phaseOrder: { id: string; name: string }[] = [];
     for (const d of days) if (!phaseOrder.some((p) => p.id === d.phaseId)) phaseOrder.push({ id: d.phaseId, name: d.phase });
@@ -182,10 +184,10 @@ export default function RoadmapScreen() {
     const donePhase = phaseOrder[lastVisibleIdx];
     const nextPhase = phaseOrder[lastVisibleIdx + 1];
     if (!nextPhase) return null;
-    if (!(phaseAllDone.get(donePhase.id) ?? false)) return null;
+    if (!isReviewAccount && !(phaseAllDone.get(donePhase.id) ?? false)) return null;
     if (!(quizResolvedQuery.data?.get(donePhase.id) ?? false)) return null;
     return nextPhase;
-  }, [days, lockedPhaseIds, phaseAllDone, quizResolvedQuery.data]);
+  }, [days, lockedPhaseIds, phaseAllDone, quizResolvedQuery.data, isReviewAccount]);
 
   let lastPhase: string | null = null;
 
@@ -257,6 +259,11 @@ export default function RoadmapScreen() {
               // through 14 days first.
               if (lockedPhaseIds.has(d.phaseId)) {
                 if (!showPhase) return null;
+                // Selling paused (free-agreement mode): the phase stays
+                // locked but is invisible — no greyed header, so no tap
+                // path into the paywall either (per explicit request
+                // 2026-09-04). Flips back on via WEB Admin's Upsell editor.
+                if (lockRequirementsQuery.data?.get(d.phaseId)?.salesEnabled === false) return null;
                 return (
                   <Reanimated.View key={d.id} entering={fadeUpEntering(140 + staggerDelay(index, 20, 10))}>
                     <Pressable
@@ -266,7 +273,9 @@ export default function RoadmapScreen() {
                       <Text
                         style={[
                           theme.type.captionSm,
-                          { color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+                          // One step above captionSm (per explicit request
+                          // 2026-09-03: roadmap phase headers a touch bigger).
+                          { fontSize: 13, lineHeight: 18, color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
                         ]}
                       >
                         {d.phase}
@@ -289,7 +298,9 @@ export default function RoadmapScreen() {
                         <Text
                           style={[
                             theme.type.captionSm,
-                            { color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+                            // One step above captionSm (per explicit request
+                            // 2026-09-03: roadmap phase headers a touch bigger).
+                            { fontSize: 13, lineHeight: 18, color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
                           ]}
                         >
                           {d.phase}

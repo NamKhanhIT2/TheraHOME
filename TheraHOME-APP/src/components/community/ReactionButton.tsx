@@ -110,7 +110,7 @@ export function ReactionButton({ currentReaction, onQuickPress, onLongPress, onL
 
 const styles = StyleSheet.create({
   hit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  hitLabelled: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, gap: 6 },
+  hitLabelled: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, gap: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   emoji: { fontSize: 18 },
   emojiSm: { fontSize: 18 },

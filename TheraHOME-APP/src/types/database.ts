@@ -62,6 +62,33 @@ export type Database = {
         }
         Relationships: []
       }
+      app_config: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value_en: string | null
+          value_ms: string | null
+          value_vi: string | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value_en?: string | null
+          value_ms?: string | null
+          value_vi?: string | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value_en?: string | null
+          value_ms?: string | null
+          value_vi?: string | null
+        }
+        Relationships: []
+      }
       articles: {
         Row: {
           body: string | null
@@ -482,6 +509,48 @@ export type Database = {
         }
         Relationships: []
       }
+      faq_items: {
+        Row: {
+          active: boolean
+          answer_en: string | null
+          answer_ms: string | null
+          answer_vi: string
+          created_at: string
+          id: string
+          question_en: string | null
+          question_ms: string | null
+          question_vi: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          answer_en?: string | null
+          answer_ms?: string | null
+          answer_vi: string
+          created_at?: string
+          id?: string
+          question_en?: string | null
+          question_ms?: string | null
+          question_vi: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          answer_en?: string | null
+          answer_ms?: string | null
+          answer_vi?: string
+          created_at?: string
+          id?: string
+          question_en?: string | null
+          question_ms?: string | null
+          question_vi?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hidden_community_comments: {
         Row: {
           comment_id: string
@@ -533,6 +602,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      legal_documents: {
+        Row: {
+          body: string
+          doc_key: string
+          language: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          body: string
+          doc_key: string
+          language: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          body?: string
+          doc_key?: string
+          language?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -675,6 +771,36 @@ export type Database = {
           },
         ]
       }
+      onboarding_question_texts: {
+        Row: {
+          language: string
+          options: string[]
+          question_key: string
+          subtitle: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          language: string
+          options: string[]
+          question_key: string
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          language?: string
+          options?: string[]
+          question_key?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           activated_at: string | null
@@ -782,6 +908,7 @@ export type Database = {
           google_product_id: string | null
           id: string
           phase_id: string
+          sales_enabled: boolean
           translations: Json
           unlock_badge: string | null
           unlock_benefits: Json | null
@@ -807,6 +934,7 @@ export type Database = {
           google_product_id?: string | null
           id?: string
           phase_id: string
+          sales_enabled?: boolean
           translations?: Json
           unlock_badge?: string | null
           unlock_benefits?: Json | null
@@ -832,6 +960,7 @@ export type Database = {
           google_product_id?: string | null
           id?: string
           phase_id?: string
+          sales_enabled?: boolean
           translations?: Json
           unlock_badge?: string | null
           unlock_benefits?: Json | null
@@ -1075,6 +1204,8 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          name_en: string | null
+          name_ms: string | null
           total_days: number
         }
         Insert: {
@@ -1083,6 +1214,8 @@ export type Database = {
           created_at?: string
           id: string
           name: string
+          name_en?: string | null
+          name_ms?: string | null
           total_days?: number
         }
         Update: {
@@ -1091,6 +1224,8 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          name_en?: string | null
+          name_ms?: string | null
           total_days?: number
         }
         Relationships: []
@@ -1275,6 +1410,8 @@ export type Database = {
           day_start: number
           id: string
           name: string
+          name_en: string | null
+          name_ms: string | null
           product_id: string
           sort_order: number
         }
@@ -1283,6 +1420,8 @@ export type Database = {
           day_start: number
           id?: string
           name: string
+          name_en?: string | null
+          name_ms?: string | null
           product_id: string
           sort_order: number
         }
@@ -1291,6 +1430,8 @@ export type Database = {
           day_start?: number
           id?: string
           name?: string
+          name_en?: string | null
+          name_ms?: string | null
           product_id?: string
           sort_order?: number
         }

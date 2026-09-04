@@ -40,8 +40,29 @@ function pick(table: Record<string, Localized>, key: string, fallback: string, l
   return language === 'vi' ? fallback : table[key]?.[language] ?? fallback;
 }
 
-export const localizeProductName = (id: string, fallback: string, lang: AppLanguage) => pick(products, id, fallback, lang);
-export const localizePhaseName = (fallback: string, lang: AppLanguage) => pick(phases, fallback, fallback, lang);
+/** Product/phase names now live on the ROW (products.name_en/_ms,
+ * program_phases.name_en/_ms) so admin owns them — the tables above are only
+ * a safety net for rows an admin hasn't filled in yet (before 2026-09-04
+ * they were the only source, keyed by the Vietnamese string, so renaming a
+ * phase in WEB Admin silently reverted EN/MS users to Vietnamese). Order:
+ * DB column → legacy lookup → Vietnamese name. */
+export const localizeProductName = (
+  id: string,
+  fallback: string,
+  lang: AppLanguage,
+  row?: { name_en?: string | null; name_ms?: string | null },
+) => (lang === 'vi' ? fallback : rowName(row, lang) ?? pick(products, id, fallback, lang));
+
+export const localizePhaseName = (
+  fallback: string,
+  lang: AppLanguage,
+  row?: { name_en?: string | null; name_ms?: string | null },
+) => (lang === 'vi' ? fallback : rowName(row, lang) ?? pick(phases, fallback, fallback, lang));
+
+function rowName(row: { name_en?: string | null; name_ms?: string | null } | undefined, lang: Exclude<AppLanguage, 'vi'>) {
+  const value = lang === 'en' ? row?.name_en : row?.name_ms;
+  return value && value.trim() ? value : null;
+}
 export const localizeCategoryName = (id: string, fallback: string, lang: AppLanguage) => pick(categories, id, fallback, lang);
 export const localizeItemName = (id: string, fallback: string, lang: AppLanguage) => pick(itemNames, id, fallback, lang);
 export const localizeItemDescription = (id: string, fallback: string, lang: AppLanguage) => pick(descriptions, id, fallback, lang);

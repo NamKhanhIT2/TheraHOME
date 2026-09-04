@@ -15,9 +15,13 @@ step — see the function's own error responses):
 
 1. App Store Connect → your app → In-App Purchases → create a
    **non-consumable** product for each phase that should require payment
-   to unlock. Copy its Product ID into that phase's `phase_promos.apple_product_id`
-   from WEB Admin (Lộ trình → pick product → Giai đoạn → "Quản lý Quiz &
-   Upsell" → tab Nội dung Upsell).
+   to unlock. The 4 ids are ALREADY set in `phase_promos.apple_product_id`
+   (normalized 2026-09-03 to match the `ai.therahome` bundle id) — create
+   the ASC products with EXACTLY these ids rather than inventing new ones:
+   `ai.therahome.neckplus.phase3unlock`, `ai.therahome.neckpro.phase3unlock`,
+   `ai.therahome.backplus.phase3unlock`, `ai.therahome.backpro.phase3unlock`.
+   (If an id ever needs changing, edit it in WEB Admin: Lộ trình → pick
+   product → Giai đoạn → "Quản lý Quiz & Upsell" → tab Nội dung Upsell.)
 2. App Store Connect → Users and Access → Integrations → App Store Server
    API → create a new API key (Team Key) → note the **Issuer ID**, the
    **Key ID**, and download the `.p8` file (only downloadable once).

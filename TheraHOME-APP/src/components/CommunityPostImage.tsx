@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, StyleSheet } from 'react-native';
 import { useTheme } from '@/theme';
 import { isVideoUri } from '@/lib/mediaKind';
 import { CommunityVideoPlayer } from '@/components/community/CommunityVideoPlayer';
 import { CommunityMediaViewer } from '@/components/community/CommunityMediaViewer';
+import { ResilientCommunityImage } from '@/components/community/ResilientCommunityImage';
 
 /** Shows the complete post/comment image or video without stretching or
  * horizontal cropping. `uri` may point to either — decided by file
@@ -17,38 +18,45 @@ import { CommunityMediaViewer } from '@/components/community/CommunityMediaViewe
  * one-image immersive viewer. */
 export function CommunityPostImage({
   uri,
+  originalUri = uri,
+  posterUri,
+  mediaWidth,
+  mediaHeight,
   itemId = uri,
   shouldAutoplay = false,
   onOpenViewer,
 }: {
   uri: string;
+  originalUri?: string;
+  posterUri?: string | null;
+  mediaWidth?: number | null;
+  mediaHeight?: number | null;
   itemId?: string;
   shouldAutoplay?: boolean;
   onOpenViewer?: () => void;
 }) {
   const theme = useTheme();
-  const [aspectRatio, setAspectRatio] = useState(4 / 3);
+  const [aspectRatio, setAspectRatio] = useState(mediaWidth && mediaHeight ? mediaWidth / mediaHeight : 4 / 3);
   const [localViewerOpen, setLocalViewerOpen] = useState(false);
-  const isVideo = isVideoUri(uri);
+  const isVideo = isVideoUri(originalUri);
   const openViewer = onOpenViewer ?? (() => setLocalViewerOpen(true));
 
-  useEffect(() => {
-    if (isVideo) return;
-    let active = true;
-    Image.getSize(uri, (width, height) => {
-      if (active && width > 0 && height > 0) setAspectRatio(Math.max(0.62, Math.min(1.9, width / height)));
-    });
-    return () => { active = false; };
-  }, [uri, isVideo]);
-
   if (isVideo) {
-    return <CommunityVideoPlayer uri={uri} itemId={itemId} shouldAutoplay={shouldAutoplay} mode="single" onOpenViewer={openViewer} />;
+    return <CommunityVideoPlayer uri={originalUri} posterUri={posterUri} itemId={itemId} shouldAutoplay={shouldAutoplay} mode="single" onOpenViewer={openViewer} />;
   }
 
   return (
     <>
       <Pressable onPress={openViewer} style={[styles.frame, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md, aspectRatio }]}>
-        <Image source={{ uri }} resizeMode="contain" style={styles.image} />
+        <ResilientCommunityImage
+          uri={uri}
+          fallbackUri={originalUri}
+          contentFit="contain"
+          style={styles.image}
+          onLoad={({ source }) => {
+            if (source.width > 0 && source.height > 0) setAspectRatio(Math.max(0.62, Math.min(1.9, source.width / source.height)));
+          }}
+        />
       </Pressable>
       {localViewerOpen ? <CommunityMediaViewer uris={[uri]} initialIndex={0} onClose={() => setLocalViewerOpen(false)} /> : null}
     </>

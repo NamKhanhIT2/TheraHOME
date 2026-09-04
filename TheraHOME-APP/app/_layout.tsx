@@ -14,6 +14,7 @@ import {
 import { ThemeProvider, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
+import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useProfile } from '@/hooks/useProfile';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 import { supabase } from '@/lib/supabase';
@@ -178,7 +179,25 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // can't self-update their content). Only depends on primitive values so it
   // re-fires exactly when something relevant actually changed (day advanced,
   // settings changed, language changed), not on every render.
-  const currentDay = programsQuery.data?.[0]?.currentDay;
+  // ACCESSIBLE day, not raw calendar day — an IAP-locked, unpurchased
+  // phase 3 caps this at 14, so the daily reminder never announces "ngày
+  // thứ 15..28" for content the user can't open (per explicit request
+  // 2026-09-04). Same source Home's "Ngày N/X" hero uses. With several
+  // activated programs the reminder follows the one the user actually has
+  // selected (falling back to the first), matching Home/Roadmap.
+  const selectedProductIdForReminder = useAppStore((s) => s.selectedProductId);
+  const reminderProgram =
+    programsQuery.data?.find((p) => p.productId === selectedProductIdForReminder) ?? programsQuery.data?.[0];
+  const accessibleProgress = useAccessibleProgress(userId, reminderProgram);
+  // undefined until the lock/purchase queries settle — the effect below
+  // must not run on the provisional (possibly uncapped) value, because
+  // backfillTodaysReminders writes a PERMANENT inbox row and dedupes per
+  // day, so a wrong day number would stick.
+  const currentDay = !accessibleProgress.isReady
+    ? undefined
+    : accessibleProgress.day > 0
+      ? accessibleProgress.day
+      : reminderProgram?.currentDay;
   useEffect(() => {
     if (!inApp || !profile || currentDay == null) return;
     reminderSettingsRef.current = {

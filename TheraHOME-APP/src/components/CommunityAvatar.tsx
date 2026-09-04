@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Text, View } from 'react-native';
 import { avatarColorFor } from '@/lib/avatarColor';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 
 /** Shared post/comment author avatar: real photo when `avatarUrl` is set
  * (community_posts.author_avatar_url / post_comments.author_avatar_url —
@@ -34,10 +35,11 @@ export function CommunityAvatar({
   }
   if (avatarUrl) {
     return (
-      <Image
-        source={{ uri: avatarUrl }}
+      <RemoteImage
+        uri={avatarUrl}
+        priority="high"
         style={{ width: size, height: size, borderRadius: size / 2 }}
-        resizeMode="cover"
+        contentFit="cover"
       />
     );
   }

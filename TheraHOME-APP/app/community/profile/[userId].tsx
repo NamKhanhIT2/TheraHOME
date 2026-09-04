@@ -137,7 +137,7 @@ export default function CommunityProfileScreen() {
                   collapsedLines={3}
                   style={[theme.type.body, { color: theme.colors.textPrimary, marginTop: 10 }]}
                 />
-                <MediaGrid uris={post.mediaUrls} postId={post.id} shouldAutoplay={false} />
+                <MediaGrid uris={post.mediaUrls} feedUris={post.mediaThumbnailUrls} posterUris={post.mediaPosterUrls} mediaWidths={post.mediaWidths} mediaHeights={post.mediaHeights} postId={post.id} shouldAutoplay={false} />
                 {post.progressSnapshot ? <ProgressShareCard postType={post.postType} snapshot={post.progressSnapshot} /> : null}
                 <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 8 }]}>{post.likesCount} {t('reactions')} · {post.commentsCount} {t('comments')}</Text>
               </Pressable>

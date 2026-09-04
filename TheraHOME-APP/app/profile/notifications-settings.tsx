@@ -5,6 +5,7 @@ import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
+import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { registerForPushNotifications, scheduleDailyReminder, scheduleEveningReminder } from '@/lib/pushNotifications';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
@@ -96,7 +97,14 @@ export default function NotificationsSettingsScreen() {
   const userId = session?.user.id;
   const profileQuery = useProfile(userId);
   const updateProfile = useUpdateProfile(userId);
-  const currentDay = useActivatedPrograms(userId).data?.[0]?.currentDay;
+  // Accessible day (IAP-locked phases excluded) of the SELECTED program,
+  // matching app/_layout.tsx's reminder scheduling — never advertises a
+  // locked day, and with several programs follows the one the user views.
+  const programs = useActivatedPrograms(userId).data;
+  const selectedProductId = useAppStore((s) => s.selectedProductId);
+  const reminderProgram = programs?.find((p) => p.productId === selectedProductId) ?? programs?.[0];
+  const accessibleProgress = useAccessibleProgress(userId, reminderProgram);
+  const currentDay = accessibleProgress.day > 0 ? accessibleProgress.day : reminderProgram?.currentDay;
 
   const [remind, setRemindState] = useState(false);
   const [remindTime, setRemindTimeState] = useState('08:00');

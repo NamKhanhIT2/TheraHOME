@@ -3,7 +3,8 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/theme';
-import { onboardingQuestions, questions } from '@/lib/mockData';
+import { questions } from '@/lib/mockData';
+import { useOnboardingContent } from '@/hooks/useOnboardingContent';
 import { useSession } from '@/hooks/useSession';
 import { useProfile, useUpdateProfile, uploadAvatarImage } from '@/hooks/useProfile';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -14,7 +15,12 @@ import { AvatarImg } from '@/components/AvatarImg';
 import { useI18n } from '@/lib/i18n';
 import type { AppLanguage } from '@/store/useAppStore';
 
-function localizeSavedAnswer(questionKey: string, value: string, language: AppLanguage): string {
+function localizeSavedAnswer(
+  questionKey: string,
+  value: string,
+  language: AppLanguage,
+  optionsFor: (lang: AppLanguage, key: string) => string[] | undefined,
+): string {
   if (!value) return value;
   const legacyOptionIndex: Record<string, Record<string, number>> = {
     priority_zone: {
@@ -26,9 +32,9 @@ function localizeSavedAnswer(questionKey: string, value: string, language: AppLa
   const legacyIndex = legacyOptionIndex[questionKey]?.[value];
   const variants: AppLanguage[] = ['vi', 'en', 'ms'];
   const index = variants
-    .map((variant) => onboardingQuestions(variant).find((question) => question.key === questionKey)?.options.indexOf(value) ?? -1)
+    .map((variant) => optionsFor(variant, questionKey)?.indexOf(value) ?? -1)
     .find((optionIndex) => optionIndex >= 0);
-  const localizedOptions = onboardingQuestions(language).find((question) => question.key === questionKey)?.options;
+  const localizedOptions = optionsFor(language, questionKey);
   const resolvedIndex = index != null && index >= 0 ? index : legacyIndex;
   return resolvedIndex != null && resolvedIndex >= 0 ? localizedOptions?.[resolvedIndex] ?? value : value;
 }
@@ -78,8 +84,13 @@ export default function EditProfileScreen() {
   const [goal, setGoal] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const zoneOptions = onboardingQuestions(language).find((question) => question.key === 'priority_zone')?.options ?? questions[1].options;
-  const goalOptions = onboardingQuestions(language).find((question) => question.key === 'goal_main')?.options ?? questions[0].options;
+  // Same source the onboarding screen uses, so admin wording changes show up
+  // in both places instead of only one.
+  const onboardingContent = useOnboardingContent();
+  const optionsFor = (lang: AppLanguage, key: string) =>
+    onboardingContent.getQuestions(lang).find((question) => question.key === key)?.options;
+  const zoneOptions = optionsFor(language, 'priority_zone') ?? questions[1].options;
+  const goalOptions = optionsFor(language, 'goal_main') ?? questions[0].options;
 
   useEffect(() => {
     if (!profileQuery.data) return;
@@ -134,8 +145,8 @@ export default function EditProfileScreen() {
         </View>
         <FieldRow label={t('name')} value={name} onChangeText={setName} />
         <FieldRow label={t('phoneNumber')} value={phone} onChangeText={setPhone} />
-        <SelectRow label={t('trainingArea')} value={localizeSavedAnswer('priority_zone', area, language)} options={zoneOptions} onChange={setArea} />
-        <SelectRow label={t('trainingGoal')} value={localizeSavedAnswer('goal_main', goal, language)} options={goalOptions} onChange={setGoal} />
+        <SelectRow label={t('trainingArea')} value={localizeSavedAnswer('priority_zone', area, language, optionsFor)} options={zoneOptions} onChange={setArea} />
+        <SelectRow label={t('trainingGoal')} value={localizeSavedAnswer('goal_main', goal, language, optionsFor)} options={goalOptions} onChange={setGoal} />
         <Button style={{ width: '100%', marginTop: 8 }} loading={updateProfile.isPending} onPress={handleSave}>
           {t('saveChanges')}
         </Button>

@@ -1,0 +1,93 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "F31C4E52-0F5B-4E39-9C60-2B1A3D7E9A01",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "299000",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0001-4A39-9C60-2B1A3D7E9A11",
+      "localizations" : [
+        {
+          "description" : "Unlock Phase 3 of the TheraNECK+ program",
+          "displayName" : "Phase 3 Unlock · TheraNECK+",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "ai.therahome.neckplus.phase3unlock",
+      "referenceName" : "Phase 3 Unlock - TheraNECK+",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "299000",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0002-4A39-9C60-2B1A3D7E9A12",
+      "localizations" : [
+        {
+          "description" : "Unlock Phase 3 of the TheraNECK PRO program",
+          "displayName" : "Phase 3 Unlock · TheraNECK PRO",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "ai.therahome.neckpro.phase3unlock",
+      "referenceName" : "Phase 3 Unlock - TheraNECK PRO",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "299000",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0003-4A39-9C60-2B1A3D7E9A13",
+      "localizations" : [
+        {
+          "description" : "Unlock Phase 3 of the TheraBACK+ program",
+          "displayName" : "Phase 3 Unlock · TheraBACK+",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "ai.therahome.backplus.phase3unlock",
+      "referenceName" : "Phase 3 Unlock - TheraBACK+",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "299000",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-0004-4A39-9C60-2B1A3D7E9A14",
+      "localizations" : [
+        {
+          "description" : "Unlock Phase 3 of the TheraBACK PRO program",
+          "displayName" : "Phase 3 Unlock · TheraBACK PRO",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "ai.therahome.backpro.phase3unlock",
+      "referenceName" : "Phase 3 Unlock - TheraBACK PRO",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "vi_VN",
+    "_storefront" : "VNM",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

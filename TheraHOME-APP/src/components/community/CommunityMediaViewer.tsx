@@ -5,12 +5,13 @@
 // MediaGrid, which owns this component and its open/closed state. See
 // CLAUDE.md's "Community video playback overhaul" section.
 import React, { useRef, useState } from 'react';
-import { FlatList, Image, Modal, Pressable, StyleSheet, Text, View, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, View, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useWindowDimensions } from 'react-native';
 import { Icon } from '@/components/icons/Icon';
 import { isVideoUri } from '@/lib/mediaKind';
 import { useVideoPlaybackStore } from '@/store/useVideoPlaybackStore';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 
 const IMMERSIVE_VIDEO_ID = 'immersive-video';
 
@@ -72,7 +73,7 @@ export function CommunityMediaViewer({ uris, initialIndex, onClose }: CommunityM
             </View>
           ) : (
             <View style={{ width }}>
-              <Image source={{ uri: item }} resizeMode="contain" style={styles.media} />
+              <RemoteImage uri={item} contentFit="contain" priority="high" style={styles.media} />
             </View>
           )
         }

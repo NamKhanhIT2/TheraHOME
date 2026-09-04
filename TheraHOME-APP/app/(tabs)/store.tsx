@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { usePathname } from 'expo-router';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { landingPage, websiteDomain } from '@/lib/mockData';
@@ -13,6 +12,7 @@ import { ProductVideoModal } from '@/components/ProductVideoModal';
 import { useTabFocusFade } from '@/hooks/useTabFocusFade';
 import { ScalePressable } from '@/components/motion/ScalePressable';
 import { fadeUpEntering, staggerDelay } from '@/lib/motion';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 
 function StoreSkeleton({ bg, bgAlt, radius, cardPadding, shadow }: { bg: string; bgAlt: string; radius: { lg: number; md: number }; cardPadding: number; shadow: object }) {
   return (
@@ -45,17 +45,8 @@ export default function StoreScreen() {
   const { t } = useI18n();
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ title: string; url: string | null } | null>(null);
-  const { data: categories, isPending, refetch } = useStoreCategories();
-  const pathname = usePathname();
+  const { data: categories, isPending } = useStoreCategories();
   const focusFadeStyle = useTabFocusFade();
-
-  // An admin can change a product's preview link while the app remains open.
-  // Refresh whenever this tab becomes active so "Xem thử" stays current.
-  useEffect(() => {
-    if (pathname === '/store') {
-      void refetch();
-    }
-  }, [pathname, refetch]);
 
   let cardIndex = -1;
 
@@ -92,7 +83,7 @@ export default function StoreScreen() {
                     >
                       <View style={styles.itemRow}>
                         {item.imageUrl ? (
-                          <Image source={{ uri: item.imageUrl }} style={[styles.itemImage, { borderRadius: theme.radius.md }]} />
+                          <RemoteImage uri={item.imageUrl} priority="high" contentFit="cover" style={[styles.itemImage, { borderRadius: theme.radius.md, backgroundColor: theme.colors.bgCardAlt }]} />
                         ) : (
                           <View style={[styles.itemIcon, { borderColor: accentColor, borderRadius: theme.radius.md }]}>
                             <Icon name="activity" size={20} color={accentColor} />

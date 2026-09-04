@@ -96,7 +96,13 @@ still waiting on their phase:
   `likes_count`/`comments_count` on `community_posts` and `likes_count` on
   `post_comments` are trigger-maintained (`bump_post_likes`/
   `bump_post_comments`/`bump_comment_likes`) — never written directly by the
-  client. `community_posts`/`post_comments` also carry denormalized
+  client. Both reaction tables are world-readable on visible content
+  (`public read post reactions` / `public read comment reactions`) — the
+  post_likes one was missing until the
+  `post_reactions_public_read_realtime` migration (2026-09-03), which is
+  why other accounts used to aggregate 0 reactions on every post; that
+  migration also added `post_likes`+`comment_likes` to the
+  `supabase_realtime` publication so reacts push live. `community_posts`/`post_comments` also carry denormalized
   `author_name`/`author_avatar_url` columns, populated by a
   `set_author_info` trigger on insert: `profiles` RLS only allows selecting
   your own row (no public user directory), so the feed can't join author
@@ -279,3 +285,10 @@ see `TheraHOME WEB/src/lib/db.ts`. No manual secret needed:
 `SUPABASE_SERVICE_ROLE_KEY` is auto-injected into every Edge Function by
 Supabase, unlike `GROQ_API_KEY`/`SHOPIFY_WEBHOOK_SECRET` above.
 
+
+**translate-content** (added 2026-09-04): staff-only VN→EN+MS machine
+translation for the WEB Admin's auto-draft feature (see TheraHOME-WEB
+docs/feature-notes.md). verify_jwt ON + requires an enabled admin/cskh row
+in web_access_contacts claimed by the caller. Uses GROQ_API_KEY (shared
+with chat-ai-reply); returns 503 when unset — callers save VN-only.
+Source: supabase/functions/translate-content/index.ts.

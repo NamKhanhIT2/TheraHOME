@@ -65,10 +65,13 @@ export default function AccountSettingsScreen() {
               <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('language')}</Text>
             </View>
             <View style={styles.langOptions}>
+              {/* Labels follow the CURRENT UI language (per explicit request
+                  2026-09-04: with English active this reads Vietnamese /
+                  English / Malay, not the endonyms). */}
               {([
-                { code: 'vi', label: 'Tiếng Việt' },
-                { code: 'en', label: 'English' },
-                { code: 'ms', label: 'Bahasa Melayu' },
+                { code: 'vi', label: t('langNameVi') },
+                { code: 'en', label: t('langNameEn') },
+                { code: 'ms', label: t('langNameMs') },
               ] as const).map(({ code, label }) => (
                 <Pressable
                   key={code}

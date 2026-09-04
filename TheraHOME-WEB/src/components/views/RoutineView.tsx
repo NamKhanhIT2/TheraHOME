@@ -8,7 +8,7 @@
 // a NOT NULL check constraint.
 import { Fragment, useEffect, useState } from "react";
 import type { Product, ProgramDay, ProgramPhase, MarketContent } from "@/lib/mockData";
-import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updateProductInfo, createProgramDay, updateProgramDay, deleteProgramDay } from "@/lib/db";
+import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updateProductInfo, saveLocalizedNames, createProgramDay, updateProgramDay, deleteProgramDay } from "@/lib/db";
 import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs, MarketSelect } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -45,6 +45,13 @@ export function RoutineView() {
   const [newProductDays, setNewProductDays] = useState("28");
   const [newProductLink, setNewProductLink] = useState("");
   const [editInfo, setEditInfo] = useState(false);
+  // EN/MS display names for this product + its phases. Before 2026-09-04
+  // these lived in a hardcoded lookup inside the mobile app, keyed by the
+  // Vietnamese string — so renaming a phase here silently pushed UK/ML
+  // users back to Vietnamese names.
+  const [infoNameEn, setInfoNameEn] = useState("");
+  const [infoNameMs, setInfoNameMs] = useState("");
+  const [phaseNames, setPhaseNames] = useState<Array<{ id: string; name: string; nameEn: string; nameMs: string }>>([]);
   const [infoName, setInfoName] = useState("");
   const [infoLink, setInfoLink] = useState("");
   const [dayModal, setDayModal] = useState<DayModalState>(null);
@@ -100,6 +107,9 @@ export function RoutineView() {
   function openEditInfo() {
     if (!product) return;
     setInfoName(product.name);
+    setInfoNameEn(product.nameEn);
+    setInfoNameMs(product.nameMs);
+    setPhaseNames(product.phases.map((ph) => ({ id: ph.id, name: ph.name, nameEn: ph.nameEn, nameMs: ph.nameMs })));
     setInfoLink(storeLinks[product.id] ?? "");
     setEditInfo(true);
   }
@@ -107,6 +117,12 @@ export function RoutineView() {
     if (!product) return;
     try {
       await updateProductInfo(product.id, { name: infoName, link: infoLink });
+      await saveLocalizedNames({
+        productId: product.id,
+        productNameEn: infoNameEn,
+        productNameMs: infoNameMs,
+        phases: phaseNames.map((ph) => ({ id: ph.id, nameEn: ph.nameEn, nameMs: ph.nameMs })),
+      });
       setEditInfo(false);
       pushToast("Đã lưu thông tin " + infoName);
       reload(product.id);
@@ -331,8 +347,48 @@ export function RoutineView() {
             </Fragment>
           }
         >
-          <FieldLabel>Tên hiển thị</FieldLabel>
-          <input value={infoName} onChange={(e) => setInfoName(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
+          <FieldLabel>Tên hiển thị (VN)</FieldLabel>
+          <input value={infoName} onChange={(e) => setInfoName(e.target.value)} style={{ ...inputStyle, marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <div style={{ flex: 1 }}>
+              <FieldLabel>Tên (UK)</FieldLabel>
+              <input value={infoNameEn} onChange={(e) => setInfoNameEn(e.target.value)} placeholder={infoName} style={inputStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <FieldLabel>Tên (ML)</FieldLabel>
+              <input value={infoNameMs} onChange={(e) => setInfoNameMs(e.target.value)} placeholder={infoName} style={inputStyle} />
+            </div>
+          </div>
+
+          <FieldLabel>Tên các giai đoạn theo ngôn ngữ</FieldLabel>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+            Để trống ô UK/ML thì app sẽ hiển thị tên tiếng Việt cho người dùng thị trường đó.
+            Nhớ cập nhật lại đây mỗi khi đổi tên giai đoạn.
+          </div>
+          {phaseNames.map((ph, index) => (
+            <div key={ph.id} style={{ background: "var(--bg-card-alt)", borderRadius: 10, padding: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 }}>{ph.name}</div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <input
+                  value={ph.nameEn}
+                  placeholder="UK"
+                  onChange={(e) =>
+                    setPhaseNames((current) => current.map((item, i) => (i === index ? { ...item, nameEn: e.target.value } : item)))
+                  }
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <input
+                  value={ph.nameMs}
+                  placeholder="ML"
+                  onChange={(e) =>
+                    setPhaseNames((current) => current.map((item, i) => (i === index ? { ...item, nameMs: e.target.value } : item)))
+                  }
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+              </div>
+            </div>
+          ))}
+
           <FieldLabel>Link trang sản phẩm</FieldLabel>
           <input value={infoLink} onChange={(e) => setInfoLink(e.target.value)} placeholder="https://..." style={inputStyle} />
           <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--text-muted)" }}>Link chỉ được lưu nếu sản phẩm này đã có mục tương ứng trong Sản Phẩm (Cửa hàng).</div>

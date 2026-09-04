@@ -1,7 +1,8 @@
 import React from 'react';
-import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Icon } from '@/components/icons/Icon';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 
 export interface ChatMediaViewerProps {
   uri: string;
@@ -22,7 +23,7 @@ export function ChatMediaViewer({ uri, kind, onClose }: ChatMediaViewerProps) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        {kind === 'video' ? <VideoViewer uri={uri} /> : <Image source={{ uri }} resizeMode="contain" style={styles.media} />}
+        {kind === 'video' ? <VideoViewer uri={uri} /> : <RemoteImage uri={uri} cacheKey={uri.split('?')[0]} contentFit="contain" priority="high" style={styles.media} />}
         <Pressable onPress={onClose} style={styles.close} hitSlop={10}>
           <Icon name="x" size={24} color="#fff" />
         </Pressable>

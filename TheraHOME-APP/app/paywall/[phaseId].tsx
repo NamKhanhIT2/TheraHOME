@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { usePhasePromo } from '@/hooks/usePhasePromo';
 import { usePhasePurchases, usePurchasePhase } from '@/hooks/usePhasePurchase';
+import { Image as ExpoImage } from 'expo-image';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { RemoteImage } from '@/components/ui/RemoteImage';
+import { paywallHeroFor } from '@/lib/paywallHeroes';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
@@ -46,6 +49,7 @@ export default function PaywallScreen() {
     ? promo.unlockBenefits
     : [t('paywallBenefit1'), t('paywallBenefit2'), t('paywallBenefit3')];
   const priceLabel = product?.displayPrice ?? promo?.unlockPriceLabel ?? null;
+  const localHero = paywallHeroFor(promo?.productName);
 
   return (
     // Bottom-only safe area: the hero image deliberately bleeds under the
@@ -85,10 +89,21 @@ export default function PaywallScreen() {
             ]}
           >
             {promo?.unlockImageUrl ? (
-              // expo-image (disk-cached): shares the cache PhaseUnlockPromo
-              // pre-warms from the roadmap, so the hero is instant on
-              // revisits instead of re-downloading each open.
-              <RemoteImage uri={promo.unlockImageUrl} contentFit="cover" style={styles.heroImage} />
+              // Admin-uploaded image wins when configured. The bundled hero
+              // renders as its placeholder, so the panel is never empty even
+              // on a cold cache — the remote (disk-cached, pre-warmed by
+              // PhaseUnlockPromo) fades in over it once downloaded.
+              <RemoteImage
+                uri={promo.unlockImageUrl}
+                contentFit="cover"
+                style={styles.heroImage}
+                placeholder={localHero ?? undefined}
+                placeholderContentFit="cover"
+              />
+            ) : localHero ? (
+              // No admin image → the bundled per-device hero, instant and
+              // offline-safe (see src/lib/paywallHeroes.ts).
+              <ExpoImage source={localHero} contentFit="cover" style={styles.heroImage} />
             ) : (
               <View style={styles.heroPlaceholder}>
                 <Icon name="lock" size={48} color={theme.colors.primary} />
@@ -170,6 +185,18 @@ export default function PaywallScreen() {
               {verifying ? t('purchaseVerifying') : t('unlockNow')}
             </Button>
 
+            {/* Intro video — same admin-authored unlock_video_url the promo
+                card uses; hidden when the phase has none configured. */}
+            {promo?.unlockVideoUrl ? (
+              <Pressable
+                style={[styles.videoBtn, { borderColor: theme.colors.borderInput, borderRadius: theme.radius.md }]}
+                onPress={() => void WebBrowser.openBrowserAsync(promo.unlockVideoUrl!)}
+              >
+                <Icon name="play" size={14} color={theme.colors.primary} />
+                <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('watchIntroVideo')}</Text>
+              </Pressable>
+            ) : null}
+
             {/* Footer links — restore first (per request 2026-09-03). Each
                 item can shrink and its label stays on one line with a capped
                 font scale, so all three fit on narrow screens without
@@ -218,8 +245,20 @@ const styles = StyleSheet.create({
   },
   heroWrap: {
     width: '100%',
-    height: 360,
+    // 360 → 320: a touch shorter (per explicit request 2026-09-04) so the
+    // "Xem video giới thiệu" row below the CTA fits without pushing the
+    // footer off-screen on smaller devices.
+    height: 320,
     overflow: 'hidden',
+  },
+  videoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderWidth: 1,
+    paddingVertical: 13,
+    marginTop: 10,
   },
   heroImage: {
     width: '100%',

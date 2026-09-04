@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
-import { onboardingQuestions } from '@/lib/mockData';
+import { useOnboardingContent } from '@/hooks/useOnboardingContent';
 import { useAppStore, type AnswerValue } from '@/store/useAppStore';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
@@ -231,7 +231,9 @@ export default function QuestionsScreen() {
   const answers = useAppStore((s) => s.onboardingAnswers);
   const setAnswer = useAppStore((s) => s.setAnswer);
   const language = useAppStore((s) => s.language);
-  const questions = onboardingQuestions(language);
+  // Bundled wording + admin overrides (option COUNT stays fixed — see
+  // useOnboardingContent's safety rule).
+  const questions = useOnboardingContent().getQuestions(language);
 
   const q = questions[qIndex];
   const isMulti = !!q.multi;

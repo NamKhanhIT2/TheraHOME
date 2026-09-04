@@ -10,7 +10,7 @@ import { useTabFocusFade } from '@/hooks/useTabFocusFade';
 import { usePopOnChange } from '@/hooks/usePopOnChange';
 import { TransitionText } from '@/components/motion/TransitionText';
 import { fadeUpEntering } from '@/lib/motion';
-import { introVideo } from '@/lib/mockData';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useDefaultProductId, usePainLogs, usePrimaryProducts, useProducts, useProgramDays } from '@/hooks/usePrograms';
@@ -37,6 +37,8 @@ const WATER_GOAL_CUPS = 8;
 export default function HomeScreen() {
   const theme = useTheme();
   const { t } = useI18n();
+  // "Hướng dẫn nhanh" video URL is admin-editable (app_config).
+  const appConfig = useAppConfig();
   const scrollY = useRef(new Animated.Value(0)).current;
   const { session } = useSession();
   const userId = session?.user.id;
@@ -260,7 +262,7 @@ export default function HomeScreen() {
               <View style={[styles.heroActions, { marginTop: 16 }]}>
                 <Pressable
                   style={[styles.heroBtnOutline, { borderColor: 'rgba(255,255,255,0.5)', borderRadius: theme.radius.md }]}
-                  onPress={() => WebBrowser.openBrowserAsync(introVideo)}
+                  onPress={() => WebBrowser.openBrowserAsync(appConfig.get('home_intro_video_url'))}
                 >
                   <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>{t('quickGuide')}</Text>
                 </Pressable>

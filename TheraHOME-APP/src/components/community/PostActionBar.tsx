@@ -62,11 +62,11 @@ export function PostActionBar({
           label={currentReactionLabel}
           labelColor={currentReaction ? theme.colors.primary : theme.colors.textSecondary}
         />
-        <Pressable onPress={onCommentPress} style={styles.actionBtn}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${t('commentAction')}, ${commentsCount} ${t('comments')}`} onPress={onCommentPress} style={styles.actionBtn}>
           <Icon name="message-circle" size={18} color={theme.colors.textMuted} />
           <Text style={[theme.type.caption, { color: theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>{t('commentAction')}</Text>
         </Pressable>
-        <Pressable onPress={onSavePress} style={styles.actionBtn}>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: saved }} accessibilityLabel={saved ? t('savedShort') : t('savePostShort')} onPress={onSavePress} style={styles.actionBtn}>
           <Icon name="bookmark" size={18} color={saved ? theme.colors.primary : theme.colors.textMuted} />
           <Text style={[theme.type.caption, { color: saved ? theme.colors.primary : theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>{saved ? t('savedShort') : t('savePostShort')}</Text>
         </Pressable>
@@ -79,5 +79,5 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, marginTop: 12, borderTopWidth: 1, borderBottomWidth: 1 },
   statsRight: { flexDirection: 'row', gap: 12 },
   actions: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9 },
+  actionBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9 },
 });

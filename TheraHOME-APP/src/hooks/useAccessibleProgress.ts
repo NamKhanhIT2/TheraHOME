@@ -12,6 +12,12 @@ export interface AccessibleProgress {
    * unlocked) — the same phase-hiding rule the Roadmap applies. Falls back
    * to the product's nominal total while day data loads. */
   totalDays: number;
+  /** True once the day/lock/purchase queries have all settled — until then
+   * `day` may briefly be the UNCAPPED calendar day. Side-effectful
+   * consumers (the reminder scheduling/inbox backfill in app/_layout.tsx,
+   * which writes a permanent inbox row) must wait for this; pure display
+   * can render the provisional value. */
+  isReady: boolean;
 }
 
 /** One shared "Ngày N/X" source for Home's hero, the Profile header and the
@@ -34,6 +40,9 @@ export function useAccessibleProgress(
   return useMemo(() => {
     const requirements = lockRequirementsQuery.data;
     const purchased = purchasesQuery.data;
+    const isReady =
+      !program ||
+      (days.length > 0 && lockRequirementsQuery.isFetched && (!userId || purchasesQuery.isFetched));
     const accessible =
       !requirements || requirements.size === 0
         ? days.length
@@ -49,6 +58,6 @@ export function useAccessibleProgress(
       const activity = Math.max(doneMax, logMax);
       day = Math.min(totalDays, Math.max(day, activity + 1));
     }
-    return { day, totalDays };
-  }, [days, lockRequirementsQuery.data, purchasesQuery.data, program, isReviewAccount, painLogsQuery.data]);
+    return { day, totalDays, isReady };
+  }, [days, lockRequirementsQuery.data, lockRequirementsQuery.isFetched, purchasesQuery.data, purchasesQuery.isFetched, program, isReviewAccount, painLogsQuery.data, userId]);
 }

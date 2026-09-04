@@ -7,6 +7,9 @@
 export interface ProgramPhase {
   id: string;
   name: string;
+  /** EN/MS names shown to UK/ML users (empty = app falls back to `name`). */
+  nameEn: string;
+  nameMs: string;
   range: [number, number];
 }
 
@@ -30,6 +33,9 @@ export interface ProgramDay {
 export interface Product {
   id: string;
   name: string;
+  /** EN/MS names shown to UK/ML users (empty = app falls back to `name`). */
+  nameEn: string;
+  nameMs: string;
   accent: string;
   totalDays: number;
   phases: ProgramPhase[];

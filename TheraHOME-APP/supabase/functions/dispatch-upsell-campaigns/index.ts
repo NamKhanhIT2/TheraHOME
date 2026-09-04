@@ -19,15 +19,17 @@ type Campaign = {
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const expectedSecret = Deno.env.get('UPSELL_CRON_SECRET');
-  if (!expectedSecret || request.headers.get('x-upsell-cron-secret') !== expectedSecret) {
+  const customSecretIsValid = !!expectedSecret && request.headers.get('x-upsell-cron-secret') === expectedSecret;
+  const serviceRoleIsValid = !!serviceKey && request.headers.get('Authorization') === `Bearer ${serviceKey}`;
+  if (!customSecretIsValid && !serviceRoleIsValid) {
     return json({ error: 'unauthorized' }, 401);
   }
 
   try {
     const url = Deno.env.get('SUPABASE_URL')!;
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const admin = createClient(url, serviceKey);
+    const admin = createClient(url, serviceKey!);
     const now = new Date().toISOString();
 
     // A terminated run should not permanently strand a campaign in

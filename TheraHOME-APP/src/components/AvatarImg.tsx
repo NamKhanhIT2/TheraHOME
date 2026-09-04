@@ -1,7 +1,8 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
+import { RemoteImage } from '@/components/ui/RemoteImage';
 
 export interface AvatarImgProps {
   size?: number;
@@ -32,7 +33,7 @@ export function AvatarImg({ size = 44, editable = false, uri, onPress }: AvatarI
         ]}
       >
         {uri ? (
-          <Image source={{ uri }} style={{ width: size, height: size }} resizeMode="cover" />
+          <RemoteImage uri={uri} priority="high" style={{ width: size, height: size }} contentFit="cover" />
         ) : (
           <Icon name="user" size={size * 0.5} color={theme.colors.textMuted} />
         )}

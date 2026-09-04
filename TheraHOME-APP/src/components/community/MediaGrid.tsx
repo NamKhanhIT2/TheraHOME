@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/theme';
 import { isVideoUri } from '@/lib/mediaKind';
 import { CommunityPostImage } from '@/components/CommunityPostImage';
 import { CommunityVideoPlayer } from '@/components/community/CommunityVideoPlayer';
 import { CommunityMediaViewer } from '@/components/community/CommunityMediaViewer';
+import { ResilientCommunityImage } from '@/components/community/ResilientCommunityImage';
 
-function GridCell({ uri, itemId, shouldAutoplay, overlayCount, onOpenViewer }: { uri: string; itemId: string; shouldAutoplay: boolean; overlayCount?: number; onOpenViewer: () => void }) {
+function GridCell({ uri, displayUri, posterUri, itemId, shouldAutoplay, overlayCount, onOpenViewer }: { uri: string; displayUri: string; posterUri?: string | null; itemId: string; shouldAutoplay: boolean; overlayCount?: number; onOpenViewer: () => void }) {
   const theme = useTheme();
   const isVideo = isVideoUri(uri);
   return (
     <View style={[styles.cell, { backgroundColor: theme.colors.bgCardAlt }]}>
       {isVideo ? (
-        <CommunityVideoPlayer uri={uri} itemId={itemId} shouldAutoplay={shouldAutoplay} mode="grid" onOpenViewer={onOpenViewer} />
+        <CommunityVideoPlayer uri={uri} posterUri={posterUri} itemId={itemId} shouldAutoplay={shouldAutoplay} mode="grid" onOpenViewer={onOpenViewer} />
       ) : (
         <Pressable onPress={onOpenViewer} style={StyleSheet.absoluteFill}>
-          <Image source={{ uri }} resizeMode="cover" style={StyleSheet.absoluteFill} />
+          <ResilientCommunityImage uri={displayUri} fallbackUri={uri} contentFit="cover" style={StyleSheet.absoluteFill} />
         </Pressable>
       )}
       {overlayCount ? (
@@ -29,6 +30,10 @@ function GridCell({ uri, itemId, shouldAutoplay, overlayCount, onOpenViewer }: {
 
 export interface MediaGridProps {
   uris: string[];
+  feedUris?: string[];
+  posterUris?: string[];
+  mediaWidths?: number[];
+  mediaHeights?: number[];
   /** Unique per post — item ids for the video-playback coordinator are
    * `${postId}:${index}`. */
   postId: string;
@@ -47,7 +52,7 @@ export interface MediaGridProps {
  * media on their own. Also owns the immersive full-screen viewer — tapping
  * any cell opens it at that item.
  */
-export function MediaGrid({ uris, postId, shouldAutoplay }: MediaGridProps) {
+export function MediaGrid({ uris, feedUris = uris, posterUris = [], mediaWidths = [], mediaHeights = [], postId, shouldAutoplay }: MediaGridProps) {
   const theme = useTheme();
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   if (!uris.length) return null;
@@ -59,7 +64,7 @@ export function MediaGrid({ uris, postId, shouldAutoplay }: MediaGridProps) {
   if (uris.length === 1) {
     return (
       <>
-        <CommunityPostImage uri={uris[0]} itemId={`${postId}:0`} shouldAutoplay={shouldAutoplay} onOpenViewer={() => setViewerIndex(0)} />
+        <CommunityPostImage uri={feedUris[0] || uris[0]} originalUri={uris[0]} posterUri={posterUris[0]} mediaWidth={mediaWidths[0]} mediaHeight={mediaHeights[0]} itemId={`${postId}:0`} shouldAutoplay={shouldAutoplay} onOpenViewer={() => setViewerIndex(0)} />
         {viewer}
       </>
     );
@@ -69,6 +74,8 @@ export function MediaGrid({ uris, postId, shouldAutoplay }: MediaGridProps) {
   const cell = (index: number, overlayCount?: number) => (
     <GridCell
       uri={uris[index]}
+      displayUri={feedUris[index] || uris[index]}
+      posterUri={posterUris[index] || null}
       itemId={`${postId}:${index}`}
       shouldAutoplay={shouldAutoplay}
       overlayCount={overlayCount}

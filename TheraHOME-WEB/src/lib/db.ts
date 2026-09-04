@@ -105,8 +105,8 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 
 export async function fetchRoutineProducts(): Promise<Product[]> {
   const [{ data: products, error: pErr }, { data: phases, error: phErr }, { data: days, error: dErr }] = await Promise.all([
-    supabase.from("products").select("id, name, accent_color_key, total_days").order("id"),
-    supabase.from("program_phases").select("id, product_id, name, day_start, day_end, sort_order").order("sort_order"),
+    supabase.from("products").select("id, name, name_en, name_ms, accent_color_key, total_days").order("id"),
+    supabase.from("program_phases").select("id, product_id, name, name_en, name_ms, day_start, day_end, sort_order").order("sort_order"),
     supabase
       .from("program_days")
       .select("id, product_id, phase_id, day_number, day_type, video_url_vn, video_url_us, video_url_malay, support_tools_url_vn, support_tools_url_us, support_tools_url_malay")
@@ -119,7 +119,7 @@ export async function fetchRoutineProducts(): Promise<Product[]> {
   return (products ?? []).map((p): Product => {
     const productPhases: ProgramPhase[] = (phases ?? [])
       .filter((ph) => ph.product_id === p.id)
-      .map((ph) => ({ id: ph.id, name: ph.name, range: [ph.day_start, ph.day_end] }));
+      .map((ph) => ({ id: ph.id, name: ph.name, nameEn: ph.name_en ?? "", nameMs: ph.name_ms ?? "", range: [ph.day_start, ph.day_end] as [number, number] }));
     const phaseNameById = new Map((phases ?? []).map((ph) => [ph.id, ph.name]));
     const productDays: ProgramDay[] = (days ?? [])
       .filter((d) => d.product_id === p.id)
@@ -136,6 +136,8 @@ export async function fetchRoutineProducts(): Promise<Product[]> {
     return {
       id: p.id,
       name: p.name,
+      nameEn: p.name_en ?? "",
+      nameMs: p.name_ms ?? "",
       accent: accentFromKey(p.accent_color_key),
       totalDays: p.total_days,
       phases: productPhases,
@@ -157,6 +159,31 @@ export async function createRoutineProduct(input: { name: string; category: "nec
   if (phaseErr) throw phaseErr;
 
   return id;
+}
+
+/** EN/MS display names for one product and its phases — shown to UK/ML app
+ * users. Empty string clears the override (app falls back to the Vietnamese
+ * name). Added 2026-09-04, replacing a hardcoded lookup in the mobile app
+ * that broke silently whenever a phase was renamed here. */
+export async function saveLocalizedNames(input: {
+  productId: string;
+  productNameEn: string;
+  productNameMs: string;
+  phases: Array<{ id: string; nameEn: string; nameMs: string }>;
+}) {
+  const { error } = await supabase
+    .from("products")
+    .update({ name_en: input.productNameEn.trim() || null, name_ms: input.productNameMs.trim() || null })
+    .eq("id", input.productId);
+  if (error) throw error;
+
+  for (const phase of input.phases) {
+    const { error: phaseErr } = await supabase
+      .from("program_phases")
+      .update({ name_en: phase.nameEn.trim() || null, name_ms: phase.nameMs.trim() || null })
+      .eq("id", phase.id);
+    if (phaseErr) throw phaseErr;
+  }
 }
 
 export async function updateProductInfo(productId: string, patch: { name?: string; link?: string }) {
@@ -622,6 +649,10 @@ export interface PhasePromoAdmin {
   unlockPackageName: string;
   unlockPackageDesc: string;
   unlockPriceLabel: string;
+  /** False = "tạm ngưng bán" (free-agreement mode): mobile keeps the phase
+   * locked but hides the greyed header, both promo cards and the paywall
+   * path entirely. */
+  salesEnabled: boolean;
   /** EN/MS overrides; an empty field falls back to the VN base on mobile.
    * Stored in phase_promos.translations keyed by language then snake_case
    * column name (see migration 202609011100_phase_promo_translations). */
@@ -629,6 +660,7 @@ export interface PhasePromoAdmin {
 }
 
 const EMPTY_PHASE_PROMO: PhasePromoAdmin = {
+  salesEnabled: true,
   crossSellImageUrl: "",
   crossSellBadge: "",
   crossSellTitle: "",
@@ -704,7 +736,7 @@ export async function fetchPhasePromo(phaseId: string): Promise<PhasePromoAdmin>
   const { data, error } = await supabase
     .from("phase_promos")
     .select(
-      "cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, google_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, translations"
+      "cross_sell_image_url, cross_sell_badge, cross_sell_title, cross_sell_description, cross_sell_cta_url, cross_sell_video_url, unlock_image_url, unlock_description, unlock_video_url, apple_product_id, google_product_id, unlock_badge, unlock_title, unlock_subtitle, unlock_benefits, unlock_package_name, unlock_package_desc, unlock_price_label, sales_enabled, translations"
     )
     .eq("phase_id", phaseId)
     .maybeSingle();
@@ -729,6 +761,7 @@ export async function fetchPhasePromo(phaseId: string): Promise<PhasePromoAdmin>
     unlockPackageName: data.unlock_package_name ?? "",
     unlockPackageDesc: data.unlock_package_desc ?? "",
     unlockPriceLabel: data.unlock_price_label ?? "",
+    salesEnabled: data.sales_enabled !== false,
     translations: parsePromoTranslations(data.translations),
   };
 }
@@ -758,6 +791,7 @@ export async function savePhasePromo(phaseId: string, promo: PhasePromoAdmin) {
       unlock_package_name: promo.unlockPackageName || null,
       unlock_package_desc: promo.unlockPackageDesc || null,
       unlock_price_label: promo.unlockPriceLabel || null,
+      sales_enabled: promo.salesEnabled,
       translations: serializePromoTranslations(promo.translations),
     },
     { onConflict: "phase_id" }
@@ -1182,11 +1216,11 @@ export interface PinnedDisplay {
 
 export type PostModerationStatus = "pending" | "approved" | "rejected";
 
-export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay })[]> {
+export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay; targetMarkets: string[] | null })[]> {
   const [{ data: posts, error: postErr }, { data: comments, error: commentErr }] = await Promise.all([
     supabase
       .from("community_posts")
-      .select("id, is_official, author_name, title, tag, text, image_url, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url")
+      .select("id, is_official, author_name, title, tag, text, image_url, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url, target_markets")
       .order("created_at", { ascending: false }),
     supabase.from("post_comments").select("id, post_id, author_name, text, created_at, hidden").order("created_at"),
   ]);
@@ -1194,7 +1228,7 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: 
   if (commentErr) throw commentErr;
 
   return (posts ?? []).map(
-    (p): CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay } => ({
+    (p): CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay; targetMarkets: string[] | null } => ({
       id: p.id,
       official: p.is_official,
       name: p.author_name || "TheraHOME",
@@ -1208,6 +1242,8 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: 
       hidden: p.hidden,
       status: (p.status as PostModerationStatus) ?? "approved",
       pinnedDisplay: { title: p.pinned_title, content: p.pinned_content, thumbnailUrl: p.pinned_thumbnail_url },
+      // null = hiển thị ở mọi thị trường; ngược lại chỉ các thị trường liệt kê.
+      targetMarkets: p.target_markets ?? null,
       commentsList: (comments ?? [])
         .filter((c) => c.post_id === p.id)
         .map((c): CommunityComment => ({ name: c.author_name || "Người dùng", text: c.text, time: new Date(c.created_at).toLocaleDateString("vi-VN"), idKey: c.id })),
@@ -1798,5 +1834,302 @@ export async function addAISuggestedReply(text: string, sortOrder: number) {
 
 export async function deleteAISuggestedReply(id: string) {
   const { error } = await supabase.from("ai_suggested_replies").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// App content (app_config) — settings the mobile app used to hardcode
+// ---------------------------------------------------------------------------
+
+export interface AppConfigRow {
+  key: string;
+  valueVi: string;
+  valueEn: string;
+  valueMs: string;
+}
+
+export async function fetchAppConfig(): Promise<AppConfigRow[]> {
+  const { data, error } = await supabase.from("app_config").select("key, value_vi, value_en, value_ms").order("key");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    key: r.key,
+    valueVi: r.value_vi ?? "",
+    valueEn: r.value_en ?? "",
+    valueMs: r.value_ms ?? "",
+  }));
+}
+
+/** Empty string clears an override — mobile then falls back to the VN value,
+ * and to its own built-in default if that is empty too. */
+export async function saveAppConfig(rows: AppConfigRow[]) {
+  for (const row of rows) {
+    const { error } = await supabase
+      .from("app_config")
+      .update({
+        value_vi: row.valueVi.trim() || null,
+        value_en: row.valueEn.trim() || null,
+        value_ms: row.valueMs.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("key", row.key);
+    if (error) throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Legal documents (legal_documents) — admin-publishable overrides
+// ---------------------------------------------------------------------------
+
+export type LegalLang = "vi" | "en" | "ms";
+
+export interface LegalDocOverride {
+  docKey: string;
+  language: LegalLang;
+  title: string;
+  body: string;
+  updatedAt: string;
+}
+
+/** Only rows an admin has actually published. Anything missing means the app
+ * still renders its bundled text — deleting a row is how you revert. */
+export async function fetchLegalOverrides(): Promise<LegalDocOverride[]> {
+  const { data, error } = await supabase
+    .from("legal_documents")
+    .select("doc_key, language, title, body, updated_at");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    docKey: r.doc_key,
+    language: r.language as LegalLang,
+    title: r.title,
+    body: r.body,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function saveLegalOverride(input: { docKey: string; language: LegalLang; title: string; body: string }) {
+  const { error } = await supabase.from("legal_documents").upsert(
+    {
+      doc_key: input.docKey,
+      language: input.language,
+      title: input.title,
+      body: input.body,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "doc_key,language" }
+  );
+  if (error) throw error;
+}
+
+/** Reverts one document+language to the version bundled in the app. */
+export async function deleteLegalOverride(docKey: string, language: LegalLang) {
+  const { error } = await supabase.from("legal_documents").delete().eq("doc_key", docKey).eq("language", language);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// FAQ (faq_items) — Hồ sơ → Trợ giúp in the mobile app
+// ---------------------------------------------------------------------------
+
+export interface FaqItemAdmin {
+  id: string;
+  sortOrder: number;
+  active: boolean;
+  questionVi: string;
+  answerVi: string;
+  questionEn: string;
+  answerEn: string;
+  questionMs: string;
+  answerMs: string;
+}
+
+export async function fetchFaqItems(): Promise<FaqItemAdmin[]> {
+  const { data, error } = await supabase
+    .from("faq_items")
+    .select("id, sort_order, active, question_vi, answer_vi, question_en, answer_en, question_ms, answer_ms")
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    sortOrder: r.sort_order,
+    active: r.active,
+    questionVi: r.question_vi,
+    answerVi: r.answer_vi,
+    questionEn: r.question_en ?? "",
+    answerEn: r.answer_en ?? "",
+    questionMs: r.question_ms ?? "",
+    answerMs: r.answer_ms ?? "",
+  }));
+}
+
+/** `id: "new"` inserts. Empty EN/MS fields clear the override — the app then
+ * shows the Vietnamese text for those markets. */
+export async function saveFaqItem(item: FaqItemAdmin) {
+  const payload = {
+    sort_order: item.sortOrder,
+    active: item.active,
+    question_vi: item.questionVi.trim(),
+    answer_vi: item.answerVi.trim(),
+    question_en: item.questionEn.trim() || null,
+    answer_en: item.answerEn.trim() || null,
+    question_ms: item.questionMs.trim() || null,
+    answer_ms: item.answerMs.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  if (item.id === "new") {
+    const { error } = await supabase.from("faq_items").insert(payload);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase.from("faq_items").update(payload).eq("id", item.id);
+  if (error) throw error;
+}
+
+export async function deleteFaqItem(id: string) {
+  const { error } = await supabase.from("faq_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/** Persists a new order after a move up/down. */
+export async function reorderFaqItems(ids: string[]) {
+  for (let index = 0; index < ids.length; index++) {
+    const { error } = await supabase.from("faq_items").update({ sort_order: index + 1 }).eq("id", ids[index]);
+    if (error) throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Insights: survey answers (user_quiz_attempts) + IAP purchases
+// ---------------------------------------------------------------------------
+
+export interface SurveyAnswer {
+  question: string;
+  answer: string;
+  optionIndex: number;
+}
+
+export interface SurveyAttempt {
+  id: string;
+  userName: string;
+  phaseName: string;
+  productName: string;
+  completedAt: string;
+  answers: SurveyAnswer[];
+}
+
+/** Every phase survey submitted, newest first. The mobile app stores the
+ * question + chosen option AS THE USER SAW THEM, so answers stay readable
+ * even after admin later edits the question. */
+export async function fetchSurveyAttempts(limit = 200): Promise<SurveyAttempt[]> {
+  const [{ data: attempts, error }, { data: phases }, { data: products }, { data: profs }] = await Promise.all([
+    supabase.from("user_quiz_attempts").select("id, user_id, phase_id, completed_at, answers").order("completed_at", { ascending: false }).limit(limit),
+    supabase.from("program_phases").select("id, name, product_id"),
+    supabase.from("products").select("id, name"),
+    supabase.from("profiles").select("id, full_name, username"),
+  ]);
+  if (error) throw error;
+
+  const phaseById = new Map((phases ?? []).map((p) => [p.id, p]));
+  const productById = new Map((products ?? []).map((p) => [p.id, p.name]));
+  const profileById = new Map((profs ?? []).map((p) => [p.id, p.full_name || p.username || ""]));
+
+  return (attempts ?? []).map((a) => {
+    const phase = phaseById.get(a.phase_id);
+    const raw = (a.answers ?? {}) as Record<string, { question?: string; answer?: string; optionIndex?: number }>;
+    return {
+      id: a.id,
+      userName: profileById.get(a.user_id) || "Người dùng",
+      phaseName: phase?.name ?? "",
+      productName: phase ? productById.get(phase.product_id) ?? "" : "",
+      completedAt: a.completed_at,
+      answers: Object.values(raw).map((v) => ({
+        question: v.question ?? "",
+        answer: v.answer ?? "",
+        optionIndex: v.optionIndex ?? 0,
+      })),
+    };
+  });
+}
+
+export interface PurchaseRow {
+  id: string;
+  userName: string;
+  productName: string;
+  phaseName: string;
+  platform: string;
+  purchasedAt: string;
+  revokedAt: string | null;
+}
+
+export async function fetchPhasePurchases(limit = 200): Promise<PurchaseRow[]> {
+  const [{ data: rows, error }, { data: phases }, { data: products }, { data: profs }] = await Promise.all([
+    supabase.from("phase_purchases").select("id, user_id, phase_id, platform, purchased_at, revoked_at").order("purchased_at", { ascending: false }).limit(limit),
+    supabase.from("program_phases").select("id, name, product_id"),
+    supabase.from("products").select("id, name"),
+    supabase.from("profiles").select("id, full_name, username"),
+  ]);
+  if (error) throw error;
+
+  const phaseById = new Map((phases ?? []).map((p) => [p.id, p]));
+  const productById = new Map((products ?? []).map((p) => [p.id, p.name]));
+  const profileById = new Map((profs ?? []).map((p) => [p.id, p.full_name || p.username || ""]));
+
+  return (rows ?? []).map((r) => {
+    const phase = phaseById.get(r.phase_id);
+    return {
+      id: r.id,
+      userName: profileById.get(r.user_id) || "Người dùng",
+      productName: phase ? productById.get(phase.product_id) ?? "" : "",
+      phaseName: phase?.name ?? "",
+      platform: r.platform,
+      purchasedAt: r.purchased_at,
+      revokedAt: r.revoked_at,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding questionnaire wording (onboarding_question_texts)
+// ---------------------------------------------------------------------------
+
+export interface OnboardingQuestionText {
+  questionKey: string;
+  language: LegalLang;
+  title: string;
+  subtitle: string;
+  options: string[];
+}
+
+export async function fetchOnboardingTexts(): Promise<OnboardingQuestionText[]> {
+  const { data, error } = await supabase
+    .from("onboarding_question_texts")
+    .select("question_key, language, title, subtitle, options");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    questionKey: r.question_key,
+    language: r.language as LegalLang,
+    title: r.title,
+    subtitle: r.subtitle ?? "",
+    options: r.options ?? [],
+  }));
+}
+
+/** Wording only. The caller must pass exactly as many options as the row
+ * already has — the mobile app maps a user's saved answer by its POSITION in
+ * this list, so adding/removing/reordering would silently re-map existing
+ * profiles to a different answer. */
+export async function saveOnboardingText(input: OnboardingQuestionText, expectedOptionCount: number) {
+  if (input.options.length !== expectedOptionCount) {
+    throw new Error("option_count_mismatch");
+  }
+  const { error } = await supabase
+    .from("onboarding_question_texts")
+    .update({
+      title: input.title.trim(),
+      subtitle: input.subtitle.trim() || null,
+      options: input.options.map((o) => o.trim()),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("question_key", input.questionKey)
+    .eq("language", input.language);
   if (error) throw error;
 }

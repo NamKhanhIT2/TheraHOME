@@ -25,13 +25,14 @@ import {
   type PostModerationStatus,
 } from "@/lib/db";
 import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, Avatar, PillTabs } from "@/components/ui/primitives";
+import { translateDrafts } from "@/lib/translate";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { TableShell } from "@/components/ui/TableShell";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 
-type PinnedPost = CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay };
+type PinnedPost = CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay; targetMarkets: string[] | null };
 
 type AuthorTab = "official" | "users";
 const AUTHOR_TABS: Array<[AuthorTab, string]> = [
@@ -237,12 +238,13 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
   const [sendNotification, setSendNotification] = useState(false);
   const [notifyTitle, setNotifyTitle] = useState("");
   const [notifyBody, setNotifyBody] = useState("");
-  // New-post market targeting: VN content is always the `title`/`text`
-  // fields above and always shown; UK/ML are opt-in extra variants — only
-  // checking one reveals its own fields and adds it to targetMarkets, so
-  // posting stays a one-field-set action unless staff actually wants a
-  // market-specific version (matches the explicit "chỉ quốc gia nào được
-  // hiển thị mới cần điền nội dung" instruction).
+  // New-post market targeting. `title`/`text` are the BASE content (also the
+  // fallback for any targeted market with no variant filled in); UK/ML can
+  // additionally carry their own variant fields. VN is now un-tickable
+  // (fix 2026-09-04: it used to be force-added to every post, so a UK-only
+  // post still reached Vietnamese users). Ticking nothing but UK posts to
+  // UK only.
+  const [vnTargeted, setVnTargeted] = useState(true);
   const [extraMarkets, setExtraMarkets] = useState<Array<"US" | "MALAY">>([]);
   const [composerMarketTab, setComposerMarketTab] = useState<AdminMarket>("VN");
   const [titleUs, setTitleUs] = useState("");
@@ -273,6 +275,7 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
     setSendNotification(false);
     setNotifyTitle("");
     setNotifyBody("");
+    setVnTargeted(true);
     setExtraMarkets([]);
     setComposerMarketTab("VN");
     setTitleUs("");
@@ -301,11 +304,54 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           pushToast("Vui lòng nhập tiêu đề và nội dung bài viết");
           return;
         }
-        if (extraMarkets.includes("US") && (!titleUs.trim() || !textUs.trim())) {
+        if (!vnTargeted && extraMarkets.length === 0) {
+          pushToast("Hãy chọn ít nhất một thị trường được xem bài này");
+          return;
+        }
+        // UK/ML variants left empty auto-draft from the VN content (per
+        // explicit request 2026-09-04) instead of blocking the publish —
+        // staff can refine them later by editing the post. Only when the
+        // translator itself fails do we fall back to the old "please fill
+        // in" error for the still-empty variant.
+        let finalTitleUs = titleUs.trim();
+        let finalTextUs = textUs.trim();
+        let finalTitleMalay = titleMalay.trim();
+        let finalTextMalay = textMalay.trim();
+        let finalNotifyTitleUs = notifyTitleUs.trim();
+        let finalNotifyBodyUs = notifyBodyUs.trim();
+        let finalNotifyTitleMalay = notifyTitleMalay.trim();
+        let finalNotifyBodyMalay = notifyBodyMalay.trim();
+        const needUs = extraMarkets.includes("US") && (!finalTitleUs || !finalTextUs);
+        const needMalay = extraMarkets.includes("MALAY") && (!finalTitleMalay || !finalTextMalay);
+        let drafted = false;
+        if (needUs || needMalay) {
+          const drafts = await translateDrafts({
+            title: title.trim(),
+            text: text.trim(),
+            notifyTitle: notifyTitle.trim(),
+            notifyBody: notifyBody.trim(),
+          });
+          if (drafts) {
+            if (needUs) {
+              finalTitleUs = finalTitleUs || drafts.en.title || "";
+              finalTextUs = finalTextUs || drafts.en.text || "";
+              finalNotifyTitleUs = finalNotifyTitleUs || drafts.en.notifyTitle || "";
+              finalNotifyBodyUs = finalNotifyBodyUs || drafts.en.notifyBody || "";
+            }
+            if (needMalay) {
+              finalTitleMalay = finalTitleMalay || drafts.ms.title || "";
+              finalTextMalay = finalTextMalay || drafts.ms.text || "";
+              finalNotifyTitleMalay = finalNotifyTitleMalay || drafts.ms.notifyTitle || "";
+              finalNotifyBodyMalay = finalNotifyBodyMalay || drafts.ms.notifyBody || "";
+            }
+            drafted = true;
+          }
+        }
+        if (extraMarkets.includes("US") && (!finalTitleUs || !finalTextUs)) {
           pushToast("Vui lòng nhập tiêu đề và nội dung bản UK");
           return;
         }
-        if (extraMarkets.includes("MALAY") && (!titleMalay.trim() || !textMalay.trim())) {
+        if (extraMarkets.includes("MALAY") && (!finalTitleMalay || !finalTextMalay)) {
           pushToast("Vui lòng nhập tiêu đề và nội dung bản ML");
           return;
         }
@@ -315,17 +361,26 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           sendNotification,
           notifyTitle,
           notifyBody,
-          targetMarkets: extraMarkets.length ? ["VN", ...extraMarkets] : undefined,
-          titleUs: extraMarkets.includes("US") ? titleUs.trim() : undefined,
-          textUs: extraMarkets.includes("US") ? textUs.trim() : undefined,
-          titleMalay: extraMarkets.includes("MALAY") ? titleMalay.trim() : undefined,
-          textMalay: extraMarkets.includes("MALAY") ? textMalay.trim() : undefined,
-          notifyTitleUs: extraMarkets.includes("US") ? notifyTitleUs.trim() : undefined,
-          notifyBodyUs: extraMarkets.includes("US") ? notifyBodyUs.trim() : undefined,
-          notifyTitleMalay: extraMarkets.includes("MALAY") ? notifyTitleMalay.trim() : undefined,
-          notifyBodyMalay: extraMarkets.includes("MALAY") ? notifyBodyMalay.trim() : undefined,
+          // Exactly the ticked markets. All three ticked => undefined (null
+          // in the DB = "everywhere", which also covers markets added
+          // later). Untick VN to post for UK/ML only.
+          targetMarkets:
+            vnTargeted && extraMarkets.length === 2
+              ? undefined
+              : [...(vnTargeted ? (["VN"] as AdminMarket[]) : []), ...extraMarkets],
+          titleUs: extraMarkets.includes("US") ? finalTitleUs : undefined,
+          textUs: extraMarkets.includes("US") ? finalTextUs : undefined,
+          titleMalay: extraMarkets.includes("MALAY") ? finalTitleMalay : undefined,
+          textMalay: extraMarkets.includes("MALAY") ? finalTextMalay : undefined,
+          notifyTitleUs: extraMarkets.includes("US") ? finalNotifyTitleUs : undefined,
+          notifyBodyUs: extraMarkets.includes("US") ? finalNotifyBodyUs : undefined,
+          notifyTitleMalay: extraMarkets.includes("MALAY") ? finalNotifyTitleMalay : undefined,
+          notifyBodyMalay: extraMarkets.includes("MALAY") ? finalNotifyBodyMalay : undefined,
         });
-        pushToast(sendNotification ? "Đã đăng bài và gửi thông báo" : "Đã đăng bài viết mới lên Cộng đồng");
+        pushToast(
+          (sendNotification ? "Đã đăng bài và gửi thông báo" : "Đã đăng bài viết mới lên Cộng đồng") +
+            (drafted ? " · đã tự dịch nháp UK/ML" : ""),
+        );
       } else if (modal !== null) {
         const imageUrl = editImageFile
           ? await uploadPostThumbnail(String(modal), editImageFile)
@@ -510,8 +565,12 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
       ) : null}
       {modal === "new" ? (
         <Fragment>
-          <FieldLabel>Cũng hiển thị bản riêng cho</FieldLabel>
-          <div style={{ display: "flex", gap: 14, marginBottom: extraMarkets.length ? 10 : 16 }}>
+          <FieldLabel>Hiển thị cho thị trường</FieldLabel>
+          <div style={{ display: "flex", gap: 14, marginBottom: 6 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--text-primary)", cursor: "pointer" }}>
+              <input type="checkbox" checked={vnTargeted} onChange={(e) => setVnTargeted(e.target.checked)} />
+              VN
+            </label>
             {([["US", "UK"], ["MALAY", "ML"]] as const).map(([code, label]) => (
               <label key={code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--text-primary)", cursor: "pointer" }}>
                 <input
@@ -525,6 +584,10 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
                 {label}
               </label>
             ))}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: extraMarkets.length ? 10 : 16 }}>
+            Chỉ người dùng ở thị trường được tick mới thấy bài này. Bỏ tick VN nếu bài chỉ dành cho UK/ML.
+            Thị trường được tick mà không điền bản riêng sẽ dùng nội dung gốc bên dưới.
           </div>
           {extraMarkets.length ? (
             <div style={{ marginBottom: 16 }}>
@@ -737,6 +800,19 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           <td style={{ padding: "14px 20px", color: "var(--text-secondary)", maxWidth: 320 }}>
             {it.title ? <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 3 }}>{it.title}</div> : null}
             {it.text}
+            {/* Which markets actually see this post — without it staff had
+                no way to tell a VN-only post from a UK-only one, and no way
+                to know which market a pin belongs to (pins are per-market
+                since 2026-09-04). */}
+            {it.official ? (
+              <span style={{ marginLeft: 8 }}>
+                <Badge color="var(--color-primary)" bg="var(--color-primary-tint-10)">
+                  {it.targetMarkets === null || it.targetMarkets.length === 0
+                    ? "Mọi thị trường"
+                    : it.targetMarkets.map((m) => (m === "US" ? "UK" : m === "MALAY" ? "ML" : m)).join(" · ")}
+                </Badge>
+              </span>
+            ) : null}
             {it.hidden ? (
               <span style={{ marginLeft: 8 }}>
                 <Badge color="#8A93A3" bg="rgba(138,147,163,0.12)">Đã ẩn</Badge>

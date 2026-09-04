@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Tabs, router } from 'expo-router';
+import { Tabs, router, usePathname } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
@@ -98,6 +98,11 @@ export default function TabsLayout() {
   // so by the time a user reaches the tabs there's nothing else to ask.
   const hasSeenReminderPrompt = useAppStore((s) => s.hasSeenReminderPrompt);
   const [reminderDoneThisSession, setReminderDoneThisSession] = useState(false);
+  // The assistant bubble stays off the Community tab (per explicit request
+  // 2026-09-04) — it overlapped the feed's action row; chat stays reachable
+  // from every other tab.
+  const pathname = usePathname();
+  const onCommunityTab = pathname.startsWith('/community');
   const { session } = useSession();
   const userId = session?.user.id;
   const isStaff = useIsStaff(userId);
@@ -169,11 +174,13 @@ export default function TabsLayout() {
         <Tabs.Screen name="store" />
         <Tabs.Screen name="community/index" />
       </Tabs>
-      <AssistantBubble
-        isStaff={isStaff}
-        onOpenAIChat={() => router.push('/chat/ai')}
-        onOpenSupportChat={() => router.push(isStaff ? '/chat/admin-conversations' : '/chat/human')}
-      />
+      {!onCommunityTab ? (
+        <AssistantBubble
+          isStaff={isStaff}
+          onOpenAIChat={() => router.push('/chat/ai')}
+          onOpenSupportChat={() => router.push(isStaff ? '/chat/admin-conversations' : '/chat/human')}
+        />
+      ) : null}
       {showReminderPrompt && userId ? (
         <ReminderPopup userId={userId} onDone={() => setReminderDoneThisSession(true)} />
       ) : null}

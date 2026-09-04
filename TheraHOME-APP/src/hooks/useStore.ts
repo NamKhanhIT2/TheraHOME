@@ -1,7 +1,7 @@
 // Phase 4: real store catalog. Still no in-app checkout (matches the
 // design) — each item links out to therahomeai.com via `external_link`.
 // Replaces the Phase 1 mock store's `storeCategories`. See CLAUDE.md.
-import { Image } from 'react-native';
+import { Image } from 'expo-image';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ThemeColors } from '@/theme/colors';
@@ -109,8 +109,9 @@ export function useStoreCategories() {
   return useQuery({
     queryKey: storeCategoriesQueryKey(market),
     queryFn: () => fetchStoreCategories(market),
-    // Store links are edited from the web Admin. Keep this query stale so a
-    // user revisiting the tab receives the latest "Xem thử" configuration.
+    staleTime: 5 * 60 * 1000,
+    // Catalog changes infrequently; avoid a duplicate request immediately
+    // after launch/prefetch while still refreshing during a long session.
   });
 }
 
@@ -131,11 +132,12 @@ export async function prefetchStoreCategories(queryClient: QueryClient, language
     queryKey: storeCategoriesQueryKey(market),
     queryFn: () => fetchStoreCategories(market),
   });
-  for (const category of categories) {
-    for (const item of category.items) {
-      // Product artwork is an optional cache warm-up. A transient network
-      // loss must not surface as an unhandled promise rejection at launch.
-      if (item.imageUrl) void Image.prefetch(item.imageUrl).catch(() => false);
-    }
+  const urls = categories.flatMap((category) => category.items.map((item) => item.imageUrl).filter((url): url is string => !!url));
+  // Warm the same disk cache used by RemoteImage. Downloads run together so
+  // a slow first product cannot block every thumbnail after it.
+  // Keep cold-start bandwidth available for the current Home content. Warm
+  // Store images two at a time instead of opening every download at once.
+  for (let index = 0; index < urls.length; index += 2) {
+    await Image.prefetch(urls.slice(index, index + 2), { cachePolicy: 'memory-disk' }).catch(() => false);
   }
 }

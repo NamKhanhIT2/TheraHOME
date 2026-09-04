@@ -1,7 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/theme';
-import { legalContent, type LegalDocKey } from '@/lib/legalContent';
+import { type LegalDocKey } from '@/lib/legalContent';
+import { useLegalDoc } from '@/hooks/useLegalDoc';
 
 const SECTION_HEADER_RE = /^\d+(\.\d+)?\.\s/;
 
@@ -16,7 +17,8 @@ export interface LegalDocBodyProps {
  * lines are skipped. */
 export function LegalDocBody({ docKey }: LegalDocBodyProps) {
   const theme = useTheme();
-  const doc = legalContent[docKey];
+  // Admin-published override when one exists, otherwise the bundled text.
+  const doc = useLegalDoc(docKey);
   const lines = doc.text.split('\n');
 
   return (

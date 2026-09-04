@@ -2,6 +2,7 @@
 // Notifications Settings, and Profile's header all read/write this instead
 // of the Phase 1 `mockUser` constant. See CLAUDE.md.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import type { TablesUpdate } from '@/types/database';
 
@@ -103,12 +104,18 @@ export function useUpdateProfile(userId: string | undefined) {
  * public `avatars` bucket under this user's own folder, and returns the
  * public URL — caller still has to save it onto `profiles.avatar_url`. */
 export async function uploadAvatarImage(userId: string, localUri: string): Promise<string> {
-  const ext = (localUri.split('.').pop() || 'jpg').split('?')[0].toLowerCase();
-  const path = `${userId}/${Date.now()}.${ext}`;
-  const response = await fetch(localUri);
+  const optimized = await manipulateAsync(
+    localUri,
+    [{ resize: { width: 512 } }],
+    { compress: 0.78, format: SaveFormat.JPEG },
+  );
+  const path = `${userId}/${Date.now()}.jpg`;
+  const response = await fetch(optimized.uri);
   const arrayBuffer = await response.arrayBuffer();
-  const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
-  const { error } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType });
+  const { error } = await supabase.storage.from('avatars').upload(path, arrayBuffer, {
+    contentType: 'image/jpeg',
+    cacheControl: '31536000',
+  });
   if (error) throw error;
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }

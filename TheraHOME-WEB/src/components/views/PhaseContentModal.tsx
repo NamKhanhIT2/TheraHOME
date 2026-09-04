@@ -22,6 +22,7 @@ import { GhostBtn, PrimaryBtn, FieldLabel, inputStyle, PillTabs } from "@/compon
 import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
+import { translateDrafts } from "@/lib/translate";
 
 type ContentTab = "quiz" | "promo";
 type QuizLangKey = "vi" | "en" | "ms";
@@ -105,9 +106,35 @@ function QuizTab({ phaseId }: { phaseId: string }) {
     }
     setSaving(true);
     try {
-      await saveQuizQuestion(phaseId, { id: draft.id || null, sortOrder: draft.sortOrder, vi: draft.vi, en: draft.en, ms: draft.ms });
+      // Auto-draft EN/MS from the VN content when a language was left
+      // untouched (per explicit request 2026-09-04): staff only writes VN,
+      // the drafts land in the same en/ms slots the app reads, and stay
+      // editable here afterwards. A failed translation saves VN-only —
+      // the app then falls back per its normal language logic.
+      let { en, ms } = draft;
+      const needsEn = !en.question.trim();
+      const needsMs = !ms.question.trim();
+      let drafted = false;
+      if (needsEn || needsMs) {
+        const texts: Record<string, string> = { question: vi.question };
+        vi.options.forEach((option, i) => {
+          texts[`option_${i}`] = option;
+        });
+        const drafts = await translateDrafts(texts);
+        if (drafts) {
+          const fill = (lang: "en" | "ms"): QuizLanguageContent => ({
+            question: drafts[lang].question ?? vi.question,
+            options: vi.options.map((option, i) => drafts[lang][`option_${i}`] ?? option),
+            correctIndex: vi.correctIndex,
+          });
+          if (needsEn) en = fill("en");
+          if (needsMs) ms = fill("ms");
+          drafted = true;
+        }
+      }
+      await saveQuizQuestion(phaseId, { id: draft.id || null, sortOrder: draft.sortOrder, vi: draft.vi, en, ms });
       setDraft(null);
-      pushToast("Đã lưu câu hỏi");
+      pushToast(drafted ? "Đã lưu câu hỏi + tự dịch nháp EN/MS (kiểm tra lại ở 2 tab)" : "Đã lưu câu hỏi");
       reload();
     } catch {
       pushToast("Không thể lưu câu hỏi");
@@ -213,8 +240,35 @@ function PromoTab({ phaseId }: { phaseId: string }) {
     if (!promo) return;
     setSaving(true);
     try {
-      await savePhasePromo(phaseId, promo);
-      pushToast("Đã lưu nội dung upsell");
+      // Auto-draft EN/MS overrides for text fields staff left empty (per
+      // explicit request 2026-09-04). URLs and the fallback price label are
+      // deliberately NOT translated — they're shared/market-specific. A
+      // failed translation just saves VN-only (app falls back per field).
+      const TRANSLATABLE: PromoTextKey[] = [
+        "crossSellBadge", "crossSellTitle", "crossSellDescription",
+        "unlockDescription", "unlockBadge", "unlockTitle", "unlockSubtitle",
+        "unlockBenefits", "unlockPackageName", "unlockPackageDesc",
+      ];
+      let toSave = promo;
+      const needed = TRANSLATABLE.filter(
+        (key) => promo[key].trim() && (!promo.translations.en[key].trim() || !promo.translations.ms[key].trim()),
+      );
+      if (needed.length) {
+        const drafts = await translateDrafts(Object.fromEntries(needed.map((key) => [key, promo[key]])));
+        if (drafts) {
+          const merge = (lang: "en" | "ms"): PhasePromoTranslation => {
+            const entry = { ...promo.translations[lang] };
+            for (const key of needed) {
+              if (!entry[key].trim() && drafts[lang][key]) entry[key] = drafts[lang][key];
+            }
+            return entry;
+          };
+          toSave = { ...promo, translations: { en: merge("en"), ms: merge("ms") } };
+          setPromo(toSave);
+        }
+      }
+      await savePhasePromo(phaseId, toSave);
+      pushToast(toSave !== promo ? "Đã lưu + tự dịch nháp EN/MS (kiểm tra lại ở 2 tab)" : "Đã lưu nội dung upsell");
     } catch {
       pushToast("Không thể lưu nội dung upsell");
     } finally {
@@ -232,6 +286,25 @@ function PromoTab({ phaseId }: { phaseId: string }) {
       {!isVi ? (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12, marginTop: -6 }}>
           Bản dịch cho người dùng {langTab === "en" ? "tiếng Anh (thị trường UK)" : "tiếng Malay (thị trường ML)"}. Trường nào để trống, app sẽ dùng bản VN. Ảnh và Apple/Google Product ID dùng chung — chỉnh ở tab VN.
+        </div>
+      ) : null}
+      {isVi ? (
+        <div style={{ background: "#fff", borderRadius: 12, padding: 14, boxShadow: "var(--shadow-card)", marginBottom: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <input
+            type="checkbox"
+            id="promo-sales-enabled"
+            checked={promo.salesEnabled}
+            onChange={(e) => set("salesEnabled", e.target.checked)}
+            style={{ marginTop: 3, cursor: "pointer" }}
+          />
+          <label htmlFor="promo-sales-enabled" style={{ fontSize: 13, color: "var(--text-primary)", cursor: "pointer" }}>
+            <strong>Đang mở bán giai đoạn này</strong>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+              Bỏ chọn khi chưa thể bán IAP (ví dụ chờ Paid Apps Agreement active): app sẽ ẨN hẳn header giai đoạn khoá,
+              cả 2 thẻ giới thiệu và màn paywall — nội dung vẫn bị khoá, không ai truy cập được. Tick lại là hiện ngay
+              trên mọi máy, không cần build mới.
+            </div>
+          </label>
         </div>
       ) : null}
       <div style={{ background: "#fff", borderRadius: 12, padding: 14, boxShadow: "var(--shadow-card)", marginBottom: 14 }}>

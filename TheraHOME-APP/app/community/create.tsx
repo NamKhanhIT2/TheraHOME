@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/theme';
@@ -107,7 +107,7 @@ export default function CreatePostScreen() {
     if (next === 'image') void pickMedia();
   }
 
-  const canSubmit = postType === 'progress' || postType === 'exercise' ? !!snapshot : !!text.trim();
+  const canSubmit = postType === 'progress' || postType === 'exercise' ? !!snapshot : !!text.trim() || media.length > 0;
 
   function handleSubmit() {
     if (!canSubmit || createPost.isPending) return;
@@ -142,7 +142,8 @@ export default function CreatePostScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.body}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {params.achievement ? <View style={[styles.achievementBanner, { backgroundColor: theme.colors.primaryTint10, borderColor: theme.colors.primary }]}><Text style={styles.achievementEmoji}>🎉</Text><View style={{ flex: 1 }}><Text style={[theme.type.bodyStrong, { color: theme.colors.primaryDark }]}>{t('newAchievement')}</Text><Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('achievementCardHint')}</Text></View></View> : null}
         <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginBottom: 10 }]}>{t('shareWhat')}</Text>
         <View style={styles.typeRow}>
@@ -200,6 +201,7 @@ export default function CreatePostScreen() {
           placeholder={snapshot ? t('addThought') : t('thinkingAbout', { name: displayName })}
           placeholderTextColor={theme.colors.textMuted}
           multiline
+          maxLength={3000}
           style={[styles.textArea, { color: theme.colors.textPrimary, minHeight: snapshot ? 70 : 140 }]}
         />
 
@@ -221,6 +223,7 @@ export default function CreatePostScreen() {
             ))}
           </ScrollView>
         ) : null}
+        <Text style={[theme.type.captionSm, styles.characterCount, { color: text.length > 2800 ? theme.colors.warning : theme.colors.textMuted }]}>{text.length}/3000</Text>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -239,11 +242,13 @@ export default function CreatePostScreen() {
           <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, textDecorationLine: 'underline' }]}>{t('viewCommunityGuidelines')}</Text>
         </Pressable>
       </View>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -308,6 +313,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlignVertical: 'top',
   },
+  characterCount: { textAlign: 'right', marginTop: 4, marginBottom: 8 },
   mediaRow: {
     gap: 10,
     marginBottom: 12,

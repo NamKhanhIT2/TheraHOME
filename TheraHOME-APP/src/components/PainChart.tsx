@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, Line, LinearGradient, Path, Circle, Text as SvgText, Stop } from 'react-native-svg';
 import Reanimated, { Easing as REasing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
@@ -75,8 +75,10 @@ const RANGE_OPTIONS = [7, 14] as const;
 export function PainChart({ data }: PainChartProps) {
   const theme = useTheme();
   const { t } = useI18n();
+  const { width: windowWidth } = useWindowDimensions();
   const [range, setRange] = useState<number>(7);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState({ x: 0, y: 0 });
   const scrollRef = useRef<ScrollView>(null);
   const [chartWidth, setChartWidth] = useState(300);
   const revealAnim = useRef(new Animated.Value(0)).current;
@@ -200,34 +202,22 @@ export function PainChart({ data }: PainChartProps) {
       <View style={styles.headerRow}>
         <Text style={[theme.type.h2, { color: theme.colors.textPrimary }]}>{t('healthChart')}</Text>
         {!isEmpty ? <View>
-          <Pressable onPress={() => setMenuOpen((o) => !o)} style={styles.rangeBtn}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${range} ${t('daysUnit')}`}
+            accessibilityState={{ expanded: menuOpen }}
+            hitSlop={8}
+            onPress={(event) => {
+              setMenuAnchor({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY });
+              setMenuOpen((open) => !open);
+            }}
+            style={styles.rangeBtn}
+          >
             <Text style={[theme.type.caption, { fontFamily: theme.fontFamily.semiBold, color: theme.colors.primary }]}>
               {range} {t('daysUnit')}
             </Text>
             <Icon name="chevron-down" size={14} color={theme.colors.primary} />
           </Pressable>
-          {menuOpen ? (
-            <View
-              style={[
-                styles.menu,
-                theme.shadows.card,
-                { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md },
-              ]}
-            >
-              {RANGE_OPTIONS.map((o) => (
-                <Pressable
-                  key={o}
-                  onPress={() => {
-                    setRange(o);
-                    setMenuOpen(false);
-                  }}
-                  style={[styles.menuItem, { backgroundColor: o === range ? theme.colors.bgCardAlt : 'transparent' }]}
-                >
-                  <Text style={[theme.type.caption, { color: theme.colors.textPrimary }]}>{o} {t('daysUnit')}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
         </View> : <View style={[styles.previewPill, { backgroundColor: theme.colors.primaryTint10 }]}>
           <Icon name="sparkles" size={13} color={theme.colors.primary} />
           <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>{t('chartPreview')}</Text>
@@ -312,6 +302,39 @@ export function PainChart({ data }: PainChartProps) {
         </View>
       </View> : null}
       {!isEmpty ? <Text style={[theme.type.bodyStrong, { color: theme.colors.primary, marginTop: 12 }]}>{t('doingGreat')}</Text> : null}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Đóng danh sách" style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+          <Pressable
+            onPress={() => undefined}
+            style={[
+              styles.menu,
+              theme.shadows.card,
+              {
+                top: menuAnchor.y + 12,
+                left: Math.max(12, Math.min(menuAnchor.x - 76, windowWidth - 112)),
+                backgroundColor: theme.colors.bgCard,
+                borderRadius: theme.radius.md,
+              },
+            ]}
+          >
+            {RANGE_OPTIONS.map((option) => (
+              <Pressable
+                key={option}
+                accessibilityRole="menuitem"
+                accessibilityState={{ selected: option === range }}
+                onPress={() => {
+                  setRange(option);
+                  setMenuOpen(false);
+                }}
+                style={[styles.menuItem, { backgroundColor: option === range ? theme.colors.bgCardAlt : 'transparent' }]}
+              >
+                <Text style={[theme.type.caption, { color: option === range ? theme.colors.primary : theme.colors.textPrimary, fontFamily: option === range ? theme.fontFamily.semiBold : theme.fontFamily.regular }]}>{option} {t('daysUnit')}</Text>
+                {option === range ? <Icon name="check" size={15} color={theme.colors.primary} /> : null}
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -343,16 +366,19 @@ const styles = StyleSheet.create({
   },
   menu: {
     position: 'absolute',
-    top: '100%',
-    right: 0,
-    marginTop: 6,
     overflow: 'hidden',
-    minWidth: 96,
+    width: 100,
     zIndex: 40,
   },
+  menuBackdrop: { flex: 1, backgroundColor: 'transparent' },
   menuItem: {
+    minHeight: 44,
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   axisRow: {
     marginTop: -4,

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -50,6 +50,7 @@ import { getReactionTrayFrame, pickerReactionAt } from '@/components/community/r
 import { hapticConfirm } from '@/lib/haptics';
 import { useTabFocusFade } from '@/hooks/useTabFocusFade';
 import { fadeUpEntering, staggerDelay } from '@/lib/motion';
+import { rankCommunityPosts } from '@/lib/communityRanking';
 
 type Filter = 'all' | 'official';
 
@@ -166,11 +167,11 @@ export default function CommunityScreen() {
   const blockedUsersQuery = useBlockedCommunityUsers(userId);
   const blockUser = useBlockCommunityUser(userId);
 
-  const posts = postsQuery.data ?? [];
-  const myReactions = reactionsQuery.data ?? new Map<string, PostReaction>();
-  const savedSet = savedSetQuery.data ?? new Set<string>();
-  const hiddenPostIds = hiddenPostsQuery.data ?? new Set<string>();
-  const blockedUserIds = blockedUsersQuery.data ?? new Set<string>();
+  const posts = useMemo(() => postsQuery.data ?? [], [postsQuery.data]);
+  const myReactions = useMemo(() => reactionsQuery.data ?? new Map<string, PostReaction>(), [reactionsQuery.data]);
+  const savedSet = useMemo(() => savedSetQuery.data ?? new Set<string>(), [savedSetQuery.data]);
+  const hiddenPostIds = useMemo(() => hiddenPostsQuery.data ?? new Set<string>(), [hiddenPostsQuery.data]);
+  const blockedUserIds = useMemo(() => blockedUsersQuery.data ?? new Set<string>(), [blockedUsersQuery.data]);
 
   const focusFadeStyle = useTabFocusFade();
   const [filter, setFilter] = useState<Filter>('all');
@@ -208,15 +209,18 @@ export default function CommunityScreen() {
   // alongside every other official post, same as before.
   const pinnedPost = posts.find((p) => p.isOfficial && p.pinned && !hiddenPostIds.has(p.id)) ?? null;
   const pinnedPostDisplay = pinnedPost ? pinnedDisplay(pinnedPost) : null;
-  const filteredPosts = posts.filter(
-    (p) =>
-      !hiddenPostIds.has(p.id) &&
-      (!p.authorId || !blockedUserIds.has(p.authorId)) &&
-      (
-        (filter === 'all' && !p.isOfficial) ||
-        (filter === 'official' && p.isOfficial)
-      ),
-  );
+  const filteredPosts = useMemo(() => {
+    const eligible = posts.filter(
+      (p) =>
+        !hiddenPostIds.has(p.id) &&
+        (!p.authorId || !blockedUserIds.has(p.authorId)) &&
+        (
+          (filter === 'all' && !p.isOfficial) ||
+          (filter === 'official' && p.isOfficial)
+        ),
+    );
+    return rankCommunityPosts(eligible, myReactions, savedSet);
+  }, [blockedUserIds, filter, hiddenPostIds, myReactions, posts, savedSet]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -349,6 +353,19 @@ export default function CommunityScreen() {
           />
         </View>
       ) : null}
+
+      {postsQuery.isError ? (
+        <View style={[styles.feedNotice, { backgroundColor: theme.colors.errorTint }]}>
+          <Icon name="activity" size={20} color={theme.colors.error} />
+          <View style={styles.feedNoticeText}>
+            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>Không thể tải bảng tin</Text>
+            <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>Kiểm tra kết nối rồi thử lại.</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Tải lại bảng tin" onPress={() => void refreshFeed()} style={styles.retryButton} hitSlop={8}>
+            <Icon name="rotate-ccw" size={19} color={theme.colors.primary} />
+          </Pressable>
+        </View>
+      ) : null}
     </>
   );
 
@@ -409,7 +426,7 @@ export default function CommunityScreen() {
           ]}
         />
 
-        <MediaGrid uris={p.mediaUrls} postId={p.id} shouldAutoplay={p.id === activeFeedItemId} />
+        <MediaGrid uris={p.mediaUrls} feedUris={p.mediaFeedUrls} posterUris={p.mediaPosterUrls} mediaWidths={p.mediaWidths} mediaHeights={p.mediaHeights} postId={p.id} shouldAutoplay={p.id === activeFeedItemId} />
 
         {p.progressSnapshot ? <ProgressShareCard postType={p.postType} snapshot={p.progressSnapshot} /> : null}
 
@@ -426,7 +443,7 @@ export default function CommunityScreen() {
           commentsCount={p.commentsCount}
           savesCount={p.savesCount}
           saved={savedByMe}
-          onQuickReact={() => setPostReaction.mutate({ postId: p.id, current: currentReaction, reaction: currentReaction ? null : 'heart' }, { onError: () => showToast(t('cannotUpdateReaction')) })}
+          onQuickReact={() => { hapticConfirm(); setPostReaction.mutate({ postId: p.id, current: currentReaction, reaction: currentReaction ? null : 'heart' }, { onError: () => showToast(t('cannotUpdateReaction')) }); }}
           onReactionLongPress={({ pageX, pageY }) => setReactionPicker({ post: p, pageX, pageY, hovered: null })}
           onReactionLongPressMove={(point) => setReactionPicker((active) => active?.post.id === p.id ? { ...active, hovered: pickerReactionAt(point, getReactionTrayFrame(active, WINDOW_WIDTH)) } : active)}
           onReactionLongPressRelease={() => {
@@ -437,7 +454,7 @@ export default function CommunityScreen() {
             setReactionPicker(null);
           }}
           onCommentPress={() => router.push({ pathname: '/community/[postId]', params: { postId: p.id } })}
-          onSavePress={() => toggleSave.mutate({ postId: p.id, saved: savedByMe }, { onError: () => showToast(t('cannotSavePost')) })}
+          onSavePress={() => { hapticConfirm(); toggleSave.mutate({ postId: p.id, saved: savedByMe }, { onError: () => showToast(t('cannotSavePost')) }); }}
         />
         {isMilestone ? (
           <Pressable
@@ -494,14 +511,20 @@ export default function CommunityScreen() {
           />
         }
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={
-          <Text style={[theme.type.body, { color: theme.colors.textMuted, textAlign: 'center', marginTop: 40 }]}>
-            {t('noPosts')}
-          </Text>
-        }
-        ListFooterComponent={postsQuery.isFetching && !postsQuery.isRefetching ? <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 18 }} /> : null}
+        ListEmptyComponent={postsQuery.isError ? null : (
+          <View style={[styles.emptyState, { backgroundColor: theme.colors.bgCardAlt }]}>
+            <View style={[styles.emptyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="users" size={25} color={theme.colors.primary} /></View>
+            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('noPosts')}</Text>
+            {filter === 'all' ? <Pressable onPress={() => router.push('/community/create')} style={[styles.emptyCta, { backgroundColor: theme.colors.primary }]}><Icon name="plus" size={17} color="#fff" /><Text style={[theme.type.caption, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]}>Tạo bài viết đầu tiên</Text></Pressable> : null}
+          </View>
+        )}
+        ListFooterComponent={postsQuery.isFetching && !postsQuery.isRefetching ? <View style={styles.loadingMore}><ActivityIndicator color={theme.colors.primary} /><Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>Đang tải thêm…</Text></View> : filteredPosts.length ? <Text style={[theme.type.captionSm, styles.feedEnd, { color: theme.colors.textMuted }]}>Bạn đã xem hết các bài viết mới.</Text> : null}
       />
       </Reanimated.View>
+
+      {/* The floating "+" FAB was removed (per explicit request 2026-09-04)
+          — composing goes through the "Chia sẻ hành trình..." row and the
+          empty-state CTA instead. */}
       </Reanimated.View>
 
       {reactionPicker ? (
@@ -597,6 +620,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 140,
   },
+  feedNotice: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginTop: 14, borderRadius: 14 },
+  feedNoticeText: { flex: 1, minWidth: 0, gap: 2 },
+  retryButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  emptyState: { marginTop: 28, padding: 24, borderRadius: 18, alignItems: 'center', gap: 10 },
+  emptyIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  emptyCta: { minHeight: 44, marginTop: 4, paddingHorizontal: 18, borderRadius: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  loadingMore: { paddingVertical: 20, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  feedEnd: { textAlign: 'center', paddingVertical: 22 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',

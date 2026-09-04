@@ -8,8 +8,12 @@
 // `profiles` RLS only allows selecting your own row — there's no public
 // directory of other users to join against client-side.
 import { useEffect, useRef } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Image as ExpoImage } from 'expo-image';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { supabase } from '@/lib/supabase';
+import { isVideoUri } from '@/lib/mediaKind';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 import { marketForLanguage, type StoreMarket } from '@/hooks/useStore';
 import { translate, type TranslationKey } from '@/lib/i18n';
@@ -73,6 +77,11 @@ export interface CommunityPostRow {
   text: string;
   imageUrl: string | null;
   mediaUrls: string[];
+  mediaFeedUrls: string[];
+  mediaThumbnailUrls: string[];
+  mediaPosterUrls: string[];
+  mediaWidths: number[];
+  mediaHeights: number[];
   tag: string | null;
   dayMilestone: number | null;
   phaseMilestone: string | null;
@@ -119,6 +128,11 @@ interface RawPost {
   text: string;
   image_url: string | null;
   media_urls: string[] | null;
+  media_feed_urls: string[] | null;
+  media_thumbnail_urls: string[] | null;
+  media_poster_urls: string[] | null;
+  media_widths: number[] | null;
+  media_heights: number[] | null;
   tag: string | null;
   day_milestone: number | null;
   phase_milestone: string | null;
@@ -163,6 +177,11 @@ function mapPost(r: RawPost, market: StoreMarket, reactionCounts = emptyReaction
     text,
     imageUrl: r.image_url,
     mediaUrls: r.media_urls ?? [],
+    mediaFeedUrls: r.media_feed_urls?.length ? r.media_feed_urls : (r.media_urls ?? []),
+    mediaThumbnailUrls: r.media_thumbnail_urls?.length ? r.media_thumbnail_urls : (r.media_urls ?? []),
+    mediaPosterUrls: r.media_poster_urls ?? [],
+    mediaWidths: r.media_widths ?? [],
+    mediaHeights: r.media_heights ?? [],
     tag: r.tag,
     dayMilestone: r.day_milestone,
     phaseMilestone: r.phase_milestone,
@@ -183,7 +202,7 @@ function mapPost(r: RawPost, market: StoreMarket, reactionCounts = emptyReaction
 
 const POSTS_KEY = ['community_posts'] as const;
 const POST_COLUMNS =
-  'id, author_id, is_official, author_name, author_avatar_url, title, text, image_url, media_urls, tag, day_milestone, phase_milestone, likes_count, comments_count, saves_count, pinned, pinned_title, pinned_content, pinned_thumbnail_url, post_type, progress_snapshot, created_at, status, target_markets, title_us, text_us, title_malay, text_malay';
+  'id, author_id, is_official, author_name, author_avatar_url, title, text, image_url, media_urls, media_feed_urls, media_thumbnail_urls, media_poster_urls, media_widths, media_heights, tag, day_milestone, phase_milestone, likes_count, comments_count, saves_count, pinned, pinned_title, pinned_content, pinned_thumbnail_url, post_type, progress_snapshot, created_at, status, target_markets, title_us, text_us, title_malay, text_malay';
 
 /** Vietnamese-friendly message for the shared anti-spam trigger (see
  * enforce_content_rate_limit in the community_moderation_and_notifications
@@ -234,6 +253,13 @@ export function useCommunityPosts(limit: number = DEFAULT_POSTS_PAGE_SIZE) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'community_posts' }, () => {
         queryClient.invalidateQueries({ queryKey: POSTS_KEY });
       })
+      // Reactions live in their own table; without this, another user's
+      // react only reached this client via the likes_count bump on the
+      // post row — and a reaction SWITCH (upsert like→heart) bumps nothing,
+      // so counts sat stale until some unrelated refetch.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
+        queryClient.invalidateQueries({ queryKey: POSTS_KEY });
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -242,6 +268,10 @@ export function useCommunityPosts(limit: number = DEFAULT_POSTS_PAGE_SIZE) {
 
   return useQuery({
     queryKey: [...POSTS_KEY, limit, market],
+    // Growing the limit must keep the current feed visible while the next
+    // batch arrives. Without this, every onEndReached swaps the list back to
+    // the full-screen skeleton because the query key changed.
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<CommunityPostRow[]> => {
       const { data, error } = await supabase
         .from('community_posts')
@@ -267,17 +297,53 @@ export function useCommunityPosts(limit: number = DEFAULT_POSTS_PAGE_SIZE) {
         if (key in counts) counts[key] += 1;
         countsByPost.set(reaction.post_id, counts);
       }
-      return rows.map((row) => mapPost(row, market, countsByPost.get(row.id)));
+      const posts = rows.map((row) => mapPost(row, market, countsByPost.get(row.id)));
+      // Fire-and-forget: warm expo-image's disk cache with the top posts'
+      // display media so a freshly-pushed post (this refetch usually runs
+      // off a realtime insert) shows its image near-instantly instead of
+      // the author seeing it (local cache) while everyone else stares at a
+      // blank tile mid-download.
+      const prefetchUrls = posts
+        .slice(0, 5)
+        .map((post) => post.mediaPosterUrls[0] || post.mediaFeedUrls[0])
+        // Legacy video posts have no poster, so the fallback URL IS the
+        // video file — prefetching that would pull whole videos into the
+        // image disk cache on every feed refetch.
+        .filter((url): url is string => !!url && !isVideoUri(url));
+      if (prefetchUrls.length) void ExpoImage.prefetch(Array.from(new Set(prefetchUrls)), { cachePolicy: 'disk' }).catch(() => {});
+      return posts;
     },
   });
 }
 
 /** Fetches one post directly by id — used by post detail so a deep link
  * (notification tap, "view post" from a report, etc.) still resolves even
- * when that post has scrolled past the feed's paginated `limit`. */
+ * when that post has scrolled past the feed's paginated `limit`. Subscribes
+ * to THIS post's row and its reactions so an open detail screen tracks
+ * other users' reacts live — the feed-level subscription only invalidates
+ * POSTS_KEY, which this per-post query key doesn't match. */
 export function usePost(postId: string | undefined) {
+  const queryClient = useQueryClient();
+  const channelId = useRef(`community_post_${Math.random().toString(36).slice(2)}`);
   const language = useAppStore((state) => state.language);
   const market = marketForLanguage(language);
+
+  useEffect(() => {
+    if (!postId) return;
+    const channel = supabase
+      .channel(`${channelId.current}_${postId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_posts', filter: `id=eq.${postId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['community_post', postId] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes', filter: `post_id=eq.${postId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['community_post', postId] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [postId, queryClient]);
+
   return useQuery({
     queryKey: ['community_post', postId, market],
     queryFn: async (): Promise<CommunityPostRow | null> => {
@@ -527,6 +593,8 @@ export function useUpdatePost(userId: string | undefined) {
 export interface PostMediaItem {
   uri: string;
   mimeType?: string | null;
+  width?: number;
+  height?: number;
 }
 
 export interface CreatePostVars {
@@ -543,14 +611,20 @@ export function useCreatePost(userId: string | undefined) {
   return useMutation({
     mutationFn: async (vars: CreatePostVars) => {
       const items = vars.media ?? [];
-      const mediaUrls = items.length
-        ? await Promise.all(items.map((item) => uploadCommunityImage(userId!, item.uri, item.mimeType)))
+      const uploadedMedia = items.length
+        ? await Promise.all(items.map((item) => uploadCommunityImage(userId!, item.uri, item.mimeType, item.width, item.height)))
         : [];
+      const mediaUrls = uploadedMedia.map((media) => media.originalUrl);
       const { error } = await supabase.from('community_posts').insert({
         author_id: userId!,
         text: vars.text,
         image_url: mediaUrls[0] ?? null,
         media_urls: mediaUrls,
+        media_feed_urls: uploadedMedia.map((media) => media.feedUrl),
+        media_thumbnail_urls: uploadedMedia.map((media) => media.thumbnailUrl),
+        media_poster_urls: uploadedMedia.map((media) => media.posterUrl ?? ''),
+        media_widths: uploadedMedia.map((media) => media.width ?? 0),
+        media_heights: uploadedMedia.map((media) => media.height ?? 0),
         tag: 'story',
         day_milestone: vars.dayMilestone ?? null,
         phase_milestone: vars.phaseMilestone ?? null,
@@ -570,25 +644,57 @@ export function useCreatePost(userId: string | undefined) {
  * the same pattern used for chat attachments). Render side detects video by
  * file extension too (see CommunityPostImage), so no separate DB column is
  * needed to tell image and video posts apart. */
-export async function uploadCommunityImage(userId: string, localUri: string, mimeType?: string | null): Promise<string> {
-  const ext = (localUri.split('.').pop() || (mimeType?.startsWith('video/') ? 'mp4' : 'jpg')).split('?')[0].toLowerCase();
-  const path = `${userId}/${Date.now()}.${ext}`;
-  const response = await fetch(localUri);
-  const arrayBuffer = await response.arrayBuffer();
-  const contentType =
-    mimeType ??
-    (ext === 'png'
-      ? 'image/png'
-      : ext === 'webp'
-        ? 'image/webp'
-        : ext === 'mov'
-          ? 'video/quicktime'
-          : ext === 'mp4' || ext === 'm4v'
-            ? 'video/mp4'
-            : 'image/jpeg');
-  const { error } = await supabase.storage.from('community-images').upload(path, arrayBuffer, { contentType });
+export interface UploadedCommunityMedia {
+  originalUrl: string;
+  feedUrl: string;
+  thumbnailUrl: string;
+  posterUrl: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+async function uploadCommunityFile(userId: string, uri: string, suffix: string, contentType: string): Promise<string> {
+  const extension = contentType === 'image/jpeg' ? 'jpg' : contentType === 'image/webp' ? 'webp' : contentType === 'image/png' ? 'png' : uri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'bin';
+  const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${suffix}.${extension}`;
+  const response = await fetch(uri);
+  const bytes = await response.arrayBuffer();
+  const { error } = await supabase.storage.from('community-images').upload(path, bytes, { contentType, cacheControl: '31536000' });
   if (error) throw error;
   return supabase.storage.from('community-images').getPublicUrl(path).data.publicUrl;
+}
+
+export async function uploadCommunityImage(userId: string, localUri: string, mimeType?: string | null, width?: number, height?: number): Promise<UploadedCommunityMedia> {
+  const isVideo = mimeType?.startsWith('video/') ?? false;
+  if (isVideo) {
+    const videoType = mimeType ?? 'video/mp4';
+    const originalUrl = await uploadCommunityFile(userId, localUri, 'original', videoType);
+    let posterUrl: string | null = null;
+    try {
+      const poster = await VideoThumbnails.getThumbnailAsync(localUri, { time: 500, quality: 0.72 });
+      const optimizedPoster = await manipulateAsync(poster.uri, [{ resize: { width: 720 } }], { compress: 0.75, format: SaveFormat.JPEG });
+      posterUrl = await uploadCommunityFile(userId, optimizedPoster.uri, 'poster', 'image/jpeg');
+    } catch {
+      // A video remains usable even when the device codec cannot extract a frame.
+    }
+    return { originalUrl, feedUrl: originalUrl, thumbnailUrl: posterUrl ?? originalUrl, posterUrl, width: width ?? null, height: height ?? null };
+  }
+
+  const sourceWidth = width ?? 1440;
+  const sourceHeight = height ?? 1440;
+  const resizeFor = (maxDimension: number) => sourceWidth >= sourceHeight
+    ? { width: Math.min(sourceWidth, maxDimension) }
+    : { height: Math.min(sourceHeight, maxDimension) };
+  const [original, feed, thumbnail] = await Promise.all([
+    manipulateAsync(localUri, [{ resize: resizeFor(2048) }], { compress: 0.88, format: SaveFormat.JPEG }),
+    manipulateAsync(localUri, [{ resize: resizeFor(1280) }], { compress: 0.8, format: SaveFormat.JPEG }),
+    manipulateAsync(localUri, [{ resize: resizeFor(480) }], { compress: 0.72, format: SaveFormat.JPEG }),
+  ]);
+  const [originalUrl, feedUrl, thumbnailUrl] = await Promise.all([
+    uploadCommunityFile(userId, original.uri, 'original', 'image/jpeg'),
+    uploadCommunityFile(userId, feed.uri, 'feed', 'image/jpeg'),
+    uploadCommunityFile(userId, thumbnail.uri, 'thumb', 'image/jpeg'),
+  ]);
+  return { originalUrl, feedUrl, thumbnailUrl, posterUrl: null, width: width ?? null, height: height ?? null };
 }
 
 // ---- Comments (nested replies) ----
@@ -656,6 +762,12 @@ export function usePostComments(postId: string | undefined, limit: number = DEFA
           queryClient.invalidateQueries({ queryKey: key });
         },
       )
+      // comment_likes only carries comment_id, so no per-post realtime
+      // filter is possible — listen unfiltered (low volume) and refresh
+      // this post's comment list, which re-aggregates reaction counts.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comment_likes' }, () => {
+        queryClient.invalidateQueries({ queryKey: key });
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -711,7 +823,8 @@ export function useAddComment(userId: string | undefined) {
   return useMutation({
     mutationFn: async (vars: { postId: string; text: string; parentCommentId?: string; imageUri?: string | null; imageMimeType?: string | null }) => {
       if (!userId) throw new Error('authentication_required');
-      const imageUrl = vars.imageUri ? await uploadCommunityImage(userId, vars.imageUri, vars.imageMimeType) : null;
+      const uploadedImage = vars.imageUri ? await uploadCommunityImage(userId, vars.imageUri, vars.imageMimeType) : null;
+      const imageUrl = uploadedImage?.feedUrl ?? null;
       const { data, error } = await supabase.rpc('create_community_comment', {
         p_post_id: vars.postId,
         p_text: vars.text,

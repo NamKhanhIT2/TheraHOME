@@ -7,8 +7,10 @@ import { Badge, FieldLabel, GhostBtn, inputStyle, PrimaryBtn, SectionCard, PillT
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { pushToast } from "@/components/ui/Toast";
+import { translateDrafts } from "@/lib/translate";
 
 const DAY = 24 * 60 * 60 * 1000;
+const DISPATCH_GRACE_MS = 2 * 60 * 1000;
 
 // Language variants are optional per campaign day (unlike roadmap/products)
 // — a campaign can target whichever cohorts are ready without blocking on
@@ -58,6 +60,7 @@ const DESTINATION_LABEL: Record<UpsellCampaign["destination"], string> = {
 
 export function UpsaleNotificationsView() {
   const [campaigns, setCampaigns] = useState<UpsellCampaign[] | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
   const [targetMeta, setTargetMeta] = useState<Record<string, string>>({ all: "Tất cả người dùng" });
   const [composeOpen, setComposeOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -75,6 +78,13 @@ export function UpsaleNotificationsView() {
     fetchUpsellCampaigns().then(setCampaigns).catch(() => pushToast("Không thể tải lịch Upsale"));
   }
   useEffect(reload, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClock(Date.now());
+      reload();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     fetchRoutineProducts()
       .then((products) => {
@@ -112,6 +122,39 @@ export function UpsaleNotificationsView() {
     }
     setSaving(true);
     try {
+      // Auto-draft EN/MS for any scheduled day whose variants were left
+      // empty (per explicit request 2026-09-04) — recipients whose language
+      // has no variant used to silently get the VN text; now they get a
+      // machine draft instead, still editable by re-creating the campaign.
+      // Batched 15 days per call to stay inside the translator's limits;
+      // a translator failure just schedules with whatever variants exist.
+      let drafted = false;
+      let draftFailed = false;
+      const needing = parsedSchedules.filter(
+        (schedule) => !schedule.titleEn.trim() || !schedule.bodyEn.trim() || !schedule.titleMs.trim() || !schedule.bodyMs.trim(),
+      );
+      for (let start = 0; start < needing.length; start += 15) {
+        const chunk = needing.slice(start, start + 15);
+        const texts: Record<string, string> = {};
+        for (const schedule of chunk) {
+          texts[`t_${schedule.id}`] = schedule.title.trim();
+          texts[`b_${schedule.id}`] = schedule.body.trim();
+        }
+        const drafts = await translateDrafts(texts);
+        if (!drafts) {
+          // A failed chunk leaves its days VN-only — say so instead of
+          // claiming everything was drafted.
+          draftFailed = true;
+          break;
+        }
+        for (const schedule of chunk) {
+          if (!schedule.titleEn.trim()) schedule.titleEn = drafts.en[`t_${schedule.id}`] ?? "";
+          if (!schedule.bodyEn.trim()) schedule.bodyEn = drafts.en[`b_${schedule.id}`] ?? "";
+          if (!schedule.titleMs.trim()) schedule.titleMs = drafts.ms[`t_${schedule.id}`] ?? "";
+          if (!schedule.bodyMs.trim()) schedule.bodyMs = drafts.ms[`b_${schedule.id}`] ?? "";
+        }
+        drafted = true;
+      }
       await createUpsellCampaigns({
         target,
         destination,
@@ -127,7 +170,11 @@ export function UpsaleNotificationsView() {
       });
       setComposeOpen(false);
       resetCompose();
-      pushToast(`Đã lên lịch ${schedules.length} thông báo Upsale`);
+      pushToast(
+        `Đã lên lịch ${schedules.length} thông báo Upsale${
+          draftFailed ? " · dịch nháp EN/MS lỗi, một số ngày còn VN" : drafted ? " · đã tự dịch nháp EN/MS" : ""
+        }`,
+      );
       reload();
     } catch (error) {
       pushToast(error instanceof Error && error.message.includes("30 days") ? "Upsale chỉ được lên lịch tối đa 30 ngày" : "Không thể tạo lịch Upsale");
@@ -201,7 +248,10 @@ export function UpsaleNotificationsView() {
             <tbody>
               {campaigns.length === 0 ? <tr><td colSpan={6} style={{ padding: "24px 8px", color: "var(--text-muted)" }}>Chưa có Upsale nào được lên lịch.</td></tr> : null}
               {campaigns.map((campaign) => {
-                const [label, color, bg] = STATUS_META[campaign.status];
+                const overdue = campaign.status === "scheduled" && new Date(campaign.scheduledFor).getTime() < clock - DISPATCH_GRACE_MS;
+                const [label, color, bg] = overdue
+                  ? ["Quá hạn · kiểm tra Cron", "#D14343", "rgba(209,67,67,0.12)"]
+                  : STATUS_META[campaign.status];
                 return <tr key={campaign.id} style={{ borderTop: "1px solid var(--divider)" }}>
                   <td style={{ padding: "12px 8px", maxWidth: 420 }}>
                     <div style={{ color: "var(--text-primary)", fontWeight: 700 }}>{campaign.title}</div>

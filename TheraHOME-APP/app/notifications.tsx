@@ -180,7 +180,7 @@ export default function NotificationInboxScreen() {
                       <Text numberOfLines={1} style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flexShrink: 1 }]}>{notification.type === 'schedule' && notification.relatedDayNumber != null ? t('dayUnlocked', { day: notification.relatedDayNumber }) : notification.title}</Text>
                       {!notification.read ? <View style={[styles.unreadDot, { backgroundColor: theme.colors.primary }]} /> : null}
                     </View>
-                    {bodyText ? <Text numberOfLines={2} style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 16 }]}>{bodyText}</Text> : null}
+                    {bodyText ? <Text numberOfLines={2} style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 18 }]}>{bodyText}</Text> : null}
                     <View style={styles.metaRow}>
                       <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{timeAgo(notification.createdAt, t)}</Text>
                     </View>

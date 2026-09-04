@@ -37,11 +37,11 @@ export function useProducts() {
   return useQuery({
     queryKey: ['products', language],
     queryFn: async (): Promise<ProductInfo[]> => {
-      const { data, error } = await supabase.from('products').select('id, name, accent_color_key, total_days');
+      const { data, error } = await supabase.from('products').select('id, name, name_en, name_ms, accent_color_key, total_days');
       if (error) throw error;
       return data.map((p) => ({
         id: p.id,
-        name: localizeProductName(p.id, p.name, language),
+        name: localizeProductName(p.id, p.name, language, p),
         accent: p.accent_color_key as keyof ThemeColors,
         totalDays: p.total_days,
       }));
@@ -226,9 +226,9 @@ export function useProgramDays(userProgramId: string | undefined, productId: str
   const phasesQuery = useQuery({
     queryKey: ['program_phases', productId, language],
     queryFn: async () => {
-      const { data, error } = await supabase.from('program_phases').select('id, name').eq('product_id', productId!);
+      const { data, error } = await supabase.from('program_phases').select('id, name, name_en, name_ms').eq('product_id', productId!);
       if (error) throw error;
-      return data.map((phase) => ({ ...phase, name: localizePhaseName(phase.name, language) }));
+      return data.map((phase) => ({ ...phase, name: localizePhaseName(phase.name, language, phase) }));
     },
     enabled: !!productId,
     staleTime: Infinity,
@@ -273,7 +273,7 @@ export function useCatalogProgramDays(productId: string | undefined, userProgram
       const [phasesRes, daysRes, progressRes] = await Promise.all([
         supabase
           .from('program_phases')
-          .select('id, name')
+          .select('id, name, name_en, name_ms')
           .eq('product_id', productId!)
           .order('sort_order'),
         supabase
@@ -292,7 +292,7 @@ export function useCatalogProgramDays(productId: string | undefined, userProgram
       if (daysRes.error) throw daysRes.error;
       if (progressRes.error) throw progressRes.error;
 
-      const phaseNames = new Map(phasesRes.data.map((phase) => [phase.id, localizePhaseName(phase.name, language)]));
+      const phaseNames = new Map(phasesRes.data.map((phase) => [phase.id, localizePhaseName(phase.name, language, phase)]));
       const statuses = new Map(progressRes.data.map((row) => [row.program_day_id, row.status]));
       const todayDay = userProgramId && activatedAt ? daysSinceLocal(activatedAt) + 1 : null;
       return daysRes.data.map((day) => ({

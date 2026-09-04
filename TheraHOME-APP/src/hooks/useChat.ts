@@ -5,6 +5,7 @@
 // in app/chat/ai.tsx and app/chat/human.tsx.
 import { useEffect, useRef } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 
 export type ChatKind = 'ai' | 'human';
@@ -101,20 +102,24 @@ export function useChatMessages(threadId: string | undefined) {
         ? await supabase.from('chat_message_reactions').select('id, message_id, user_id, emoji').in('message_id', ids)
         : { data: [], error: null };
       if (reactionError) throw reactionError;
-      const messages = await Promise.all(data.map(async (r) => {
-        let imageUrl: string | null = null;
-        const attachmentKind = r.attachment_path?.match(/\.(mp4|mov|m4v|webm)(?:$|\?)/i) ? 'video' as const : r.attachment_path ? 'image' as const : null;
-        if (r.attachment_path) {
-          const { data: signed } = await supabase.storage.from('chat-attachments').createSignedUrl(r.attachment_path, 3600);
-          imageUrl = signed?.signedUrl ?? null;
+      const attachmentPaths = data.flatMap((row) => row.attachment_path ? [row.attachment_path] : []);
+      const signedUrlByPath = new Map<string, string>();
+      if (attachmentPaths.length) {
+        const { data: signedRows, error: signedError } = await supabase.storage.from('chat-attachments').createSignedUrls(attachmentPaths, 3600);
+        if (signedError) throw signedError;
+        for (const signed of signedRows) {
+          if (signed.path && signed.signedUrl) signedUrlByPath.set(signed.path, signed.signedUrl);
         }
+      }
+      const messages = data.map((r) => {
+        const attachmentKind = r.attachment_path?.match(/\.(mp4|mov|m4v|webm)(?:$|\?)/i) ? 'video' as const : r.attachment_path ? 'image' as const : null;
         return {
           id: r.id,
           senderType: r.sender_type as ChatMessageRow['senderType'],
           body: r.body,
           createdAt: r.created_at,
           attachmentPath: r.attachment_path,
-          imageUrl,
+          imageUrl: r.attachment_path ? signedUrlByPath.get(r.attachment_path) ?? null : null,
           attachmentKind,
           readAt: r.read_at,
           editedAt: r.edited_at,
@@ -126,7 +131,7 @@ export function useChatMessages(threadId: string | undefined) {
             emoji: reaction.emoji,
           })),
         };
-      }));
+      });
       return { messages, nextOffset: data.length === CHAT_PAGE_SIZE ? pageParam + CHAT_PAGE_SIZE : null };
     },
     getNextPageParam: (lastPage) => lastPage.nextOffset,
@@ -141,6 +146,11 @@ export function useChatMessages(threadId: string | undefined) {
 export interface SendChatMessageInput {
   body: string;
   attachmentPath?: string | null;
+  attachmentLocalUri?: string | null;
+  attachmentKind?: 'image' | 'video' | null;
+  attachmentMimeType?: string | null;
+  attachmentWidth?: number;
+  attachmentHeight?: number;
   replyToMessageId?: string | null;
 }
 
@@ -155,14 +165,16 @@ export function useSendChatMessage(threadId: string | undefined, userId: string 
       const message: SendChatMessageInput = typeof input === 'string' ? { body: input } : input;
       const previous = queryClient.getQueryData<ChatMessagesData>(key);
       const attachmentPath = message.attachmentPath ?? null;
+      const attachmentKind = message.attachmentKind
+        ?? (attachmentPath?.match(/\.(mp4|mov|m4v|webm)(?:$|\?)/i) ? 'video' : attachmentPath || message.attachmentLocalUri ? 'image' : null);
       const optimistic: ChatMessageRow = {
         id: `pending-${Date.now()}`,
         senderType,
         body: message.body,
         createdAt: new Date().toISOString(),
         attachmentPath,
-        imageUrl: null,
-        attachmentKind: attachmentPath?.match(/\.(mp4|mov|m4v|webm)(?:$|\?)/i) ? 'video' : attachmentPath ? 'image' : null,
+        imageUrl: message.attachmentLocalUri ?? null,
+        attachmentKind,
         readAt: null,
         editedAt: null,
         deletedAt: null,
@@ -183,6 +195,9 @@ export function useSendChatMessage(threadId: string | undefined, userId: string 
     },
     mutationFn: async (input: string | SendChatMessageInput) => {
       const message: SendChatMessageInput = typeof input === 'string' ? { body: input } : input;
+      const attachmentPath = message.attachmentPath ?? (message.attachmentLocalUri
+        ? await uploadChatAttachment(userId!, threadId!, message.attachmentLocalUri, message.attachmentMimeType ?? undefined, message.attachmentWidth, message.attachmentHeight)
+        : null);
       const { error } = await supabase
         .from('chat_messages')
         .insert({
@@ -190,7 +205,7 @@ export function useSendChatMessage(threadId: string | undefined, userId: string 
           sender_type: senderType,
           sender_id: userId!,
           body: message.body,
-          attachment_path: message.attachmentPath ?? null,
+          attachment_path: attachmentPath,
           reply_to_message_id: message.replyToMessageId ?? null,
         });
       if (error) throw error;
@@ -249,13 +264,24 @@ export async function toggleChatReaction(messageId: string, userId: string, emoj
   if (insertError) throw insertError;
 }
 
-export async function uploadChatAttachment(userId: string, threadId: string, uri: string, mimeType?: string | null): Promise<string> {
-  const extension = uri.split('.').pop()?.split('?')[0]?.toLowerCase() || (mimeType?.startsWith('video/') ? 'mp4' : 'jpg');
+export async function uploadChatAttachment(userId: string, threadId: string, uri: string, mimeType?: string | null, width?: number, height?: number): Promise<string> {
+  const isVideo = mimeType?.startsWith('video/') ?? false;
+  let uploadUri = uri;
+  let uploadMimeType = mimeType;
+  if (!isVideo && width && height && Math.max(width, height) > 1280) {
+    const resize = width >= height ? { width: 1280 } : { height: 1280 };
+    const optimized = await manipulateAsync(uri, [{ resize }], { compress: 0.8, format: SaveFormat.JPEG });
+    uploadUri = optimized.uri;
+    uploadMimeType = 'image/jpeg';
+  }
+  const extension = uploadMimeType === 'image/jpeg'
+    ? 'jpg'
+    : uploadUri.split('.').pop()?.split('?')[0]?.toLowerCase() || (isVideo ? 'mp4' : 'jpg');
   const path = `${userId}/${threadId}/${Date.now()}.${extension}`;
-  const response = await fetch(uri);
+  const response = await fetch(uploadUri);
   const bytes = await response.arrayBuffer();
-  const contentType = mimeType ?? (extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : extension === 'mov' ? 'video/quicktime' : extension === 'mp4' || extension === 'm4v' ? 'video/mp4' : 'image/jpeg');
-  const { error } = await supabase.storage.from('chat-attachments').upload(path, bytes, { contentType });
+  const contentType = uploadMimeType ?? (extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : extension === 'mov' ? 'video/quicktime' : extension === 'mp4' || extension === 'm4v' ? 'video/mp4' : 'image/jpeg');
+  const { error } = await supabase.storage.from('chat-attachments').upload(path, bytes, { contentType, cacheControl: '31536000' });
   if (error) throw error;
   return path;
 }

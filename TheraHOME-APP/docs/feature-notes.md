@@ -2742,3 +2742,403 @@ narrows the new-product trigger to `admin`/`review` (+ claimed web
 staff), and revoked the previously auto-granted programs/synthetic
 `@thera.local` access contacts from existing `admin_issued` accounts
 that had never redeemed a real activation contact.
+
+## Bigger body text + text-only, reordered roadmap promo cards (2026-09-03)
+
+Two per-explicit-request UI tweaks, mobile only:
+- **Type scale +1px on body tiers**: `src/theme/typography.ts` — body/
+  bodyStrong 15→16 (lineHeight 23), caption 13→14 (19), captionSm 11→12
+  (17). Heading tiers (display/h1/h2) and button deliberately unchanged —
+  the request called the big titles ("Chào…", "Lộ trình…") already big
+  enough. Since ~97% of screens style text via `theme.type.*`, this one
+  file moves the whole app; per-usage `lineHeight` overrides were audited
+  and all still ≥ the new font sizes (only `app/notifications.tsx`'s
+  2-line body preview was nudged 16→18 so Vietnamese diacritics don't
+  clip).
+- **Roadmap promo cards**: `PhaseUnlockPromo` now renders the next-phase
+  UNLOCK card first and the cross-sell card second (swapped), and both
+  are text-only — the left thumbnail/placeholder column is gone. The
+  admin-configured `unlock_image_url` is still prefetched (expo-image
+  disk cache) because the paywall screen keeps using it as its hero;
+  `cross_sell_image_url` is no longer read by mobile (admin field stays
+  harmless).
+- **Review-account addendum (same day)**: the bottom promo pair used to
+  require ALL of the last phase's days done/missed even for `review`
+  accounts — which can finish the survey early via their gating bypass
+  and then saw no cards. `bottomPromoPhase` now skips the all-days gate
+  for review accounts, so completing the phase survey alone reveals the
+  two cards (real accounts unchanged — they can't reach the survey
+  early anyway).
+
+## Apple-review prep pass (2026-09-03)
+
+Per explicit request ("làm cho Apple trước"):
+- **`supportsTablet` → `false`** in app.json — the iPhone-only layout was
+  never tested on iPad and reviewers test what the flag claims (Guideline
+  2.4.1 is the classic rejection). Re-enable only after a real iPad pass.
+- **Apple IAP product ids normalized** in `phase_promos` (prod DB, safe:
+  no App Store Connect products exist yet and the one `phase_purchases`
+  row is an already-revoked `admin_granted` grant keyed by phase_id):
+  now `ai.therahome.<neckplus|neckpro|backplus|backpro>.phase3unlock`,
+  matching the `ai.therahome` bundle id. Old values were the
+  `com.therahome.app.*` scheme with NECK+ missing its device segment.
+  **Create the ASC non-consumables with EXACTLY these 4 ids** (also
+  listed in docs/app-review-notes.md).
+- **`docs/app-review-notes.md` added** — draft App Review notes (demo
+  account, test path to survey → promo cards → paywall, physical-goods
+  cross-sell rationale). Fill in the demo password before submitting.
+Still manual before submitting: the App Store Server API key + secrets
+and sandbox tester (docs/manual-setup.md), and a legal-counsel pass over
+legalContent.ts. Google-side items (RECORD_AUDIO removal, AI-response
+reporting, web account-deletion page) intentionally deferred.
+
+## Community reactions visible + live for everyone (2026-09-03)
+
+Two user-reported sync bugs, one root cause each:
+- **Other accounts always saw "no reactions"**: `post_likes` only had the
+  "own post_likes" RLS policy (unlike `comment_likes`, which has had a
+  public-read policy all along), so every client's reaction aggregation
+  could only count its OWN rows. Migration
+  `post_reactions_public_read_realtime` adds a `comment_likes`-style
+  public-read policy (readable when the post isn't hidden) and puts
+  `post_likes` + `comment_likes` into the `supabase_realtime` publication.
+- **Reacts/new posts reached other clients late**: `useCommunityPosts` now
+  also subscribes to `post_likes` (a reaction SWITCH via upsert bumps no
+  post-row counter, so the old likes_count-bump path never fired for it);
+  `usePost` (detail screen) gets its own per-post subscription
+  (community_posts row + its post_likes) — previously it had none, so an
+  open detail screen never live-updated; `usePostComments` also listens to
+  `comment_likes` (unfiltered — the table has no post_id column to filter
+  on). New-post images on OTHER devices now also pop faster: the feed
+  queryFn prefetches the top-8 posts' thumbnail/feed/poster variants into
+  expo-image's disk cache right when a (usually realtime-triggered)
+  refetch lands.
+
+## Upsale scheduling actually dispatches now (2026-09-03)
+
+The Upsale cron had NEVER worked: the old every-5-minutes pg_cron job
+(created outside migrations) got 401 UNAUTHORIZED_NO_AUTH_HEADER on every
+tick — the Functions gateway rejected it before `dispatch-upsell-campaigns`'
+own x-upsell-cron-secret check could run, because the function was deployed
+with verify_jwt on and pg_net sends no Authorization header. Fix:
+- Redeployed `dispatch-upsell-campaigns` (v15) with **verify_jwt disabled**
+  — auth is the function's own check (user-added dual path: the
+  x-upsell-cron-secret header, or a service-role bearer). Local source now
+  lives at `supabase/functions/dispatch-upsell-campaigns/index.ts`.
+- Migration `schedule_upsell_dispatch` (202609031600): unschedules BOTH
+  old job names, schedules `dispatch-upsell-campaigns-every-minute`
+  ('* * * * *') using the pre-existing Vault secrets `upsell_project_url`
+  + `upsell_cron_secret` (the original draft expected differently-named
+  secrets that didn't exist, and forgot to unschedule the 5-minute job).
+- Verified end-to-end: manual net.http_post returned 200 and flushed the
+  two stranded campaigns (8 + 11 recipients, both now status 'sent').
+- WEB Admin (user-authored, same day): UpsaleNotificationsView polls every
+  30s and flags a scheduled campaign >2min overdue as "Quá hạn · kiểm tra
+  Cron".
+
+## Bundled paywall heroes — instant image on open (2026-09-04)
+
+Per explicit request ("đảm bảo khi màn paywall hiện là thấy luôn ảnh"):
+4 per-device hero JPGs now ship in the app bundle (`assets/paywall/*.jpg`;
+the ~7MB PNG twins were deleted). `src/lib/paywallHeroes.ts` maps them by
+device keyword from the promo's product name (usePhasePromo now joins
+`program_phases(products(name))` → `productName`). Paywall hero priority:
+admin's `unlock_image_url` still wins when set (bundled hero renders as
+its expo-image placeholder, so the panel is never blank on a cold cache) →
+bundled hero → lock-icon placeholder. TheraNECK+'s stale blue-leaf
+`unlock_image_url` was cleared (file kept in `store-images/phase-promos/
+7d5d46b0-.../unlock-1788146319087.png`, re-uploadable via WEB Admin's
+Upsell editor) so its new bundled hero shows.
+- **Same-day addendum**: paywall gained a full-width outline "Xem video
+  giới thiệu" row right under the unlock CTA (opens the admin-authored
+  `unlock_video_url` in the in-app browser; hidden when unset — all 4
+  phases currently have one). Hero height trimmed 360 → 320 to make room.
+
+## Legal documents translated to EN + MS, shown per app language (2026-09-04)
+
+`src/lib/legalContent.ts` now carries all four legal docs (terms/privacy/
+security/community) in three languages: the original Vietnamese
+(`legalContent`, export unchanged for backward compat), plus new
+`legalContentEn` / `legalContentMs` — **AI translations of the VN original,
+not counsel-reviewed; the VN text stays the legally-authoritative version**.
+New `getLegalDoc(docKey, language)` picks by language with a VN fallback.
+Both consumers (`app/profile/legal/[doc].tsx` and
+`src/components/LegalDocBody.tsx`) now resolve the doc via `useI18n()`'s
+`language`, so the Terms/Privacy screens follow the user's app language.
+Kept verbatim across all languages: company name (H-COMMERCE GLOBAL COMPANY
+LIMITED), product names, the `${supportEmail}` interpolation in the
+community doc, "Last updated" dates, section numbering and `\t• ` bullets
+(the LegalDocBody line parser depends on that structure). The public web
+copy `TheraHOME-WEB/src/lib/appLegalContent.ts` was synced with the same
+three-language data + `getLegalDoc`; its public /terms + /privacy pages
+still render Vietnamese only (no web language switcher yet). Both repos
+pass `npx tsc --noEmit`.
+
+## Noti ngày tập tôn trọng khóa IAP + 2 chỉnh UI (2026-09-04)
+
+Per explicit request, three changes:
+
+**1. Day notifications stop at day 14 while phase 3 is IAP-locked.**
+Two writers were announcing locked days:
+- Client daily reminder (`scheduleDailyReminder`/`backfillTodaysReminders`
+  — the "ngày thứ N" copy): fed raw `program.currentDay` (calendar day, ran
+  to 19). Both callers (`app/_layout.tsx`, `profile/notifications-settings`)
+  now feed `useAccessibleProgress().day` — capped at reachable days (14
+  locked / 28 purchased), same source as Home's "Ngày N/X" hero — and with
+  several activated programs they follow the SELECTED program (falling back
+  to the first), not blindly programs[0].
+- Server `complete_day` RPC (dead code for current builds — completion is
+  `mark_day_watched` — but old installed builds still call it): migration
+  `next_day_notification_respects_phase_lock` gates its "Ngày N+1 đang chờ
+  bạn" insert on the next day's phase not being IAP-locked-unpurchased
+  (locked = phase_promos has apple/google product id AND no unrevoked
+  phase_purchases row; platform-agnostic on purpose — the server can't know
+  the caller's platform, so it errs on not notifying).
+
+Test matrix (server cases executed as SQL against prod data, client cases
+by the shared `useAccessibleProgress` logic Home already ships):
+- next day 14 (phase 2, no IAP requirement) → notify ✓ (SQL-verified)
+- next day 15, phase 3 unpurchased → suppress ✓ (SQL-verified)
+- next day 15, purchase REVOKED → suppress ✓ (SQL-verified)
+- next day 15, valid purchase → notify ✓ (SQL-verified)
+- reminder copy day: calendar day 19 + locked phase 3 → "ngày thứ 14";
+  purchased → "ngày thứ 19"; review accounts → activity-based day (all via
+  useAccessibleProgress, the same numbers the Home hero shows)
+- multiple roadmaps → reminder follows the selected program's day
+- no program → no day-bearing reminder scheduled (unchanged guard)
+- winback/inactivity, evening reminder, upsell, streak notis carry no day
+  number → unaffected
+
+**2. Language labels localize with the UI** (`profile/account.tsx`): the
+picker now reads Vietnamese/English/Malay in English, Tiếng Việt/Tiếng
+Anh/Tiếng Malay in Vietnamese, Bahasa … in Malay (new i18n keys
+langNameVi/En/Ms) instead of fixed endonyms.
+
+**3. Community tab de-cluttered**: the floating "+" compose FAB is gone
+(composing via the share row + empty-state CTA) and the assistant bubble no
+longer renders on the Community tab (pathname-gated in the tabs layout;
+still on Home/Roadmap/Store).
+
+## Store catalog filled for US + MALAY markets (2026-09-04)
+
+Per explicit request: the "Sản Phẩm" tab only had VN rows. Inserted the US
+and MALAY variants directly in prod, following exactly the WEB Admin's
+save scheme (row id = `<group_key>-us|-malay`, items linked to that same
+market's category row): 3 categories × 2 markets (Neck/Back support
+devices, Accessories · Peranti sokongan leher/belakang, Aksesori) and all
+8 items × 2 markets with translated names/descriptions (device names stay
+TheraNECK+/PRO, TheraBACK+/PRO). Images, external links, preview video,
+sort order, has_trial/is_primary and PRICE TEXT are copied from VN as-is —
+prices are still shown in ₫ and links point at the VN site; edit per
+market in WEB Admin's Sản Phẩm tab when UK/ML pricing/links exist. Mobile
+Store + the primary-product dropdown name mapping pick these up with no
+app change.
+
+## QA sweep: counter triggers + 5 follow-up fixes (2026-09-04)
+
+Hands-on simulator QA + a static review of the uncommitted diff.
+- **CRITICAL, fixed + verified live**: the three counter trigger functions
+  (bump_post_likes/bump_post_comments/bump_comment_likes) lacked SECURITY
+  DEFINER, so their counter UPDATE ran under the LIKER's RLS ("authors
+  update own posts") and silently updated 0 rows for anyone else's content
+  — likes/comments were stored but counts never moved. Migration
+  `counter_triggers_security_definer` makes all three definer and
+  backfills every counter from the source tables (one test post jumped
+  0 → 4 likes, live via realtime).
+- Reminder cold-start race: `useAccessibleProgress` now exposes `isReady`
+  (day/lock/purchase queries settled) and app/_layout.tsx skips reminder
+  scheduling + inbox backfill until then — before, the first effect run
+  could see the uncapped calendar day and write a permanent "Ngày 15"
+  inbox row while phase 3 was locked.
+- Feed prefetch no longer downloads whole VIDEO files: legacy video posts
+  have no poster, so the fallback URL is the video itself — now filtered
+  via isVideoUri.
+- EN relative times are now 5m/3h/2d (was "1 days").
+- Upsale composer toast now says when EN/MS auto-drafting failed part-way
+  instead of claiming success.
+- Deleted the accidental nested `TheraHOME-WEB/TheraHOME-WEB/.next` build
+  junk (22MB) and un-anchored the `.next/` gitignore pattern.
+Known items deliberately left for a decision: assistant bubble overlaps
+bottom CTAs on Roadmap/Store; every reaction invalidates every feed
+(thundering herd + mid-scroll re-rank at scale); legacy videos show a bare
+play tile (poster backfill script skips videos); comment image upload
+upscales small images and uploads 2 unused variants; realtime DELETE
+events may not match the post_id filter on the detail screen (surrogate
+PK); paywall EN/VN upsell titles were hand-edited in admin to "Phase3 …"
+(content, not code).
+
+## Community deep QA: UX + security pass (2026-09-04)
+
+End-to-end tester run on the Community tab (dev build, EN locale) plus an
+RLS attack round via SQL role simulation. UX: fast-scroll over a media
+feed clean (no VirtualizedList warnings), fullscreen viewer OK, composer
+caps (10 media / 3000 chars) enforced, 2-image post uploaded 3 variants
+each under the author's storage prefix, moderation dialog shown, and the
+fixed counter triggers verified in BOTH directions (react 3→4, un-react
+4→3). Security — all blocked as intended: strangers see zero pending
+posts and zero profiles rows; updating another user's post hits 0 rows;
+forging a like as another user and posting under another author_id both
+raise RLS violations; inserting one's own post with status='approved' is
+forced back to 'pending' by trg_post_moderation_status; storage policies
+scope insert/delete to the uploader's own folder; rate-limit + content
+filter triggers exist on both posts and comments. New minor find: the
+feed's end-of-list "Bạn đã xem hết các bài viết mới." and empty-state
+"Tạo bài viết đầu tiên" strings are hardcoded VN (not i18n), and a post
+with images saves post_type='text' (render unaffected). Test data cleaned
+up (QA post + test reaction deleted); two orphaned test images remain in
+the review account's community-images folder — SQL deletion is blocked by
+Supabase, remove via dashboard/Storage API if desired.
+
+## "Tạm ngưng bán" switch for the free-agreement launch (2026-09-04)
+
+Per explicit request: the first App Store submission ships under the FREE
+apps agreement, so the phase-3 IAP must be invisible — but clearing
+apple_product_id would have made phase 3 free. New
+`phase_promos.sales_enabled` (migration `phase_promo_sales_enabled`,
+default true, currently FALSE for all 4 phases): the phase stays locked
+(days hidden, Ngày N/14 cap, no day-15 notification) while the app hides
+every selling surface — the greyed locked header on the roadmap, both
+promo cards (PhaseUnlockPromo renders null), and with them the only
+paths into the paywall. usePhaseLockRequirements now returns
+{productId, salesEnabled} per phase. WEB Admin's Upsell editor (VN tab)
+gained a "Đang mở bán giai đoạn này" checkbox — tick it once the Paid
+Apps Agreement is active and everything reappears on all installs, no
+build needed. docs/app-review-notes.md now carries a free-agreement
+banner: omit the IAP section and attach no IAPs on the first submission.
+- **Addendum (same day)**: a QA check found khanha1k59@gmail.com still saw
+  phase 3 of TheraNECK PRO — not a leak in the new switch, but a leftover
+  `admin_granted` phase_purchases row created by hand at 14:51 that day
+  (sales_enabled deliberately does NOT revoke existing entitlements). It
+  was revoked at the owner's request; the whole system now has ZERO
+  unrevoked phase purchases, so no account sees phase 3 anywhere.
+  Also worth knowing (pre-existing, unchanged): `claim_user_access_contact`
+  treats ANY enabled `web_access_contacts` row as staff — it checks only
+  `disabled = false`, NOT `roles` — and grants all 4 programs while
+  skipping the activation-contact check entirely. That is why this contact
+  works without appearing in the WEB "Kích hoạt" tab even though its
+  `roles` array is now empty; set `disabled = true` to cut that access.
+
+## Đóng 2 khoảng trống quản trị lớn nhất (2026-09-04)
+
+**A. Tên sản phẩm/giai đoạn đa ngôn ngữ giờ do admin sở hữu.** Trước đây
+EN/MS lấy từ bảng tra cứu HARDCODE trong `src/lib/adminContent.ts`, khoá
+theo chuỗi tiếng Việt — đổi tên giai đoạn trong WEB là user UK/ML âm thầm
+thấy tên tiếng Việt. Migration `localized_product_phase_names` thêm
+`name_en`/`name_ms` vào `products` + `program_phases` và backfill đúng nội
+dung bảng cũ (người dùng không thấy khác biệt tại thời điểm chuyển). App
+đọc theo thứ tự: cột DB → bảng hardcode (lưới an toàn) → tên VN. WEB:
+modal "Sửa thông tin" trong tab Lộ trình nay nhập tên UK/ML cho sản phẩm
+VÀ từng giai đoạn (`saveLocalizedNames`).
+
+**B. Tab "Nội dung ứng dụng" (mới) + bảng `app_config`.** Hotline
+`1900 1234` (số giả, bấm gọi thật), email hỗ trợ và link video nút "Hướng
+dẫn nhanh" ở Trang chủ đều hardcode trong bundle — đổi là phải build +
+duyệt store. Nay lưu ở `app_config` (RLS: authenticated đọc, admin/cskh
+ghi), app đọc qua `useAppConfig` với fallback DB → VN → hằng số built-in
+nên xoá dòng cũng không vỡ giao diện. Đã kiểm chứng trên simulator: màn
+Trợ giúp hiển thị chuỗi chỉ có trong DB.
+
+## Nội dung pháp lý sửa được từ Admin + vá bẫy phân quyền (2026-09-04)
+
+**Bẫy phân quyền (phòng ngừa, không cấp quyền cho ai).**
+`current_web_roles()` coalesce `web_access_contacts.roles` → `profiles.
+account_type`, nhưng mảng RỖNG không phải NULL nên chuỗi dừng ngay và tài
+khoản mất sạch quyền. Cả 2 contact Google của chủ sở hữu đang ở trạng thái
+`roles = '{}'` (effective_roles = []). Không ảnh hưởng vận hành vì admin
+đăng nhập bằng TÀI KHOẢN THERAHOME (`therahome`, account_type='admin' →
+[admin, cskh]; `cskh01` → [cskh]) đi qua nhánh profiles. Migration
+`web_roles_empty_array_falls_through` dùng `nullif(roles, '{}')` để mảng
+rỗng rơi tiếp xuống nhánh account_type. Hệ quả: mục "thiếu UI quản lý
+admin/cskh" trong bản rà soát KHÔNG còn đúng — tab "Tài khoản TheraHOME"
+đã làm việc đó qua account_type.
+
+**Nội dung pháp lý.** 4 văn bản × 3 ngôn ngữ nằm trong HAI file code phải
+tự đồng bộ tay, sửa là phải phát hành lại app. Bảng mới `legal_documents`
+(khoá `doc_key+language`, RLS: ai cũng đọc — kể cả anon cho trang web,
+admin/cskh ghi) + tab "Nội dung ứng dụng → Nội dung pháp lý" trên WEB.
+CỐ TÌNH KHÔNG seed: bảng rỗng nghĩa là app dùng đúng bản đóng gói như hiện
+nay; editor tự nạp sẵn nội dung gốc để staff sửa từ bản thật; nút "Khôi
+phục bản gốc" xoá dòng để quay lại. App đọc qua `useLegalDoc` (override →
+bản đóng gói), dùng cho cả tiêu đề màn lẫn nội dung. Đã kiểm chứng
+end-to-end trên simulator rồi xoá dữ liệu test.
+
+## FAQ do admin/CSKH quản lý (2026-09-04)
+
+Bảng `faq_items` (sort_order, active, question/answer × vi/en/ms; RLS:
+authenticated đọc, admin/cskh ghi) + tab "Nội dung ứng dụng → Câu hỏi
+thường gặp" trên WEB: thêm/sửa/xoá, ẩn/hiện, đổi thứ tự bằng mũi tên, và
+TỰ DỊCH NHÁP UK/ML khi chỉ điền tiếng Việt (dùng lại `translateDrafts`).
+Đã seed đúng 4 câu hiện có ở cả 3 ngôn ngữ nên người dùng không thấy khác
+biệt. App đọc qua `useFaqItems` — bảng rỗng hoặc lỗi mạng thì rơi về đúng
+4 cặp khoá i18n cũ, nên mục Trợ giúp không bao giờ trống. Đã kiểm chứng
+end-to-end trên simulator (thêm 1 câu từ DB → app hiện bản tiếng Anh đúng
+vị trí) rồi xoá dữ liệu test.
+
+**Chưa làm — bộ 8 câu hỏi onboarding.** Vẫn hardcode ở `src/lib/mockData.
+ts` (`questions`, `countryQuestion`). Khác FAQ ở chỗ nó KHÔNG chỉ là chữ:
+mỗi đáp án là một khoá dùng để cá nhân hoá lộ trình, và
+`app/profile/edit.tsx` tái sử dụng chính mảng đó làm danh sách lựa chọn —
+đưa lên DB mà sai khoá là hỏng luồng onboarding (luồng quan trọng nhất).
+Nên làm riêng, kèm ràng buộc khoá đáp án cố định + test kỹ.
+
+## Tab "Khảo sát & Giao dịch" (2026-09-04)
+
+`user_quiz_attempts.answers` và `phase_purchases` đã thu thập dữ liệu từ
+lâu nhưng KHÔNG màn nào đọc — muốn xem phải query SQL. Thêm `InsightsView`
+(nav Admin) với 2 tab:
+- **Kết quả khảo sát**: khối "Tổng hợp câu trả lời" gom theo từng câu hỏi,
+  xếp theo đáp án được chọn nhiều nhất kèm thanh % (mục đích thật của
+  khảo sát: biết nội dung nào đang bị hiểu sai), + bảng từng lượt nộp,
+  bấm "Xem" mở đầy đủ câu hỏi/đáp án. Đọc `answers` jsonb do app ghi
+  nguyên văn câu hỏi + đáp án NGƯỜI DÙNG ĐÃ THẤY, nên vẫn đọc được sau khi
+  admin sửa câu hỏi.
+- **Giao dịch mở khoá**: mọi dòng phase_purchases, phân biệt Apple IAP /
+  Google Play / "Cấp tay (Admin)", trạng thái Đang hiệu lực vs Đã thu hồi,
+  kèm đếm ở phụ đề.
+Không cần migration: RLS `web admin cskh select all ...` đã có sẵn trên cả
+hai bảng. Kiểm chứng bằng `next build` (compile + TS + prerender 11 trang)
+vì màn admin cần đăng nhập mới xem trực tiếp được.
+
+## Bỏ hotline (2026-09-04)
+
+Chủ sở hữu xác nhận CHƯA có tổng đài, nên số `1900 1234` trong app là số
+giả — rủi ro thật vì App Review có bấm thử thông tin liên hệ, và số đó
+không thuộc về TheraHOME. Thay vì thay bằng số di động cá nhân, mục hotline
+được ẨN: `app_config.support_hotline` để trống (kèm default rỗng trong
+`useAppConfig`), và màn Trợ giúp chỉ render dòng hotline khi số có giá trị.
+Không còn chuỗi "19001234"/"1900 1234" nào trong mã app. Khi có tổng đài,
+điền số ở WEB Admin → Nội dung ứng dụng là mục hiện lại ngay, KHÔNG cần
+build mới. Người dùng vẫn còn 3 kênh liên hệ: Trợ lý AI, Chat chuyên gia,
+email hỗ trợ — đủ cho yêu cầu "có kênh hỗ trợ" của cả Apple lẫn Google.
+
+## Câu hỏi onboarding: sửa CHỮ được, cấu trúc khoá cứng (2026-09-04)
+
+Mục cuối trong bản rà soát quản trị, làm theo hướng an toàn đã hẹn.
+
+**Vì sao không làm trình tạo câu hỏi đầy đủ.** App lưu câu trả lời dưới
+dạng CHUỖI TEXT của đáp án (profiles.treatment_area / goal), và
+`localizeSavedAnswer` (app/profile/edit.tsx) dịch hồ sơ cũ sang ngôn ngữ
+khác bằng cách tìm VỊ TRÍ chuỗi đó trong danh sách đáp án của một ngôn ngữ
+rồi lấy cùng vị trí ở ngôn ngữ đích. Nên THỨ TỰ và SỐ LƯỢNG đáp án là khoá
+ngầm: thêm/bớt/đảo là hồ sơ đã lưu bị hiểu sang đáp án khác.
+
+**Thiết kế.** Bảng `onboarding_question_texts` (PK question_key+language;
+RLS: anon+authenticated đọc — onboarding chạy trước cả cổng kích hoạt,
+admin/cskh ghi), seed đúng nội dung đang bundle nên người dùng không thấy
+khác biệt. Ba lớp bảo vệ:
+1. WEB `OnboardingContentView` chỉ render đúng số ô đáp án hiện có, KHÔNG
+   có nút thêm/xoá/kéo thả; question_key hiển thị read-only; có cảnh báo
+   vàng giải thích lý do.
+2. `saveOnboardingText` ném `option_count_mismatch` nếu số đáp án lệch.
+3. **Chốt chặn cuối ở app**: `useOnboardingContent` BỎ QUA toàn bộ override
+   nào có số đáp án khác bản bundle — kể cả sửa thẳng bằng SQL.
+`app/(onboarding)/questions.tsx` và `app/profile/edit.tsx` giờ dùng chung
+một nguồn (trước đây edit.tsx đọc thẳng mockData nên sẽ lệch chữ với màn
+onboarding).
+
+**Kiểm chứng end-to-end trên simulator, đúng 2 kịch bản:**
+- Sửa chữ hợp lệ (giữ 3 đáp án) → app hiện "Neck & shoulders (edited)"
+  đúng vị trí ✓
+- Cố tình nhét 5 đáp án bằng SQL (né UI) → app bỏ qua override, giữ nguyên
+  4 đáp án gốc ✓
+Đã trả lại nguyên trạng cả 2 câu sau khi test.

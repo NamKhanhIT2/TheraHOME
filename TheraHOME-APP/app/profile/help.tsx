@@ -8,7 +8,8 @@ import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
 import { OnlineIndicator } from '@/components/AssistantBubble';
 import { useI18n } from '@/lib/i18n';
-import { supportEmail } from '@/lib/mockData';
+import { useAppConfig } from '@/hooks/useAppConfig';
+import { useFaqItems } from '@/hooks/useFaqItems';
 
 const AI_ASSISTANT_IMAGE = require('../../assets/ai-assistant.png');
 const SPECIALIST_IMAGE = require('../../assets/therahome-specialist.png');
@@ -28,15 +29,14 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 export default function HelpSupportScreen() {
+  // Hotline/email are admin-editable (app_config) — see useAppConfig.
+  const appConfig = useAppConfig();
+  const hotline = appConfig.get('support_hotline').trim();
   const theme = useTheme();
   const { t } = useI18n();
   const specialistOnline = useSpecialistPresence();
-  const faqs = [
-    { q: t('faqUnlockQuestion'), a: t('faqUnlockAnswer') },
-    { q: t('faqAreaQuestion'), a: t('faqAreaAnswer') },
-    { q: t('faqMedicalQuestion'), a: t('faqMedicalAnswer') },
-    { q: t('faqDeviceQuestion'), a: t('faqDeviceAnswer') },
-  ];
+  // Admin/CSKH-managed (faq_items); falls back to the bundled i18n pairs.
+  const faqs = useFaqItems();
 
   return (
     <ScreenContainer>
@@ -87,25 +87,32 @@ export default function HelpSupportScreen() {
             <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
           </Pressable>
 
-          <Pressable
-            onPress={() => Linking.openURL('tel:19001234')}
-            style={[styles.contactRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
-          >
-            <Icon name="external-link" size={20} color={theme.colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportHotline')}</Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>1900 1234 · 8:00–21:00</Text>
-            </View>
-          </Pressable>
+          {/* Hotline row only exists once admin fills a number in WEB Admin
+              (Nội dung ứng dụng). TheraHOME has none today, and shipping a
+              placeholder number is a real App Review risk. */}
+          {hotline ? (
+            <Pressable
+              onPress={() => Linking.openURL(`tel:${hotline}`)}
+              style={[styles.contactRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+            >
+              <Icon name="external-link" size={20} color={theme.colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportHotline')}</Text>
+                {appConfig.get('support_hotline_label') ? (
+                  <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{appConfig.get('support_hotline_label')}</Text>
+                ) : null}
+              </View>
+            </Pressable>
+          ) : null}
 
           <Pressable
-            onPress={() => Linking.openURL(`mailto:${supportEmail}`)}
+            onPress={() => Linking.openURL(`mailto:${appConfig.get('support_email')}`)}
             style={[styles.contactRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
           >
             <Icon name="external-link" size={20} color={theme.colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportEmail')}</Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{supportEmail}</Text>
+              <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{appConfig.get('support_email')}</Text>
             </View>
           </Pressable>
         </View>

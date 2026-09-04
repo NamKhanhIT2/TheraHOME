@@ -27,13 +27,35 @@ export const NAV_ADMIN: NavItem[] = [
       { id: "notifications-upsale", label: "Upsale", icon: "megaphone" },
     ],
   },
+  // Full Community management (official posts, per-market pinning AND the
+  // Thử thách editor). CSKH gets the pin-only variant in NAV_CARE; the
+  // challenges editor is admin-only because its RLS policy
+  // ("web admin manage challenges") only grants writes to the admin role.
+  // Added 2026-09-04 — ChallengesAdminView had shipped with no way in.
+  { id: "community", label: "Cộng đồng", icon: "users" },
   // content_reports RLS grants read/update to both admin and cskh — matches
   // NAV_CARE below.
   { id: "reports", label: "Báo cáo", icon: "flag" },
+  // user_quiz_attempts + phase_purchases — dữ liệu đã thu thập từ lâu
+  // nhưng trước 2026-09-04 không có màn nào đọc được (chỉ query SQL).
+  { id: "insights", label: "Khảo sát & Giao dịch", icon: "trending-up" },
   { id: "users", label: "User", icon: "users" },
   // Admin-only — accounts here carry a password, unlike the app-user list
   // above, so it's deliberately not added to NAV_CARE.
   { id: "thera-accounts", label: "Tài khoản TheraHOME", icon: "lock" },
+  // app_config — hotline, email hỗ trợ, link video "Hướng dẫn nhanh"...
+  // Trước 2026-09-04 các giá trị này hardcode trong bundle mobile.
+  {
+    id: "app-content",
+    label: "Nội dung ứng dụng",
+    icon: "file-text",
+    children: [
+      { id: "app-content", label: "Cấu hình chung", icon: "settings" },
+      { id: "faq-content", label: "Câu hỏi thường gặp", icon: "message-circle" },
+      { id: "onboarding-content", label: "Câu hỏi onboarding", icon: "clipboard-check" },
+      { id: "legal-content", label: "Nội dung pháp lý", icon: "shield" },
+    ],
+  },
   { id: "ai", label: "AI Prompts", icon: "brain" },
 ];
 
