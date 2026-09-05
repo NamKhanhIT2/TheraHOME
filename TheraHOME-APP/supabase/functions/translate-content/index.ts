@@ -92,6 +92,7 @@ async function translate(texts: Record<string, string>, lang: string): Promise<R
     "- Return ONLY a JSON object with exactly the same keys; each value is the translation.",
     "- Keep product/brand names unchanged (TheraHOME, TheraNECK+, TheraNECK PRO, TheraBACK+, TheraBACK PRO).",
     "- Keep URLs, numbers, prices and line breaks (\\n) unchanged.",
+    "- Keep placeholder tokens such as {{day}} or {{days}} EXACTLY as written, braces included; never translate or reword them.",
     "- Natural, concise wording suited to a health & wellness mobile app; no diagnosis/medical-claim language.",
     "",
     JSON.stringify(texts),

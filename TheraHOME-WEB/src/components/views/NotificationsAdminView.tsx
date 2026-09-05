@@ -9,6 +9,7 @@ import { Badge, FieldLabel, GhostBtn, inputStyle, PrimaryBtn, SectionCard, PillT
 import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
+import { translateDrafts } from "@/lib/translate";
 
 const META: Record<SystemNotificationTemplateKey, { label: string; description: string; icon: string; color: string; bg: string }> = {
   daily_workout: { label: "Lịch tập hằng ngày", description: "Hệ thống gửi theo giờ người dùng chọn; bấm mở Lộ trình hôm nay.", icon: "calendar", color: "#0066AD", bg: "var(--color-primary-tint-10)" },
@@ -31,6 +32,7 @@ export function NotificationsAdminView() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   function reload() {
     fetchSystemNotificationTemplates().then(setTemplates).catch(() => pushToast("Không thể tải mẫu thông báo hệ thống"));
@@ -52,6 +54,32 @@ export function NotificationsAdminView() {
     setTitle(copy?.title ?? "");
     setBody(copy?.body ?? "");
   }
+  /** Fills the EN/MS tab from the saved VN copy. The modal edits one language
+   * at a time, so this is a button rather than a save-time step; {{day}} /
+   * {{days}} placeholders are preserved by the translator prompt. */
+  async function translateFromVi() {
+    if (!editing || languageTab === "vi") return;
+    const source = byKey.get(editing)?.byLanguage.vi;
+    if (!source?.title?.trim() || !source?.body?.trim()) {
+      pushToast("Cần có bản VN đầy đủ trước khi dịch");
+      return;
+    }
+    setTranslating(true);
+    try {
+      const drafts = await translateDrafts({ title: source.title, body: source.body });
+      if (!drafts) {
+        pushToast("Không dịch được lúc này — thử lại sau hoặc nhập tay");
+        return;
+      }
+      const picked = drafts[languageTab];
+      setTitle(picked.title || source.title);
+      setBody(picked.body || source.body);
+      pushToast("Đã điền bản nháp — kiểm tra lại rồi bấm Lưu");
+    } finally {
+      setTranslating(false);
+    }
+  }
+
   async function save() {
     if (!editing || !title.trim() || !body.trim()) return;
     setSaving(true);
@@ -102,6 +130,13 @@ export function NotificationsAdminView() {
     </SectionCard>
     {editing ? <Modal title={`Sửa mẫu · ${META[editing].label}`} onClose={() => setEditing(null)} width={500} footer={<Fragment><GhostBtn onClick={() => setEditing(null)}>Hủy</GhostBtn><PrimaryBtn onClick={save} disabled={saving || !title.trim() || !body.trim()}>{saving ? "Đang lưu..." : "Lưu thay đổi"}</PrimaryBtn></Fragment>}>
       <PillTabs options={LANGUAGE_TABS} value={languageTab} onChange={switchLanguageTab} />
+      {languageTab !== "vi" ? (
+        <div style={{ marginTop: 10, marginBottom: 4 }}>
+          <GhostBtn onClick={translateFromVi} disabled={translating}>
+            {translating ? "Đang dịch..." : "Dịch từ bản VN"}
+          </GhostBtn>
+        </div>
+      ) : null}
       <FieldLabel>Tiêu đề</FieldLabel><input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Nội dung</FieldLabel><textarea value={body} maxLength={500} onChange={(event) => setBody(event.target.value)} style={{ ...inputStyle, minHeight: 78, resize: "vertical", marginBottom: 8 }} />
       <div style={{ color: "var(--text-muted)", fontSize: 12 }}>Dùng <code>{"{{day}}"}</code> cho ngày lộ trình và <code>{"{{days}}"}</code> cho số ngày không hoạt động.</div>

@@ -36,6 +36,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
+import { translateDrafts } from "@/lib/translate";
 
 const MARKET_TABS: Array<[AdminMarket, string]> = [["VN", "VN"], ["US", "UK"], ["MALAY", "ML"]];
 const MARKET_LABEL: Record<AdminMarket, string> = { VN: "VN", US: "UK", MALAY: "ML" };
@@ -113,6 +114,7 @@ export function ProductsView() {
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>(null);
   const [deleteAllMarkets, setDeleteAllMarkets] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   function emptyCategoryFields(): Record<AdminMarket, { title: string; hasTrial: boolean }> {
     return { VN: { title: "", hasTrial: false }, US: { title: "", hasTrial: false }, MALAY: { title: "", hasTrial: false } };
@@ -145,6 +147,64 @@ export function ProductsView() {
     setCategoryError(null);
     setCategoryModal({ groupKey: group.groupKey });
   }
+  /** Fills blank UK/ML titles from the VN one. Explicit, because a blank tab
+   * means "not sold in that market" — auto-filling on save would put the
+   * group on sale somewhere the admin never chose. */
+  async function translateCategory() {
+    const source = categoryFields.VN.title.trim();
+    if (!source) {
+      setCategoryError("Cần có tên nhóm ở tab VN trước khi dịch.");
+      setCategoryTab("VN");
+      return;
+    }
+    setTranslating(true);
+    setCategoryError(null);
+    try {
+      const drafts = await translateDrafts({ title: source });
+      if (!drafts) {
+        setCategoryError("Không dịch được lúc này — thử lại sau hoặc nhập tay.");
+        return;
+      }
+      setCategoryFields((f) => ({
+        ...f,
+        US: { ...f.US, title: f.US.title.trim() || drafts.en.title || "" },
+        MALAY: { ...f.MALAY, title: f.MALAY.title.trim() || drafts.ms.title || "" },
+      }));
+      pushToast("Đã điền bản nháp UK/ML — kiểm tra lại rồi lưu");
+    } finally {
+      setTranslating(false);
+    }
+  }
+
+  /** Text only (name + description). Price, links and image stay per-market:
+   * they are not translations and a wrong auto-filled price would go live. */
+  async function translateItem() {
+    const name = itemFields.VN.name.trim();
+    const desc = itemFields.VN.desc.trim();
+    if (!name) {
+      setItemError("Cần có tên sản phẩm ở tab VN trước khi dịch.");
+      setItemTab("VN");
+      return;
+    }
+    setTranslating(true);
+    setItemError(null);
+    try {
+      const drafts = await translateDrafts(desc ? { name, desc } : { name });
+      if (!drafts) {
+        setItemError("Không dịch được lúc này — thử lại sau hoặc nhập tay.");
+        return;
+      }
+      setItemFields((f) => ({
+        ...f,
+        US: { ...f.US, name: f.US.name.trim() || drafts.en.name || "", desc: f.US.desc.trim() || drafts.en.desc || "" },
+        MALAY: { ...f.MALAY, name: f.MALAY.name.trim() || drafts.ms.name || "", desc: f.MALAY.desc.trim() || drafts.ms.desc || "" },
+      }));
+      pushToast("Đã điền tên & mô tả UK/ML — còn giá và link phải nhập riêng từng thị trường");
+    } finally {
+      setTranslating(false);
+    }
+  }
+
   async function saveCategory() {
     if (!categoryModal) return;
     if (!MARKET_TABS.some(([code]) => categoryFields[code].title.trim())) {
@@ -421,6 +481,11 @@ export function ProductsView() {
             value={categoryTab}
             onChange={setCategoryTab}
           />
+          <div style={{ marginBottom: 12 }}>
+            <GhostBtn onClick={translateCategory} disabled={translating}>
+              {translating ? "Đang dịch..." : "Dịch tên nhóm từ bản VN sang UK/ML"}
+            </GhostBtn>
+          </div>
           <FieldLabel>Tên nhóm sản phẩm</FieldLabel>
           <input
             value={categoryFields[categoryTab].title}
@@ -463,6 +528,14 @@ export function ProductsView() {
             value={itemTab}
             onChange={setItemTab}
           />
+          <div style={{ marginBottom: 6 }}>
+            <GhostBtn onClick={translateItem} disabled={translating}>
+              {translating ? "Đang dịch..." : "Dịch tên & mô tả từ bản VN sang UK/ML"}
+            </GhostBtn>
+          </div>
+          <div style={{ marginBottom: 12, fontSize: 12, color: "var(--text-muted)" }}>
+            Chỉ dịch chữ. Giá, link và ảnh vẫn phải nhập riêng cho từng thị trường.
+          </div>
           <FieldLabel>Tên sản phẩm</FieldLabel>
           <input
             value={itemFields[itemTab].name}

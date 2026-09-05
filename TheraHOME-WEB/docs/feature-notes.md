@@ -943,5 +943,24 @@ dịch sẵn bản nháp để sửa sau".
   hệ thống tự dịch từ bản VN và điền nháp. Dịch lỗi thì vẫn lưu bản VN,
   không chặn thao tác lưu.
 
-**Còn thiếu (chưa nối `translateDrafts`):** Cửa hàng (tên/mô tả/giá sản
-phẩm) và Onboarding vẫn phải tự điền bản UK/ML.
+## Nối nốt tự dịch: Cửa hàng, Onboarding, Thông báo hệ thống (2026-09-05, tối)
+
+- **Cửa hàng (`ProductsView`)** — dùng NÚT, không tự điền khi lưu. Lý do: ở
+  đây tab trống nghĩa là "không bán ở thị trường đó", nên tự điền sẽ vô tình
+  mở bán; và giá/link/ảnh không phải thứ dịch được. Modal nhóm có "Dịch tên
+  nhóm từ bản VN sang UK/ML"; modal sản phẩm có "Dịch tên & mô tả từ bản VN
+  sang UK/ML" (chỉ chữ, kèm chú thích rằng giá và link vẫn nhập riêng). Cả
+  hai chỉ điền vào ô đang trống, không đè bản đã có.
+- **Onboarding (`OnboardingContentView`)** — nút "Tạo bản UK/ML từ bản VN"
+  trước đây SAO CHÉP nguyên văn tiếng Việt; nay dịch thật qua
+  `translateDrafts` (tiêu đề + mô tả phụ + từng đáp án). Số lượng đáp án giữ
+  nguyên tuyệt đối vì câu trả lời cũ map theo VỊ TRÍ; field nào dịch hỏng thì
+  rơi về bản VN. Dịch lỗi hoàn toàn thì vẫn tạo bản sao chép như cũ.
+- **Thông báo hệ thống (`NotificationsAdminView`)** — modal sửa một ngôn ngữ
+  mỗi lần, nên có nút "Dịch từ bản VN" hiện khi đang ở tab EN/MS.
+- **`translate-content` v2**: thêm luật giữ nguyên placeholder dạng
+  `{{day}}` / `{{days}}` — mẫu thông báo và upsell đều dùng.
+
+**Cố ý KHÔNG nối:** Nội dung pháp lý (`LegalContentView`). Bản tiếng Anh và
+Malay đã được viết tay sẵn trong `appLegalContent.ts`, editor mở ra là đúng
+ngôn ngữ đó rồi; máy dịch đè lên văn bản pháp lý là hạ chất lượng và rủi ro.

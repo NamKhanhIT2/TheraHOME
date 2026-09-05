@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SectionCard, PrimaryBtn, GhostBtn, FieldLabel, inputStyle, PillTabs, Badge } from "@/components/ui/primitives";
 import { pushToast } from "@/components/ui/Toast";
 import { fetchOnboardingTexts, saveOnboardingText, type OnboardingQuestionText, type LegalLang } from "@/lib/db";
+import { translateDrafts } from "@/lib/translate";
 
 const LANGS: Array<[LegalLang, string]> = [
   ["vi", "VN"],
@@ -37,6 +38,7 @@ export function OnboardingContentView() {
   const [lang, setLang] = useState<LegalLang>("vi");
   const [drafts, setDrafts] = useState<Record<string, OnboardingQuestionText>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [translatingKey, setTranslatingKey] = useState<string | null>(null);
 
   function reload() {
     return fetchOnboardingTexts()
@@ -131,19 +133,46 @@ export function OnboardingContentView() {
                 return vnRow ? (
                   <div style={{ marginTop: 8 }}>
                     <GhostBtn
+                      disabled={translatingKey === key}
                       onClick={async () => {
+                        setTranslatingKey(key);
                         try {
-                          // Same option COUNT as VN (position-mapped answers);
-                          // the wording starts as a copy to edit.
-                          await saveOnboardingText({ ...vnRow, language: lang }, vnRow.options.length);
+                          // Machine-translated draft rather than a verbatim VN
+                          // copy (owner 2026-09-05). The option COUNT must stay
+                          // identical — saved answers are mapped by position —
+                          // so each option is translated in place and any
+                          // missing/failed field falls back to the VN wording.
+                          const texts: Record<string, string> = { title: vnRow.title };
+                          if (vnRow.subtitle?.trim()) texts.subtitle = vnRow.subtitle;
+                          vnRow.options.forEach((option, i) => {
+                            texts[`option_${i}`] = option;
+                          });
+                          const drafts = await translateDrafts(texts);
+                          const picked = drafts ? drafts[lang === "en" ? "en" : "ms"] : null;
+                          const row: OnboardingQuestionText = picked
+                            ? {
+                                ...vnRow,
+                                language: lang,
+                                title: picked.title || vnRow.title,
+                                subtitle: picked.subtitle || vnRow.subtitle,
+                                options: vnRow.options.map((option, i) => picked[`option_${i}`] || option),
+                              }
+                            : { ...vnRow, language: lang };
+                          await saveOnboardingText(row, vnRow.options.length);
                           await reload();
-                          pushToast(`Đã tạo bản ${lang === "en" ? "UK" : "ML"} từ bản VN — sửa chữ rồi lưu`);
+                          pushToast(
+                            picked
+                              ? `Đã tạo bản ${lang === "en" ? "UK" : "ML"} tự dịch từ bản VN — kiểm tra lại rồi lưu`
+                              : `Không dịch được — đã tạo bản ${lang === "en" ? "UK" : "ML"} sao chép từ VN để bạn sửa tay`,
+                          );
                         } catch {
                           pushToast("Không thể tạo bản dịch — kiểm tra kết nối hoặc quyền admin/CSKH");
+                        } finally {
+                          setTranslatingKey(null);
                         }
                       }}
                     >
-                      Tạo bản {lang === "en" ? "UK" : "ML"} từ bản VN
+                      {translatingKey === key ? "Đang dịch..." : `Tạo bản ${lang === "en" ? "UK" : "ML"} từ bản VN (tự dịch)`}
                     </GhostBtn>
                   </div>
                 ) : null;
