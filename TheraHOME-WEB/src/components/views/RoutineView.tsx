@@ -69,7 +69,8 @@ export function RoutineView() {
       .then(([prods, cats]) => {
         setProducts(prods);
         const links: Record<string, string> = {};
-        for (const c of cats) for (const it of c.items) if (it.link) links[it.id] = it.link;
+        // Keyed by products.id (what this view looks up), not store_items.id.
+        for (const c of cats) for (const it of c.items) if (it.link) links[it.productId ?? it.id] = it.link;
         setStoreLinks(links);
         if (selectId) setProductId(selectId);
         else if (!productId && prods.length) setProductId(prods[0].id);
@@ -261,7 +262,7 @@ export function RoutineView() {
             </tr>
           </thead>
           <tbody>
-            {dayList.slice(0, 14).map((d) => (
+            {dayList.map((d) => (
               <tr key={d.id} style={{ borderTop: "1px solid var(--divider)" }}>
                 <td style={{ padding: "10px 8px", fontWeight: 600, color: "var(--text-primary)" }}>Ngày {d.id}</td>
                 <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>{d.phase}</td>
@@ -300,7 +301,7 @@ export function RoutineView() {
             ))}
           </tbody>
         </table>
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 10 }}>Hiển thị {Math.min(14, dayList.length)}/{dayList.length} ngày</div>
+        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 10 }}>{dayList.length} ngày</div>
       </SectionCard>
       {newProductOpen ? (
         <Modal

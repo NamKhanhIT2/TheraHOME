@@ -13,6 +13,7 @@ import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/lib/i18n';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
+import { localDateString } from '@/lib/localDate';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -225,7 +226,7 @@ async function backfillTodayReminderIfDue(kind: ReminderKind, enabled: boolean, 
   const now = new Date();
   if (now.getHours() < hour || (now.getHours() === hour && now.getMinutes() < minute)) return;
 
-  const dateKey = now.toISOString().slice(0, 10);
+  const dateKey = localDateString(now);
   const storageKey = `${REMINDER_BACKFILL_KEY_PREFIX}${kind}_${dateKey}`;
   const already = await AsyncStorage.getItem(storageKey).catch(() => null);
   if (already) return;

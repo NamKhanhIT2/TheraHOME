@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ThemeColors } from '@/theme/colors';
 import type { DayStatus, DayType } from '@/lib/mockData';
-import { useAppStore, type AppLanguage } from '@/store/useAppStore';
+import { useAppStore } from '@/store/useAppStore';
 import { localizePhaseName, localizeProductName } from '@/lib/adminContent';
 import { useMarket, type StoreMarket } from '@/hooks/useMarket';
 
@@ -234,7 +234,8 @@ export function useProgramDays(userProgramId: string | undefined, productId: str
   });
 
   return useQuery({
-    queryKey: ['user_program_days', userProgramId, activatedAt ?? null, market],
+    // `language` because the phase label is joined in from phasesQuery.
+    queryKey: ['user_program_days', userProgramId, activatedAt ?? null, market, language],
     queryFn: async (): Promise<DayRow[]> => {
       const { data, error } = await supabase
         .from('user_program_days')

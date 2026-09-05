@@ -191,10 +191,13 @@ export async function updateProductInfo(productId: string, patch: { name?: strin
     const { error } = await supabase.from("products").update({ name: patch.name }).eq("id", productId);
     if (error) throw error;
   }
-  if (patch.link !== undefined) {
-    // Only persists if a matching store_items row already exists for this
-    // product — routine products aren't required to have a storefront entry.
-    await supabase.from("store_items").update({ external_link: patch.link }).eq("product_id", productId);
+  // Link: the Sửa thông tin modal only shows the VN storefront link, so only
+  // the VN row is written — it used to overwrite all 3 markets with one value,
+  // and an untouched empty field wiped every market's link (audit 2026-09-05).
+  // Only persists if a matching store_items row exists for this product.
+  if (patch.link !== undefined && patch.link.trim()) {
+    const { error } = await supabase.from("store_items").update({ external_link: patch.link.trim() }).eq("product_id", productId).eq("market", "VN");
+    if (error) throw error;
   }
 }
 
@@ -238,7 +241,7 @@ export type AdminMarket = "VN" | "US" | "MALAY";
 export async function fetchStoreCategories(market: AdminMarket = "VN"): Promise<StoreCategory[]> {
   const [{ data: cats, error: cErr }, { data: items, error: iErr }] = await Promise.all([
     supabase.from("store_categories").select("id, title, has_trial, sort_order, market").eq("market", market).order("sort_order"),
-    supabase.from("store_items").select("id, category_id, name, description, price_text, accent_color_key, external_link, preview_url, image_url, market").eq("market", market).order("sort_order"),
+    supabase.from("store_items").select("id, category_id, product_id, name, description, price_text, accent_color_key, external_link, preview_url, image_url, market").eq("market", market).order("sort_order"),
   ]);
   if (cErr) throw cErr;
   if (iErr) throw iErr;
@@ -260,6 +263,9 @@ export async function fetchStoreCategories(market: AdminMarket = "VN"): Promise<
           previewLink: it.preview_url ?? "",
           imageUrl: it.image_url ?? "",
           market: it.market as AdminMarket,
+          // Which roadmap product this storefront row belongs to — RoutineView
+          // keys its "Link sản phẩm" by products.id, NOT store_items.id.
+          productId: it.product_id ?? null,
         })
       ),
   }));
@@ -366,6 +372,9 @@ export async function saveStoreCategoryGroup(
   const { data: existing, error: existingErr } = await supabase.from("store_categories").select("id, market").eq("group_key", finalGroupKey);
   if (existingErr) throw existingErr;
   const existingIdByMarket = new Map((existing ?? []).map((r) => [r.market, r.id]));
+  // New rows go to the end — a NULL sort_order made new groups land anywhere.
+  const { data: maxCat } = await supabase.from("store_categories").select("sort_order").order("sort_order", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+  const nextCategorySort = (maxCat?.sort_order ?? 0) + 1;
 
   if (!MARKETS.some((m) => byMarket[m].title.trim())) throw new Error("no_market_filled");
   for (const market of MARKETS) {
@@ -382,7 +391,7 @@ export async function saveStoreCategoryGroup(
     } else {
       const { error } = await supabase
         .from("store_categories")
-        .insert({ id: `${finalGroupKey}-${market.toLowerCase()}`, title: fields.title, has_trial: fields.hasTrial, is_primary: isPrimary, market, group_key: finalGroupKey });
+        .insert({ id: `${finalGroupKey}-${market.toLowerCase()}`, title: fields.title, has_trial: fields.hasTrial, is_primary: isPrimary, market, group_key: finalGroupKey, sort_order: nextCategorySort });
       if (error) throw error;
     }
   }
@@ -944,8 +953,9 @@ export async function updateAppUser(id: string, patch: { app_role?: SampleUserRo
 
 // Narrow admin/cskh contact edit — goes through admin_update_user_contact
 // (SECURITY DEFINER, gated on current_web_roles()) rather than a direct
-// `profiles` UPDATE, since cskh has no general UPDATE-any RLS policy on
-// that table and shouldn't gain one just for this.
+// `profiles` UPDATE. Note (2026-09-05): cskh DOES now have an UPDATE policy
+// on profiles, but the privileged-column triggers still block everything
+// except `locked` for them — so this RPC remains the contact-edit path.
 export async function updateUserContact(userId: string, patch: { email: string | null; phone: string | null }) {
   const { error } = await supabase.rpc("admin_update_user_contact", {
     p_user_id: userId,
@@ -1327,7 +1337,7 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & CommunityP
       targetMarkets: p.target_markets ?? null,
       commentsList: (comments ?? [])
         .filter((c) => c.post_id === p.id)
-        .map((c): CommunityComment => ({ name: c.author_name || "Người dùng", text: c.text, time: new Date(c.created_at).toLocaleDateString("vi-VN"), idKey: c.id })),
+        .map((c): CommunityComment => ({ name: c.author_name || "Người dùng", text: c.text, time: new Date(c.created_at).toLocaleDateString("vi-VN"), idKey: c.id, hidden: c.hidden })),
     })
   );
 }
@@ -1364,7 +1374,7 @@ export async function createOfficialPost(input: {
   notifyBodyUs?: string;
   notifyTitleMalay?: string;
   notifyBodyMalay?: string;
-}): Promise<string> {
+}): Promise<{ id: string; pushError: string | null }> {
   // The RPC gives Admin and CSKH precisely one privilege: create a branded
   // TheraHOME post. It deliberately does not grant them broad write access to
   // community posts made by members.
@@ -1391,7 +1401,7 @@ export async function createOfficialPost(input: {
     const pushBodyUs = (input.notifyBodyUs?.trim() || input.textUs || "").slice(0, 180) || undefined;
     const pushTitleMalay = (input.notifyTitleMalay?.trim() || input.titleMalay || "").slice(0, 80) || undefined;
     const pushBodyMalay = (input.notifyBodyMalay?.trim() || input.textMalay || "").slice(0, 180) || undefined;
-    void supabase.functions.invoke("dispatch-push", {
+    const { error: pushErr } = await supabase.functions.invoke("dispatch-push", {
       body: {
         mode: "broadcast",
         all: true,
@@ -1408,8 +1418,10 @@ export async function createOfficialPost(input: {
         bodyMalay: pushBodyMalay,
       },
     });
+    if (pushErr) console.error("dispatch-push failed for official post", postId, pushErr);
+    return { id: String(postId), pushError: pushErr ? String(pushErr.message ?? pushErr) : null };
   }
-  return String(postId);
+  return { id: String(postId), pushError: null };
 }
 export async function updateCommunityPost(
   idKey: string,
@@ -1429,11 +1441,26 @@ export async function updateCommunityPost(
     targetMarkets?: AdminMarket[] | null;
   },
 ) {
+  // A pin can never outlive the post's own reach: if target markets shrink,
+  // drop the pin from markets no longer targeted (or unpin entirely).
+  let pinPatch: { pinned?: boolean; pinned_markets?: AdminMarket[] | null } = {};
+  if (patch.targetMarkets !== undefined) {
+    const { data: pinRow } = await supabase.from("community_posts").select("pinned, pinned_markets, target_markets").eq("id", idKey).maybeSingle();
+    if (pinRow?.pinned) {
+      const currentPin = (pinRow.pinned_markets as AdminMarket[] | null) ?? (pinRow.target_markets as AdminMarket[] | null);
+      if (patch.targetMarkets === null) pinPatch = { pinned_markets: currentPin };
+      else {
+        const kept = (currentPin ?? patch.targetMarkets).filter((m) => patch.targetMarkets!.includes(m));
+        pinPatch = kept.length ? { pinned_markets: kept } : { pinned: false, pinned_markets: null };
+      }
+    }
+  }
   const { error } = await supabase
     .from("community_posts")
     // undefined keys are stripped by supabase-js, so only fields the caller
     // actually passed get updated (imageUrl: null clears the image).
     .update({
+      ...pinPatch,
       tag: patch.meta,
       title: patch.title,
       text: patch.text,
@@ -1808,8 +1835,11 @@ export async function createUpsellCampaigns(input: {
 }
 
 export async function cancelUpsellCampaign(id: string) {
-  const { error } = await supabase.from("upsell_campaigns").update({ status: "cancelled" }).eq("id", id).eq("status", "scheduled");
+  // A 0-row UPDATE is not an error in PostgREST, so a campaign that has
+  // already moved to `processing` used to show "Đã hủy" while still sending.
+  const { data, error } = await supabase.from("upsell_campaigns").update({ status: "cancelled" }).eq("id", id).eq("status", "scheduled").select("id");
   if (error) throw error;
+  if (!data?.length) throw new Error("not_cancellable");
 }
 
 // ---------------------------------------------------------------------------
@@ -1836,14 +1866,20 @@ export async function fetchChatThreads(): Promise<ChatThread[]> {
   // explicit request) until the user actually sends something.
   const threadsWithMessages = (threads ?? []).filter((t) => (messages ?? []).some((m) => m.thread_id === t.id));
 
+  // ONE signing call for every attachment instead of one per message — this
+  // fetch re-runs on every realtime change, and N+1 storage calls made the
+  // CSKH tab crawl once threads had a few hundred photos.
+  const attachmentPaths = [...new Set((messages ?? []).map((m) => m.attachment_path).filter((p): p is string => !!p))];
+  const signedByPath = new Map<string, string>();
+  if (attachmentPaths.length) {
+    const { data: signedList } = await supabase.storage.from("chat-attachments").createSignedUrls(attachmentPaths, 3600);
+    for (const item of signedList ?? []) if (item.path && item.signedUrl) signedByPath.set(item.path, item.signedUrl);
+  }
+
   return Promise.all(threadsWithMessages.map(async (t) => {
     const msgs = (messages ?? []).filter((m) => m.thread_id === t.id);
     const chatMessages: ChatMessage[] = await Promise.all(msgs.map(async (m) => {
-      let imageUrl: string | null = null;
-      if (m.attachment_path) {
-        const { data: signed } = await supabase.storage.from("chat-attachments").createSignedUrl(m.attachment_path, 3600);
-        imageUrl = signed?.signedUrl ?? null;
-      }
+      const imageUrl: string | null = m.attachment_path ? signedByPath.get(m.attachment_path) ?? null : null;
       return {
         id: m.id,
         from: m.sender_type === "specialist" ? "admin" : "user",
@@ -1939,10 +1975,10 @@ export async function fetchAIPrompt(): Promise<string> {
 
 export async function updateAIPrompt(systemPrompt: string) {
   const { data: { user } } = await supabase.auth.getUser();
+  // Upsert: an UPDATE on a missing singleton row is a silent 0-row no-op.
   const { error } = await supabase
     .from("ai_prompts")
-    .update({ system_prompt: systemPrompt, updated_at: new Date().toISOString(), updated_by: user?.id ?? null })
-    .eq("id", true);
+    .upsert({ id: true, system_prompt: systemPrompt, updated_at: new Date().toISOString(), updated_by: user?.id ?? null }, { onConflict: "id" });
   if (error) throw error;
 }
 
@@ -2271,15 +2307,17 @@ export async function saveOnboardingText(input: OnboardingQuestionText, expected
   if (input.options.length !== expectedOptionCount) {
     throw new Error("option_count_mismatch");
   }
+  // Upsert so a language that has no row yet (e.g. a missing MS version) can
+  // be created from Admin — UPDATE alone left it uncreatable forever.
   const { error } = await supabase
     .from("onboarding_question_texts")
-    .update({
+    .upsert({
+      question_key: input.questionKey,
+      language: input.language,
       title: input.title.trim(),
       subtitle: input.subtitle.trim() || null,
       options: input.options.map((o) => o.trim()),
       updated_at: new Date().toISOString(),
-    })
-    .eq("question_key", input.questionKey)
-    .eq("language", input.language);
+    }, { onConflict: "question_key,language" });
   if (error) throw error;
 }

@@ -13,7 +13,7 @@ const corsHeaders = {
 const INACTIVITY_TIERS = [2, 3, 4, 5, 7, 10, 14];
 
 type Profile = { id: string; language: string | null; last_login_at: string | null };
-type Template = { template_key: string; title: string; body: string };
+type Template = { template_key: string; title: string; body: string; language: string | null };
 
 function copy(language: string | null, days: number) {
   if (language === 'en') return {
@@ -68,10 +68,16 @@ Deno.serve(async (request) => {
     if (error) throw error;
     const { data: templateRows, error: templateError } = await admin
       .from('system_notification_templates')
-      .select('template_key, title, body')
+      .select('template_key, title, body, language')
       .in('template_key', INACTIVITY_TIERS.map((days) => `inactive_${days}`));
     if (templateError) throw templateError;
-    const templates = new Map((templateRows ?? []).map((template: Template) => [template.template_key, template]));
+    // One row per (key, language). Keying by template_key alone let the LAST
+    // language row win for every recipient (audit 2026-09-05).
+    const templates = new Map((templateRows ?? []).map((template: Template) => [`${template.template_key}:${template.language ?? 'vi'}`, template]));
+    const pickTemplate = (days: number, language: string | null) => {
+      const lang = language === 'en' || language === 'ms' ? language : 'vi';
+      return templates.get(`inactive_${days}:${lang}`) ?? templates.get(`inactive_${days}:vi`);
+    };
 
     const now = Date.now();
     const delivered: Array<{ userId: string; days: number; title: string; body: string }> = [];
@@ -80,7 +86,7 @@ Deno.serve(async (request) => {
       const inactiveDays = Math.floor((now - new Date(profile.last_login_at).getTime()) / 86_400_000);
       if (!INACTIVITY_TIERS.includes(inactiveDays)) continue;
       const fallback = copy(profile.language, inactiveDays);
-      const template = templates.get(`inactive_${inactiveDays}`);
+      const template = pickTemplate(inactiveDays, profile.language);
       const message = template
         ? { title: interpolate(template.title, { days: inactiveDays }), body: interpolate(template.body, { days: inactiveDays }) }
         : fallback;

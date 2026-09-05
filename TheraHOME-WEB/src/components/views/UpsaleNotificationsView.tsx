@@ -209,8 +209,12 @@ export function UpsaleNotificationsView() {
       await cancelUpsellCampaign(campaign.id);
       setCampaigns((current) => current?.map((item) => item.id === campaign.id ? { ...item, status: "cancelled" } : item) ?? current);
       pushToast("Đã hủy lịch gửi Upsale");
-    } catch {
-      pushToast("Không thể hủy lịch gửi");
+    } catch (error) {
+      pushToast(
+        error instanceof Error && error.message === "not_cancellable"
+          ? "Chiến dịch đã bắt đầu gửi nên không thể hủy nữa"
+          : "Không thể hủy lịch gửi",
+      );
     }
   }
 

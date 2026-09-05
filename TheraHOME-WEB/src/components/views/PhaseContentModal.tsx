@@ -45,15 +45,28 @@ function QuestionEditor({ draft, onChange, onCancel, onSave, saving }: { draft: 
     options[index] = value;
     updateContent({ options });
   }
+  // Add/remove apply to EVERY language at once. The app maps a saved answer
+  // by option POSITION, so vi/en/ms must always have the same count — a
+  // 5-option VN quiz with a 4-option EN version silently re-maps answers.
   function addOption() {
     if (content.options.length >= 6) return;
-    updateContent({ options: [...content.options, ""] });
+    const next = { ...draft };
+    for (const [code] of QUIZ_LANG_TABS) {
+      const entry = next[code] ?? { question: "", options: [], correctIndex: 0 };
+      next[code] = { ...entry, options: [...entry.options, ""] };
+    }
+    onChange(next);
   }
   function removeOption(index: number) {
     if (content.options.length <= 2) return;
-    const options = content.options.filter((_, i) => i !== index);
-    const correctIndex = content.correctIndex >= options.length ? 0 : content.correctIndex;
-    updateContent({ options, correctIndex });
+    const next = { ...draft };
+    for (const [code] of QUIZ_LANG_TABS) {
+      const entry = next[code];
+      if (!entry) continue;
+      const options = entry.options.filter((_, i) => i !== index);
+      next[code] = { ...entry, options, correctIndex: entry.correctIndex >= options.length ? 0 : entry.correctIndex };
+    }
+    onChange(next);
   }
 
   return (
@@ -103,6 +116,18 @@ function QuizTab({ phaseId }: { phaseId: string }) {
     if (!vi.question.trim() || vi.options.some((o) => !o.trim())) {
       pushToast("Vui lòng điền đầy đủ câu hỏi và các lựa chọn (ít nhất tiếng Việt)");
       return;
+    }
+    // A language that HAS a question must have every option filled and the
+    // same option count as VN — otherwise UK/ML users get blank buttons or
+    // answers that map to the wrong VN option.
+    for (const [code, label] of QUIZ_LANG_TABS) {
+      if (code === "vi") continue;
+      const entry = draft[code];
+      if (!entry?.question.trim()) continue;
+      if (entry.options.length !== vi.options.length || entry.options.some((o) => !o.trim())) {
+        pushToast(`Bản ${label}: cần đủ ${vi.options.length} lựa chọn, không để trống lựa chọn nào`);
+        return;
+      }
     }
     setSaving(true);
     try {

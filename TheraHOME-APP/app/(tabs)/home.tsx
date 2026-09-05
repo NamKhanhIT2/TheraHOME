@@ -242,7 +242,15 @@ export default function HomeScreen() {
 
         <Reanimated.View entering={fadeUpEntering(0)}>
         <Animated.View style={[styles.heroCard, softParallax(7), { backgroundColor: theme.colors.primary, borderRadius: theme.radius.xl, padding: theme.space[5] }]}>
-          {program && today ? (
+          {/* While lock requirements / purchases are still loading, the
+              accessible-progress numbers are provisional (28 instead of 14)
+              and `today` could point into a locked phase — hold the hero
+              instead of exposing "Bắt đầu" / "Hướng dẫn nhanh" for it. */}
+          {program && !progress.isReady ? (
+            <View style={{ minHeight: 150, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color="#fff" />
+            </View>
+          ) : program && today ? (
             <>
               <View style={styles.heroTopRow}>
                 <TransitionText

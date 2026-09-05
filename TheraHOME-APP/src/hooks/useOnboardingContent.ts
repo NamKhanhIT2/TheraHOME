@@ -51,7 +51,7 @@ export function useOnboardingContent(): OnboardingContent {
         return bundled.map((question) => {
           const override = rows.find((r) => r.question_key === question.key && r.language === language);
           // The count check is the guard that protects saved answers.
-          if (!override || override.options.length !== question.options.length) return question;
+          if (!override || !Array.isArray(override.options) || override.options.length !== question.options.length) return question;
           return {
             ...question,
             title: override.title?.trim() || question.title,

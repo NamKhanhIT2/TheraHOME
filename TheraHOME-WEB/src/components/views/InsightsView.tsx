@@ -4,7 +4,7 @@
 // unlocks). Both tables have been collecting rows since the quiz/IAP work
 // shipped, but nothing read them outside SQL — added 2026-09-04 so the
 // answers people give and the unlocks they buy are actually visible.
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TableShell } from "@/components/ui/TableShell";
 import { Modal } from "@/components/ui/Modal";
 import { GhostBtn, Badge } from "@/components/ui/primitives";

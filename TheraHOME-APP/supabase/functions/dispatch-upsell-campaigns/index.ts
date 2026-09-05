@@ -12,6 +12,10 @@ type Campaign = {
   id: string;
   title: string;
   body: string;
+  title_en: string | null;
+  body_en: string | null;
+  title_ms: string | null;
+  body_ms: string | null;
   target: string;
   destination: 'store' | 'home' | 'roadmap' | 'community';
 };
@@ -42,7 +46,7 @@ Deno.serve(async (request) => {
 
     const { data: due, error: dueError } = await admin
       .from('upsell_campaigns')
-      .select('id, title, body, target, destination')
+      .select('id, title, body, title_en, body_en, title_ms, body_ms, target, destination')
       .eq('status', 'scheduled')
       .lte('scheduled_for', now)
       .order('scheduled_for')
@@ -75,6 +79,20 @@ Deno.serve(async (request) => {
         }
         recipientIds = [...new Set(recipientIds)];
 
+        // Wording follows each recipient's app language (audit 2026-09-05):
+        // the EN/MS drafts admin fills were stored but never used here.
+        const { data: langRows, error: langError } = recipientIds.length
+          ? await admin.from('profiles').select('id, language').in('id', recipientIds)
+          : { data: [], error: null };
+        if (langError) throw langError;
+        const languageByUser = new Map((langRows ?? []).map((row) => [row.id as string, row.language as string | null]));
+        const copyFor = (userId: string) => {
+          const lang = languageByUser.get(userId);
+          if (lang === 'en' && (campaign.title_en || campaign.body_en)) return { title: campaign.title_en || campaign.title, body: campaign.body_en || campaign.body };
+          if (lang === 'ms' && (campaign.title_ms || campaign.body_ms)) return { title: campaign.title_ms || campaign.title, body: campaign.body_ms || campaign.body };
+          return { title: campaign.title, body: campaign.body };
+        };
+
         if (recipientIds.length) {
           const { data: existingNotifications, error: existingError } = await admin
             .from('notifications')
@@ -87,8 +105,8 @@ Deno.serve(async (request) => {
             missingRecipients.map((user_id) => ({
               user_id,
               type: 'ad',
-              title: campaign.title,
-              body: campaign.body,
+              title: copyFor(user_id).title,
+              body: copyFor(user_id).body,
               related_product_id: campaign.target === 'all' ? null : campaign.target,
               upsell_campaign_id: campaign.id,
               destination: campaign.destination,
@@ -98,13 +116,18 @@ Deno.serve(async (request) => {
         }
 
         const { data: tokens, error: tokenError } = recipientIds.length
-          ? await admin.from('push_tokens').select('expo_push_token').in('user_id', recipientIds)
+          ? await admin.from('push_tokens').select('user_id, expo_push_token').in('user_id', recipientIds)
           : { data: [], error: null };
         if (tokenError) throw tokenError;
-        const messages = [...new Set((tokens ?? []).map((row) => row.expo_push_token))].map((to) => ({
-          to,
-          title: campaign.title,
-          body: campaign.body,
+        const seenTokens = new Set<string>();
+        const messages = (tokens ?? []).filter((row) => {
+          if (!row.expo_push_token || seenTokens.has(row.expo_push_token)) return false;
+          seenTokens.add(row.expo_push_token);
+          return true;
+        }).map((row) => ({
+          to: row.expo_push_token,
+          title: copyFor(row.user_id).title,
+          body: copyFor(row.user_id).body,
           data: { type: 'ad', campaignId: campaign.id, destination: campaign.destination, productId: campaign.target === 'all' ? undefined : campaign.target },
           categoryId: 'upsaleoffer',
           sound: 'ting.wav',

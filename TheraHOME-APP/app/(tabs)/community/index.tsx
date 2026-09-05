@@ -250,7 +250,7 @@ export default function CommunityScreen() {
     } else if (action === 'block' && post.authorId) {
       Alert.alert(t('blockUserConfirmTitle'), t('blockUserConfirmBody', { name: post.authorName }), [
         { text: t('cancel'), style: 'cancel' },
-        { text: t('blockUser'), style: 'destructive', onPress: () => blockUser.mutate(post.authorId!, { onSuccess: () => showToast(t('blockUser')), onError: () => showToast(t('noContent')) }) },
+        { text: t('blockUser'), style: 'destructive', onPress: () => { if (post.authorId) blockUser.mutate(post.authorId, { onSuccess: () => showToast(t('blockUser')), onError: () => showToast(t('noContent')) }); } },
       ]);
     } else if (action === 'delete') {
       Alert.alert(t('deletePost'), t('deletePost'), [
@@ -384,7 +384,7 @@ export default function CommunityScreen() {
         style={[styles.postCard, theme.shadows.card, { backgroundColor: p.isOfficial ? theme.colors.primaryTint05 : theme.colors.bgCard, borderColor: p.isOfficial ? theme.colors.primary : 'transparent', borderRadius: theme.radius.lg, padding: theme.cardPadding }]}
       >
         <View style={styles.postHeader}>
-          <Pressable onPress={() => router.push({ pathname: '/community/profile/[userId]', params: { userId: p.isOfficial ? 'official' : p.authorId! } })} style={styles.authorTapArea}>
+          <Pressable disabled={!p.isOfficial && !p.authorId} onPress={() => router.push({ pathname: '/community/profile/[userId]', params: { userId: p.isOfficial ? 'official' : (p.authorId ?? '') } })} style={styles.authorTapArea}>
             <CommunityAvatar name={p.authorName} authorId={p.authorId} avatarUrl={p.authorAvatarUrl} size={36} isOfficial={p.isOfficial} />
             <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
               <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>

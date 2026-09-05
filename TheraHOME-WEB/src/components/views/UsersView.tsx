@@ -55,7 +55,7 @@ function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact
                 </div>
               </td>
               <td style={{ padding: "12px 8px", color: "var(--text-secondary)" }}>{u.area}</td>
-              <td style={{ padding: "12px 8px", color: "var(--text-secondary)" }}>{u.day != null ? `${u.day}/14` : "N/A"}</td>
+              <td style={{ padding: "12px 8px", color: "var(--text-secondary)" }}>{u.day != null ? `Ngày ${u.day}` : "N/A"}</td>
               <td style={{ padding: "12px 8px", color: "var(--text-secondary)" }}>{u.adherence != null ? `${u.adherence}%` : "N/A"}</td>
               <td style={{ padding: "12px 8px" }}><Badge color={rc} bg={rb}>{rl}</Badge></td>
               <td style={{ padding: "12px 8px" }}><StatusPill status={u.locked ? "inactive" : u.status} /></td>
@@ -77,7 +77,7 @@ function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact
   );
 }
 
-function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onClose: () => void; readOnly: boolean; onSave: (patch: Partial<SampleUser>) => void }) {
+function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onClose: () => void; readOnly: boolean; onSave: (patch: Partial<SampleUser>) => Promise<boolean> }) {
   const [permRole, setPermRole] = useState<SampleUserRole>(user.role);
   const [trend, setTrend] = useState<number[]>([]);
   const [programs, setPrograms] = useState<UserProgramRow[] | null>(null);
@@ -155,13 +155,13 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
     }
   }
 
-  function toggleLock() {
-    onSave({ locked: !user.locked });
-    pushToast(user.locked ? "Đã mở khóa tài khoản " + user.name : "Đã khóa tài khoản " + user.name);
+  async function toggleLock() {
+    // Wait for the write — success toast used to fire before (and alongside)
+    // the failure toast from updateUser.
+    if (await onSave({ locked: !user.locked })) pushToast(user.locked ? "Đã mở khóa tài khoản " + user.name : "Đã khóa tài khoản " + user.name);
   }
-  function saveRole() {
-    onSave({ role: permRole });
-    pushToast("Đã cập nhật phân quyền cho " + user.name + ": " + (ROLE_META[permRole] || ROLE_META.user)[0]);
+  async function saveRole() {
+    if (await onSave({ role: permRole })) pushToast("Đã cập nhật phân quyền cho " + user.name + ": " + (ROLE_META[permRole] || ROLE_META.user)[0]);
   }
 
   return (
@@ -198,7 +198,7 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
           </div>
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             <div style={{ flex: 1, background: "#fff", borderRadius: 12, padding: 14, textAlign: "center", boxShadow: "var(--shadow-card)" }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>{user.day != null ? `${user.day}/14` : "N/A"}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>{user.day != null ? `Ngày ${user.day}` : "N/A"}</div>
               <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2 }}>ngày lộ trình</div>
             </div>
             <div style={{ flex: 1, background: "#fff", borderRadius: 12, padding: 14, textAlign: "center", boxShadow: "var(--shadow-card)" }}>
@@ -388,12 +388,14 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
   const rows = (users ?? []).filter((u) => (status === "all" || u.status === status) && u.name.toLowerCase().includes(q.toLowerCase()));
   const openUser = (users ?? []).find((u) => u.id === openId);
 
-  async function updateUser(id: SampleUser["id"], patch: Partial<SampleUser>) {
+  async function updateUser(id: SampleUser["id"], patch: Partial<SampleUser>): Promise<boolean> {
     try {
       await updateAppUser(String(id), { app_role: patch.role, locked: patch.locked });
       setUsers((us) => (us ? us.map((u) => (u.id === id ? { ...u, ...patch } : u)) : us));
+      return true;
     } catch {
       pushToast("Không thể lưu thay đổi");
+      return false;
     }
   }
 
@@ -403,7 +405,7 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
         {readOnly ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--bg-card-alt)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "var(--text-secondary)" }}>
             <Icon name="eye" size={14} color="var(--text-secondary)" />
-            Bạn có thể xem, cập nhật thông tin liên hệ và giai đoạn lộ trình. Phân quyền và khoá tài khoản chỉ Admin thực hiện được.
+            Bạn có thể xem, cập nhật thông tin liên hệ và giai đoạn lộ trình. Phân quyền chỉ Admin thực hiện được; khoá tài khoản vi phạm làm ở tab Báo cáo.
           </div>
         ) : null}
         <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
@@ -411,7 +413,7 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
             <Icon name="search" size={16} color="var(--text-muted)" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo tên..." style={{ border: "none", outline: "none", flex: 1, fontFamily: "var(--font-family)", fontSize: 13.5 }} />
           </div>
-          {([["all", "Tất cả"], ["active", "Hoạt động"], ["unactivated", "Chưa kích hoạt"], ["paused", "Tạm dừng"], ["inactive", "Ngừng"]] as const).map(([k, l]) => (
+          {([["all", "Tất cả"], ["active", "Hoạt động"], ["unactivated", "Chưa kích hoạt"], ["inactive", "Ngừng"]] as const).map(([k, l]) => (
             <button
               key={k}
               onClick={() => setStatus(k)}

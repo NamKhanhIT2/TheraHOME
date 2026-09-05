@@ -856,3 +856,14 @@ NAV_ADMIN mất "Cộng đồng" và "Khảo sát & Giao dịch"; NAV_CARE nhậ
 CommunityView bỏ prop `pinOnly` — CSKH giờ dùng bản đầy đủ (bài viết +
 Thử thách). Kèm migration nới policy `challenges` từ admin-only sang
 admin+cskh, nếu không tab Thử thách sẽ không đọc/ghi được.
+
+## Rà soát toàn diện (2026-09-05, chiều)
+
+Chi tiết đầy đủ ở `TheraHOME-APP/docs/feature-notes.md` mục cùng tên. Phía
+web: modal Sửa bài không còn chặn bài cũ thiếu bản UK/ML; link sản phẩm ở
+Lộ trình key theo products.id và chỉ ghi row VN, không bao giờ ghi ""; Lộ
+trình hiện đủ 28 ngày; UsersView bỏ "/14" cứng và bộ lọc "Tạm dừng" chết;
+chat ký URL ảnh theo lô; sửa target markets đối chiếu pin; bình luận ẩn
+có badge + bỏ ẩn; hủy Upsale/lưu prompt/khoá tài khoản báo đúng kết quả;
+onboarding tạo được bản ngôn ngữ thiếu; quiz đồng bộ số option 3 ngôn ngữ;
+đăng bài báo khi push lỗi; nav parent "notifications-group"; lint 0 error.

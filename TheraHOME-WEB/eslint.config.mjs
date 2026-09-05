@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // A stray nested checkout/.next dir occasionally appears here; never lint it.
+    "TheraHOME-WEB/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

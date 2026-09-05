@@ -32,15 +32,20 @@ export function usePhaseQuiz(phaseId: string | undefined) {
         .eq('phase_id', phaseId!)
         .order('sort_order');
       if (error) throw error;
-      return data.map((row) => {
-        const content = row.content as unknown as Record<string, QuizContentEntry>;
-        const localized = content[language] ?? content.vi;
-        return {
+      // A row missing both the viewer's language and the VN base (legacy flat
+      // shape, or an admin insert that skipped languages) used to throw and
+      // take the whole quiz row off the roadmap. Fall back to whatever
+      // language exists, and skip the row only if it has none.
+      return data.flatMap((row) => {
+        const content = (row.content ?? {}) as unknown as Record<string, QuizContentEntry | undefined>;
+        const localized = content[language] ?? content.vi ?? Object.values(content).find((entry) => entry?.question);
+        if (!localized?.question) return [];
+        return [{
           id: row.id,
           sortOrder: row.sort_order,
           question: localized.question,
-          options: localized.options,
-        };
+          options: localized.options ?? [],
+        }];
       });
     },
     enabled: !!phaseId,

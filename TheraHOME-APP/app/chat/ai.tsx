@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
@@ -37,7 +37,12 @@ export default function AIChatScreen() {
     const v = (value ?? text).trim();
     if (!v || sendMessage.isPending) return;
     setText('');
-    sendMessage.mutate(v);
+    // Same failure path as chat/human.tsx — without it a failed send
+    // rolled the optimistic bubble back and silently lost the typed text.
+    void sendMessage.mutateAsync(v).catch(() => {
+      setText(v);
+      Alert.alert(t('sendFailTitle'), t('tryAgainBody'));
+    });
   }
 
   const loading = threadQuery.isPending || messagesQuery.isPending;

@@ -44,6 +44,8 @@ export interface Product {
 }
 
 export interface StoreItem {
+  /** products.id this storefront row belongs to (null for accessories). */
+  productId?: string | null;
   id: string;
   name: string;
   desc: string;
@@ -69,6 +71,7 @@ export interface Article {
 }
 
 export interface CommunityComment {
+  hidden?: boolean;
   name: string;
   avatarColor?: string;
   text: string;

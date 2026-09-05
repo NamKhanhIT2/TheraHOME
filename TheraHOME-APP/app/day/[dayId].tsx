@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -7,6 +7,9 @@ import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useCatalogProgramDays, useMarkDayWatched } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
+import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
+import { usePhasePurchases } from '@/hooks/usePhasePurchase';
+import { useProfile } from '@/hooks/useProfile';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { PainScaleModal } from '@/components/PainScaleModal';
@@ -36,6 +39,23 @@ export default function DayDetailScreen() {
 
   const daysQuery = useCatalogProgramDays(productId, program?.userProgramId, program?.activatedAt);
   const d = (daysQuery.data ?? []).find((x) => x.id === Number(dayId));
+
+  // IAP gate. Roadmap/Home hide locked days, but this screen is also reached
+  // by push taps, inbox rows, and stale navigation history — so it must
+  // refuse a day whose phase needs a purchase the user hasn't made (audit
+  // 2026-09-05). Review accounts are exempt, as everywhere else.
+  const phaseIds = useMemo(() => Array.from(new Set((daysQuery.data ?? []).map((x) => x.phaseId))), [daysQuery.data]);
+  const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
+  const purchasesQuery = usePhasePurchases(userId);
+  const isReviewAccount = useProfile(userId).data?.accountType === 'review';
+  const lockDataReady = !d || phaseIds.length === 0 || (lockRequirementsQuery.isFetched && (!userId || purchasesQuery.isFetched));
+  const lockRequirement = d ? lockRequirementsQuery.data?.get(d.phaseId) : undefined;
+  const phaseLocked = !!d && !isReviewAccount && lockDataReady && !!lockRequirement && !purchasesQuery.data?.has(d.phaseId);
+  useEffect(() => {
+    if (!phaseLocked || !d) return;
+    if (lockRequirement?.salesEnabled) router.replace({ pathname: '/paywall/[phaseId]', params: { phaseId: d.phaseId } });
+    else router.replace('/(tabs)/roadmap');
+  }, [phaseLocked, d, lockRequirement?.salesEnabled]);
 
   // Fallback discomfort check-in for entries that BYPASS the Roadmap/Home
   // gates (notification deep links open this screen directly): if this
@@ -96,6 +116,15 @@ export default function DayDetailScreen() {
     );
   }
   if (!d) return null;
+  if (!lockDataReady || phaseLocked) {
+    return (
+      <ScreenContainer>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   // Calendar-unlock mechanic: watching the video is what records completion
   // (no completion button, no pain gate). Days beyond tomorrow's midnight

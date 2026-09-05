@@ -3352,3 +3352,61 @@ An toàn với paywall: `today` đã được neo về ngày cuối còn truy c�
 giai đoạn sau còn khoá, nên không mở được video của giai đoạn chưa mua.
 Nhãn nút giữ nguyên theo yêu cầu. Kiểm chứng trên simulator: bấm ra đúng
 "Ngày 14: Duy trì cột sống cổ khỏe lâu dài" (trước đó ra video giới thiệu).
+
+## Rà soát toàn diện web + app (2026-09-05, chiều)
+
+Hai agent đọc toàn bộ mã (WEB 38 phát hiện, APP 23) + tự kiểm tầng DB
+(policy, advisor, log). Dưới đây là những gì ĐÃ SỬA; danh sách còn lại ghi
+ở cuối để không quên.
+
+**Nặng — app**
+- `useWaterLog` + khoá dedupe nhắc tập dùng ngày UTC → ghi nhầm ngày cho
+  người dùng lệch giờ; thêm `src/lib/localDate.ts`.
+- Hero Home render trên số liệu TẠM (trước `isReady`) → có cửa sổ trỏ vào
+  ngày của giai đoạn khoá; giờ hiện spinner tới khi lock/purchase tải xong.
+- `day/[dayId]` không kiểm tra khoá giai đoạn: mọi lối vào ngoài roadmap
+  (push, inbox, history) phát được video chưa mua. Thêm gate → paywall
+  (nếu đang bán) hoặc về roadmap; review account miễn.
+- Rollback optimistic của màn chi tiết bài dùng sai query key (thiếu
+  market) → không bao giờ rollback. Dùng prefix-match.
+- `dispatch-system-notifications`: Map template theo key bỏ qua language →
+  bản ngôn ngữ cuối thắng cho MỌI người. Chọn theo `(key, lang)` + fallback vi.
+- `dispatch-upsell-campaigns`: title_en/ms/body_en/ms lưu mà không dùng →
+  push + inbox theo ngôn ngữ từng người nhận.
+
+**Trung bình — app:** useProgramDays thiếu `language` trong key; paywall bỏ
+qua `salesEnabled` (deep link vẫn thấy nút mua); "Ẩn danh" hardcode; share
+card lấy program đầu tiên thay vì program đang chọn; gửi AI/khảo sát/toggle
+thông báo im lặng khi lỗi; `useQuiz` throw khi content thiếu ngôn ngữ;
+`authorId!` non-null trên bài member; 3 route ngoài Stack.Protected;
+options null ở onboarding override.
+
+**Nặng — web:** modal Sửa bài (do tôi làm sáng nay) chặn lưu mọi bài cũ không
+có bản UK/ML; link sản phẩm ở Lộ trình key sai id (store_items.id vs
+products.id) nên luôn "Chưa có link"; `updateProductInfo` ghi link "" cho
+CẢ 3 thị trường khi chỉ đổi tên (mất dữ liệu); Lộ trình cắt cứng 14/28 ngày
+không sửa được ngày 15–28; UsersView hiển thị "20/14"; `fetchChatThreads`
+ký URL từng ảnh (N+1) — gom một lệnh.
+
+**Trung bình — web:** sửa target_markets không đối chiếu pinned_markets;
+lỗi ảnh hiện thành "Không thể lưu"; bình luận ẩn không thấy/không bỏ ẩn
+được; hủy Upsale báo thành công dù đã gửi; updateAIPrompt 0-row im lặng
+(upsert); bản dịch chip không rollback (controlled input); toast khoá tài
+khoản bắn trước khi ghi; onboarding thiếu ngôn ngữ không tạo được (upsert +
+nút "Tạo từ VN"); quiz add/remove option lệch số lượng giữa ngôn ngữ (giờ
+đồng bộ + validate); `admin_set_user_phase` chỉ nhìn apple (giờ apple OR
+google); dispatch-push fire-and-forget (giờ await + báo trong toast).
+
+**DB/RLS:** CSKH thiếu quyền ẩn/xoá bình luận và khoá tác giả (policy +
+trigger cho phép đổi RIÊNG `locked`); drop overload 5 tham số của
+`set_official_post_pinned` còn lộ cho anon; revoke execute helper nội bộ;
+15 index FK thiếu; 2 index trùng; 8 policy `auth.uid()` → `(select
+auth.uid())`. Mirror schema drift `system_notification_templates.language`.
+
+**Chưa sửa (ghi để làm sau):** InsightsView gom câu hỏi theo chuỗi thô nên
+tách 3 dòng theo ngôn ngữ; RoutineView link sản phẩm chỉ VN; phase lookup
+theo `name` `.single()`; ảnh mồ côi khi ghim/lưu fail sau upload; 500
+notifications rồi slice 30; ô Tìm kiếm/chuông topbar trang trí; profile
+card cộng đồng dùng currentDay thô; `landingPage` chung 3 thị trường;
+TAB_ITEMS.label + 3 export adminContent là mã chết; bật Leaked Password
+Protection trong Supabase Auth (thao tác dashboard).

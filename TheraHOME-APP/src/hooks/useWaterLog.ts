@@ -2,9 +2,11 @@
 // `water`/`setWater`. See CLAUDE.md.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { localDateString } from '@/lib/localDate';
 
+// Local calendar day — see localDate.ts for why not toISOString().
 function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 
 export function useWaterLog(userId: string | undefined) {

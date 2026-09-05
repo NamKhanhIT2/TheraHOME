@@ -19,7 +19,9 @@ export const NAV_ADMIN: NavItem[] = [
   // Per-product activation contacts, CSKH-managed — cũng có mặt ở NAV_CARE.
   { id: "activation", label: "Kích hoạt", icon: "shield" },
   {
-    id: "notifications",
+    // Parent id must differ from its first child ("notifications"), or the
+    // header title resolver picks the parent for every child page.
+    id: "notifications-group",
     label: "Thông báo",
     icon: "bell",
     children: [

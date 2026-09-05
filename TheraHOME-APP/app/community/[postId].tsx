@@ -187,7 +187,7 @@ export default function PostDetailScreen() {
   }
 
   const postText = !postExpanded && post.text.length > 360 ? `${post.text.slice(0, 360).trimEnd()}…` : post.text;
-  const headerAuthor = <Pressable onPress={() => router.push({ pathname: '/community/profile/[userId]', params: { userId: post.isOfficial ? 'official' : post.authorId! } })} style={styles.headerAuthor}>
+  const headerAuthor = <Pressable disabled={!post.isOfficial && !post.authorId} onPress={() => router.push({ pathname: '/community/profile/[userId]', params: { userId: post.isOfficial ? 'official' : (post.authorId ?? '') } })} style={styles.headerAuthor}>
     <CommunityAvatar name={post.authorName} authorId={post.authorId} avatarUrl={post.authorAvatarUrl} size={34} isOfficial={post.isOfficial} />
     <View style={{ flex: 1, minWidth: 0 }}>
       <View style={styles.headerAuthorNameRow}>

@@ -59,13 +59,13 @@ export function AIPromptsView() {
   }
 
   async function saveTranslation(id: string, field: "textEn" | "textMs", value: string) {
-    const current = replies?.find((r) => r.id === id);
-    if (!current || current[field] === value) return;
-    setReplies((rs) => (rs ?? []).map((r) => (r.id === id ? { ...r, [field]: value } : r)));
     try {
       await updateAISuggestedReply(id, { [field]: value });
     } catch {
-      pushToast("Không thể lưu bản dịch");
+      pushToast("Không thể lưu bản dịch — đang tải lại giá trị đã lưu");
+      // Controlled inputs: reload so the screen shows what the DB really has
+      // instead of an edit that never landed.
+      fetchAISuggestedReplies().then(setReplies).catch(() => undefined);
     }
   }
 
@@ -125,7 +125,8 @@ export function AIPromptsView() {
                       <label key={field} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", flex: 1, minWidth: 220 }}>
                         <span style={{ fontWeight: 700, width: 22 }}>{label}</span>
                         <input
-                          defaultValue={r[field]}
+                          value={r[field]}
+                          onChange={(e) => setReplies((rs) => (rs ?? []).map((row) => (row.id === r.id ? { ...row, [field]: e.target.value } : row)))}
                           placeholder={`Chưa có bản ${label} — app dùng tiếng Việt`}
                           onBlur={(e) => saveTranslation(r.id, field, e.target.value.trim())}
                           style={{ flex: 1, border: "1px solid var(--border-input)", borderRadius: 8, padding: "5px 8px", fontFamily: "var(--font-family)", fontSize: 12.5, color: "var(--text-secondary)" }}

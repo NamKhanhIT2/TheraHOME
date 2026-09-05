@@ -30,8 +30,11 @@ export function LegalContentView() {
   const [overrides, setOverrides] = useState<LegalDocOverride[] | null>(null);
   const [docKey, setDocKey] = useState<LegalDocKey>("terms");
   const [lang, setLang] = useState<LegalLang>("vi");
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  // Unsaved edits, keyed per (doc, language). Reading the editor value as
+  // `draft ?? published ?? bundled` means switching tabs never needs an
+  // effect to copy server data into state (react-hooks/set-state-in-effect),
+  // and an edit on one tab survives peeking at another.
+  const [drafts, setDrafts] = useState<Record<string, { title?: string; body?: string }>>({});
   const [saving, setSaving] = useState(false);
   const [reverting, setReverting] = useState(false);
 
@@ -50,15 +53,19 @@ export function LegalContentView() {
   );
   const bundled = useMemo(() => getLegalDoc(docKey, lang), [docKey, lang]);
 
-  // Load the editor whenever the selection (or the fetched data) changes:
-  // the published override if there is one, otherwise the app's own text so
-  // staff edits from the real wording instead of a blank box.
-  useEffect(() => {
-    if (!overrides) return;
-    const row = overrides.find((o) => o.docKey === docKey && o.language === lang);
-    setTitle(row?.title ?? bundled.title);
-    setBody(row?.body ?? bundled.text);
-  }, [overrides, docKey, lang, bundled]);
+  // The editor shows the published override if there is one, otherwise the
+  // app's own text so staff edit from the real wording, not a blank box.
+  const draftKey = `${docKey}:${lang}`;
+  const title = drafts[draftKey]?.title ?? current?.title ?? bundled.title;
+  const body = drafts[draftKey]?.body ?? current?.body ?? bundled.text;
+  const setTitle = (value: string) => setDrafts((d) => ({ ...d, [draftKey]: { ...d[draftKey], title: value } }));
+  const setBody = (value: string) => setDrafts((d) => ({ ...d, [draftKey]: { ...d[draftKey], body: value } }));
+  const clearDraft = () =>
+    setDrafts((d) => {
+      const next = { ...d };
+      delete next[draftKey];
+      return next;
+    });
 
   async function save() {
     if (saving) return;
@@ -70,9 +77,10 @@ export function LegalContentView() {
     try {
       await saveLegalOverride({ docKey, language: lang, title: title.trim(), body });
       await reload();
+      clearDraft();
       pushToast("Đã xuất bản — app sẽ hiển thị bản này, không cần build mới");
     } catch {
-      pushToast("Không thể lưu (cần quyền admin/CSKH)");
+      pushToast("Không thể lưu — kiểm tra kết nối hoặc quyền admin/CSKH");
     } finally {
       setSaving(false);
     }
@@ -82,6 +90,7 @@ export function LegalContentView() {
     try {
       await deleteLegalOverride(docKey, lang);
       await reload();
+      clearDraft();
       pushToast("Đã khôi phục bản gốc trong app");
     } catch {
       pushToast("Không thể khôi phục");
@@ -164,6 +173,7 @@ export function LegalContentView() {
 
       {reverting ? (
         <ConfirmModal
+          busy={reverting}
           title="Khôi phục bản gốc"
           message="Xoá bản đã xuất bản của văn bản này? App sẽ quay lại dùng nội dung đóng gói sẵn trong bản build."
           confirmLabel="Khôi phục"

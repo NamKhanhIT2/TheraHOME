@@ -91,7 +91,7 @@ export function FaqContentView() {
       await reload();
       pushToast(drafted ? "Đã lưu · đã tự dịch nháp UK/ML" : "Đã lưu câu hỏi");
     } catch {
-      pushToast("Không thể lưu (cần quyền admin/CSKH)");
+      pushToast("Không thể lưu — kiểm tra kết nối hoặc quyền admin/CSKH");
     } finally {
       setSaving(false);
     }

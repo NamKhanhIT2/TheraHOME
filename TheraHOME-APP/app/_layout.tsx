@@ -315,6 +315,14 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="community/create" options={{ presentation: 'modal' }} />
           <Stack.Screen name="chat/ai" />
           <Stack.Screen name="chat/human" />
+          <Stack.Screen name="quiz/[phaseId]" />
+        </Stack.Protected>
+        {/* Staff chat screens are reachable from BOTH shells (AssistantBubble
+            shows the conversation list to staff inside (tabs) too), so they
+            gate on being signed in rather than on a specific shell. */}
+        <Stack.Protected guard={inApp}>
+          <Stack.Screen name="chat/admin-conversations" />
+          <Stack.Screen name="chat/admin-thread/[threadId]" />
         </Stack.Protected>
         {/* Purely-staff TheraHOME accounts (admin/cskh, no patient program)
             — a dedicated 3-tab shell (Chat/Cộng đồng/Thông báo), not the

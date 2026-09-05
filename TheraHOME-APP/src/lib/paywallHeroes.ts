@@ -7,7 +7,7 @@
 // twins added ~7MB of app size for no visual gain.
 import type { ImageSourcePropType } from 'react-native';
 
-const HEROES: Array<{ match: RegExp; source: ImageSourcePropType }> = [
+const HEROES: { match: RegExp; source: ImageSourcePropType }[] = [
   // Order matters: PRO patterns must be tested before their non-PRO device.
   { match: /neck.*pro/i, source: require('../../assets/paywall/theraneck-pro-hero.jpg') },
   { match: /neck/i, source: require('../../assets/paywall/theraneck-phase-3-hero.jpg') },

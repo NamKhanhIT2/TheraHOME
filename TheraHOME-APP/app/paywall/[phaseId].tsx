@@ -60,6 +60,14 @@ export default function PaywallScreen() {
         <View style={styles.loadingBox}>
           <ActivityIndicator color={theme.colors.primary} />
         </View>
+      ) : promo && promo.salesEnabled === false && !unlocked ? (
+        // Free-agreement mode (sales switched off in Admin): every entry point
+        // hides this screen, but a deep link or an already-open screen still
+        // lands here — never show a purchase button in that state.
+        <View style={[styles.loadingBox, { paddingHorizontal: 28, gap: 16 }]}>
+          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center' }]}>{t('phaseNotOnSale')}</Text>
+          <Button onPress={() => router.back()}>{t('backLabel')}</Button>
+        </View>
       ) : unlocked ? (
         <Reanimated.View entering={FadeIn.duration(220)} style={styles.resultBody}>
           <View style={[styles.resultIcon, { backgroundColor: theme.colors.successTint }]}>

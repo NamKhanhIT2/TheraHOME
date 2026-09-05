@@ -189,7 +189,7 @@ function mapPost(r: RawPost, market: StoreMarket, reactionCounts = emptyReaction
     id: r.id,
     authorId: r.author_id,
     isOfficial: r.is_official,
-    authorName: r.is_official ? 'TheraHOME' : (r.author_name ?? 'Ẩn danh'),
+    authorName: r.is_official ? 'TheraHOME' : (r.author_name ?? translate(useAppStore.getState().language, 'anonymous')),
     authorAvatarUrl: r.is_official ? null : r.author_avatar_url,
     title,
     text,
@@ -440,7 +440,9 @@ export function useSetPostReaction(userId: string | undefined) {
       else next.delete(vars.postId);
       queryClient.setQueryData(reactionsKey, next);
       const previousPosts = queryClient.getQueriesData<CommunityPostRow[]>({ queryKey: POSTS_KEY });
-      const previousDetail = queryClient.getQueryData<CommunityPostRow | null>(['community_post', vars.postId]);
+      // Detail key is ['community_post', id, market] — prefix-match so the
+      // rollback actually finds it (exact-key lookup always missed).
+      const previousDetail = queryClient.getQueriesData<CommunityPostRow | null>({ queryKey: ['community_post', vars.postId] });
       const patchPost = (post: CommunityPostRow): CommunityPostRow => {
         if (post.id !== vars.postId) return post;
         const counts = { ...post.reactionCounts };
@@ -455,7 +457,7 @@ export function useSetPostReaction(userId: string | undefined) {
     onError: (_error, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(reactionsKey, context.previous);
       context?.previousPosts.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      queryClient.setQueryData(['community_post', _vars.postId], context?.previousDetail);
+      context?.previousDetail.forEach(([key, data]) => queryClient.setQueryData(key, data));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: reactionsKey });
@@ -738,7 +740,7 @@ function mapComment(r: RawComment, reactionCounts = emptyReactionCounts()): Comm
   return {
     id: r.id,
     authorId: r.author_id,
-    authorName: r.author_name ?? 'Ẩn danh',
+    authorName: r.author_name ?? translate(useAppStore.getState().language, 'anonymous'),
     authorAvatarUrl: r.author_avatar_url,
     text: r.text,
     imageUrl: r.image_url,

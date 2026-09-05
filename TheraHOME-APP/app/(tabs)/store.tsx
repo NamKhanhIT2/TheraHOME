@@ -83,7 +83,13 @@ export default function StoreScreen() {
                     >
                       <View style={styles.itemRow}>
                         {item.imageUrl ? (
-                          <RemoteImage uri={item.imageUrl} priority="high" contentFit="cover" style={[styles.itemImage, { borderRadius: theme.radius.md, backgroundColor: theme.colors.bgCardAlt }]} />
+                          // Nền TRÙNG MÀU CARD, không phải bgCardAlt: ảnh
+                          // sản phẩm do admin tải lên thường có nền trong
+                          // suốt, nên một ô placeholder xám sẽ lộ vĩnh viễn
+                          // thành khung vuông quanh sản phẩm (báo lỗi
+                          // 2026-09-05). Vẫn là màu đặc nên lúc đang tải
+                          // không bị thủng lỗ, chỉ là không nhìn thấy.
+                          <RemoteImage uri={item.imageUrl} priority="high" contentFit="contain" style={[styles.itemImage, { borderRadius: theme.radius.md, backgroundColor: theme.colors.bgCard }]} />
                         ) : (
                           <View style={[styles.itemIcon, { borderColor: accentColor, borderRadius: theme.radius.md }]}>
                             <Icon name="activity" size={20} color={accentColor} />
@@ -155,16 +161,18 @@ const styles = StyleSheet.create({
     gap: 14,
     alignItems: 'center',
   },
+  // Ô ảnh sản phẩm to hơn (2026-09-05) — chỉ riêng ảnh, card giữ nguyên.
+  // itemIcon là ô dự phòng khi sản phẩm chưa có ảnh nên phải cùng cỡ.
   itemIcon: {
-    width: 48,
-    height: 48,
+    width: 62,
+    height: 62,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   itemImage: {
-    width: 48,
-    height: 48,
+    width: 62,
+    height: 62,
     resizeMode: 'cover',
   },
   itemActions: {

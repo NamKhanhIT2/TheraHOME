@@ -89,7 +89,7 @@ export default function NotificationInboxScreen() {
   };
 
   const sections = useMemo(() => {
-    const headings: Array<{ id: TimeGroup; labelKey: TranslationKey }> = [
+    const headings: { id: TimeGroup; labelKey: TranslationKey }[] = [
       { id: 'new', labelKey: 'notificationNew' },
       { id: 'today', labelKey: 'notificationToday' },
       { id: 'earlier', labelKey: 'notificationEarlier' },

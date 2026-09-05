@@ -217,28 +217,28 @@ export default function NotificationsSettingsScreen() {
             title={t('notifCommunitySection')}
             sub={t('notifCommunityAllSub')}
             value={profileQuery.data?.notifyCommunity ?? true}
-            onChange={(v) => updateProfile.mutate({ notify_community: v })}
+            onChange={(v) => updateProfile.mutate({ notify_community: v }, { onError: () => Alert.alert(t('sendFailTitle'), t('tryAgainBody')) })}
           />
           <ToggleRow
             icon="message-circle"
             title={t('notifComments')}
             sub={t('notifCommentsSub')}
             value={profileQuery.data?.notifyComments ?? true}
-            onChange={(v) => updateProfile.mutate({ notify_comments: v })}
+            onChange={(v) => updateProfile.mutate({ notify_comments: v }, { onError: () => Alert.alert(t('sendFailTitle'), t('tryAgainBody')) })}
           />
           <ToggleRow
             icon="message-circle"
             title={t('notifReplies')}
             sub={t('notifRepliesSub')}
             value={profileQuery.data?.notifyReplies ?? true}
-            onChange={(v) => updateProfile.mutate({ notify_replies: v })}
+            onChange={(v) => updateProfile.mutate({ notify_replies: v }, { onError: () => Alert.alert(t('sendFailTitle'), t('tryAgainBody')) })}
           />
           <ToggleRow
             icon="heart"
             title={t('notifReactions')}
             sub={t('notifReactionsSub')}
             value={profileQuery.data?.notifyReactions ?? true}
-            onChange={(v) => updateProfile.mutate({ notify_reactions: v })}
+            onChange={(v) => updateProfile.mutate({ notify_reactions: v }, { onError: () => Alert.alert(t('sendFailTitle'), t('tryAgainBody')) })}
             isLast
           />
         </View>

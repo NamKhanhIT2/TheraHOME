@@ -374,7 +374,7 @@ export function TheraAccountsView() {
     if (!window.confirm("Xóa (khóa vĩnh viễn) tài khoản " + a.username + "?")) return;
     try {
       await updateTheraAccount(a.id, { locked: true });
-      pushToast("Đã xóa tài khoản " + a.username);
+      pushToast("Đã khoá vĩnh viễn tài khoản " + a.username);
       reload();
     } catch {
       pushToast("Không thể xóa tài khoản");

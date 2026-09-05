@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
@@ -57,7 +57,8 @@ export default function QuizScreen() {
       setSubmitted(true);
     } catch {
       // Attempt not saved -- leave answers in place so the user can retry
-      // Submit without losing their picks.
+      // Submit without losing their picks, and SAY so (it used to fail silently).
+      Alert.alert(t('sendFailTitle'), t('tryAgainBody'));
     }
   }
 

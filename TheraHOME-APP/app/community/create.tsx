@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms, useProgramDays, usePainLogs, usePrimaryProducts } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
+import { useAppStore } from '@/store/useAppStore';
 import { useCreatePost, friendlyCommunityError, type PostMediaItem, type PostType, type ProgressSnapshot } from '@/hooks/useCommunity';
 import { ProgressShareCard } from '@/components/ProgressShareCard';
 import { Icon } from '@/components/icons/Icon';
@@ -42,7 +43,11 @@ export default function CreatePostScreen() {
   // Offers to tag the post with the phase the user is currently on, matching
   // the "Hoàn thành Giai đoạn X" badge shown on milestone posts in the feed —
   // and, for postType progress/exercise, the source of the shared snapshot.
-  const activeProgram = useActivatedPrograms(userId).data?.[0];
+  // The program the user is LOOKING AT (Home/Roadmap dropdown), not the
+  // first one activated — a TheraBACK viewer used to share TheraNECK stats.
+  const selectedProductId = useAppStore((s) => s.selectedProductId);
+  const programs = useActivatedPrograms(userId).data;
+  const activeProgram = programs?.find((p) => p.productId === selectedProductId) ?? programs?.[0];
   const daysQuery = useProgramDays(activeProgram?.userProgramId, activeProgram?.productId);
   const painLogs = usePainLogs(activeProgram?.userProgramId).data ?? [];
   // "Ngày N/X" in the shared snapshot counts only reachable phases — same

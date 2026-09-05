@@ -8,7 +8,7 @@
 // reordering an option would silently re-map every existing profile to a
 // different answer, so this editor exposes a FIXED number of option boxes
 // with no add/remove control, and the question keys are read-only.
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SectionCard, PrimaryBtn, GhostBtn, FieldLabel, inputStyle, PillTabs, Badge } from "@/components/ui/primitives";
 import { pushToast } from "@/components/ui/Toast";
 import { fetchOnboardingTexts, saveOnboardingText, type OnboardingQuestionText, type LegalLang } from "@/lib/db";
@@ -91,7 +91,7 @@ export function OnboardingContentView() {
       pushToast(
         error instanceof Error && error.message === "option_count_mismatch"
           ? "Số lượng đáp án phải giữ nguyên"
-          : "Không thể lưu (cần quyền admin/CSKH)",
+          : "Không thể lưu — kiểm tra kết nối hoặc quyền admin/CSKH",
       );
     } finally {
       setSavingKey(null);
@@ -126,6 +126,28 @@ export function OnboardingContentView() {
               <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
                 Chưa có bản {lang === "en" ? "UK" : "ML"} — app đang dùng bản tiếng Việt cho thị trường này.
               </div>
+              {(() => {
+                const vnRow = rows?.find((r) => r.questionKey === key && r.language === "vi");
+                return vnRow ? (
+                  <div style={{ marginTop: 8 }}>
+                    <GhostBtn
+                      onClick={async () => {
+                        try {
+                          // Same option COUNT as VN (position-mapped answers);
+                          // the wording starts as a copy to edit.
+                          await saveOnboardingText({ ...vnRow, language: lang }, vnRow.options.length);
+                          await reload();
+                          pushToast(`Đã tạo bản ${lang === "en" ? "UK" : "ML"} từ bản VN — sửa chữ rồi lưu`);
+                        } catch {
+                          pushToast("Không thể tạo bản dịch — kiểm tra kết nối hoặc quyền admin/CSKH");
+                        }
+                      }}
+                    >
+                      Tạo bản {lang === "en" ? "UK" : "ML"} từ bản VN
+                    </GhostBtn>
+                  </div>
+                ) : null;
+              })()}
             </div>
           );
         }

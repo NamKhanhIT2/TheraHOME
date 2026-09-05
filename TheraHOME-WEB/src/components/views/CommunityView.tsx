@@ -15,6 +15,7 @@ import {
   updateCommunityPost,
   deleteCommunityPost,
   deleteCommunityComment,
+  hideCommunityComment,
   setCommunityPostStatus,
   fetchChallenges,
   createChallenge,
@@ -495,7 +496,7 @@ export function CommunityView() {
           pushToast("Vui lòng nhập tiêu đề và nội dung bản ML");
           return;
         }
-        const newPostId = await createOfficialPost({
+        const created = await createOfficialPost({
           title: source.title,
           text: source.text,
           sendNotification,
@@ -523,7 +524,7 @@ export function CommunityView() {
             // Pin into exactly the markets this post targets, each with its
             // own copy (VN base falls back in when a variant is empty).
             const pinMarkets: AdminMarket[] = [...(vnTargeted ? (["VN"] as AdminMarket[]) : []), ...extraMarkets];
-            await setOfficialPostPinned(newPostId, true, {
+            await setOfficialPostPinned(created.id, true, {
               markets: pinMarkets,
               vn: { title: source.title.slice(0, 80), content: source.text.slice(0, 160), thumbnailUrl: null },
               us: pinMarkets.includes("US") ? { title: (finalTitleUs || source.title).slice(0, 80), content: (finalTextUs || source.text).slice(0, 160), thumbnailUrl: null } : undefined,
@@ -535,7 +536,9 @@ export function CommunityView() {
           }
         }
         pushToast(
-          (sendNotification ? "Đã đăng bài và gửi thông báo" : "Đã đăng bài viết mới lên Cộng đồng") +
+          (sendNotification && created.pushError
+            ? "Đã đăng bài nhưng gửi thông báo đẩy THẤT BẠI — bài vẫn vào hộp thư trong app"
+            : sendNotification ? "Đã đăng bài và gửi thông báo" : "Đã đăng bài viết mới lên Cộng đồng") +
             (pinned ? " · đã ghim lên đầu" : "") +
             (drafted ? " · đã tự dịch nháp UK/ML" : ""),
         );
@@ -545,12 +548,30 @@ export function CommunityView() {
           return;
         }
         const editedMarkets: AdminMarket[] = [...(vnTargeted ? (["VN"] as AdminMarket[]) : []), ...extraMarkets];
-        const missingEdit = editedMarkets.find((code) =>
-          code === "VN" ? !title.trim() || !text.trim() : code === "US" ? !titleUs.trim() || !textUs.trim() : !titleMalay.trim() || !textMalay.trim(),
-        );
-        if (missingEdit) {
-          setComposerMarketTab(missingEdit);
-          pushToast(`Chưa có tiêu đề và nội dung cho thị trường ${MARKET_LABEL[missingEdit]}`);
+        // A ticked UK/ML market with NO variant is fine — the app falls back
+        // to the base text (most older posts have no title_us at all, and the
+        // stricter rule made them impossible to edit). Only block a HALF
+        // variant (title without text or vice versa) and a post with no
+        // content anywhere.
+        const baseOk = !!title.trim() && !!text.trim();
+        const halfVariant = (["US", "MALAY"] as const).find((code) => {
+          if (!extraMarkets.includes(code)) return false;
+          const [tt, tx] = code === "US" ? [titleUs.trim(), textUs.trim()] : [titleMalay.trim(), textMalay.trim()];
+          return (tt && !tx) || (!tt && tx);
+        });
+        if (halfVariant) {
+          setComposerMarketTab(halfVariant);
+          pushToast(`Bản ${MARKET_LABEL[halfVariant]} mới điền một nửa — cần cả tiêu đề và nội dung, hoặc để trống hoàn toàn để dùng bản gốc.`);
+          return;
+        }
+        if (vnTargeted && !baseOk) {
+          setComposerMarketTab("VN");
+          pushToast("Bài hiển thị cho VN nên cần tiêu đề và nội dung bản VN");
+          return;
+        }
+        const anyVariant = (titleUs.trim() && textUs.trim()) || (titleMalay.trim() && textMalay.trim());
+        if (!baseOk && !anyVariant) {
+          pushToast("Bài viết cần tiêu đề và nội dung ở ít nhất một thị trường");
           return;
         }
         const imageUrl = editImageFile
@@ -572,8 +593,13 @@ export function CommunityView() {
       }
       setModal(null);
       reload();
-    } catch {
-      pushToast("Không thể lưu bài viết");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      pushToast(
+        message === "image_too_large" ? "Ảnh quá lớn (tối đa 15 MB)"
+        : message === "invalid_image_type" ? "Định dạng ảnh không hợp lệ (JPG, PNG, WebP)"
+        : "Không thể lưu bài viết",
+      );
     }
   }
   function togglePin(it: PinnedPost) {
@@ -665,6 +691,17 @@ export function CommunityView() {
       pushToast("Không thể xoá bài viết");
     } finally {
       setDeleteBusy(false);
+    }
+  }
+  // Hidden comments used to be invisible in this list and un-hideable from
+  // anywhere in the UI (Reports only ever hides). Show the state, allow undo.
+  async function toggleCommentHidden(id: string, hidden: boolean) {
+    try {
+      await hideCommunityComment(id, hidden);
+      pushToast(hidden ? "Đã ẩn bình luận" : "Đã hiện lại bình luận");
+      reload();
+    } catch {
+      pushToast("Không thể cập nhật bình luận");
     }
   }
   async function removeComment(id: string) {
@@ -911,13 +948,19 @@ export function CommunityView() {
                 {c.name}
                 {c.official ? <span style={{ color: "var(--color-primary)" }}> ✓</span> : null}{" "}
                 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>· {c.time}</span>
+                {c.hidden ? <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "var(--text-muted)", background: "rgba(138,147,163,0.12)", borderRadius: 999, padding: "1px 7px" }}>Đã ẩn</span> : null}
               </div>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>{c.text}</div>
+              <div style={{ fontSize: 13, color: c.hidden ? "var(--text-muted)" : "var(--text-secondary)", marginTop: 2, textDecoration: c.hidden ? "line-through" : "none" }}>{c.text}</div>
             </div>
             {c.idKey ? (
-              <button onClick={() => removeComment(c.idKey!)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", alignSelf: "flex-start" }}>
-                <Icon name="trash-2" size={14} color="var(--error)" />
-              </button>
+              <div style={{ display: "flex", gap: 8, alignSelf: "flex-start" }}>
+                <button onClick={() => toggleCommentHidden(c.idKey!, !c.hidden)} title={c.hidden ? "Hiện lại bình luận" : "Ẩn bình luận"} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                  <Icon name="eye" size={14} color={c.hidden ? "var(--text-muted)" : "var(--text-secondary)"} />
+                </button>
+                <button onClick={() => removeComment(c.idKey!)} title="Xoá bình luận" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                  <Icon name="trash-2" size={14} color="var(--error)" />
+                </button>
+              </div>
             ) : null}
           </div>
         ))}
