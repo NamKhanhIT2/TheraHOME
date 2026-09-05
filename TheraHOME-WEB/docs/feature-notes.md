@@ -799,3 +799,46 @@ mà chế độ đó lại ẩn đúng tab Thử thách; NAV_ADMIN không có m�
 Thêm `{ id: "community" }` vào NAV_ADMIN + mount `<CommunityView />`
 (không pinOnly) ở app/admin/page.tsx. Hợp với RLS: policy "web admin
 manage challenges" vốn chỉ cho role admin ghi.
+
+## Sản Phẩm: xoá theo từng thị trường, tab trống = không bán (2026-09-05)
+
+Thùng rác giờ chỉ gỡ nhóm/sản phẩm khỏi thị trường ĐANG XEM (checkbox
+"Xoá ở mọi thị trường" nếu cần). Luật "điền đủ 3 thị trường" bị bỏ: tab để
+trống = không bán ở đó; tab đã có dữ liệu mà bỏ trống thì bị từ chối và
+chỉ về thùng rác. Chi tiết + lý do trong
+`TheraHOME-APP/docs/feature-notes.md` (mục cùng ngày) — cùng ngày, app
+đổi sang lấy thị trường theo `profiles.country` thay vì ngôn ngữ.
+
+## Đăng bài Cộng đồng chỉ cho một số quốc gia (2026-09-05)
+
+Composer đã cho bỏ tick VN từ 04/09, nhưng phần "Tiêu đề/Nội dung (VN)"
+vẫn BẮT BUỘC nên muốn đăng bài chỉ cho UK vẫn phải gõ một bản tiếng Việt
+không ai đọc. Giờ: VN không tick → phần VN được bỏ trống (nhãn đổi thành
+"có thể bỏ trống"), bản UK/ML điền đầu tiên trở thành nội dung gốc (DB bắt
+buộc `text`; app dùng gốc làm fallback cho thị trường chưa có bản riêng).
+Tick thêm thị trường khác mà chưa điền → dịch nháp từ bản gốc đó. Thông
+báo đẩy cũng lấy tiêu đề/nội dung thông báo của bản gốc nếu phần VN trống.
+Ảnh chụp chủ sở hữu gửi là bản Vercel cũ ("Cũng hiển thị bản riêng cho…") —
+production chưa nhận các commit trên nhánh feature.
+
+## Đăng bài: ghim ngay khi đăng; push đúng ngôn ngữ/thị trường (2026-09-05)
+
+Composer có ô "Ghim bài lên đầu Cộng đồng ngay khi đăng". `createOfficialPost`
+trả về id bài. Bug lớn hơn nằm ở server: `dispatch-push` cũ bỏ qua
+`targetMarkets/titleUs…` mà composer gửi từ 04/09 → push tiếng Việt cho mọi
+người; đã viết lại (v26) — chi tiết ở `TheraHOME-APP/docs/feature-notes.md`.
+
+## Cộng đồng: bài dài không còn chiếm cả màn (2026-09-05)
+
+Ô Nội dung in nguyên văn bài → một bài dạng blog đẩy mọi hàng khác ra khỏi
+màn. Giờ clamp 3 dòng (`-webkit-line-clamp`), giữ xuống dòng, nút "Xem
+thêm / Thu gọn" theo từng hàng (state `expandedIds`); chỉ hiện nút khi bài
+> 180 ký tự hoặc > 3 dòng. Ô nội dung rộng tối đa 420px, căn trên.
+
+## CSKH xoá được bài TheraHOME (2026-09-05)
+
+Trước đây chủ ý chỉ cho CSKH xoá bài thành viên (RLS `NOT is_official` +
+UI ẩn nút). CSKH đã được đăng và sửa bài chính thức nên chặn xoá là lệch;
+đổi policy thành "web cskh delete any post" (migration
+202609051200) và bỏ điều kiện ẩn nút. Xoá bài cascade sang bình luận,
+cảm xúc, lưu, và dòng hộp thư thông báo — vẫn qua hộp xác nhận.

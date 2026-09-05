@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
+import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 
 export type ChatKind = 'ai' | 'human';
 
@@ -217,7 +218,7 @@ export function useSendChatMessage(threadId: string | undefined, userId: string 
         if (fnError) throw fnError;
       } else {
         void supabase.functions.invoke('dispatch-push', {
-          body: { mode: 'chat', threadId, senderType, preview: message.body || 'Đã gửi một ảnh' },
+          body: { mode: 'chat', threadId, senderType, preview: message.body || undefined, attachment: !message.body },
         });
       }
     },
@@ -432,28 +433,47 @@ export interface AISuggestedReply {
   text: string;
 }
 
-const FALLBACK_AI_SUGGESTIONS: AISuggestedReply[] = [
-  { id: 'fallback-1', text: 'Tôi bị đau khi tập' },
-  { id: 'fallback-2', text: 'Đổi lịch nhắc tập' },
-  { id: 'fallback-3', text: 'Lộ trình của tôi thế nào?' },
-];
+const FALLBACK_AI_SUGGESTIONS: Record<AppLanguage, AISuggestedReply[]> = {
+  vi: [
+    { id: 'fallback-1', text: 'Tôi thấy khó chịu khi tập' },
+    { id: 'fallback-2', text: 'Đổi lịch nhắc tập' },
+    { id: 'fallback-3', text: 'Lộ trình của tôi thế nào?' },
+  ],
+  en: [
+    { id: 'fallback-1', text: 'I feel discomfort while exercising' },
+    { id: 'fallback-2', text: 'Change my workout reminder' },
+    { id: 'fallback-3', text: 'How is my roadmap going?' },
+  ],
+  ms: [
+    { id: 'fallback-1', text: 'Saya rasa tidak selesa semasa bersenam' },
+    { id: 'fallback-2', text: 'Tukar peringatan senaman saya' },
+    { id: 'fallback-3', text: 'Bagaimana pelan saya setakat ini?' },
+  ],
+};
 
-/** Admin-curated suggestion chips shown in the empty AI chat state. Falls
- * back to a small hardcoded list so the UI never shows nothing (e.g. before
- * the DB has any active rows). */
+/** Admin-curated suggestion chips shown in the empty AI chat state, in the
+ * viewer's app language (EN/MS column, VN fallback — the chips are what
+ * the user SENDS, and the assistant replies in the language they write,
+ * so a Vietnamese chip under an English UI would flip the whole thread).
+ * Falls back to a small bundled list so the UI never shows nothing. */
 export function useAISuggestedReplies() {
+  const language = useAppStore((state) => state.language);
   return useQuery({
-    queryKey: ['ai_suggested_replies'],
+    queryKey: ['ai_suggested_replies', language],
     queryFn: async (): Promise<AISuggestedReply[]> => {
       const { data, error } = await supabase
         .from('ai_suggested_replies')
-        .select('id, text')
+        .select('id, text, text_en, text_ms')
         .eq('active', true)
         .order('sort_order', { ascending: true });
       if (error) throw error;
-      return data.length ? data : FALLBACK_AI_SUGGESTIONS;
+      if (!data.length) return FALLBACK_AI_SUGGESTIONS[language];
+      return data.map((row) => ({
+        id: row.id,
+        text: (language === 'en' ? row.text_en : language === 'ms' ? row.text_ms : null)?.trim() || row.text,
+      }));
     },
-    placeholderData: FALLBACK_AI_SUGGESTIONS,
+    placeholderData: FALLBACK_AI_SUGGESTIONS[language],
     staleTime: 5 * 60 * 1000,
   });
 }

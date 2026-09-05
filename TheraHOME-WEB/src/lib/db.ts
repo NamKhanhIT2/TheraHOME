@@ -347,10 +347,16 @@ export async function fetchStoreCategoryGroups(): Promise<StoreCategoryGroup[]> 
   });
 }
 
-/** Creates/updates all 3 market rows of one category group in one call —
- * `groupKey: "new"` mints a fresh group. Each market gets its own row id;
- * a market with no existing row is inserted, an existing one is updated.
- * `isPrimary` (nhóm chính/phụ) is one value per group, written to all rows. */
+/** Creates/updates the market rows of one category group in one call —
+ * `groupKey: "new"` mints a fresh group. Each market gets its own row id.
+ *
+ * Per-market semantics (owner, 2026-09-05): a market whose title is BLANK
+ * means "không bán ở thị trường này" — no row is created for it. A blank
+ * title on a market that already HAS a row is refused
+ * (`market_has_data_<MARKET>`): stopping sales somewhere is the trash
+ * icon's job while viewing that market, never a side effect of an edit
+ * (a category row cascades into its items). `isPrimary` (nhóm chính/phụ)
+ * is one value per group, written to every row that exists. */
 export async function saveStoreCategoryGroup(
   groupKey: string | "new",
   byMarket: Record<AdminMarket, { title: string; hasTrial: boolean }>,
@@ -361,8 +367,14 @@ export async function saveStoreCategoryGroup(
   if (existingErr) throw existingErr;
   const existingIdByMarket = new Map((existing ?? []).map((r) => [r.market, r.id]));
 
+  if (!MARKETS.some((m) => byMarket[m].title.trim())) throw new Error("no_market_filled");
+  for (const market of MARKETS) {
+    if (!byMarket[market].title.trim() && existingIdByMarket.has(market)) throw new Error(`market_has_data_${market}`);
+  }
+
   for (const market of MARKETS) {
     const fields = byMarket[market];
+    if (!fields.title.trim()) continue;
     const existingId = existingIdByMarket.get(market);
     if (existingId) {
       const { error } = await supabase.from("store_categories").update({ title: fields.title, has_trial: fields.hasTrial, is_primary: isPrimary }).eq("id", existingId);
@@ -384,12 +396,24 @@ export async function deleteStoreCategoryGroup(groupKey: string) {
   if (error) throw error;
 }
 
-/** Creates/updates all 3 market rows of one item group, linking each
+/** Stops selling one category in ONE market: deletes only that market's
+ * row (its items in that market cascade). The other markets' rows stay —
+ * the bug this replaces was the UK trash icon wiping VN too. */
+export async function deleteStoreCategoryMarket(groupKey: string, market: AdminMarket) {
+  const { error } = await supabase.from("store_categories").delete().eq("group_key", groupKey).eq("market", market);
+  if (error) throw error;
+}
+
+/** Creates/updates the market rows of one item group, linking each
  * market's item to that SAME market's category row within
  * `categoryGroupKey` (an item's US row must reference the US category
- * row's id, not the VN one) — throws if that market's category row
- * doesn't exist yet (the category group itself must be fully created
- * across all 3 markets first). */
+ * row's id, not the VN one).
+ *
+ * Same per-market semantics as saveStoreCategoryGroup: a market with
+ * BLANK name+price is "không bán ở đó" and gets no row; blank on a market
+ * that already has a row is refused (`market_has_data_<MARKET>`) — use the
+ * trash icon while viewing that market. A filled market whose category
+ * has no row there throws `missing_category_for_market_<MARKET>`. */
 export async function saveStoreItemGroup(categoryGroupKey: string, groupKey: string | "new", byMarket: Record<AdminMarket, StoreItemMarketFields>): Promise<string> {
   const finalGroupKey = groupKey === "new" ? `item-${Date.now()}` : groupKey;
   const [{ data: catRows, error: catErr }, { data: existingItems, error: existingErr }] = await Promise.all([
@@ -401,7 +425,14 @@ export async function saveStoreItemGroup(categoryGroupKey: string, groupKey: str
   const categoryIdByMarket = new Map((catRows ?? []).map((r) => [r.market, r.id]));
   const existingIdByMarket = new Map((existingItems ?? []).map((r) => [r.market, r.id]));
 
+  const filled = (m: AdminMarket) => !!byMarket[m].name.trim() && !!byMarket[m].price.trim();
+  if (!MARKETS.some(filled)) throw new Error("no_market_filled");
   for (const market of MARKETS) {
+    if (!filled(market) && existingIdByMarket.has(market)) throw new Error(`market_has_data_${market}`);
+  }
+
+  for (const market of MARKETS) {
+    if (!filled(market)) continue;
     const categoryId = categoryIdByMarket.get(market);
     if (!categoryId) throw new Error(`missing_category_for_market_${market}`);
     const fields = byMarket[market];
@@ -428,6 +459,12 @@ export async function saveStoreItemGroup(categoryGroupKey: string, groupKey: str
 
 export async function deleteStoreItemGroup(groupKey: string) {
   const { error } = await supabase.from("store_items").delete().eq("group_key", groupKey);
+  if (error) throw error;
+}
+
+/** Stops selling one item in ONE market — see deleteStoreCategoryMarket. */
+export async function deleteStoreItemMarket(groupKey: string, market: AdminMarket) {
+  const { error } = await supabase.from("store_items").delete().eq("group_key", groupKey).eq("market", market);
   if (error) throw error;
 }
 
@@ -1283,7 +1320,7 @@ export async function createOfficialPost(input: {
   notifyBodyUs?: string;
   notifyTitleMalay?: string;
   notifyBodyMalay?: string;
-}) {
+}): Promise<string> {
   // The RPC gives Admin and CSKH precisely one privilege: create a branded
   // TheraHOME post. It deliberately does not grant them broad write access to
   // community posts made by members.
@@ -1328,6 +1365,7 @@ export async function createOfficialPost(input: {
       },
     });
   }
+  return String(postId);
 }
 export async function updateCommunityPost(idKey: string, patch: { meta?: string; title?: string; text?: string; pinned?: boolean; hidden?: boolean; imageUrl?: string | null }) {
   const { error } = await supabase
@@ -1692,7 +1730,7 @@ export async function fetchChatThreads(): Promise<ChatThread[]> {
   const [{ data: threads, error: tErr }, { data: messages, error: mErr }, { data: profiles, error: pErr }, { data: reactions, error: rErr }] = await Promise.all([
     supabase.from("chat_threads").select("id, user_id, created_at").eq("kind", "human").order("created_at", { ascending: false }),
     supabase.from("chat_messages").select("id, thread_id, sender_type, body, created_at, attachment_path, read_at, edited_at, deleted_at, reply_to_message_id").order("created_at"),
-    supabase.from("profiles").select("id, full_name, email"),
+    supabase.from("profiles").select("id, full_name, email, language, country"),
     supabase.from("chat_message_reactions").select("id, message_id, user_id, emoji"),
   ]);
   if (tErr) throw tErr;
@@ -1701,6 +1739,7 @@ export async function fetchChatThreads(): Promise<ChatThread[]> {
   if (rErr) throw rErr;
 
   const nameByUser = new Map((profiles ?? []).map((p) => [p.id, p.full_name || p.email || "Người dùng"]));
+  const profileByUser = new Map((profiles ?? []).map((p) => [p.id, p]));
 
   // Threads are auto-created the moment a user OPENS the chat screen — one
   // with zero messages is just that, so it stays out of the CSKH list (per
@@ -1733,6 +1772,8 @@ export async function fetchChatThreads(): Promise<ChatThread[]> {
       id: t.id,
       userId: t.user_id,
       user: nameByUser.get(t.user_id) ?? "Người dùng",
+      language: (profileByUser.get(t.user_id)?.language as ChatThread["language"]) ?? "vi",
+      country: (profileByUser.get(t.user_id)?.country as ChatThread["country"]) ?? null,
       unread: msgs.some((m) => m.sender_type === "user" && !m.read_at),
       time: new Date(t.created_at).toLocaleString("vi-VN"),
       messages: chatMessages.length ? chatMessages : [{ from: "user", text: "(Chưa có tin nhắn)", time: "" }],
@@ -1749,7 +1790,8 @@ export async function sendSpecialistMessage(threadId: string, text: string, atta
     reply_to_message_id: replyToMessageId ?? null,
   });
   if (error) throw error;
-  void supabase.functions.invoke("dispatch-push", { body: { mode: "chat", threadId, senderType: "specialist", preview: text || "Đã gửi một ảnh" } });
+  // `attachment` lets dispatch-push say "Sent a photo" in the customer's own language.
+  void supabase.functions.invoke("dispatch-push", { body: { mode: "chat", threadId, senderType: "specialist", preview: text || undefined, attachment: !text } });
 }
 
 export async function editSpecialistMessage(messageId: string, body: string) {
@@ -1817,18 +1859,36 @@ export async function updateAIPrompt(systemPrompt: string) {
 export interface AISuggestedReply {
   id: string;
   text: string;
+  /** EN/MS versions shown to users on those app languages (VN fallback in
+   * the app when empty). Auto-drafted on add, editable here. */
+  textEn: string;
+  textMs: string;
   sortOrder: number;
 }
 
 export async function fetchAISuggestedReplies(): Promise<AISuggestedReply[]> {
-  const { data, error } = await supabase.from("ai_suggested_replies").select("id, text, sort_order").order("sort_order", { ascending: true });
+  const { data, error } = await supabase.from("ai_suggested_replies").select("id, text, text_en, text_ms, sort_order").order("sort_order", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map((r) => ({ id: r.id, text: r.text, sortOrder: r.sort_order }));
+  return (data ?? []).map((r) => ({ id: r.id, text: r.text, textEn: r.text_en ?? "", textMs: r.text_ms ?? "", sortOrder: r.sort_order }));
 }
 
-export async function addAISuggestedReply(text: string, sortOrder: number) {
+export async function addAISuggestedReply(text: string, sortOrder: number, drafts?: { textEn?: string; textMs?: string }) {
   const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from("ai_suggested_replies").insert({ text, sort_order: sortOrder, created_by: user?.id ?? null });
+  const { error } = await supabase
+    .from("ai_suggested_replies")
+    .insert({ text, text_en: drafts?.textEn || null, text_ms: drafts?.textMs || null, sort_order: sortOrder, created_by: user?.id ?? null });
+  if (error) throw error;
+}
+
+export async function updateAISuggestedReply(id: string, patch: { text?: string; textEn?: string; textMs?: string }) {
+  const { error } = await supabase
+    .from("ai_suggested_replies")
+    .update({
+      ...(patch.text !== undefined ? { text: patch.text } : {}),
+      ...(patch.textEn !== undefined ? { text_en: patch.textEn || null } : {}),
+      ...(patch.textMs !== undefined ? { text_ms: patch.textMs || null } : {}),
+    })
+    .eq("id", id);
   if (error) throw error;
 }
 

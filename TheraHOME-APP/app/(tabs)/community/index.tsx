@@ -358,10 +358,10 @@ export default function CommunityScreen() {
         <View style={[styles.feedNotice, { backgroundColor: theme.colors.errorTint }]}>
           <Icon name="activity" size={20} color={theme.colors.error} />
           <View style={styles.feedNoticeText}>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>Không thể tải bảng tin</Text>
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>Kiểm tra kết nối rồi thử lại.</Text>
+            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('feedErrorTitle')}</Text>
+            <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{t('feedErrorBody')}</Text>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Tải lại bảng tin" onPress={() => void refreshFeed()} style={styles.retryButton} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('a11yReloadFeed')} onPress={() => void refreshFeed()} style={styles.retryButton} hitSlop={8}>
             <Icon name="rotate-ccw" size={19} color={theme.colors.primary} />
           </Pressable>
         </View>
@@ -515,10 +515,10 @@ export default function CommunityScreen() {
           <View style={[styles.emptyState, { backgroundColor: theme.colors.bgCardAlt }]}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="users" size={25} color={theme.colors.primary} /></View>
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('noPosts')}</Text>
-            {filter === 'all' ? <Pressable onPress={() => router.push('/community/create')} style={[styles.emptyCta, { backgroundColor: theme.colors.primary }]}><Icon name="plus" size={17} color="#fff" /><Text style={[theme.type.caption, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]}>Tạo bài viết đầu tiên</Text></Pressable> : null}
+            {filter === 'all' ? <Pressable onPress={() => router.push('/community/create')} style={[styles.emptyCta, { backgroundColor: theme.colors.primary }]}><Icon name="plus" size={17} color="#fff" /><Text style={[theme.type.caption, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]}>{t('createFirstPost')}</Text></Pressable> : null}
           </View>
         )}
-        ListFooterComponent={postsQuery.isFetching && !postsQuery.isRefetching ? <View style={styles.loadingMore}><ActivityIndicator color={theme.colors.primary} /><Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>Đang tải thêm…</Text></View> : filteredPosts.length ? <Text style={[theme.type.captionSm, styles.feedEnd, { color: theme.colors.textMuted }]}>Bạn đã xem hết các bài viết mới.</Text> : null}
+        ListFooterComponent={postsQuery.isFetching && !postsQuery.isRefetching ? <View style={styles.loadingMore}><ActivityIndicator color={theme.colors.primary} /><Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>{t('loadingMore')}</Text></View> : filteredPosts.length ? <Text style={[theme.type.captionSm, styles.feedEnd, { color: theme.colors.textMuted }]}>{t('seenAllPosts')}</Text> : null}
       />
       </Reanimated.View>
 

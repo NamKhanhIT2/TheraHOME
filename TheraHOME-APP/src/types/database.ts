@@ -43,6 +43,8 @@ export type Database = {
           id: string
           sort_order: number
           text: string
+          text_en: string | null
+          text_ms: string | null
         }
         Insert: {
           active?: boolean
@@ -51,6 +53,8 @@ export type Database = {
           id?: string
           sort_order?: number
           text: string
+          text_en?: string | null
+          text_ms?: string | null
         }
         Update: {
           active?: boolean
@@ -59,6 +63,8 @@ export type Database = {
           id?: string
           sort_order?: number
           text?: string
+          text_en?: string | null
+          text_ms?: string | null
         }
         Relationships: []
       }

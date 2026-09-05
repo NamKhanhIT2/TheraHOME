@@ -209,34 +209,34 @@ export default function NotificationsSettingsScreen() {
             { color: theme.colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.4, marginVertical: 8, marginTop: 22 },
           ]}
         >
-          Cộng đồng
+          {t('notifCommunitySection')}
         </Text>
         <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
           <ToggleRow
             icon="bell"
-            title="Cộng đồng"
-            sub="Bật/tắt tất cả thông báo đẩy từ Cộng đồng"
+            title={t('notifCommunitySection')}
+            sub={t('notifCommunityAllSub')}
             value={profileQuery.data?.notifyCommunity ?? true}
             onChange={(v) => updateProfile.mutate({ notify_community: v })}
           />
           <ToggleRow
             icon="message-circle"
-            title="Bình luận"
-            sub="Khi ai đó bình luận về bài viết của bạn"
+            title={t('notifComments')}
+            sub={t('notifCommentsSub')}
             value={profileQuery.data?.notifyComments ?? true}
             onChange={(v) => updateProfile.mutate({ notify_comments: v })}
           />
           <ToggleRow
             icon="message-circle"
-            title="Trả lời"
-            sub="Khi ai đó trả lời bình luận của bạn"
+            title={t('notifReplies')}
+            sub={t('notifRepliesSub')}
             value={profileQuery.data?.notifyReplies ?? true}
             onChange={(v) => updateProfile.mutate({ notify_replies: v })}
           />
           <ToggleRow
             icon="heart"
-            title="Cảm xúc"
-            sub="Khi ai đó bày tỏ cảm xúc về bài viết/bình luận của bạn"
+            title={t('notifReactions')}
+            sub={t('notifReactionsSub')}
             value={profileQuery.data?.notifyReactions ?? true}
             onChange={(v) => updateProfile.mutate({ notify_reactions: v })}
             isLast

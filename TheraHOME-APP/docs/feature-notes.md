@@ -3142,3 +3142,151 @@ onboarding).
 - Cố tình nhét 5 đáp án bằng SQL (né UI) → app bỏ qua override, giữ nguyên
   4 đáp án gốc ✓
 Đã trả lại nguyên trạng cả 2 câu sau khi test.
+
+## Thị trường đi theo QUỐC GIA, không theo ngôn ngữ (2026-09-05)
+
+**Quy tắc (chủ sở hữu):** giá, link sản phẩm, video lộ trình, tên thiết bị
+theo thị trường, bài cộng đồng theo thị trường — tất cả hiển thị theo
+QUỐC GIA người dùng trả lời ở onboarding (`profiles.country`), không phụ
+thuộc ngôn ngữ app. Khách VN bật tiếng Anh vẫn thấy giá ₫ và link VN.
+
+**Trước đó sai ở đâu:** cột `profiles.country` đã tạo 03/09 đúng mục đích
+này nhưng app KHÔNG ghi (country.tsx chỉ lưu language) và KHÔNG đọc; mọi
+hook suy thị trường từ `marketForLanguage(language)`. Tệ hơn, bộ chọn ngôn
+ngữ ở Cài đặt tài khoản còn `setMarket()` theo ngôn ngữ → khách VN chọn
+English là bị đẩy sang cửa hàng US (đã có 1 hồ sơ thật rơi vào ca này).
+
+**Sửa:**
+- `src/hooks/useMarket.ts` — nguồn sự thật duy nhất: `profiles.country` →
+  market local (đặt lúc xác nhận quốc gia) → ngôn ngữ (chỉ cho tài khoản
+  TheraHOME cấp/review vốn không qua màn quốc gia). `StoreMarket` +
+  `marketForLanguage` chuyển sang đây, `useStore` re-export để import cũ
+  không gãy.
+- Thay hết `marketForLanguage(language)` bằng `useMarket()` ở useStore
+  (catalog + prefetch), usePrograms (video/support link theo ngày, tên
+  thiết bị chính), useCommunity (lọc `target_markets` + nội dung bài).
+- country.tsx ghi thêm `country`. Cài đặt tài khoản: ngôn ngữ KHÔNG còn
+  chạm market; thêm khối "Quốc gia / Khu vực" (US/EU · VIET NAM · MALAY)
+  ghi `profiles.country` — vì chọn nhầm ở onboarding trước đây là bị khoá
+  giá sai vĩnh viễn. Backfill hồ sơ còn null từ ngôn ngữ (chỉ 1 hồ sơ).
+- Đã kiểm chứng trên simulator với app_review1 (English): US/EU → cửa hàng
+  US; bấm VIET NAM → cửa hàng VN với giao diện vẫn English.
+
+## WEB Sản Phẩm: xoá theo từng thị trường (2026-09-05)
+
+**Lỗi:** một "nhóm"/"sản phẩm" trong Admin là 3 dòng VN/US/MALAY chung
+`group_key`; thùng rác xoá theo `group_key` nên đang xem UK mà xoá "Thiết
+bị hỗ trợ lưng" là VN mất theo — dù hộp thoại có ghi "cả 3 thị trường",
+người dùng không đọc và cũng không mong đợi thế khi đang lọc UK.
+
+**Sửa (db.ts + ProductsView.tsx):**
+- `deleteStoreCategoryMarket/deleteStoreItemMarket(groupKey, market)`:
+  chỉ xoá dòng của thị trường ĐANG XEM. Hộp thoại nói rõ "Bản VN, ML giữ
+  nguyên", có checkbox "Xoá ở mọi thị trường" nếu thật sự muốn; thị trường
+  cuối cùng thì cảnh báo đỏ. Thùng rác ẩn khi nhóm/sản phẩm không bán ở
+  thị trường đang xem.
+- Bỏ luật "bắt buộc điền đủ 3 thị trường" (không tương thích với "không
+  bán ở UK"). Tab để trống = không bán ở đó → không tạo dòng; tab của
+  thị trường ĐÃ có dữ liệu mà để trống thì từ chối
+  (`market_has_data_X`) và chỉ về thùng rác — ngừng bán không bao giờ là
+  tác dụng phụ của một lần sửa (dòng nhóm cascade sang sản phẩm). Điền
+  nửa (tên không giá) bị chặn. Tab modal đánh dấu "· trống" để catalog
+  thiếu thị trường vẫn nhìn thấy ngay chứ không âm thầm.
+- Danh sách: "(không bán ở UK)" / "Không bán ở thị trường UK — bấm sửa để
+  thêm" thay cho chữ đỏ "chưa có nội dung"; "n/3 thị trường · không bán:
+  UK, ML".
+- Kiểm chứng thật trên Admin bằng nhóm test tạo qua SQL: xoá ở UK → DB chỉ
+  mất 2 dòng US (nhóm + sản phẩm), VN/MALAY nguyên; đã dọn nhóm test.
+
+## Trợ lý AI trả lời theo ngôn ngữ app; CSKH thấy ngôn ngữ khách (2026-09-05)
+
+**Lỗi:** `chat-ai-reply` chỉ nhận `thread_id`, không biết ngôn ngữ người
+dùng; prompt Admin ghim "bằng tiếng Việt"; tin dự phòng chỉ tiếng Việt →
+khách UK/ML nhận toàn tiếng Việt.
+
+**Quy tắc (chủ sở hữu):** AI nói cùng ngôn ngữ với GIAO DIỆN
+(`profiles.language`). Ngôn ngữ app mặc định theo máy cho tới khi người
+dùng tự chọn, nên "máy tiếng Anh → AI tiếng Anh" tự đúng mà không cần đọc
+locale riêng. Nếu người dùng gõ bằng ngôn ngữ khác, AI theo ngôn ngữ họ
+gõ. Tách bạch với thị trường: quốc gia quyết giá/nội dung, ngôn ngữ quyết
+chữ nghĩa.
+
+**Sửa:** hàm đọc `profiles.language` của chủ thread (service-role) và NỐI
+`LANGUAGE_RULE[lang]` vào CUỐI system prompt (để thắng mọi câu về ngôn ngữ
+còn sót trong prompt Admin); `FALLBACK_MESSAGE` 3 thứ tiếng; response trả
+thêm `lang` để debug. Prompt trong `ai_prompts` đã bỏ cụm ", bằng tiếng
+Việt," cho trung lập. Mã nguồn hàm giờ có trong repo
+(`supabase/functions/chat-ai-reply/index.ts` — trước đây chỉ tồn tại trên
+Supabase). Deploy v24, verify_jwt giữ true.
+
+**WEB CSKH:** `fetchChatThreads` lấy thêm `language, country`; ChatView
+hiện badge "English · UK" cạnh tên (nổi màu vàng khi khác tiếng Việt, ẩn
+ở danh sách nếu là tiếng Việt để không rối) — chuyên viên là người thật,
+phải nhìn thấy mới trả lời đúng ngôn ngữ.
+
+**Cùng đợt — chữ tiếng Việt ghim cứng quanh chat AI:** tiêu đề/phụ đề màn
+chat AI, placeholder ô nhập, link "Cần hỗ trợ trực tiếp?" chuyển sang i18n
+(`aiInstantNoDoctor`, `aiInputPlaceholder`, `aiNeedHuman`). Chip gợi ý
+(`ai_suggested_replies`) chỉ có một cột `text` tiếng Việt → thêm
+`text_en/text_ms` (migration 202609051000), app chọn theo ngôn ngữ với
+fallback VN, danh sách fallback bundle cũng 3 thứ tiếng. Lý do quan trọng
+hơn thẩm mỹ: chip là thứ người dùng GỬI, và AI trả lời theo ngôn ngữ họ
+gõ — một chip tiếng Việt dưới giao diện tiếng Anh sẽ lật cả cuộc hội thoại
+sang tiếng Việt. WEB AI Prompts: thêm chip tiếng Việt → tự dịch nháp UK/ML
+(translate-content), sửa inline, blur là lưu; 3 chip đang có đã điền tay.
+
+**Kiểm chứng:** simulator, app_review1 (English). Lần 1 gõ bằng bàn phím
+Telex nên câu bị biến thành tiếng Việt lơ lớ → AI trả lời tiếng Việt: đúng
+luật "theo ngôn ngữ người gõ", không phải bằng chứng cho luật tiếng Anh.
+Lần 2 bấm chip "How is my roadmap going?" (đã dịch) → AI trả lời hoàn toàn bằng tiếng Anh ✓. Đã xoá các tin test khỏi thread AI của tài khoản review.
+
+## Thông báo theo ngôn ngữ người nhận; bài viết theo thị trường (2026-09-05)
+
+**Chủ sở hữu báo:** "đang ở UK nhưng noti vẫn tiếng Việt". Rà toàn bộ đường
+đi thông báo, tìm được 6 nguồn tiếng Việt cứng:
+1. `dispatch-push` v25 bỏ qua hoàn toàn `targetMarkets/titleUs/bodyUs` mà
+   WEB gửi → push bài mới đi tiếng Việt cho MỌI người, kể cả thị trường
+   không được nhắm.
+2. Trigger `notify_official_post_inbox` fan-out bản VN cho mọi profile,
+   không lọc thị trường.
+3. Push tương tác (react/bình luận/trả lời) + inbox: template tiếng Việt.
+4. Chat: "Đội ngũ hỗ trợ", "Chuyên gia TheraHOME", "Đã gửi một ảnh/tệp".
+5. Duyệt bài (`notify_post_moderation`).
+6. `complete_day` / `mark_day_watched`: "Đến giờ tập", "Chuỗi N ngày".
+
+**Quy tắc:** chữ theo NGÔN NGỮ app của người nhận; bài chính thức đi tới
+ai và bản nào theo THỊ TRƯỜNG (`profiles.country`, null → suy từ ngôn ngữ).
+
+**Sửa:**
+- `dispatch-push` v26 (nguồn trong repo): ghép tin NHẮN THEO TỪNG NGƯỜI
+  NHẬN — đọc `profiles(language,country)`; broadcast lọc theo
+  `targetMarkets` và chọn bản US/MALAY; social/chat dùng template 3 thứ
+  tiếng; `attachment: true` thay literal "Đã gửi một ảnh" (vẫn nhận literal
+  cũ cho client chưa cập nhật). Staff luôn nhận tiếng Việt.
+- Migration `notifications_localized`: helper `notification_copy(lang,key,n)`
+  + `profile_language(uid)`; viết lại 6 hàm trên để chèn đúng ngôn ngữ
+  người nhận; inbox bài chính thức lọc thị trường + chọn bản theo thị trường.
+- App `notifications.tsx`: tiêu đề react/comment/reply được DỰNG LẠI từ cột
+  cấu trúc (actor_name, second_actor_name, group_actor_ids) bằng i18n → đổi
+  ngôn ngữ là hàng cũ cũng đổi theo. (DB vẫn lưu tiêu đề tiếng Việt, chỉ
+  còn là fallback.)
+
+**Cùng đợt — quét chuỗi tiếng Việt ghim cứng phía người dùng** (agent rà
+`app/` + `src/`): màn chặn tài khoản, chat người thật (giờ theo locale, "Đang
+gửi…", nhãn trợ năng), bảng tin cộng đồng (lỗi tải, "Tạo bài viết đầu tiên",
+footer), Cài đặt thông báo (cả khối Cộng đồng), `friendlyCommunityError`
+(8 thông điệp lỗi), ProductVideoModal, ResilientCommunityImage, nút "Mở
+TheraHOME" và tên kênh Android trong `pushNotifications.ts`, DeleteAccountModal
+"Hủy", vài accessibilityLabel. ~45 khoá i18n mới. Chủ ý KHÔNG dịch màn
+staff `(staff)/*`, `admin-thread`, AdminThreadsList — nhân viên là người
+Việt.
+
+**WEB CSKH/Admin — Đăng bài:** thêm ô "Ghim bài lên đầu Cộng đồng ngay khi
+đăng" (dùng tiêu đề + 160 ký tự đầu làm thẻ; sửa ảnh/chữ qua nút ghim sau).
+`createOfficialPost` trả về `postId`. Push chat từ chuyên viên gửi
+`attachment` thay literal.
+
+**Chưa kiểm chứng thật:** push tới máy thật (cần push token); đã kiểm
+`notification_copy` bằng SQL và typecheck. Push bài mới đúng thị trường
+sẽ tự thể hiện ở lần đăng bài kế tiếp — nếu khách VN vẫn nhận bài UK, xem
+`profiles.country` của họ trước.

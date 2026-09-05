@@ -17,6 +17,7 @@ import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useProfile } from '@/hooks/useProfile';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
+import { translate } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { scheduleDailyReminder, scheduleEveningReminder, registerLocalReminderInboxSync, backfillTodaysReminders } from '@/lib/pushNotifications';
 import { Button } from '@/components/ui/Button';
@@ -51,10 +52,6 @@ const MIN_SPLASH_MS = __DEV__ ? 0 : 1820;
 
 type BlockedReason = 'locked' | 'expired' | null;
 
-const BLOCKED_COPY: Record<Exclude<BlockedReason, null>, string> = {
-  locked: 'Tài khoản này hiện đã bị khóa.\nVui lòng liên hệ TheraHOME để được hỗ trợ.',
-  expired: 'Quyền truy cập của tài khoản đã hết hạn.\nVui lòng liên hệ TheraHOME để gia hạn.',
-};
 
 function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const theme = useTheme();
@@ -279,7 +276,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
       <View style={{ flex: 1, backgroundColor: theme.colors.bgApp, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 20 }}>
         <StatusBar style={theme.dark ? 'light' : 'dark'} />
         <Text style={{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 24 }}>
-          {BLOCKED_COPY[blockedReason]}
+          {translate(language, blockedReason === 'locked' ? 'accountLocked' : 'accountExpired')}
         </Text>
         <Button
           onPress={() => {
@@ -287,7 +284,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
             router.replace('/login');
           }}
         >
-          Quay lại
+          {translate(language, 'backLabel')}
         </Button>
       </View>
     );

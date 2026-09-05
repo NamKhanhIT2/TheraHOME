@@ -10,6 +10,7 @@ import { OptionCard } from '@/components/ui/OptionCard';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
+import { marketForCountryOption } from '@/hooks/useMarket';
 
 /** Gated by RootNavigator's countryPending (app/_layout.tsx) — shown once,
  * right after activation, for every account type. Was previously the last
@@ -45,7 +46,9 @@ export default function CountryScreen() {
     setMarket(mapped.market);
     setLanguage(mapped.language);
     try {
-      await updateProfile.mutateAsync({ language: mapped.language, language_explicit: true, country_confirmed: true });
+      // `country` is what every market-specific surface keys off from now
+      // on (useMarket.ts) — language is just the initial UI language.
+      await updateProfile.mutateAsync({ language: mapped.language, language_explicit: true, country_confirmed: true, country: marketForCountryOption(selected) });
       // RootNavigator's countryPending gate flips false once this profile
       // refetch lands, which swaps the Stack.Protected group to (tabs) —
       // no explicit navigation needed here.

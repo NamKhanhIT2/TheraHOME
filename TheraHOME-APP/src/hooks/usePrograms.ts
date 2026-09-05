@@ -6,17 +6,16 @@ import type { ThemeColors } from '@/theme/colors';
 import type { DayStatus, DayType } from '@/lib/mockData';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 import { localizePhaseName, localizeProductName } from '@/lib/adminContent';
-import { marketForLanguage } from '@/hooks/useStore';
+import { useMarket, type StoreMarket } from '@/hooks/useMarket';
 
 /** Resolves a day's market-specific video/support-tools link, falling back
  * to the VN value if the viewer's own market hasn't been filled in yet —
  * mirrors `translate()`'s vi-fallback shape. Shared by both queries below
  * since they read the same 6 market columns. */
 function resolveMarketDayContent(
-  language: AppLanguage,
+  market: StoreMarket,
   day: { video_url_vn: string | null; video_url_us: string | null; video_url_malay: string | null; support_tools_url_vn: string | null; support_tools_url_us: string | null; support_tools_url_malay: string | null },
 ): { video: string; supportToolsUrl: string } {
-  const market = marketForLanguage(language);
   const video = market === 'US' ? day.video_url_us : market === 'MALAY' ? day.video_url_malay : day.video_url_vn;
   const supportToolsUrl = market === 'US' ? day.support_tools_url_us : market === 'MALAY' ? day.support_tools_url_malay : day.support_tools_url_vn;
   return { video: video ?? day.video_url_vn ?? '', supportToolsUrl: supportToolsUrl ?? day.support_tools_url_vn ?? '' };
@@ -66,8 +65,7 @@ export interface PrimaryProductsInfo {
 /** The devices the Home/Roadmap dropdowns list, with per-market names —
  * see PrimaryProductsInfo. */
 export function usePrimaryProducts() {
-  const language = useAppStore((state) => state.language);
-  const market = marketForLanguage(language);
+  const market = useMarket();
   return useQuery({
     queryKey: ['primary_products', market],
     queryFn: async (): Promise<PrimaryProductsInfo> => {
@@ -223,6 +221,7 @@ interface RawUserProgramDay {
  * the calendar-based derivation — pass it whenever you have the program. */
 export function useProgramDays(userProgramId: string | undefined, productId: string | undefined, activatedAt?: string | null) {
   const language = useAppStore((state) => state.language);
+  const market = useMarket();
   const phasesQuery = useQuery({
     queryKey: ['program_phases', productId, language],
     queryFn: async () => {
@@ -235,7 +234,7 @@ export function useProgramDays(userProgramId: string | undefined, productId: str
   });
 
   return useQuery({
-    queryKey: ['user_program_days', userProgramId, activatedAt ?? null],
+    queryKey: ['user_program_days', userProgramId, activatedAt ?? null, market],
     queryFn: async (): Promise<DayRow[]> => {
       const { data, error } = await supabase
         .from('user_program_days')
@@ -252,7 +251,7 @@ export function useProgramDays(userProgramId: string | undefined, productId: str
           phase: phases.find((ph) => ph.id === r.program_days.phase_id)?.name ?? '',
           phaseId: r.program_days.phase_id,
           status: todayDay != null ? deriveDayStatus(r.program_days.day_number, r.status, todayDay) : (r.status as DayStatus),
-          ...resolveMarketDayContent(language, r.program_days),
+          ...resolveMarketDayContent(market, r.program_days),
           type: r.program_days.day_type as DayType,
         }));
       return rows.sort((a, b) => a.id - b.id);
@@ -267,8 +266,9 @@ export function useProgramDays(userProgramId: string | undefined, productId: str
  * marked as preview and remain open for read-only viewing. */
 export function useCatalogProgramDays(productId: string | undefined, userProgramId?: string, activatedAt?: string | null) {
   const language = useAppStore((state) => state.language);
+  const market = useMarket();
   return useQuery({
-    queryKey: ['catalog_program_days', productId, userProgramId, activatedAt ?? null, language],
+    queryKey: ['catalog_program_days', productId, userProgramId, activatedAt ?? null, language, market],
     queryFn: async (): Promise<DayRow[]> => {
       const [phasesRes, daysRes, progressRes] = await Promise.all([
         supabase
@@ -304,7 +304,7 @@ export function useCatalogProgramDays(productId: string | undefined, userProgram
           todayDay != null
             ? deriveDayStatus(day.day_number, statuses.get(day.id), todayDay)
             : ((statuses.get(day.id) ?? 'preview') as DayStatus),
-        ...resolveMarketDayContent(language, day),
+        ...resolveMarketDayContent(market, day),
         type: day.day_type as DayType,
       }));
     },

@@ -12,6 +12,32 @@ import { supabase } from "@/lib/supabase";
 import { deleteSpecialistMessage, editSpecialistMessage, fetchChatThreads, markThreadMessagesRead, sendSpecialistMessage, toggleSpecialistReaction, uploadSpecialistChatImage } from "@/lib/db";
 import type { ChatMessage, ChatThread } from "@/lib/adminMockData";
 import { Avatar } from "@/components/ui/primitives";
+
+/** Customer's app language + market at a glance, so the specialist answers
+ * in the language the customer actually reads (the AI assistant follows the
+ * same profiles.language; CSKH is a human, so it needs to be visible). */
+const LANG_LABEL: Record<string, string> = { vi: "Tiếng Việt", en: "English", ms: "Bahasa Melayu" };
+const MARKET_LABEL: Record<string, string> = { VN: "VN", US: "UK", MALAY: "ML" };
+function LangBadge({ thread, compact = false }: { thread: ChatThread; compact?: boolean }) {
+  const lang = thread.language ?? "vi";
+  const highlight = lang !== "vi";
+  return (
+    <span
+      title={`Khách đọc app bằng ${LANG_LABEL[lang] ?? lang}${thread.country ? ` · thị trường ${MARKET_LABEL[thread.country] ?? thread.country}` : ""}`}
+      style={{
+        fontSize: compact ? 10.5 : 11.5,
+        fontWeight: 700,
+        padding: compact ? "1px 6px" : "2px 8px",
+        borderRadius: 999,
+        color: highlight ? "#B9860B" : "var(--text-muted)",
+        background: highlight ? "rgba(185,134,11,0.12)" : "rgba(138,147,163,0.12)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {LANG_LABEL[lang] ?? lang}{thread.country && !compact ? ` · ${MARKET_LABEL[thread.country] ?? thread.country}` : ""}
+    </span>
+  );
+}
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 
@@ -164,7 +190,10 @@ export function ChatView() {
               <Avatar name={t.user} color={t.avatarColor} size={36} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text-primary)" }}>{t.user}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 6 }}>
+                    {t.user}
+                    {t.language && t.language !== "vi" ? <LangBadge thread={t} compact /> : null}
+                  </div>
                   <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{t.time}</div>
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -180,7 +209,10 @@ export function ChatView() {
         <div style={{ flex: 1, background: "#fff", borderRadius: 16, boxShadow: "var(--shadow-card)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 16, borderBottom: "1px solid var(--divider)" }}>
             <Avatar name={active.user} color={active.avatarColor} size={36} />
-            <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--text-primary)" }}>{active.user}</div>
+            <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
+              {active.user}
+              <LangBadge thread={active} />
+            </div>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
             {active.messages.map((m, i) => {

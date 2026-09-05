@@ -3,6 +3,7 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'rea
 import * as WebBrowser from 'expo-web-browser';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { useTheme } from '@/theme';
+import { useI18n } from '@/lib/i18n';
 import { Icon } from '@/components/icons/Icon';
 
 interface ProductVideoModalProps {
@@ -26,6 +27,7 @@ function normalizedUrl(url: string | null): string {
 
 export function ProductVideoModal({ title, url, onClose }: ProductVideoModalProps) {
   const theme = useTheme();
+  const { t } = useI18n();
   const [width, setWidth] = useState(0);
   const [failed, setFailed] = useState(false);
   const previewUrl = normalizedUrl(url);
@@ -62,15 +64,15 @@ export function ProductVideoModal({ title, url, onClose }: ProductVideoModalProp
             ) : previewUrl ? (
               <View style={styles.empty}>
                 <Icon name="external-link" size={28} color={theme.colors.primary} />
-                <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center' }]}>Link xem thử này sẽ được mở trong trình duyệt an toàn.</Text>
+                <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center' }]}>{t('previewOpensInBrowser')}</Text>
                 <Pressable onPress={() => void WebBrowser.openBrowserAsync(previewUrl)} style={[styles.openLink, { backgroundColor: theme.colors.primary }]}> 
-                  <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>Mở link xem thử</Text>
+                  <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>{t('openPreviewLink')}</Text>
                 </Pressable>
               </View>
             ) : (
               <View style={styles.empty}>
                 <Icon name="film" size={28} color={theme.colors.textMuted} />
-                <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center' }]}>Video xem thử chưa được cập nhật.</Text>
+                <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center' }]}>{t('previewNotAvailable')}</Text>
               </View>
             )}
           </View>

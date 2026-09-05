@@ -245,6 +245,9 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
   // post still reached Vietnamese users). Ticking nothing but UK posts to
   // UK only.
   const [vnTargeted, setVnTargeted] = useState(true);
+  // "Ghim ngay khi đăng" (owner request 2026-09-05) — pins with the post's
+  // own title/text as the card copy; staff can refine via the pin editor.
+  const [pinAfterPost, setPinAfterPost] = useState(false);
   const [extraMarkets, setExtraMarkets] = useState<Array<"US" | "MALAY">>([]);
   const [composerMarketTab, setComposerMarketTab] = useState<AdminMarket>("VN");
   const [titleUs, setTitleUs] = useState("");
@@ -262,6 +265,10 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
   // shouldn't require scrolling past rows of the other.
   const [authorTab, setAuthorTab] = useState<AuthorTab>("official");
   const [pinning, setPinning] = useState<PinnedPost | null>(null);
+  // Long posts used to be printed in full inside the table cell, which made
+  // one article push every other row off-screen. Clamp to 3 lines and let
+  // staff expand a row on demand.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   function reload() {
     fetchCommunityPosts().then(setItems).catch(() => pushToast("Không thể tải bài viết Cộng đồng"));
@@ -276,6 +283,7 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
     setNotifyTitle("");
     setNotifyBody("");
     setVnTargeted(true);
+    setPinAfterPost(false);
     setExtraMarkets([]);
     setComposerMarketTab("VN");
     setTitleUs("");
@@ -300,14 +308,34 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
   async function save() {
     try {
       if (modal === "new") {
-        if (!title.trim() || !text.trim()) {
-          pushToast("Vui lòng nhập tiêu đề và nội dung bài viết");
-          return;
-        }
         if (!vnTargeted && extraMarkets.length === 0) {
           pushToast("Hãy chọn ít nhất một thị trường được xem bài này");
           return;
         }
+        // The VN fields are the BASE content. They are only mandatory when
+        // VN is actually a target; for a UK/ML-only post (owner request
+        // 2026-09-05: "đôi khi tôi chỉ muốn đăng ở 1 số quốc gia") staff can
+        // leave them empty and the first filled market variant becomes the
+        // base (the DB requires `text`, and the app falls back to base for
+        // any market without its own variant).
+        const baseFilled = !!title.trim() && !!text.trim();
+        if (vnTargeted && !baseFilled) {
+          pushToast("Vui lòng nhập tiêu đề và nội dung bài viết (VN)");
+          return;
+        }
+        const firstVariant =
+          extraMarkets.includes("US") && titleUs.trim() && textUs.trim()
+            ? { title: titleUs.trim(), text: textUs.trim(), notifyTitle: notifyTitleUs.trim(), notifyBody: notifyBodyUs.trim() }
+            : extraMarkets.includes("MALAY") && titleMalay.trim() && textMalay.trim()
+              ? { title: titleMalay.trim(), text: textMalay.trim(), notifyTitle: notifyTitleMalay.trim(), notifyBody: notifyBodyMalay.trim() }
+              : null;
+        if (!baseFilled && !firstVariant) {
+          pushToast(`Nhập tiêu đề và nội dung cho bản ${extraMarkets[0] === "US" ? "UK" : "ML"} (VN không được tick nên có thể bỏ trống phần VN)`);
+          return;
+        }
+        const source = baseFilled
+          ? { title: title.trim(), text: text.trim(), notifyTitle: notifyTitle.trim(), notifyBody: notifyBody.trim() }
+          : firstVariant!;
         // UK/ML variants left empty auto-draft from the VN content (per
         // explicit request 2026-09-04) instead of blocking the publish —
         // staff can refine them later by editing the post. Only when the
@@ -325,12 +353,7 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
         const needMalay = extraMarkets.includes("MALAY") && (!finalTitleMalay || !finalTextMalay);
         let drafted = false;
         if (needUs || needMalay) {
-          const drafts = await translateDrafts({
-            title: title.trim(),
-            text: text.trim(),
-            notifyTitle: notifyTitle.trim(),
-            notifyBody: notifyBody.trim(),
-          });
+          const drafts = await translateDrafts(source);
           if (drafts) {
             if (needUs) {
               finalTitleUs = finalTitleUs || drafts.en.title || "";
@@ -355,12 +378,12 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           pushToast("Vui lòng nhập tiêu đề và nội dung bản ML");
           return;
         }
-        await createOfficialPost({
-          title: title.trim(),
-          text: text.trim(),
+        const newPostId = await createOfficialPost({
+          title: source.title,
+          text: source.text,
           sendNotification,
-          notifyTitle,
-          notifyBody,
+          notifyTitle: notifyTitle.trim() || source.notifyTitle,
+          notifyBody: notifyBody.trim() || source.notifyBody,
           // Exactly the ticked markets. All three ticked => undefined (null
           // in the DB = "everywhere", which also covers markets added
           // later). Untick VN to post for UK/ML only.
@@ -377,8 +400,18 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           notifyTitleMalay: extraMarkets.includes("MALAY") ? finalNotifyTitleMalay : undefined,
           notifyBodyMalay: extraMarkets.includes("MALAY") ? finalNotifyBodyMalay : undefined,
         });
+        let pinned = false;
+        if (pinAfterPost) {
+          try {
+            await setOfficialPostPinned(newPostId, true, { title: source.title.slice(0, 80), content: source.text.slice(0, 160), thumbnailUrl: null });
+            pinned = true;
+          } catch {
+            pushToast("Đã đăng bài nhưng chưa ghim được — bấm biểu tượng ghim trong danh sách để thử lại");
+          }
+        }
         pushToast(
           (sendNotification ? "Đã đăng bài và gửi thông báo" : "Đã đăng bài viết mới lên Cộng đồng") +
+            (pinned ? " · đã ghim lên đầu" : "") +
             (drafted ? " · đã tự dịch nháp UK/ML" : ""),
         );
       } else if (modal !== null) {
@@ -537,9 +570,9 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
         </Fragment>
       }
     >
-      <FieldLabel>Tiêu đề (VN)</FieldLabel>
+      <FieldLabel>{modal === "new" && !vnTargeted ? "Tiêu đề (VN · không đăng cho VN, có thể bỏ trống)" : "Tiêu đề (VN)"}</FieldLabel>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ví dụ: 5 phút thư giãn cổ vai" style={{ ...inputStyle, marginBottom: 14 }} />
-      <FieldLabel>Nội dung (VN)</FieldLabel>
+      <FieldLabel>{modal === "new" && !vnTargeted ? "Nội dung (VN · có thể bỏ trống)" : "Nội dung (VN)"}</FieldLabel>
       <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Nội dung bài viết đăng lên Cộng đồng..." style={{ ...inputStyle, minHeight: 100, resize: "vertical", marginBottom: 14 }} />
       {modal !== "new" ? (
         <Fragment>
@@ -586,8 +619,8 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
             ))}
           </div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: extraMarkets.length ? 10 : 16 }}>
-            Chỉ người dùng ở thị trường được tick mới thấy bài này. Bỏ tick VN nếu bài chỉ dành cho UK/ML.
-            Thị trường được tick mà không điền bản riêng sẽ dùng nội dung gốc bên dưới.
+            Chỉ người dùng ở thị trường được tick mới thấy bài này. Bỏ tick VN nếu bài chỉ dành cho UK/ML — khi đó phần VN ở trên có thể bỏ trống,
+            bài sẽ lấy bản UK/ML bạn điền làm nội dung gốc. Thị trường được tick mà chưa điền bản riêng sẽ được dịch nháp tự động.
           </div>
           {extraMarkets.length ? (
             <div style={{ marginBottom: 16 }}>
@@ -628,6 +661,16 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
             />
             Gửi thông báo đến người dùng
           </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, color: "var(--text-primary)", cursor: "pointer", marginTop: 8 }}>
+            <input type="checkbox" checked={pinAfterPost} onChange={(e) => setPinAfterPost(e.target.checked)} />
+            Ghim bài lên đầu Cộng đồng ngay khi đăng
+          </label>
+          {pinAfterPost ? (
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+              Thẻ ghim sẽ dùng tiêu đề và đoạn đầu nội dung; mỗi thị trường chỉ có một bài ghim nên bài ghim cũ của các thị trường được tick sẽ tự bỏ ghim.
+              Muốn đổi ảnh/chữ trên thẻ, bấm biểu tượng ghim trong danh sách sau khi đăng.
+            </div>
+          ) : null}
           {sendNotification ? (
             <div style={{ marginTop: 14 }}>
               {extraMarkets.length ? <PillTabs options={[["VN", "VN"] as [AdminMarket, string], ...(["US", "MALAY"] as const).filter((m) => extraMarkets.includes(m)).map((m) => [m, m === "US" ? "UK" : "ML"] as [AdminMarket, string])]} value={composerMarketTab} onChange={setComposerMarketTab} /> : null}
@@ -797,9 +840,41 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
               </div>
             </div>
           </td>
-          <td style={{ padding: "14px 20px", color: "var(--text-secondary)", maxWidth: 320 }}>
+          <td style={{ padding: "14px 20px", color: "var(--text-secondary)", maxWidth: 420, verticalAlign: "top" }}>
             {it.title ? <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 3 }}>{it.title}</div> : null}
-            {it.text}
+            {(() => {
+              const expanded = expandedIds.has(String(it.id));
+              const isLong = it.text.length > 180 || it.text.split("\n").length > 3;
+              return (
+                <Fragment>
+                  <div
+                    style={
+                      expanded
+                        ? { whiteSpace: "pre-wrap", lineHeight: 1.55 }
+                        : { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.55, whiteSpace: "pre-wrap" }
+                    }
+                  >
+                    {it.text}
+                  </div>
+                  {isLong ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(String(it.id))) next.delete(String(it.id));
+                          else next.add(String(it.id));
+                          return next;
+                        })
+                      }
+                      style={{ border: "none", background: "none", padding: 0, marginTop: 4, color: "var(--color-primary)", fontFamily: "var(--font-family)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      {expanded ? "Thu gọn" : "Xem thêm"}
+                    </button>
+                  ) : null}
+                </Fragment>
+              );
+            })()}
             {/* Which markets actually see this post — without it staff had
                 no way to tell a VN-only post from a UK-only one, and no way
                 to know which market a pin belongs to (pins are per-market
@@ -838,8 +913,8 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           {/* Moderation (duyệt/từ chối/ẩn user posts) shows for BOTH Admin
               and CSKH — RLS grants cskh post updates and the pending queue
               is CSKH's job. Edit/delete (and touching official posts) stay
-              Admin-only (`pinOnly` is the CSKH variant; post deletes are
-              admin-only in RLS anyway). */}
+              Admin-only except: CSKH may edit AND delete official posts
+              (`pinOnly` is the CSKH variant). */}
           <td style={{ padding: "14px 20px" }}>
             <div style={{ display: "flex", gap: 10 }}>
               {!it.official && it.status !== "approved" ? (
@@ -864,9 +939,11 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
                   <Icon name="eye" size={16} color={it.hidden ? "var(--text-muted)" : "var(--text-secondary)"} />
                 </button>
               ) : null}
-              {/* Delete: Admin everywhere; CSKH on user posts (RLS policy
-                  "web cskh delete user posts"). Confirmed via ConfirmModal. */}
-              {!pinOnly || !it.official ? (
+              {/* Delete: Admin and CSKH on every post — CSKH publishes the
+                  official ones, so they can retract them too (RLS policy
+                  "web cskh delete any post", 2026-09-05). Confirmed via
+                  ConfirmModal; comments/reactions/inbox rows cascade. */}
+              {(
                 <button
                   onClick={() => setDeletingPost({ id: it.id, label: it.title || it.text || it.name })}
                   title="Xoá bài viết"
@@ -874,7 +951,7 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
                 >
                   <Icon name="trash-2" size={16} color="var(--error)" />
                 </button>
-              ) : null}
+              )}
             </div>
           </td>
         </tr>

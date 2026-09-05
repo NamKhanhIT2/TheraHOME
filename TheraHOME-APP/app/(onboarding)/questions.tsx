@@ -202,10 +202,11 @@ function OptionReveal({
 }
 
 function QuestionPreloadSkeleton({ pulse }: { pulse: Animated.Value }) {
+  const { t } = useI18n();
   return (
     <Animated.View
       pointerEvents="auto"
-      accessibilityLabel="Đang chuẩn bị câu hỏi"
+      accessibilityLabel={t('a11yPreparingQuestions')}
       style={[styles.preloadOverlay, { opacity: pulse }]}
     >
       <View style={[styles.skeletonBlock, styles.skeletonHero]} />

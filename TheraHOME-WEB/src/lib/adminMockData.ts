@@ -174,6 +174,11 @@ export interface ChatThread {
   id: string;
   userId: string;
   user: string;
+  /** App language the customer reads in (profiles.language) — shown as a
+   * badge so the specialist replies in the right language. */
+  language?: "vi" | "en" | "ms";
+  /** Market the customer belongs to (profiles.country). */
+  country?: "VN" | "US" | "MALAY" | null;
   avatarColor?: string;
   unread: boolean;
   time: string;

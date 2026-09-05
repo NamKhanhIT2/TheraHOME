@@ -8,7 +8,9 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
 import type { LegalDocKey } from '@/lib/legalContent';
-import { useAppStore, type AppLanguage, type AppMarket } from '@/store/useAppStore';
+import { useAppStore, type AppLanguage } from '@/store/useAppStore';
+import { countryQuestion } from '@/lib/mockData';
+import { localFromMarket, marketForCountryOption, useMarket, type StoreMarket } from '@/hooks/useMarket';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 
 const LEGAL_ROWS: { key: LegalDocKey; icon: string; labelKey: TranslationKey }[] = [
@@ -44,6 +46,7 @@ export default function AccountSettingsScreen() {
   const language = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
   const setMarket = useAppStore((s) => s.setMarket);
+  const market = useMarket();
 
   const shareData = profile?.dataSharingEnabled ?? false;
 
@@ -76,9 +79,10 @@ export default function AccountSettingsScreen() {
                 <Pressable
                   key={code}
                   onPress={() => {
+                    // Language only. It used to overwrite the market too,
+                    // which is how a VN customer reading in English ended
+                    // up with US prices — market lives in the block below.
                     setLanguage(code as AppLanguage);
-                    const market: AppMarket = code === 'ms' ? 'malay' : code === 'en' ? 'us-eu' : 'vietnam';
-                    setMarket(market);
                     updateProfile.mutate({ language: code, language_explicit: true });
                   }}
                   style={[
@@ -97,6 +101,42 @@ export default function AccountSettingsScreen() {
                 </Pressable>
               ))}
             </View>
+          </View>
+
+          <View style={[styles.langBlock, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}>
+            <View style={styles.langHeader}>
+              <Icon name="globe" size={20} color={theme.colors.primary} />
+              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('countryRegion')}</Text>
+            </View>
+            <View style={styles.langOptions}>
+              {countryQuestion[language].options.map((option) => {
+                const code: StoreMarket = marketForCountryOption(option);
+                const active = market === code;
+                return (
+                  <Pressable
+                    key={option}
+                    onPress={() => {
+                      setMarket(localFromMarket(code));
+                      updateProfile.mutate({ country: code });
+                    }}
+                    style={[
+                      styles.langBtn,
+                      {
+                        borderWidth: active ? 2 : 1,
+                        borderColor: active ? theme.colors.primary : theme.colors.borderInput,
+                        backgroundColor: active ? theme.colors.primaryTint10 : theme.colors.bgCard,
+                        borderRadius: theme.radius.md,
+                      },
+                    ]}
+                  >
+                    <Text style={[theme.type.body, { color: active ? theme.colors.primary : theme.colors.textPrimary, fontFamily: theme.fontFamily.semiBold }]}>
+                      {option}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginTop: 8 }]}>{t('countryRegionHint')}</Text>
           </View>
 
           <ToggleRow

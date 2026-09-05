@@ -55,7 +55,7 @@ export function DeleteAccountModal({ onCancel }: DeleteAccountModalProps) {
               disabled={submitting}
               style={[styles.btn, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md, opacity: submitting ? 0.5 : 1 }]}
             >
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>Hủy</Text>
+              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('cancel')}</Text>
             </Pressable>
             <Pressable
               onPress={handleConfirm}

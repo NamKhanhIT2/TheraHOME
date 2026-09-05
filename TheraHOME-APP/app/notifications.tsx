@@ -36,6 +36,27 @@ function fallbackActorName(notification: NotificationRow, language: AppLanguage)
   return 'TheraHOME';
 }
 
+/** Social notifications are re-rendered from their structured columns so
+ * the title follows the user's CURRENT app language — the DB stores a
+ * Vietnamese title at insert time (see notifications_localized migration). */
+function socialTitle(notification: NotificationRow, t: (key: TranslationKey, values?: Record<string, string | number>) => string): string | null {
+  const actor = notification.actorName?.trim() || t('notifSomeone');
+  const count = notification.groupActorIds?.length ?? 1;
+  const who =
+    count >= 3
+      ? t('notifAndOthers', { a: actor, n: count - 1 })
+      : count === 2
+        ? t('notifAndOne', { a: actor, b: notification.secondActorName?.trim() || t('notifSomeone') })
+        : actor;
+  switch (notification.type) {
+    case 'post_reaction': return t('notifReactedPost', { who });
+    case 'comment_reaction': return t('notifReactedComment', { who });
+    case 'post_comment': return t('notifCommented', { who: actor });
+    case 'comment_reply': return t('notifReplied', { who: actor });
+    default: return null;
+  }
+}
+
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(-2).map((word) => word[0]).join('').toUpperCase() || 'T';
 }
@@ -177,7 +198,7 @@ export default function NotificationInboxScreen() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={styles.titleRow}>
-                      <Text numberOfLines={1} style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flexShrink: 1 }]}>{notification.type === 'schedule' && notification.relatedDayNumber != null ? t('dayUnlocked', { day: notification.relatedDayNumber }) : notification.title}</Text>
+                      <Text numberOfLines={1} style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flexShrink: 1 }]}>{notification.type === 'schedule' && notification.relatedDayNumber != null ? t('dayUnlocked', { day: notification.relatedDayNumber }) : socialTitle(notification, t) ?? notification.title}</Text>
                       {!notification.read ? <View style={[styles.unreadDot, { backgroundColor: theme.colors.primary }]} /> : null}
                     </View>
                     {bodyText ? <Text numberOfLines={2} style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 18 }]}>{bodyText}</Text> : null}

@@ -12,7 +12,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/lib/i18n';
-import type { AppLanguage } from '@/store/useAppStore';
+import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -37,7 +37,7 @@ export const UPSALE_OPEN_ACTION = 'upsaleopen';
 export async function registerUpsaleNotificationActions(): Promise<void> {
   await Notifications.setNotificationCategoryAsync(
     UPSALE_NOTIFICATION_CATEGORY,
-    [{ identifier: UPSALE_OPEN_ACTION, buttonTitle: 'Mở TheraHOME', options: { opensAppToForeground: true } }],
+    [{ identifier: UPSALE_OPEN_ACTION, buttonTitle: translate(useAppStore.getState().language, 'openApp'), options: { opensAppToForeground: true } }],
   );
 }
 
@@ -59,7 +59,7 @@ export async function registerForPushNotifications(userId: string): Promise<bool
     // channel id (devices that already created 'default' would otherwise
     // keep the old default sound forever). dispatch-push sends the same id.
     await Notifications.setNotificationChannelAsync('default-v2', {
-      name: 'Thông báo TheraHOME',
+      name: translate(useAppStore.getState().language, 'notificationChannelName'),
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 180, 250],
       sound: 'ting.wav',

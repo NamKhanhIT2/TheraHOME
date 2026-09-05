@@ -22,6 +22,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCommunityPosts, pinnedDisplay } from '@/hooks/useCommunity';
 import { prefetchStoreCategories } from '@/hooks/useStore';
+import { useMarket } from '@/hooks/useMarket';
 import { ArticleCard } from '@/components/community/ArticleCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { Icon } from '@/components/icons/Icon';
@@ -45,6 +46,7 @@ export default function HomeScreen() {
   const selectedProductId = useAppStore((s) => s.selectedProductId);
   const selectProduct = useAppStore((s) => s.selectProduct);
   const language = useAppStore((s) => s.language);
+  const market = useMarket();
   const profile = useProfile(userId).data;
   const notifications = useNotifications(userId).data ?? [];
   const officialPostsQuery = useCommunityPosts();
@@ -59,10 +61,10 @@ export default function HomeScreen() {
     // the first time it's opened, which is what made it feel slow right
     // after launch. See CLAUDE.md / useStore.ts.
     const task = InteractionManager.runAfterInteractions(() => {
-      void prefetchStoreCategories(queryClient, language).catch(() => {});
+      void prefetchStoreCategories(queryClient, market).catch(() => {});
     });
     return () => task.cancel();
-  }, [queryClient, language]);
+  }, [queryClient, market]);
   const focusFadeStyle = useTabFocusFade();
   const badgePopStyle = usePopOnChange(unreadCount);
   const productsQuery = useProducts();

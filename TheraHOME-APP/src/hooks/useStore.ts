@@ -5,7 +5,11 @@ import { Image } from 'expo-image';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ThemeColors } from '@/theme/colors';
-import { useAppStore, type AppLanguage } from '@/store/useAppStore';
+import { useMarket, type StoreMarket } from '@/hooks/useMarket';
+
+// Kept as re-exports so older imports keep resolving; the market decision
+// itself lives in useMarket.ts.
+export { marketForLanguage, type StoreMarket } from '@/hooks/useMarket';
 
 export interface StoreItemRow {
   id: string;
@@ -23,12 +27,6 @@ export interface StoreCategoryRow {
   title: string;
   hasTrial: boolean;
   items: StoreItemRow[];
-}
-
-export type StoreMarket = 'VN' | 'US' | 'MALAY';
-
-export function marketForLanguage(language: AppLanguage): StoreMarket {
-  return language === 'ms' ? 'MALAY' : language === 'en' ? 'US' : 'VN';
 }
 
 function storeCategoriesQueryKey(market: StoreMarket) {
@@ -100,12 +98,10 @@ async function fetchStoreCategories(market: StoreMarket): Promise<StoreCategoryR
 
 // Reference data — 3 categories / 8 items, admin-managed, effectively static.
 export function useStoreCategories() {
-  // A profile persists its language server-side, while `market` is a local
-  // onboarding preference that can survive an old session. Derive the store
-  // catalog from the active language so changing language cannot leave the
-  // user seeing another country's products.
-  const language = useAppStore((state) => state.language);
-  const market = marketForLanguage(language);
+  // Catalog follows the user's COUNTRY, not the UI language — see
+  // useMarket.ts. A VN customer reading the app in English still gets VN
+  // prices and VN links.
+  const market = useMarket();
   return useQuery({
     queryKey: storeCategoriesQueryKey(market),
     queryFn: () => fetchStoreCategories(market),
@@ -126,8 +122,7 @@ export function useStoreCategories() {
  * asset. Safe to call even if Store's own query is already warm/in-flight;
  * `prefetchQuery` is a no-op for fresh data and react-query dedupes
  * concurrent fetches for the same key. */
-export async function prefetchStoreCategories(queryClient: QueryClient, language: AppLanguage): Promise<void> {
-  const market = marketForLanguage(language);
+export async function prefetchStoreCategories(queryClient: QueryClient, market: StoreMarket): Promise<void> {
   const categories = await queryClient.fetchQuery({
     queryKey: storeCategoriesQueryKey(market),
     queryFn: () => fetchStoreCategories(market),

@@ -71,9 +71,9 @@ export default function AIChatScreen() {
           <Image source={AI_ASSISTANT_IMAGE} style={styles.avatar} resizeMode="cover" />
           <View>
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>
-              Trợ lý AI TheraHOME
+              {t('aiAssistant')}
             </Text>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>Trả lời tức thì · Không thay thế bác sĩ</Text>
+            <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('aiInstantNoDoctor')}</Text>
           </View>
         </View>
 
@@ -167,7 +167,7 @@ export default function AIChatScreen() {
         <>
         <Pressable onPress={() => router.push('/chat/human')} style={styles.escalateBtn}>
           <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, textDecorationLine: 'underline' }]}>
-            Cần hỗ trợ trực tiếp? Chat với đội ngũ TheraHOME
+            {t('aiNeedHuman')}
           </Text>
         </Pressable>
 
@@ -176,7 +176,7 @@ export default function AIChatScreen() {
             value={text}
             onChangeText={setText}
             onSubmitEditing={() => send()}
-            placeholder="Nhập câu hỏi..."
+            placeholder={t('aiInputPlaceholder')}
             placeholderTextColor={theme.colors.textMuted}
             style={[styles.input, { borderColor: theme.colors.borderInput, borderRadius: theme.radius.full, color: theme.colors.textPrimary }]}
           />

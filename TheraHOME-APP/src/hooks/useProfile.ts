@@ -39,6 +39,10 @@ export interface ProfileRow {
   // Also read by RootNavigator (countryPending gate) — true once the user
   // has confirmed their country/region on app/(onboarding)/country.tsx.
   countryConfirmed: boolean;
+  // The market whose prices/links/videos this user sees — see useMarket.ts.
+  // Written by country.tsx and the Account "Quốc gia" picker; null only for
+  // accounts that never saw the country screen.
+  country: 'VN' | 'US' | 'MALAY' | null;
   // Per-category Community push toggles — see the Community notification
   // system in CLAUDE.md. Turning one off only stops *push*; the
   // Notification Center row is always created by the DB trigger regardless
@@ -50,7 +54,7 @@ export interface ProfileRow {
 }
 
 const PROFILE_COLUMNS =
-  'full_name, email, phone, avatar_url, treatment_area, goal, language, language_explicit, data_sharing_enabled, daily_reminder_enabled, daily_reminder_time, evening_reminder_enabled, evening_reminder_time, locked, expires_at, onboarding_completed, country_confirmed, notify_comments, notify_replies, notify_reactions, notify_community, account_type';
+  'full_name, email, phone, avatar_url, treatment_area, goal, language, language_explicit, data_sharing_enabled, daily_reminder_enabled, daily_reminder_time, evening_reminder_enabled, evening_reminder_time, locked, expires_at, onboarding_completed, country_confirmed, country, notify_comments, notify_replies, notify_reactions, notify_community, account_type';
 
 export function useProfile(userId: string | undefined) {
   return useQuery({
@@ -77,6 +81,7 @@ export function useProfile(userId: string | undefined) {
         onboardingCompleted: data.onboarding_completed,
         accountType: data.account_type,
         countryConfirmed: data.country_confirmed,
+        country: (data.country as 'VN' | 'US' | 'MALAY' | null) ?? null,
         notifyComments: data.notify_comments,
         notifyReplies: data.notify_replies,
         notifyReactions: data.notify_reactions,

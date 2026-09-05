@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ImageStyle, type StyleProp } from 'react-native';
 import type { ImageProps } from 'expo-image';
 import { useTheme } from '@/theme';
+import { useI18n } from '@/lib/i18n';
 import { RemoteImage } from '@/components/ui/RemoteImage';
 import { Icon } from '@/components/icons/Icon';
 
@@ -19,6 +20,7 @@ export function ResilientCommunityImage({
   onLoad?: ImageProps['onLoad'];
 }) {
   const theme = useTheme();
+  const { t } = useI18n();
   const [source, setSource] = useState(uri);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -63,9 +65,9 @@ export function ResilientCommunityImage({
       />
       {loading ? <View pointerEvents="none" style={styles.status}><ActivityIndicator color={theme.colors.primary} /></View> : null}
       {failed ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Tải lại ảnh" onPress={retry} style={styles.status}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('a11yReloadImage')} onPress={retry} style={styles.status}>
           <Icon name="rotate-ccw" size={20} color={theme.colors.textSecondary} />
-          <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>Chạm để tải lại ảnh</Text>
+          <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>{t('tapToReloadImage')}</Text>
         </Pressable>
       ) : null}
     </View>

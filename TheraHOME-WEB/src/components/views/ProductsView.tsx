@@ -3,20 +3,27 @@
 
 // Real data: store_categories / store_items, grouped across markets by
 // group_key (see src/lib/db.ts's fetchStoreCategoryGroups/
-// saveStoreCategoryGroup/saveStoreItemGroup). Display vs. edit differ by
-// design (both per explicit requests): the LIST has a top-row market
-// dropdown (VN/UK/ML) and shows one market's content at a time, but the
-// edit MODALS still hold all 3 markets in one form with name/price required
-// for all 3 before save — that all-3 rule exists because a per-market-only
-// editor is exactly how the catalog ended up VN-only in practice, leaving
-// UK/ML users an empty store.
+// saveStoreCategoryGroup/saveStoreItemGroup). The LIST has a top-row market
+// dropdown (VN/UK/ML) and shows one market's content at a time; the edit
+// MODALS hold all 3 markets in one form (opened at the selected market's
+// tab) so staff always see what the other markets have.
+//
+// Per-market rule (owner, 2026-09-05): every market is independent. The
+// trash icon removes the group/item from the market being VIEWED only —
+// it used to wipe all 3 rows, so deleting a back-support group while on UK
+// silently deleted it for VN too. A blank tab in the modal means "không
+// bán ở thị trường này" (no row); the earlier all-3-required rule is gone,
+// but the tabs flag blank markets so a half-filled catalog is visible at a
+// glance rather than silent.
 import { Fragment, useEffect, useState } from "react";
 import {
   fetchStoreCategoryGroups,
   saveStoreCategoryGroup,
   deleteStoreCategoryGroup,
+  deleteStoreCategoryMarket,
   saveStoreItemGroup,
   deleteStoreItemGroup,
+  deleteStoreItemMarket,
   uploadStoreItemImage,
   type AdminMarket,
   type StoreCategoryGroup,
@@ -34,8 +41,8 @@ const MARKET_TABS: Array<[AdminMarket, string]> = [["VN", "VN"], ["US", "UK"], [
 const MARKET_LABEL: Record<AdminMarket, string> = { VN: "VN", US: "UK", MALAY: "ML" };
 const EMPTY_ITEM_FIELDS: StoreItemMarketFields = { name: "", desc: "", price: "", link: "", previewLink: "", imageUrl: "" };
 
-/** "n/3 thị trường", plus which markets are still missing so staff can see
- * at a glance what's left to fill in (e.g. "1/3 thị trường · thiếu UK, ML"). */
+/** "n/3 thị trường", plus which markets this is NOT sold in, so staff can
+ * see the coverage at a glance (e.g. "1/3 thị trường · không bán: UK, ML"). */
 function marketCompleteness(byMarket: StoreCategoryGroup["byMarket"] | StoreItemGroup["byMarket"]): string {
   const missing = MARKET_TABS.filter(([code]) => {
     const row = byMarket[code];
@@ -43,7 +50,7 @@ function marketCompleteness(byMarket: StoreCategoryGroup["byMarket"] | StoreItem
     return "title" in row ? !row.title.trim() : !row.name.trim();
   });
   const base = `${3 - missing.length}/3 thị trường`;
-  return missing.length ? `${base} · thiếu ${missing.map(([, label]) => label).join(", ")}` : base;
+  return missing.length ? `${base} · không bán: ${missing.map(([, label]) => label).join(", ")}` : base;
 }
 
 /** Best-effort display name for a group in the list — prefers VN, falls
@@ -71,22 +78,26 @@ function storeSaveErrorMessage(error: unknown, subject = "sản phẩm"): string
   if (message.startsWith("missing_category_for_market_")) {
     const code = message.split("_").at(-1)?.toUpperCase() as AdminMarket | undefined;
     const label = code ? MARKET_LABEL[code] ?? code : "?";
-    return `Nhóm sản phẩm này chưa được lưu cho thị trường ${label}. Hãy bấm "Sửa nhóm", điền đủ tên cho cả 3 thị trường và lưu nhóm trước, rồi lưu lại sản phẩm.`;
+    return `Nhóm sản phẩm này không bán ở thị trường ${label}. Hãy bấm "Sửa nhóm", điền tên nhóm ở tab ${label} và lưu trước — hoặc để trống tab ${label} của sản phẩm này.`;
   }
+  if (message.startsWith("market_has_data_")) {
+    const code = message.split("_").at(-1)?.toUpperCase() as AdminMarket | undefined;
+    const label = code ? MARKET_LABEL[code] ?? code : "?";
+    return `Thị trường ${label} đang có dữ liệu nên không thể để trống. Muốn ngừng bán ở ${label}: chọn thị trường ${label} ở đầu trang rồi bấm biểu tượng thùng rác.`;
+  }
+  if (message === "no_market_filled") return "Cần điền ít nhất một thị trường trước khi lưu.";
   if (message.includes("failed to fetch") || message.includes("network")) return "Mất kết nối mạng. Kiểm tra Internet rồi thử lại.";
   return `Không thể lưu ${subject}: ${error.message}`;
 }
 
 type CategoryModalState = { groupKey: string | "new" } | null;
 type ItemModalState = { categoryGroupKey: string; groupKey: string | "new" } | null;
-type DeleteConfirmState = { kind: "category" | "item"; groupKey: string; label: string } | null;
+type DeleteConfirmState = { kind: "category" | "item"; groupKey: string; label: string; market: AdminMarket; marketsWithData: AdminMarket[] } | null;
 
 export function ProductsView() {
   const [groups, setGroups] = useState<StoreCategoryGroup[] | null>(null);
   // Top-row market dropdown — the list below shows/manages ONE market's
-  // content at a time (per explicit request). The edit modals still hold
-  // all 3 markets' fields (opened at the selected market's tab) so the
-  // all-3-required save rule keeps the catalog complete for UK/ML users.
+  // content at a time, and the trash icon only touches that market.
   const [viewMarket, setViewMarket] = useState<AdminMarket>("VN");
   const [categoryModal, setCategoryModal] = useState<CategoryModalState>(null);
   const [categoryTab, setCategoryTab] = useState<AdminMarket>("VN");
@@ -100,6 +111,7 @@ export function ProductsView() {
   const [itemError, setItemError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>(null);
+  const [deleteAllMarkets, setDeleteAllMarkets] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   function emptyCategoryFields(): Record<AdminMarket, { title: string; hasTrial: boolean }> {
@@ -135,12 +147,18 @@ export function ProductsView() {
   }
   async function saveCategory() {
     if (!categoryModal) return;
-    const missing = MARKET_TABS.find(([code]) => !categoryFields[code].title.trim());
-    if (missing) {
-      // Jump to the offending market's tab so the empty field is on screen,
-      // and keep the message inside the modal instead of a transient toast.
-      setCategoryTab(missing[0]);
-      setCategoryError(`Chưa nhập tên nhóm sản phẩm cho thị trường ${missing[1]}. Hãy điền tên ở tab ${missing[1]} rồi lưu lại.`);
+    if (!MARKET_TABS.some(([code]) => categoryFields[code].title.trim())) {
+      setCategoryError("Cần điền tên nhóm cho ít nhất một thị trường.");
+      return;
+    }
+    // A blank tab is "không bán ở đó" — but never for a market that already
+    // has a row: that removal (which cascades into items) is the trash
+    // icon's job. Jump to the offending tab and explain inside the modal.
+    const current = groups?.find((g) => g.groupKey === categoryModal.groupKey);
+    const blankWithData = MARKET_TABS.find(([code]) => !categoryFields[code].title.trim() && !!current?.byMarket[code]);
+    if (blankWithData) {
+      setCategoryTab(blankWithData[0]);
+      setCategoryError(storeSaveErrorMessage(new Error(`market_has_data_${blankWithData[0]}`), "nhóm sản phẩm"));
       return;
     }
     try {
@@ -179,10 +197,22 @@ export function ProductsView() {
   }
   async function saveItem() {
     if (!itemModal) return;
-    const missing = MARKET_TABS.find(([code]) => !itemFields[code].name.trim() || !itemFields[code].price.trim());
-    if (missing) {
-      setItemTab(missing[0]);
-      setItemError(`Chưa nhập tên và giá sản phẩm cho thị trường ${missing[1]}. Hãy điền ở tab ${missing[1]} rồi lưu lại.`);
+    const filled = (code: AdminMarket) => !!itemFields[code].name.trim() && !!itemFields[code].price.trim();
+    const partial = MARKET_TABS.find(([code]) => !filled(code) && (itemFields[code].name.trim() || itemFields[code].price.trim()));
+    if (partial) {
+      setItemTab(partial[0]);
+      setItemError(`Thị trường ${partial[1]} mới điền một nửa — cần cả tên và giá, hoặc để trống hoàn toàn nếu không bán ở ${partial[1]}.`);
+      return;
+    }
+    if (!MARKET_TABS.some(([code]) => filled(code))) {
+      setItemError("Cần điền tên và giá cho ít nhất một thị trường.");
+      return;
+    }
+    const currentItem = groups?.find((g) => g.groupKey === itemModal.categoryGroupKey)?.items.find((it) => it.groupKey === itemModal.groupKey);
+    const blankWithData = MARKET_TABS.find(([code]) => !filled(code) && !!currentItem?.byMarket[code].itemId);
+    if (blankWithData) {
+      setItemTab(blankWithData[0]);
+      setItemError(storeSaveErrorMessage(new Error(`market_has_data_${blankWithData[0]}`)));
       return;
     }
     try {
@@ -208,15 +238,26 @@ export function ProductsView() {
     }
   }
 
+  function closeDelete() {
+    setDeleteConfirm(null);
+    setDeleteAllMarkets(false);
+  }
   async function confirmDelete() {
     if (!deleteConfirm) return;
     const isCategory = deleteConfirm.kind === "category";
+    // Default is the market being viewed only; "all markets" needs the
+    // explicit checkbox in the dialog.
+    const everywhere = deleteAllMarkets || deleteConfirm.marketsWithData.length <= 1;
     try {
       setDeleting(true);
-      if (isCategory) await deleteStoreCategoryGroup(deleteConfirm.groupKey);
-      else await deleteStoreItemGroup(deleteConfirm.groupKey);
-      setDeleteConfirm(null);
-      pushToast(isCategory ? "Đã xoá nhóm sản phẩm" : "Đã xoá sản phẩm");
+      if (everywhere) {
+        if (isCategory) await deleteStoreCategoryGroup(deleteConfirm.groupKey);
+        else await deleteStoreItemGroup(deleteConfirm.groupKey);
+      } else if (isCategory) await deleteStoreCategoryMarket(deleteConfirm.groupKey, deleteConfirm.market);
+      else await deleteStoreItemMarket(deleteConfirm.groupKey, deleteConfirm.market);
+      closeDelete();
+      const what = isCategory ? "nhóm sản phẩm" : "sản phẩm";
+      pushToast(everywhere ? `Đã xoá ${what} ở mọi thị trường` : `Đã ngừng bán ${what} ở thị trường ${MARKET_LABEL[deleteConfirm.market]}`);
       reload();
     } catch (error) {
       console.error("Unable to delete store group", error);
@@ -240,7 +281,7 @@ export function ProductsView() {
       {groups.map((group) => (
         <SectionCard
           key={group.groupKey}
-          title={group.byMarket[viewMarket]?.title.trim() || `${primaryLabel(group.byMarket)} (chưa có tên ${MARKET_LABEL[viewMarket]})`}
+          title={group.byMarket[viewMarket]?.title.trim() || `${primaryLabel(group.byMarket)} (không bán ở ${MARKET_LABEL[viewMarket]})`}
           action={
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span
@@ -258,12 +299,23 @@ export function ProductsView() {
               <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{marketCompleteness(group.byMarket)}</span>
               <GhostBtn onClick={() => openEditCategory(group)}>Sửa nhóm</GhostBtn>
               <PrimaryBtn icon="plus" onClick={() => openNewItem(group.groupKey)}>Thêm sản phẩm</PrimaryBtn>
-              <button
-                onClick={() => setDeleteConfirm({ kind: "category", groupKey: group.groupKey, label: primaryLabel(group.byMarket) })}
-                style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}
-              >
-                <Icon name="trash-2" size={16} color="var(--error)" />
-              </button>
+              {group.byMarket[viewMarket] ? (
+                <button
+                  title={`Ngừng bán ở ${MARKET_LABEL[viewMarket]}`}
+                  onClick={() =>
+                    setDeleteConfirm({
+                      kind: "category",
+                      groupKey: group.groupKey,
+                      label: group.byMarket[viewMarket]?.title.trim() || primaryLabel(group.byMarket),
+                      market: viewMarket,
+                      marketsWithData: MARKET_TABS.filter(([code]) => !!group.byMarket[code]).map(([code]) => code),
+                    })
+                  }
+                  style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}
+                >
+                  <Icon name="trash-2" size={16} color="var(--error)" />
+                </button>
+              ) : null}
             </div>
           }
         >
@@ -292,7 +344,7 @@ export function ProductsView() {
                     {filled ? (
                       <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{row.desc}</div>
                     ) : (
-                      <div style={{ fontSize: 12.5, color: "var(--error)" }}>Chưa có nội dung cho thị trường {MARKET_LABEL[viewMarket]} — bấm sửa để điền.</div>
+                      <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>Không bán ở thị trường {MARKET_LABEL[viewMarket]} — bấm sửa để thêm.</div>
                     )}
                     <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{marketCompleteness(item.byMarket)}</div>
                   </div>
@@ -301,12 +353,23 @@ export function ProductsView() {
                     <button onClick={() => openEditItem(group.groupKey, item)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                       <Icon name="pencil" size={16} color="var(--color-primary)" />
                     </button>
-                    <button
-                      onClick={() => setDeleteConfirm({ kind: "item", groupKey: item.groupKey, label: primaryLabel(item.byMarket) })}
-                      style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}
-                    >
-                      <Icon name="trash-2" size={16} color="var(--error)" />
-                    </button>
+                    {row.itemId ? (
+                      <button
+                        title={`Ngừng bán ở ${MARKET_LABEL[viewMarket]}`}
+                        onClick={() =>
+                          setDeleteConfirm({
+                            kind: "item",
+                            groupKey: item.groupKey,
+                            label: filled ? row.name : primaryLabel(item.byMarket),
+                            market: viewMarket,
+                            marketsWithData: MARKET_TABS.filter(([code]) => !!item.byMarket[code].itemId).map(([code]) => code),
+                          })
+                        }
+                        style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}
+                      >
+                        <Icon name="trash-2" size={16} color="var(--error)" />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -353,7 +416,11 @@ export function ProductsView() {
           <div style={{ marginTop: -6, marginBottom: 14, fontSize: 12, color: "var(--text-muted)" }}>
             Nhóm chính = thiết bị có lộ trình; sản phẩm trong nhóm chính hiển thị ở danh sách chọn thiết bị trên tab Lộ trình của mobile app. Nhóm phụ = phụ kiện, chỉ hiện trong Cửa hàng.
           </div>
-          <PillTabs options={MARKET_TABS} value={categoryTab} onChange={setCategoryTab} />
+          <PillTabs
+            options={MARKET_TABS.map(([code, label]): [AdminMarket, string] => [code, categoryFields[code].title.trim() ? label : `${label} · trống`])}
+            value={categoryTab}
+            onChange={setCategoryTab}
+          />
           <FieldLabel>Tên nhóm sản phẩm</FieldLabel>
           <input
             value={categoryFields[categoryTab].title}
@@ -369,7 +436,9 @@ export function ProductsView() {
             />
             Cho phép dùng thử sản phẩm trong nhóm
           </label>
-          <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>Bắt buộc điền tên cho cả 3 thị trường trước khi lưu.</div>
+          <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
+            Để trống tab của một thị trường = không bán nhóm này ở đó. Cần ít nhất một thị trường có tên.
+          </div>
           {categoryError ? (
             <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(220,53,69,0.08)", fontSize: 12.5, fontWeight: 600, color: "var(--error)", lineHeight: 1.5 }}>
               {categoryError}
@@ -389,7 +458,11 @@ export function ProductsView() {
             </Fragment>
           }
         >
-          <PillTabs options={MARKET_TABS} value={itemTab} onChange={setItemTab} />
+          <PillTabs
+            options={MARKET_TABS.map(([code, label]): [AdminMarket, string] => [code, itemFields[code].name.trim() || itemFields[code].price.trim() ? label : `${label} · trống`])}
+            value={itemTab}
+            onChange={setItemTab}
+          />
           <FieldLabel>Tên sản phẩm</FieldLabel>
           <input
             value={itemFields[itemTab].name}
@@ -435,7 +508,9 @@ export function ProductsView() {
           ) : itemFields[itemTab].imageUrl ? (
             <img src={itemFields[itemTab].imageUrl} alt="Ảnh sản phẩm hiện tại" style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, border: "1px solid var(--divider)", marginBottom: 8 }} />
           ) : null}
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>JPG, PNG hoặc WebP, tối đa 5 MB. Bắt buộc điền tên và giá cho cả 3 thị trường trước khi lưu.</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            JPG, PNG hoặc WebP, tối đa 15 MB (tự nén khi tải lên). Để trống tên và giá ở tab của một thị trường = không bán ở đó; cần ít nhất một thị trường.
+          </div>
           {itemError ? (
             <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(220,53,69,0.08)", fontSize: 12.5, fontWeight: 600, color: "var(--error)", lineHeight: 1.5 }}>
               {itemError}
@@ -443,20 +518,44 @@ export function ProductsView() {
           ) : null}
         </Modal>
       ) : null}
-      {deleteConfirm ? (
-        <ConfirmModal
-          title={deleteConfirm.kind === "category" ? "Xoá nhóm sản phẩm" : "Xoá sản phẩm"}
-          message={
-            deleteConfirm.kind === "category"
-              ? `Xoá nhóm "${deleteConfirm.label}"? Toàn bộ sản phẩm trong nhóm này ở cả 3 thị trường sẽ bị xoá vĩnh viễn và không thể hoàn tác.`
-              : `Xoá sản phẩm "${deleteConfirm.label}" khỏi cả 3 thị trường? Hành động này không thể hoàn tác.`
-          }
-          confirmLabel="Xoá vĩnh viễn"
-          busy={deleting}
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleteConfirm(null)}
-        />
-      ) : null}
+      {deleteConfirm ? (() => {
+        const marketLabel = MARKET_LABEL[deleteConfirm.market];
+        const others = deleteConfirm.marketsWithData.filter((code) => code !== deleteConfirm.market).map((code) => MARKET_LABEL[code]);
+        const lastMarket = others.length === 0;
+        const everywhere = deleteAllMarkets || lastMarket;
+        const what = deleteConfirm.kind === "category" ? "nhóm" : "sản phẩm";
+        return (
+          <ConfirmModal
+            title={deleteConfirm.kind === "category" ? "Ngừng bán nhóm sản phẩm" : "Ngừng bán sản phẩm"}
+            message={
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  Ngừng bán {what} <strong>“{deleteConfirm.label}”</strong> ở thị trường <strong>{marketLabel}</strong>?
+                  {deleteConfirm.kind === "category" ? ` Toàn bộ sản phẩm trong nhóm này ở ${marketLabel} cũng bị xoá.` : ""}
+                </div>
+                {lastMarket ? (
+                  <div style={{ color: "var(--error)", fontWeight: 600 }}>
+                    Đây là thị trường cuối cùng còn {what} này — xoá xong sẽ biến mất hoàn toàn.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ color: "var(--text-secondary)" }}>Bản {others.join(", ")} giữ nguyên.</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                      <input type="checkbox" checked={deleteAllMarkets} onChange={(e) => setDeleteAllMarkets(e.target.checked)} />
+                      Xoá ở mọi thị trường ({deleteConfirm.marketsWithData.map((code) => MARKET_LABEL[code]).join(", ")})
+                    </label>
+                  </>
+                )}
+                <div style={{ color: "var(--text-muted)", fontSize: 12.5 }}>Hành động này không thể hoàn tác.</div>
+              </div>
+            }
+            confirmLabel={everywhere ? "Xoá ở mọi thị trường" : `Ngừng bán ở ${marketLabel}`}
+            busy={deleting}
+            onConfirm={confirmDelete}
+            onCancel={closeDelete}
+          />
+        );
+      })() : null}
     </div>
   );
 }

@@ -15,7 +15,7 @@ import * as VideoThumbnails from 'expo-video-thumbnails';
 import { supabase } from '@/lib/supabase';
 import { isVideoUri } from '@/lib/mediaKind';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
-import { marketForLanguage, type StoreMarket } from '@/hooks/useStore';
+import { useMarket, type StoreMarket } from '@/hooks/useMarket';
 import { translate, type TranslationKey } from '@/lib/i18n';
 
 export type PostType = 'text' | 'image' | 'progress' | 'exercise';
@@ -209,28 +209,18 @@ const POST_COLUMNS =
  * migration) — both post and comment mutations map to this. */
 export function friendlyCommunityError(e: unknown): string {
   const message = e instanceof Error ? e.message : String(e ?? '');
-  if (message.includes('rate_limited')) {
-    return 'Bạn đang thao tác quá nhanh. Vui lòng thử lại sau ít phút.';
-  }
-  if (message.includes('unsafe_community_content')) {
-    return 'Nội dung có từ ngữ chưa phù hợp với Quy tắc cộng đồng. Vui lòng chỉnh sửa trước khi đăng.';
-  }
-  if (message.includes('authentication_required') || message.includes('JWT')) {
-    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại rồi thử bình luận.';
-  }
-  if (message.includes('comment_text_required')) {
-    return 'Nội dung bình luận không được để trống.';
-  }
-  if (message.includes('comment_content_required')) {
-    return 'Hãy nhập nội dung hoặc chọn một ảnh để bình luận.';
-  }
-  if (message.includes('community_post_not_found')) {
-    return 'Bài viết này không còn khả dụng để bình luận.';
-  }
-  if (message.includes('invalid_parent_comment') || message.includes('comment_depth_exceeded')) {
-    return 'Bình luận bạn muốn trả lời không còn khả dụng.';
-  }
-  return 'Có lỗi xảy ra, vui lòng thử lại.';
+  // Read the store directly: this runs from mutation handlers, not render.
+  const language = useAppStore.getState().language;
+  const key: TranslationKey =
+    message.includes('rate_limited') ? 'errRateLimited'
+    : message.includes('unsafe_community_content') ? 'errUnsafeContent'
+    : message.includes('authentication_required') || message.includes('JWT') ? 'errSessionExpired'
+    : message.includes('comment_text_required') ? 'errCommentTextRequired'
+    : message.includes('comment_content_required') ? 'errCommentContentRequired'
+    : message.includes('community_post_not_found') ? 'errPostUnavailable'
+    : message.includes('invalid_parent_comment') || message.includes('comment_depth_exceeded') ? 'errParentUnavailable'
+    : 'errGeneric';
+  return translate(language, key);
 }
 
 export const DEFAULT_POSTS_PAGE_SIZE = 20;
@@ -244,8 +234,7 @@ export const DEFAULT_POSTS_PAGE_SIZE = 20;
 export function useCommunityPosts(limit: number = DEFAULT_POSTS_PAGE_SIZE) {
   const queryClient = useQueryClient();
   const channelId = useRef(`community_posts_${Math.random().toString(36).slice(2)}`);
-  const language = useAppStore((state) => state.language);
-  const market = marketForLanguage(language);
+  const market = useMarket();
 
   useEffect(() => {
     const channel = supabase
@@ -325,8 +314,7 @@ export function useCommunityPosts(limit: number = DEFAULT_POSTS_PAGE_SIZE) {
 export function usePost(postId: string | undefined) {
   const queryClient = useQueryClient();
   const channelId = useRef(`community_post_${Math.random().toString(36).slice(2)}`);
-  const language = useAppStore((state) => state.language);
-  const market = marketForLanguage(language);
+  const market = useMarket();
 
   useEffect(() => {
     if (!postId) return;

@@ -303,7 +303,7 @@ export function PainChart({ data }: PainChartProps) {
       </View> : null}
       {!isEmpty ? <Text style={[theme.type.bodyStrong, { color: theme.colors.primary, marginTop: 12 }]}>{t('doingGreat')}</Text> : null}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Đóng danh sách" style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('a11yCloseList')} style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
           <Pressable
             onPress={() => undefined}
             style={[

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Modal } from "./Modal";
 import { GhostBtn } from "./primitives";
 
@@ -16,7 +17,7 @@ export function ConfirmModal({
   onCancel,
 }: {
   title: string;
-  message: string;
+  message: ReactNode;
   confirmLabel?: string;
   busy?: boolean;
   onConfirm: () => void;
