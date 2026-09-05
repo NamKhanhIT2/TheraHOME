@@ -3410,3 +3410,16 @@ notifications rồi slice 30; ô Tìm kiếm/chuông topbar trang trí; profile
 card cộng đồng dùng currentDay thô; `landingPage` chung 3 thị trường;
 TAB_ITEMS.label + 3 export adminContent là mã chết; bật Leaked Password
 Protection trong Supabase Auth (thao tác dashboard).
+
+## TestFlight: bảng tin Cộng đồng trống một màn + footer đè lên ảnh (2026-09-05)
+
+Bản release đầu tiên sau nhiều thay đổi hiện: khoảng trống cao cả màn hình
+dưới hai nút lọc, và dòng "You are all caught up" vẽ chồng lên ảnh bài.
+Bản dev trên simulator KHÔNG tái hiện. Nguyên nhân: mỗi dòng của FlatList
+(`renderPost`) bọc trong `Reanimated.View entering={fadeUpEntering(...)}`.
+Danh sách này ảo hoá (initialNumToRender 3, windowSize 5) nên cell được tái
+sử dụng; entering chạy lại trên cell tái sử dụng và ở release build đo sai
+kích thước/vị trí → dòng trống chiếm chỗ, footer đo ở vị trí cũ. Bỏ
+`entering` khỏi dòng bài (giữ FadeIn ở cấp danh sách). Store/Roadmap vẫn
+giữ hiệu ứng vì chúng `map` trong ScrollView, không ảo hoá. Kiểm chứng bằng
+`expo run:ios --configuration Release` trên simulator.

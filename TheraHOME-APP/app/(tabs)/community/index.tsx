@@ -51,7 +51,6 @@ import { PostActionBar } from '@/components/community/PostActionBar';
 import { getReactionTrayFrame, pickerReactionAt } from '@/components/community/reactionPickerGeometry';
 import { hapticConfirm } from '@/lib/haptics';
 import { useTabFocusFade } from '@/hooks/useTabFocusFade';
-import { fadeUpEntering, staggerDelay } from '@/lib/motion';
 import { rankCommunityPosts } from '@/lib/communityRanking';
 
 type Filter = 'all' | 'official';
@@ -378,7 +377,13 @@ export default function CommunityScreen() {
     const isMilestone = p.dayMilestone != null || p.phaseMilestone != null;
     const badge = p.phaseMilestone ? t('completePhase', { phase: p.phaseMilestone }) : null;
     return (
-      <Reanimated.View entering={fadeUpEntering(staggerDelay(index, 40, 6))} style={styles.postGap}>
+      // Plain View on purpose. This is a VIRTUALIZED list (initialNumToRender
+      // 3, windowSize 5): a Reanimated `entering` on each cell re-runs as
+      // cells recycle, and on release builds (TestFlight 2026-09-05) that
+      // left a screen-tall blank gap before the first post and drew the
+      // "caught up" footer over a post image. Store/Roadmap keep their
+      // entrance because they map inside a ScrollView, not a FlatList.
+      <View style={styles.postGap}>
       <Pressable
         onPress={() => router.push({ pathname: '/community/[postId]', params: { postId: p.id } })}
         style={[styles.postCard, theme.shadows.card, { backgroundColor: p.isOfficial ? theme.colors.primaryTint05 : theme.colors.bgCard, borderColor: p.isOfficial ? theme.colors.primary : 'transparent', borderRadius: theme.radius.lg, padding: theme.cardPadding }]}
@@ -480,7 +485,7 @@ export default function CommunityScreen() {
         ) : null}
 
       </Pressable>
-      </Reanimated.View>
+      </View>
     );
   }
 
