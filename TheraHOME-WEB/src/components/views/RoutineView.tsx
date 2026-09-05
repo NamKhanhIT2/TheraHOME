@@ -66,7 +66,6 @@ export function RoutineView() {
   const [newProductName, setNewProductName] = useState("");
   const [newProductCategory, setNewProductCategory] = useState<"neck" | "back">("neck");
   const [newProductDays, setNewProductDays] = useState("28");
-  const [newProductLink, setNewProductLink] = useState("");
   const [editInfo, setEditInfo] = useState(false);
   // EN/MS display names for this product + its phases. Before 2026-09-04
   // these lived in a hardcoded lookup inside the mobile app, keyed by the
@@ -120,7 +119,6 @@ export function RoutineView() {
     setNewProductName("");
     setNewProductCategory("neck");
     setNewProductDays("28");
-    setNewProductLink("");
     setNewProductOpen(true);
   }
   async function saveProduct() {
@@ -131,9 +129,13 @@ export function RoutineView() {
       return;
     }
     try {
-      const id = await createRoutineProduct({ name, category: newProductCategory, totalDays, link: newProductLink.trim() });
+      const { id, translated } = await createRoutineProduct({ name, category: newProductCategory, totalDays });
       setNewProductOpen(false);
-      pushToast("Đã thêm sản phẩm mới vào Lộ trình");
+      pushToast(
+        translated
+          ? "Đã thêm sản phẩm + tự dịch nháp tên UK/ML — kiểm tra ở Sửa thông tin"
+          : "Đã thêm sản phẩm — chưa dịch được tên UK/ML, nhập tay ở Sửa thông tin",
+      );
       reload(id);
     } catch {
       pushToast("Không thể thêm sản phẩm");
@@ -644,9 +646,12 @@ export function RoutineView() {
           </div>
           <FieldLabel>Thời lượng lộ trình (ngày)</FieldLabel>
           <input type="number" min={1} max={365} value={newProductDays} onChange={(e) => setNewProductDays(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
-          <FieldLabel>Link trang sản phẩm</FieldLabel>
-          <input value={newProductLink} onChange={(e) => setNewProductLink(e.target.value)} placeholder="https://..." style={inputStyle} />
-          <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--text-muted)" }}>Hệ thống sẽ tạo sẵn 3 giai đoạn; bạn có thể thêm từng ngày sau khi tạo sản phẩm.</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
+            Hệ thống tạo sẵn 3 giai đoạn (sửa/xoá/thêm được ở thẻ Giai đoạn) và tự dịch nháp tên sang UK/ML.
+            Sau khi tạo: thêm từng ngày tập, rồi bấm <strong>Xuất bản lộ trình</strong> thì app mới hiện.
+            <br />
+            Link trang sản phẩm đặt ở tab <strong>Sản Phẩm</strong> (Cửa hàng) — link gắn với mục bán hàng, không gắn với lộ trình.
+          </div>
         </Modal>
       ) : null}
       {editInfo ? (

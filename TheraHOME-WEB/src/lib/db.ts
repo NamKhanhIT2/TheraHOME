@@ -8,6 +8,7 @@
 // yet, so callers do plain fetch-on-mount with useState/useEffect.
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import { translateDrafts } from "./translate";
 import type { Product, ProgramPhase, ProgramDay, MarketContent, StoreCategory, StoreItem, CommunityPost, CommunityComment, NotificationItem } from "./mockData";
 import type {
   SampleUser,
@@ -210,18 +211,52 @@ export async function deleteRoutineProduct(productId: string) {
   if (error) throw error;
 }
 
-export async function createRoutineProduct(input: { name: string; category: "neck" | "back"; totalDays: number; link: string }) {
+/** Creates the product and its starter phases. The storefront link is NOT
+ * taken here: a link lives on a `store_items` row, which a brand-new roadmap
+ * product does not have yet — the create form used to collect one and throw
+ * it away silently. Set it in Sản Phẩm (Cửa hàng), or in Sửa thông tin once
+ * the product has a storefront entry.
+ *
+ * Returns `{ id, translated }`; `translated` is false when the auto-draft
+ * translator was unavailable, so the caller can say the UK/ML names still
+ * need filling in. A translator outage never blocks creation. */
+export async function createRoutineProduct(input: { name: string; category: "neck" | "back"; totalDays: number }): Promise<{ id: string; translated: boolean }> {
   const id = `routine-${Date.now()}`;
   const { error: prodErr } = await supabase.from("products").insert({ id, name: input.name, category: input.category, total_days: input.totalDays });
   if (prodErr) throw prodErr;
 
   const phases = buildPhases(input.totalDays);
+
+  // Draft the UK/ML names up front, so a new roadmap is not Vietnamese-only
+  // for UK/ML users until someone remembers to translate it by hand.
+  const texts: Record<string, string> = { product: input.name };
+  phases.forEach((ph, i) => {
+    texts[`phase_${i}`] = ph.name;
+  });
+  const drafts = await translateDrafts(texts);
+
   const { error: phaseErr } = await supabase.from("program_phases").insert(
-    phases.map((ph, i) => ({ product_id: id, name: ph.name, day_start: ph.range[0], day_end: ph.range[1], sort_order: i }))
+    phases.map((ph, i) => ({
+      product_id: id,
+      name: ph.name,
+      name_en: drafts?.en[`phase_${i}`] ?? null,
+      name_ms: drafts?.ms[`phase_${i}`] ?? null,
+      day_start: ph.range[0],
+      day_end: ph.range[1],
+      sort_order: i,
+    }))
   );
   if (phaseErr) throw phaseErr;
 
-  return id;
+  if (drafts) {
+    const { error: nameErr } = await supabase
+      .from("products")
+      .update({ name_en: drafts.en.product ?? null, name_ms: drafts.ms.product ?? null })
+      .eq("id", id);
+    if (nameErr) throw nameErr;
+  }
+
+  return { id, translated: !!drafts };
 }
 
 /** EN/MS display names for one product and its phases — shown to UK/ML app
