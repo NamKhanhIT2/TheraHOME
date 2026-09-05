@@ -17,6 +17,9 @@ export interface ProductDropdownProps {
 export function ProductDropdown({ product, products, onSelect }: ProductDropdownProps) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
+  // With a single roadmap there is nothing to switch to: render the trigger
+  // as a plain label — no chevron, no menu (owner request 2026-09-05).
+  const single = products.length <= 1;
   const triggerRef = useRef<View>(null);
   const [menuFrame, setMenuFrame] = useState({ left: 20, top: 0, width: 0 });
   const menuAnim = useRef(new Animated.Value(0)).current;
@@ -43,7 +46,8 @@ export function ProductDropdown({ product, products, onSelect }: ProductDropdown
   return (
     <View ref={triggerRef} collapsable={false}>
       <Pressable
-        onPress={openMenu}
+        onPress={single ? undefined : openMenu}
+        disabled={single}
         style={[
           styles.trigger,
           { backgroundColor: theme.colors.bgCard, borderColor: theme.colors.borderInput, borderRadius: theme.radius.md },
@@ -51,9 +55,11 @@ export function ProductDropdown({ product, products, onSelect }: ProductDropdown
       >
         <View style={[styles.dot, { backgroundColor: theme.colors[product.accent] }]} />
         <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{product.name}</Text>
-        <Animated.View style={{ transform: [{ rotate: chevronAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
-          <Icon name="chevron-down" size={18} color={theme.colors.textSecondary} />
-        </Animated.View>
+        {single ? null : (
+          <Animated.View style={{ transform: [{ rotate: chevronAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
+            <Icon name="chevron-down" size={18} color={theme.colors.textSecondary} />
+          </Animated.View>
+        )}
       </Pressable>
       <Modal visible={open} transparent animationType="none" onRequestClose={closeMenu}>
         <Pressable style={styles.backdrop} onPress={closeMenu}>

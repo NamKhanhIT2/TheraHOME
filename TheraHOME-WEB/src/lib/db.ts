@@ -187,9 +187,9 @@ export async function setRoadmapPublished(productId: string, published: boolean)
   return { pushError: pushErr ? String(pushErr.message ?? pushErr) : null };
 }
 
-/** Number of customer accounts that already activated this product — a
- * roadmap with owners must be UNPUBLISHED, never deleted (deleting would
- * orphan their user_programs). */
+/** Number of accounts that currently hold this roadmap — shown in the delete
+ * confirm, because deleting the roadmap deletes their program, progress and
+ * pain logs with it (migration 202609051700). */
 export async function countRoadmapOwners(productId: string): Promise<number> {
   const { count, error } = await supabase.from("user_programs").select("id", { count: "exact", head: true }).eq("product_id", productId);
   if (error) throw error;
@@ -197,10 +197,14 @@ export async function countRoadmapOwners(productId: string): Promise<number> {
 }
 
 export async function deleteRoutineProduct(productId: string) {
-  const owners = await countRoadmapOwners(productId);
-  if (owners > 0) throw new Error("has_owners");
-  // program_phases / program_days / product_activation_contacts cascade;
-  // store_items.product_id is set null (the storefront row survives).
+  // Real orders reference the product and must survive — refuse those.
+  const { count, error: orderErr } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("product_id", productId);
+  if (orderErr) throw orderErr;
+  if ((count ?? 0) > 0) throw new Error("has_orders");
+  // Cascades: program_phases / program_days (with quiz + promo content),
+  // product_activation_contacts and every user_programs row (with its
+  // progress and pain logs); store_items.product_id is set null so the
+  // storefront row survives; notifications lose the product/day reference.
   const { error } = await supabase.from("products").delete().eq("id", productId);
   if (error) throw error;
 }

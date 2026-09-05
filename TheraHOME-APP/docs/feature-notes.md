@@ -3466,3 +3466,36 @@ còn ngày thiếu video hoặc lặp video ngày trước (VN làm chuẩn). K�
 badge "Lộ trình chưa xuất bản" để CSKH biết khách sẽ thấy thẻ chờ.
 
 **App Review:** review account chỉ còn thấy TheraNECK+ — khớp test path.
+
+## Chỉ còn lộ trình TheraNECK+; xoá hẳn 3 bản nháp (2026-09-05, tối)
+
+**Chốt của chủ sở hữu:** không giữ NECK PRO / BACK+ / BACK PRO ở trạng
+thái "Nháp" — xoá luôn. Tab Kích hoạt (web) chỉ liệt kê sản phẩm còn trong
+tab Lộ trình (cả hai đọc `products`, nên tự đồng bộ). App: khi danh sách
+chỉ có 1 sản phẩm thì ô chọn không có mũi tên trỏ xuống và không bấm được.
+
+**Migration 202609051700 `roadmap_hard_delete`:**
+- `user_programs.product_id` → ON DELETE CASCADE (kéo theo pain_logs,
+  user_program_days, user_quiz_attempts vốn đã cascade theo user_programs);
+  `pain_logs.program_day_id` → CASCADE; `notifications.related_product_id`
+  / `related_day_id` → SET NULL. `orders.product_id` giữ NO ACTION: sản phẩm
+  đã có đơn hàng KHÔNG xoá được (WEB báo `has_orders`).
+- Xoá 3 products nháp (28 ngày sao chép mỗi cái, 6–7 user_programs của tài
+  khoản review/tester/admin_issued/normal, 3–4 contact kích hoạt, 1 thông
+  báo `roadmap_ready` của neck-pro). store_items từng trỏ neck-pro nay
+  `product_id = null` — hàng trên Cửa hàng vẫn còn nguyên.
+
+**App:** `ProductDropdown` nhận `products.length <= 1` → chỉ là nhãn tĩnh.
+Roadmap/Home chỉ chọn trong danh sách nhìn thấy (`dropdownProducts`), kể
+cả khi `selectedProductId` lưu máy trỏ vào lộ trình đã bị ẩn/xoá; tên hiển
+thị rút gọn phần sau dấu "·" (TheraNECK+). Chart anchor ở Home cũng vậy.
+
+**WEB Lộ trình:** Xoá không còn chặn "đã có khách kích hoạt"; confirm nêu
+số tài khoản sẽ mất tiến trình + nhật ký đau; chỉ chặn khi có đơn hàng.
+Cơ chế Xuất bản/Ẩn (`roadmap_published`) GIỮ NGUYÊN cho lộ trình mới sau
+này: tạo → nháp → đủ video → Xuất bản.
+
+**Còn lại:** 3 IAP neckpro/backplus/backpro vẫn nằm trong App Store Connect
+("Ready to Submit", không đính vào version) — không xoá vì mất Product ID
+vĩnh viễn; `storekit/Configuration.storekit` vẫn khai báo đủ 4 để test.
+`src/lib/adminContent.ts` còn bản dịch dự phòng cho 3 id cũ — vô hại.

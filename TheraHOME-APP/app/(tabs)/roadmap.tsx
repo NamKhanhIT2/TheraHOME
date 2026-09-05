@@ -68,10 +68,17 @@ export default function RoadmapScreen() {
   // Prefer the product the user actually ordered over just "first activated
   // program" — only kicks in when they haven't explicitly picked one via
   // the dropdown yet (`selectedProductId` always wins once set).
+  // Only products in the VISIBLE list can be selected. A persisted
+  // selection (or the account's default device) pointing at a hidden
+  // roadmap — e.g. the review account's auto-provisioned TheraNECK PRO —
+  // falls through to the first visible one instead of rendering it.
+  const visible = (id: string | null | undefined) => (id && dropdownProducts.some((p) => p.id === id) ? id : undefined);
   const effectiveProductId =
-    selectedProductId ?? defaultProductQuery.data ?? activatedPrograms[0]?.productId ?? dropdownProducts[0]?.id;
-  const selectedProduct =
-    dropdownProducts.find((p) => p.id === effectiveProductId) ?? catalogProducts.find((p) => p.id === effectiveProductId);
+    visible(selectedProductId) ??
+    visible(defaultProductQuery.data) ??
+    visible(activatedPrograms.find((p) => dropdownProducts.some((d) => d.id === p.productId))?.productId) ??
+    dropdownProducts[0]?.id;
+  const selectedProduct = dropdownProducts.find((p) => p.id === effectiveProductId);
   const program = activatedPrograms.find((p) => p.productId === effectiveProductId);
   // Same review-aware "Ngày N" the Home hero and Profile use — keeps the
   // roadmap's "Hôm nay" marker on the day the reviewer actually reached.

@@ -74,20 +74,32 @@ export default function HomeScreen() {
   // Prefer the product the user actually ordered over just "first activated
   // program" — only kicks in when they haven't explicitly picked one via
   // the dropdown yet (`selectedProductId` always wins once set).
+  const catalogProducts = productsQuery.data ?? [];
+  // Visible roadmaps (published + unpublished-but-owned, never hidden ones
+  // for review accounts) — see useRoadmapProducts. Computed FIRST so the
+  // program below can only ever be one the user is allowed to see.
+  const activatedProductIds = useMemo(() => activatedPrograms.map((p) => p.productId), [activatedPrograms]);
+  const dropdownProducts = useRoadmapProducts(catalogProducts, activatedProductIds, profile?.accountType === 'review');
+  const visiblePrograms = activatedPrograms.filter((p) => dropdownProducts.some((d) => d.id === p.productId));
   // When nothing is explicitly selected, prefer a PUBLISHED roadmap so a
   // customer who owns TheraNECK+ and a not-yet-ready TheraBACK lands on the
   // one with content.
   const program =
-    activatedPrograms.find((p) => p.productId === selectedProductId) ??
-    activatedPrograms.find((p) => p.productId === defaultProductQuery.data && p.product.roadmapPublished) ??
-    activatedPrograms.find((p) => p.product.roadmapPublished) ??
-    activatedPrograms.find((p) => p.productId === defaultProductQuery.data) ??
-    activatedPrograms[0];
-  const catalogProducts = productsQuery.data ?? [];
+    visiblePrograms.find((p) => p.productId === selectedProductId) ??
+    visiblePrograms.find((p) => p.productId === defaultProductQuery.data && p.product.roadmapPublished) ??
+    visiblePrograms.find((p) => p.product.roadmapPublished) ??
+    visiblePrograms.find((p) => p.productId === defaultProductQuery.data) ??
+    visiblePrograms[0];
   // Before activation there's no program to key off of — fall back to
   // whatever's selected (or the first catalog product) so the product
   // dropdown/pain chart still have something to show while unactivated.
-  const effectiveChartProductId = program?.productId ?? selectedProductId ?? catalogProducts[0]?.id;
+  // Chart/dropdown anchor must also stay inside the visible list — a
+  // persisted selection can point at a roadmap this account cannot see.
+  const effectiveChartProductId =
+    program?.productId ??
+    (selectedProductId && dropdownProducts.some((d) => d.id === selectedProductId) ? selectedProductId : undefined) ??
+    dropdownProducts[0]?.id ??
+    catalogProducts[0]?.id;
   const chartProduct =
     catalogProducts.find((p) => p.id === effectiveChartProductId) ?? program?.product;
   const chartProgram = activatedPrograms.find((p) => p.productId === effectiveChartProductId);
@@ -112,9 +124,6 @@ export default function HomeScreen() {
 
   // Home's device dropdown mirrors the Roadmap's: primary-group devices
   // with the viewer's market's store names (VN fallback).
-  // Published roadmaps + unpublished ones this customer owns (useRoadmapProducts).
-  const activatedProductIds = useMemo(() => activatedPrograms.map((p) => p.productId), [activatedPrograms]);
-  const dropdownProducts = useRoadmapProducts(catalogProducts, activatedProductIds, profile?.accountType === 'review');
 
   // `programsQuery` and `daysQuery` are dependent queries. In TanStack Query
   // v5 a disabled query is still `isPending`, even though it is not fetching.

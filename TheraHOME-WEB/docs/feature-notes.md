@@ -875,3 +875,13 @@ hiện; đọc `products.roadmap_published` do tab Lộ trình quản. Tab có b
 trạng thái, bảng sẵn-sàng video theo thị trường, Xuất bản/Ẩn/Xoá (xoá bị
 chặn khi đã có khách), sửa tên giai đoạn VN, và khoá "Đang mở bán" cho giai
 đoạn thiếu/lặp video. Chi tiết ở `TheraHOME-APP/docs/feature-notes.md`.
+
+## Xoá hẳn 3 lộ trình nháp; Xoá không còn chặn theo khách (2026-09-05, tối)
+
+Chủ sở hữu chốt: chỉ còn TheraNECK+. Migration `202609051700` chuyển FK
+`user_programs.product_id` sang CASCADE (kèm pain_logs/ngày/quiz), rồi xoá
+neck-pro / back-plus / back-pro. `deleteRoutineProduct` chỉ còn chặn khi
+sản phẩm đã có `orders` (`has_orders`); confirm xoá hiện số tài khoản sẽ
+mất tiến trình (`countRoadmapOwners`). Tab Kích hoạt đọc cùng bảng
+`products` nên danh sách sản phẩm luôn khớp tab Lộ trình. Chi tiết ở
+`TheraHOME-APP/docs/feature-notes.md`.

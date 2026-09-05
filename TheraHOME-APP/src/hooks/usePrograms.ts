@@ -68,7 +68,12 @@ export function useRoadmapProducts(
   isReviewAccount: boolean,
 ): ProductInfo[] {
   return useMemo(
-    () => products.filter((p) => p.roadmapPublished || (!isReviewAccount && activatedProductIds.includes(p.id))),
+    () =>
+      products
+        .filter((p) => p.roadmapPublished || (!isReviewAccount && activatedProductIds.includes(p.id)))
+        // products.name is "Thiết bị hỗ trợ cổ · TheraNECK+"; the dropdown
+        // only needs the device part, like the old store-item names did.
+        .map((p) => ({ ...p, name: p.name.includes('·') ? p.name.split('·').pop()!.trim() || p.name : p.name })),
     [products, activatedProductIds, isReviewAccount],
   );
 }

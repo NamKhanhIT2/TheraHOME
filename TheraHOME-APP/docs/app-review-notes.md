@@ -20,19 +20,30 @@
 - Password: `<FILL IN BEFORE SUBMITTING>`
 
 This is a dedicated review account: every roadmap day is open immediately
-and each phase's survey can be taken right away, so the full 28-day program
-can be exercised in one sitting (regular users unlock one day per calendar
-day). The in-app purchase lock on Phase 3 is intentionally kept in place on
-this account — that is the IAP to review.
+and each phase's survey can be taken right away, so the full program can be
+exercised in one sitting (regular users unlock one day per calendar day).
+Only one device program exists today — TheraNECK+ — so the Home/Roadmap
+product switcher shows a single, non-interactive label. (When IAP is on
+sale, the Phase 3 purchase lock is intentionally kept in place on this
+account — that is the IAP to review.)
 
-## Suggested test path
+## Suggested test path (free-agreement build — no IAP visible)
 
 1. Sign in with the demo account above.
-2. "Lộ trình" (Roadmap) tab → pick "TheraNECK+" in the device dropdown.
+2. "Lộ trình" (Roadmap) tab → the TheraNECK+ program (Phase 1 and Phase 2,
+   14 days) is listed.
 3. Open any day → the discomfort check-in (0–10) appears → confirm → the
    day's exercise video screen opens.
 4. At the end of Phase 2, tap "Khảo sát & đánh giá giai đoạn" and submit
    the 3-question survey.
+5. Home tab: progress chart, today's card ("Quick guide" plays the current
+   day's video), water tracker. Store, Community and both chats (AI /
+   human) are reachable from the tab bar and the floating assistant.
+
+## Suggested test path (once IAP is on sale)
+
+Steps 1–4 as above, then:
+
 5. Two cards appear at the bottom of the roadmap: "Mở khóa Giai đoạn 3"
    (the IAP paywall — non-consumable `ai.therahome.neckplus.phase3unlock`)
    and a cross-sell card for a physical device.
@@ -43,13 +54,16 @@ this account — that is the IAP to review.
 
 ## In-app purchases (Guideline 3.1.1)
 
-Digital content (Phase 3 of each device's exercise program) is sold ONLY
-through Apple In-App Purchase — one non-consumable per device:
+Digital content (Phase 3 of a device's exercise program) is sold ONLY
+through Apple In-App Purchase — one non-consumable per device. Only the
+TheraNECK+ program exists in the app today, so only its IAP is attached:
 
 - `ai.therahome.neckplus.phase3unlock`
-- `ai.therahome.neckpro.phase3unlock`
-- `ai.therahome.backplus.phase3unlock`
-- `ai.therahome.backpro.phase3unlock`
+
+(`ai.therahome.neckpro.phase3unlock`, `ai.therahome.backplus.phase3unlock`
+and `ai.therahome.backpro.phase3unlock` stay in App Store Connect as
+"Ready to Submit" — unattached — for when those programs ship; deleting
+an IAP forfeits its Product ID forever.)
 
 ## Physical goods (Guideline 3.1.3(e))
 

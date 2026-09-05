@@ -12,6 +12,7 @@ import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updat
   fetchRoadmapReadiness,
   setRoadmapPublished,
   deleteRoutineProduct,
+  countRoadmapOwners,
   type RoadmapReadiness,
 } from "@/lib/db";
 import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs, MarketSelect } from "@/components/ui/primitives";
@@ -50,6 +51,7 @@ export function RoutineView() {
   // videos are before flipping it.
   const [readiness, setReadiness] = useState<RoadmapReadiness[] | null>(null);
   const [publishAction, setPublishAction] = useState<"publish" | "unpublish" | "delete" | null>(null);
+  const [deleteOwners, setDeleteOwners] = useState<number | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
   const [newProductOpen, setNewProductOpen] = useState(false);
@@ -156,8 +158,8 @@ export function RoutineView() {
       reload(product.id);
     } catch (error) {
       pushToast(
-        error instanceof Error && error.message === "has_owners"
-          ? "Không xoá được: đã có khách kích hoạt lộ trình này. Hãy dùng 'Ẩn lộ trình' thay vì xoá."
+        error instanceof Error && error.message === "has_orders"
+          ? "Không xoá được: đã có đơn hàng gắn với sản phẩm này."
           : "Không thể cập nhật trạng thái lộ trình",
       );
     } finally {
@@ -295,7 +297,16 @@ export function RoutineView() {
             ) : (
               <PrimaryBtn onClick={() => setPublishAction("publish")}>Xuất bản lộ trình</PrimaryBtn>
             )}
-            <GhostBtn color="var(--error)" onClick={() => setPublishAction("delete")}>Xoá</GhostBtn>
+            <GhostBtn
+              color="var(--error)"
+              onClick={() => {
+                setDeleteOwners(null);
+                countRoadmapOwners(product.id).then(setDeleteOwners).catch(() => setDeleteOwners(null));
+                setPublishAction("delete");
+              }}
+            >
+              Xoá
+            </GhostBtn>
           </div>
         }
       >
@@ -570,7 +581,9 @@ export function RoutineView() {
               ? `Xuất bản "${product.name}"? Lộ trình hiện lên app cho mọi người, và MỌI khách đã kích hoạt thiết bị này nhận thông báo "lộ trình đã sẵn sàng".${readiness?.some((r) => r.missingDays.length || r.duplicateDays.length) ? " Lưu ý: bảng bên trên cho thấy còn ngày thiếu video hoặc lặp video." : ""}`
               : publishAction === "unpublish"
                 ? `Ẩn "${product.name}" khỏi app? Khách chưa kích hoạt sẽ không thấy; khách đã kích hoạt thấy thẻ "đang hoàn thiện" thay cho các ngày tập.`
-                : `Xoá hẳn "${product.name}" cùng toàn bộ ngày tập và giai đoạn? Chỉ xoá được khi chưa có khách kích hoạt. Không thể hoàn tác.`
+                : `Xoá hẳn "${product.name}" cùng toàn bộ ngày tập, giai đoạn và danh sách kích hoạt?${
+                    deleteOwners ? ` ${deleteOwners} tài khoản đang có lộ trình này sẽ mất tiến trình tập và nhật ký đau.` : ""
+                  } Không thể hoàn tác.`
           }
           confirmLabel={publishAction === "publish" ? "Xuất bản" : publishAction === "unpublish" ? "Ẩn lộ trình" : "Xoá vĩnh viễn"}
           busy={publishBusy}
