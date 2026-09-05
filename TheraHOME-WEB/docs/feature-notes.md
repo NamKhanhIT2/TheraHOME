@@ -842,3 +842,17 @@ UI ẩn nút). CSKH đã được đăng và sửa bài chính thức nên chặ
 đổi policy thành "web cskh delete any post" (migration
 202609051200) và bỏ điều kiện ẩn nút. Xoá bài cascade sang bình luận,
 cảm xúc, lưu, và dòng hộp thư thông báo — vẫn qua hộp xác nhận.
+
+## Ghim theo thị trường, sửa bài đủ 3 thị trường (2026-09-05)
+
+Modal Sửa bài chỉ ghi được bản VN (bản UK/ML sau khi đăng là không sửa được),
+và modal Ghim không cho chọn ghim ở quốc gia nào — thẻ ghim lại dùng chung
+một bộ cột cho cả 3 thị trường. Đã sửa cả 3 tầng; chi tiết + kịch bản kiểm
+chứng ở `TheraHOME-APP/docs/feature-notes.md` mục cùng ngày.
+
+## Cộng đồng chuyển sang CSKH, bỏ bản rút gọn (2026-09-05)
+
+NAV_ADMIN mất "Cộng đồng" và "Khảo sát & Giao dịch"; NAV_CARE nhận cả hai.
+CommunityView bỏ prop `pinOnly` — CSKH giờ dùng bản đầy đủ (bài viết +
+Thử thách). Kèm migration nới policy `challenges` từ admin-only sang
+admin+cskh, nếu không tab Thử thách sẽ không đọc/ghi được.

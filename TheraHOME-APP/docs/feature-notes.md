@@ -3290,3 +3290,65 @@ Việt.
 `notification_copy` bằng SQL và typecheck. Push bài mới đúng thị trường
 sẽ tự thể hiện ở lần đăng bài kế tiếp — nếu khách VN vẫn nhận bài UK, xem
 `profiles.country` của họ trước.
+
+## Ghim và sửa bài: đủ 3 thị trường (2026-09-05)
+
+Chủ sở hữu báo 2 lỗi, cả hai đều do rà chưa kỹ ở các đợt trước:
+
+**1. "Chỉnh sửa mới chỉ có ở VN".** Modal Sửa bài chỉ đọc/ghi `title`+`text`
+(bản gốc = VN); `fetchCommunityPosts` thậm chí không SELECT title_us/text_us.
+Nghĩa là bản UK/ML sau khi đăng KHÔNG BAO GIỜ sửa được, kể cả bản dịch nháp
+tự động sai. Nhãn "(VN)" cũng sai với bài UK-only vì bản gốc của bài đó là
+tiếng Anh.
+
+**2. "Chọn ghim nhưng không có cụ thể ghim ở quốc gia nào".** Ghim đã theo
+thị trường từ 04/09 (chỉ bỏ ghim bài chồng lấn), NHƯNG thẻ ghim chỉ có MỘT
+bộ cột `pinned_title/pinned_content/pinned_thumbnail_url` → bài ghim cho
+VN+UK hiện cùng một thẻ tiếng Việt cho cả hai. Và nhân viên không thấy/không
+chọn được ghim ở thị trường nào.
+
+**Sửa (migration 202609051300):**
+- `pinned_markets text[]`: pin sống ở thị trường nào (null = mọi thị trường
+  bài nhắm → pin cũ giữ nguyên hành vi).
+- Thẻ ghim theo thị trường: `pinned_{title,content,thumbnail_url}_{us,malay}`.
+- `set_official_post_pinned` nhận `p_markets` + bộ tham số theo thị trường;
+  chặn ghim ra thị trường bài không nhắm (`pin_market_not_targeted`); chỉ bỏ
+  ghim bài có pinned_markets CHỒNG LẤN.
+
+**App:** `isPinnedForMarket(post, market)` quyết định slot ghim; `mapPost`
+chọn thẻ ghim theo thị trường (fallback VN). Home + tab Cộng đồng dùng chung.
+
+**WEB:** modal Ghim có ô chọn thị trường (chỉ liệt kê thị trường bài nhắm) +
+tab soạn thẻ riêng từng thị trường, mặc định lấy nội dung bài CỦA thị trường
+đó chứ không phải bản Việt; upload ảnh riêng mỗi thị trường. Modal Sửa bài
+giờ có đủ khối "Hiển thị cho thị trường" + tab UK/ML, sửa được cả target
+markets, và chặn lưu nếu một thị trường đang tick mà chưa có nội dung.
+
+**Kiểm chứng bằng SQL trên dữ liệu thật (đã dọn sau đó):** dựng 1 pin VN +
+1 pin UK, mô phỏng ghim thêm ở UK → chỉ pin UK bị thay, pin VN nguyên; truy
+vấn theo 3 thị trường trả về 3 bài ghim + 3 thẻ khác nhau đúng như app đọc.
+
+## Cộng đồng + Khảo sát chuyển hẳn sang CSKH (2026-09-05)
+
+Chủ sở hữu chuyển 2 tab khỏi Admin. Không chỉ đổi menu — mỗi tab có một
+điều kiện quyền phải nới, nếu không CSKH nhận màn hình chết:
+- **Khảo sát & Giao dịch**: RLS `user_quiz_attempts` / `phase_purchases` vốn
+  đã cấp SELECT cho cả admin lẫn cskh → chỉ cần chuyển menu.
+- **Cộng đồng**: trước đây CSKH chỉ có bản rút gọn (`pinOnly`) và tab Thử
+  thách là Admin-only vì policy `challenges` chỉ cấp ghi cho admin, kể cả
+  ĐỌC bản nháp (active = false). Migration 202609051400 đổi thành
+  admin+cskh cho cả ALL lẫn SELECT. Bỏ luôn prop `pinOnly` (giờ là mã chết)
+  cùng các nhánh ẩn nút sửa/ẩn bài theo prop đó.
+
+Admin không còn 2 tab này; tài khoản admin vẫn xem được bằng nút "Chuyển
+sang CSKH" ở góc dưới thanh bên.
+
+## Nút "Hướng dẫn nhanh" mở video của đúng ngày (2026-09-05)
+
+Trước đây luôn mở `app_config.home_intro_video_url` (một video giới thiệu
+cố định). Giờ mở `today.video` — video của ngày đang hiện trên thẻ, đã phân
+giải theo thị trường trong usePrograms; thiếu thì mới rơi về link chung.
+An toàn với paywall: `today` đã được neo về ngày cuối còn truy cập được khi
+giai đoạn sau còn khoá, nên không mở được video của giai đoạn chưa mua.
+Nhãn nút giữ nguyên theo yêu cầu. Kiểm chứng trên simulator: bấm ra đúng
+"Ngày 14: Duy trì cột sống cổ khỏe lâu dài" (trước đó ra video giới thiệu).

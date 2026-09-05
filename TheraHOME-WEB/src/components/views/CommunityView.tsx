@@ -22,6 +22,8 @@ import {
   type Challenge,
   type PinnedDisplay,
   type AdminMarket,
+  type PinnedMarketDisplay,
+  type PostMarketContent,
   type PostModerationStatus,
 } from "@/lib/db";
 import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, Avatar, PillTabs } from "@/components/ui/primitives";
@@ -32,7 +34,16 @@ import { TableShell } from "@/components/ui/TableShell";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 
-type PinnedPost = CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay; targetMarkets: string[] | null };
+type PinnedPost = CommunityPost & {
+  pinned: boolean;
+  hidden: boolean;
+  status: PostModerationStatus;
+  imageUrl: string | null;
+  pinnedDisplay: PinnedDisplay;
+  pinnedMarketDisplay: PinnedMarketDisplay;
+  marketContent: PostMarketContent;
+  targetMarkets: string[] | null;
+};
 
 type AuthorTab = "official" | "users";
 const AUTHOR_TABS: Array<[AuthorTab, string]> = [
@@ -152,6 +163,9 @@ function ChallengesAdminView() {
   );
 }
 
+const MARKET_TABS: Array<[AdminMarket, string]> = [["VN", "VN"], ["US", "UK"], ["MALAY", "ML"]];
+const MARKET_LABEL: Record<AdminMarket, string> = { VN: "VN", US: "UK", MALAY: "ML" };
+
 function PinDisplayModal({
   post,
   onClose,
@@ -159,24 +173,74 @@ function PinDisplayModal({
 }: {
   post: PinnedPost;
   onClose: () => void;
-  onConfirm: (input: { title: string; content: string; thumbnailFile: File | null; thumbnailUrl: string }) => Promise<void>;
+  onConfirm: (input: {
+    markets: AdminMarket[];
+    byMarket: Record<AdminMarket, { title: string; content: string; thumbnailUrl: string }>;
+    thumbnailFiles: Partial<Record<AdminMarket, File>>;
+  }) => Promise<void>;
 }) {
-  const [title, setTitle] = useState(post.title || post.name);
-  const [content, setContent] = useState(post.text);
-  const [thumbnailUrl, setThumbnailUrl] = useState(post.imageUrl || "");
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  // A pin can never go wider than the post itself: `targetMarkets` null
+  // means the post reaches every market.
+  const postMarkets: AdminMarket[] = post.targetMarkets?.length
+    ? (MARKET_TABS.map(([code]) => code).filter((code) => post.targetMarkets!.includes(code)) as AdminMarket[])
+    : (MARKET_TABS.map(([code]) => code) as AdminMarket[]);
+  const alreadyPinned = post.pinnedMarketDisplay.markets?.length
+    ? (post.pinnedMarketDisplay.markets.filter((code: AdminMarket) => postMarkets.includes(code)) as AdminMarket[])
+    : postMarkets;
+
+  const [markets, setMarkets] = useState<AdminMarket[]>(alreadyPinned);
+  const [tab, setTab] = useState<AdminMarket>(alreadyPinned[0] ?? postMarkets[0]);
+  const [byMarket, setByMarket] = useState<Record<AdminMarket, { title: string; content: string; thumbnailUrl: string }>>(() => {
+    // Each market's card defaults to THAT market's post content, so a UK pin
+    // never starts life holding Vietnamese copy.
+    const saved = post.pinnedMarketDisplay;
+    const base = { title: post.title || post.name, content: post.text, thumbnailUrl: post.imageUrl || "" };
+    return {
+      VN: { title: saved.vn.title || base.title, content: saved.vn.content || base.content, thumbnailUrl: saved.vn.thumbnailUrl || base.thumbnailUrl },
+      US: {
+        title: saved.us.title || post.marketContent.titleUs || base.title,
+        content: saved.us.content || post.marketContent.textUs || base.content,
+        thumbnailUrl: saved.us.thumbnailUrl || base.thumbnailUrl,
+      },
+      MALAY: {
+        title: saved.malay.title || post.marketContent.titleMalay || base.title,
+        content: saved.malay.content || post.marketContent.textMalay || base.content,
+        thumbnailUrl: saved.malay.thumbnailUrl || base.thumbnailUrl,
+      },
+    };
+  });
+  const [thumbnailFiles, setThumbnailFiles] = useState<Partial<Record<AdminMarket, File>>>({});
   const [submitting, setSubmitting] = useState(false);
-  const canSubmit = !!title.trim() && !!content.trim() && !submitting;
+  const [error, setError] = useState<string | null>(null);
+
+  function patch(code: AdminMarket, next: Partial<{ title: string; content: string; thumbnailUrl: string }>) {
+    setByMarket((current) => ({ ...current, [code]: { ...current[code], ...next } }));
+  }
+
+  const canSubmit = markets.length > 0 && markets.every((code) => byMarket[code].title.trim() && byMarket[code].content.trim()) && !submitting;
 
   async function submit() {
-    if (!canSubmit) return;
+    if (submitting) return;
+    if (!markets.length) {
+      setError("Chọn ít nhất một thị trường để ghim.");
+      return;
+    }
+    const missing = markets.find((code) => !byMarket[code].title.trim() || !byMarket[code].content.trim());
+    if (missing) {
+      setTab(missing);
+      setError(`Chưa nhập tiêu đề và nội dung thẻ ghim cho thị trường ${MARKET_LABEL[missing]}.`);
+      return;
+    }
     setSubmitting(true);
+    setError(null);
     try {
-      await onConfirm({ title: title.trim(), content: content.trim(), thumbnailFile, thumbnailUrl: thumbnailUrl.trim() });
+      await onConfirm({ markets, byMarket, thumbnailFiles });
     } finally {
       setSubmitting(false);
     }
   }
+
+  const activeTab = markets.includes(tab) ? tab : markets[0];
 
   return (
     <Modal
@@ -192,39 +256,81 @@ function PinDisplayModal({
         </Fragment>
       }
     >
-      <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 16 }}>
+      <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 14 }}>
         Nội dung hiển thị trên card ghim ở Trang chủ và Cộng đồng của app — có thể khác với bài viết gốc (ví dụ rút gọn nội dung dài, hoặc thêm ảnh minh họa).
       </div>
-      <FieldLabel>Tiêu đề hiển thị</FieldLabel>
-      <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
-      <FieldLabel>Nội dung hiển thị</FieldLabel>
-      <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical", marginBottom: 14 }} />
-      <FieldLabel>Ảnh thumbnail (tùy chọn)</FieldLabel>
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        onChange={(e) => setThumbnailFile(e.target.files?.[0] ?? null)}
-        style={{ ...inputStyle, padding: 8, marginBottom: 8 }}
-      />
-      {thumbnailFile ? (
-        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Sẵn sàng tải lên: {thumbnailFile.name}</div>
-      ) : (
-        <input
-          value={thumbnailUrl}
-          onChange={(e) => setThumbnailUrl(e.target.value)}
-          placeholder="Hoặc dán link ảnh..."
-          style={{ ...inputStyle, marginBottom: 8 }}
-        />
-      )}
-      {!thumbnailFile && thumbnailUrl ? (
-        <img src={thumbnailUrl} alt="" style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, border: "1px solid var(--divider)" }} />
+
+      <FieldLabel>Ghim ở thị trường</FieldLabel>
+      <div style={{ display: "flex", gap: 14, marginBottom: 6 }}>
+        {MARKET_TABS.filter(([code]) => postMarkets.includes(code)).map(([code, label]) => (
+          <label key={code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--text-primary)", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={markets.includes(code)}
+              onChange={(e) => {
+                setMarkets((current) => (e.target.checked ? [...current, code] : current.filter((m) => m !== code)));
+                if (e.target.checked) setTab(code);
+              }}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+        Mỗi thị trường chỉ có một bài ghim — ghim ở thị trường nào thì bài ghim cũ của riêng thị trường đó được thay, các thị trường khác giữ nguyên.
+        {postMarkets.length < 3 ? ` Bài này chỉ hiển thị ở ${postMarkets.map((code) => MARKET_LABEL[code]).join(", ")} nên không ghim ra ngoài được.` : ""}
+      </div>
+
+      {markets.length ? (
+        <Fragment>
+          <PillTabs options={MARKET_TABS.filter(([code]) => markets.includes(code))} value={activeTab} onChange={setTab} />
+          <FieldLabel>Tiêu đề hiển thị ({MARKET_LABEL[activeTab]})</FieldLabel>
+          <input value={byMarket[activeTab].title} onChange={(e) => patch(activeTab, { title: e.target.value })} style={{ ...inputStyle, marginBottom: 14 }} />
+          <FieldLabel>Nội dung hiển thị ({MARKET_LABEL[activeTab]})</FieldLabel>
+          <textarea
+            value={byMarket[activeTab].content}
+            onChange={(e) => patch(activeTab, { content: e.target.value })}
+            rows={3}
+            style={{ ...inputStyle, resize: "vertical", marginBottom: 14 }}
+          />
+          <FieldLabel>Ảnh thumbnail (tùy chọn)</FieldLabel>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => setThumbnailFiles((current) => ({ ...current, [activeTab]: e.target.files?.[0] ?? undefined }))}
+            style={{ ...inputStyle, padding: 8, marginBottom: 8 }}
+          />
+          {thumbnailFiles[activeTab] ? (
+            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Sẵn sàng tải lên: {thumbnailFiles[activeTab]!.name}</div>
+          ) : (
+            <Fragment>
+              <input
+                value={byMarket[activeTab].thumbnailUrl}
+                onChange={(e) => patch(activeTab, { thumbnailUrl: e.target.value })}
+                placeholder="Hoặc dán link ảnh..."
+                style={{ ...inputStyle, marginBottom: 8 }}
+              />
+              {byMarket[activeTab].thumbnailUrl ? (
+                <img src={byMarket[activeTab].thumbnailUrl} alt="" style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, border: "1px solid var(--divider)" }} />
+              ) : null}
+            </Fragment>
+          )}
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>JPG, PNG hoặc WebP, tối đa 15 MB (tự nén khi tải lên).</div>
+        </Fragment>
       ) : null}
-      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>JPG, PNG hoặc WebP, tối đa 5 MB.</div>
+      {error ? (
+        <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(220,53,69,0.08)", fontSize: 12.5, fontWeight: 600, color: "var(--error)", lineHeight: 1.5 }}>
+          {error}
+        </div>
+      ) : null}
     </Modal>
   );
 }
 
-export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
+// Single full-featured view. The old `pinOnly` prop (a cut-down CSKH
+// variant) is gone: Community management moved wholesale to CSKH on
+// 2026-09-05 and the RLS policies now grant cskh the same writes as admin.
+export function CommunityView() {
   const [subTab, setSubTab] = useState<"posts" | "challenges">("posts");
   const [items, setItems] = useState<PinnedPost[] | null>(null);
   const [modal, setModal] = useState<string | number | "new" | null>(null);
@@ -299,6 +405,17 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
     setModal(it.id);
     setTitle(it.title || "");
     setText(it.text);
+    // Load the UK/ML versions too — editing used to write only the VN base,
+    // so a published translation could never be corrected (owner report
+    // 2026-09-05: "chỉnh sửa mới chỉ có ở VN").
+    setTitleUs(it.marketContent.titleUs);
+    setTextUs(it.marketContent.textUs);
+    setTitleMalay(it.marketContent.titleMalay);
+    setTextMalay(it.marketContent.textMalay);
+    const targets = it.targetMarkets?.length ? (it.targetMarkets as AdminMarket[]) : (["VN", "US", "MALAY"] as AdminMarket[]);
+    setVnTargeted(targets.includes("VN"));
+    setExtraMarkets(targets.filter((m): m is "US" | "MALAY" => m === "US" || m === "MALAY"));
+    setComposerMarketTab(targets.includes("VN") ? "VN" : targets[0]);
     setEditImageUrl(it.imageUrl || "");
     setEditImageFile(null);
     setSendNotification(false);
@@ -403,7 +520,15 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
         let pinned = false;
         if (pinAfterPost) {
           try {
-            await setOfficialPostPinned(newPostId, true, { title: source.title.slice(0, 80), content: source.text.slice(0, 160), thumbnailUrl: null });
+            // Pin into exactly the markets this post targets, each with its
+            // own copy (VN base falls back in when a variant is empty).
+            const pinMarkets: AdminMarket[] = [...(vnTargeted ? (["VN"] as AdminMarket[]) : []), ...extraMarkets];
+            await setOfficialPostPinned(newPostId, true, {
+              markets: pinMarkets,
+              vn: { title: source.title.slice(0, 80), content: source.text.slice(0, 160), thumbnailUrl: null },
+              us: pinMarkets.includes("US") ? { title: (finalTitleUs || source.title).slice(0, 80), content: (finalTextUs || source.text).slice(0, 160), thumbnailUrl: null } : undefined,
+              malay: pinMarkets.includes("MALAY") ? { title: (finalTitleMalay || source.title).slice(0, 80), content: (finalTextMalay || source.text).slice(0, 160), thumbnailUrl: null } : undefined,
+            });
             pinned = true;
           } catch {
             pushToast("Đã đăng bài nhưng chưa ghim được — bấm biểu tượng ghim trong danh sách để thử lại");
@@ -415,10 +540,34 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
             (drafted ? " · đã tự dịch nháp UK/ML" : ""),
         );
       } else if (modal !== null) {
+        if (!vnTargeted && extraMarkets.length === 0) {
+          pushToast("Hãy chọn ít nhất một thị trường được xem bài này");
+          return;
+        }
+        const editedMarkets: AdminMarket[] = [...(vnTargeted ? (["VN"] as AdminMarket[]) : []), ...extraMarkets];
+        const missingEdit = editedMarkets.find((code) =>
+          code === "VN" ? !title.trim() || !text.trim() : code === "US" ? !titleUs.trim() || !textUs.trim() : !titleMalay.trim() || !textMalay.trim(),
+        );
+        if (missingEdit) {
+          setComposerMarketTab(missingEdit);
+          pushToast(`Chưa có tiêu đề và nội dung cho thị trường ${MARKET_LABEL[missingEdit]}`);
+          return;
+        }
         const imageUrl = editImageFile
           ? await uploadPostThumbnail(String(modal), editImageFile)
           : editImageUrl.trim() || null;
-        await updateCommunityPost(String(modal), { title: title.trim() || undefined, text: text.trim(), imageUrl });
+        await updateCommunityPost(String(modal), {
+          title: title.trim() || undefined,
+          text: text.trim() || (titleUs.trim() ? textUs.trim() : textMalay.trim()),
+          imageUrl,
+          titleUs: titleUs.trim() || null,
+          textUs: textUs.trim() || null,
+          titleMalay: titleMalay.trim() || null,
+          textMalay: textMalay.trim() || null,
+          // All three ticked => null = "hiển thị ở mọi thị trường", which
+          // also covers markets added later.
+          targetMarkets: editedMarkets.length === 3 ? null : editedMarkets,
+        });
         pushToast("Đã lưu bài viết");
       }
       setModal(null);
@@ -447,16 +596,41 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
       pushToast("Không thể bỏ ghim bài viết");
     }
   }
-  async function confirmPin(input: { title: string; content: string; thumbnailFile: File | null; thumbnailUrl: string }) {
+  async function confirmPin(input: {
+    markets: AdminMarket[];
+    byMarket: Record<AdminMarket, { title: string; content: string; thumbnailUrl: string }>;
+    thumbnailFiles: Partial<Record<AdminMarket, File>>;
+  }) {
     if (!pinning) return;
     try {
-      const thumbnailUrl = input.thumbnailFile ? await uploadPostThumbnail(String(pinning.id), input.thumbnailFile) : input.thumbnailUrl || null;
-      await setOfficialPostPinned(String(pinning.id), true, { title: input.title, content: input.content, thumbnailUrl });
+      const resolved = { ...input.byMarket };
+      for (const code of input.markets) {
+        const file = input.thumbnailFiles[code];
+        if (file) {
+          resolved[code] = { ...resolved[code], thumbnailUrl: await uploadPostThumbnail(`${String(pinning.id)}-${code.toLowerCase()}`, file) };
+        }
+      }
+      const forMarket = (code: AdminMarket) => ({
+        title: resolved[code].title.trim(),
+        content: resolved[code].content.trim(),
+        thumbnailUrl: resolved[code].thumbnailUrl.trim() || null,
+      });
+      await setOfficialPostPinned(String(pinning.id), true, {
+        markets: input.markets,
+        vn: forMarket("VN"),
+        us: input.markets.includes("US") ? forMarket("US") : undefined,
+        malay: input.markets.includes("MALAY") ? forMarket("MALAY") : undefined,
+      });
       setPinning(null);
-      pushToast("Đã ghim bài viết");
+      pushToast(`Đã ghim bài viết ở ${input.markets.map((code) => MARKET_LABEL[code]).join(", ")}`);
       reload();
-    } catch {
-      pushToast("Không thể ghim bài viết");
+    } catch (error) {
+      console.error("Unable to pin post", error);
+      pushToast(
+        error instanceof Error && error.message.includes("pin_market_not_targeted")
+          ? "Không ghim được ở thị trường bài viết không hiển thị"
+          : "Không thể ghim bài viết",
+      );
     }
   }
   async function moderate(it: PinnedPost, status: PostModerationStatus) {
@@ -502,9 +676,7 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
     }
   }
 
-  const communityTabs: Array<[typeof subTab, string]> = pinOnly
-    ? [["posts", "Bài viết"]]
-    : [["posts", "Bài viết"], ["challenges", "Thử thách"]];
+  const communityTabs: Array<[typeof subTab, string]> = [["posts", "Bài viết"], ["challenges", "Thử thách"]];
   const subTabSwitcher = (
     <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
       {communityTabs.map(([k, l]) => (
@@ -570,9 +742,9 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
         </Fragment>
       }
     >
-      <FieldLabel>{modal === "new" && !vnTargeted ? "Tiêu đề (VN · không đăng cho VN, có thể bỏ trống)" : "Tiêu đề (VN)"}</FieldLabel>
+      <FieldLabel>{!vnTargeted ? "Tiêu đề (VN · không đăng cho VN, có thể bỏ trống)" : "Tiêu đề (VN)"}</FieldLabel>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ví dụ: 5 phút thư giãn cổ vai" style={{ ...inputStyle, marginBottom: 14 }} />
-      <FieldLabel>{modal === "new" && !vnTargeted ? "Nội dung (VN · có thể bỏ trống)" : "Nội dung (VN)"}</FieldLabel>
+      <FieldLabel>{!vnTargeted ? "Nội dung (VN · có thể bỏ trống)" : "Nội dung (VN)"}</FieldLabel>
       <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Nội dung bài viết đăng lên Cộng đồng..." style={{ ...inputStyle, minHeight: 100, resize: "vertical", marginBottom: 14 }} />
       {modal !== "new" ? (
         <Fragment>
@@ -596,8 +768,10 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           )}
         </Fragment>
       ) : null}
-      {modal === "new" ? (
-        <Fragment>
+      {/* Market targeting + per-market content: shown for BOTH new and edit
+          (editing used to expose the VN base only). The notification and
+          pin options below stay new-post-only. */}
+      <Fragment>
           <FieldLabel>Hiển thị cho thị trường</FieldLabel>
           <div style={{ display: "flex", gap: 14, marginBottom: 6 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--text-primary)", cursor: "pointer" }}>
@@ -620,7 +794,8 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           </div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: extraMarkets.length ? 10 : 16 }}>
             Chỉ người dùng ở thị trường được tick mới thấy bài này. Bỏ tick VN nếu bài chỉ dành cho UK/ML — khi đó phần VN ở trên có thể bỏ trống,
-            bài sẽ lấy bản UK/ML bạn điền làm nội dung gốc. Thị trường được tick mà chưa điền bản riêng sẽ được dịch nháp tự động.
+            bài sẽ lấy bản UK/ML bạn điền làm nội dung gốc.
+            {modal === "new" ? " Thị trường được tick mà chưa điền bản riêng sẽ được dịch nháp tự động." : " Sửa xong nhớ điền bản của mọi thị trường đang tick."}
           </div>
           {extraMarkets.length ? (
             <div style={{ marginBottom: 16 }}>
@@ -643,6 +818,9 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
               />
             </div>
           ) : null}
+      </Fragment>
+      {modal === "new" ? (
+        <Fragment>
           <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, color: "var(--text-primary)", cursor: "pointer" }}>
             <input
               type="checkbox"
@@ -912,9 +1090,8 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
           </td>
           {/* Moderation (duyệt/từ chối/ẩn user posts) shows for BOTH Admin
               and CSKH — RLS grants cskh post updates and the pending queue
-              is CSKH's job. Edit/delete (and touching official posts) stay
-              Admin-only except: CSKH may edit AND delete official posts
-              (`pinOnly` is the CSKH variant). */}
+              is CSKH's job, and so is everything else on this screen since
+              the tab moved to CSKH (2026-09-05). */}
           <td style={{ padding: "14px 20px" }}>
             <div style={{ display: "flex", gap: 10 }}>
               {!it.official && it.status !== "approved" ? (
@@ -927,18 +1104,14 @@ export function CommunityView({ pinOnly = false }: { pinOnly?: boolean }) {
                   <Icon name="x" size={16} color="var(--error)" />
                 </button>
               ) : null}
-              {/* Edit: Admin everywhere; CSKH on official posts (the ones
-                  they publish) — content AND image, per explicit request. */}
-              {!pinOnly || it.official ? (
-                <button onClick={() => openEdit(it)} title="Sửa bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
-                  <Icon name="pencil" size={16} color="var(--color-primary)" />
-                </button>
-              ) : null}
-              {!pinOnly || !it.official ? (
-                <button onClick={() => toggleHidden(it)} title={it.hidden ? "Hiện lại" : "Ẩn bài viết"} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
-                  <Icon name="eye" size={16} color={it.hidden ? "var(--text-muted)" : "var(--text-secondary)"} />
-                </button>
-              ) : null}
+              {/* Edit covers content AND image, for member and official
+                  posts alike. */}
+              <button onClick={() => openEdit(it)} title="Sửa bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                <Icon name="pencil" size={16} color="var(--color-primary)" />
+              </button>
+              <button onClick={() => toggleHidden(it)} title={it.hidden ? "Hiện lại" : "Ẩn bài viết"} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                <Icon name="eye" size={16} color={it.hidden ? "var(--text-muted)" : "var(--text-secondary)"} />
+              </button>
               {/* Delete: Admin and CSKH on every post — CSKH publishes the
                   official ones, so they can retract them too (RLS policy
                   "web cskh delete any post", 2026-09-05). Confirmed via

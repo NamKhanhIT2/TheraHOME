@@ -27,18 +27,9 @@ export const NAV_ADMIN: NavItem[] = [
       { id: "notifications-upsale", label: "Upsale", icon: "megaphone" },
     ],
   },
-  // Full Community management (official posts, per-market pinning AND the
-  // Thử thách editor). CSKH gets the pin-only variant in NAV_CARE; the
-  // challenges editor is admin-only because its RLS policy
-  // ("web admin manage challenges") only grants writes to the admin role.
-  // Added 2026-09-04 — ChallengesAdminView had shipped with no way in.
-  { id: "community", label: "Cộng đồng", icon: "users" },
   // content_reports RLS grants read/update to both admin and cskh — matches
   // NAV_CARE below.
   { id: "reports", label: "Báo cáo", icon: "flag" },
-  // user_quiz_attempts + phase_purchases — dữ liệu đã thu thập từ lâu
-  // nhưng trước 2026-09-04 không có màn nào đọc được (chỉ query SQL).
-  { id: "insights", label: "Khảo sát & Giao dịch", icon: "trending-up" },
   { id: "users", label: "User", icon: "users" },
   // Admin-only — accounts here carry a password, unlike the app-user list
   // above, so it's deliberately not added to NAV_CARE.
@@ -62,9 +53,18 @@ export const NAV_ADMIN: NavItem[] = [
 export const NAV_CARE: NavItem[] = [
   { id: "chat", label: "Chat", icon: "message-circle" },
   { id: "activation", label: "Kích hoạt", icon: "shield" },
+  // Full Community management — official posts, per-market pinning AND the
+  // Thử thách editor. Moved out of NAV_ADMIN on 2026-09-05 at the owner's
+  // request; the accompanying migration widened the `challenges` policies
+  // from admin-only to admin+cskh so the editor actually works here.
   { id: "community", label: "Cộng đồng", icon: "message-square" },
   { id: "reports", label: "Báo cáo", icon: "flag" },
   { id: "notifications", label: "Mẫu hệ thống", icon: "bell" },
+  // user_quiz_attempts + phase_purchases. Moved out of NAV_ADMIN on
+  // 2026-09-05 at the owner's request — reading survey answers and phase
+  // purchases is customer-care work, and RLS already grants cskh SELECT on
+  // both tables ("web admin cskh select all ...").
+  { id: "insights", label: "Khảo sát & Giao dịch", icon: "trending-up" },
   { id: "users", label: "User", icon: "users" },
 ];
 

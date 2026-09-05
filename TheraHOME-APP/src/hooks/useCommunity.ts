@@ -97,6 +97,9 @@ export interface CommunityPostRow {
   // below for the fallback-to-raw-post-fields resolution.
   pinnedTitle: string | null;
   pinnedContent: string | null;
+  /** Which markets this pin is live in. null = every market the post
+   * targets (pins predate per-market pinning). */
+  pinnedMarkets: string[] | null;
   pinnedThumbnailUrl: string | null;
   postType: PostType;
   progressSnapshot: ProgressSnapshot | null;
@@ -110,6 +113,14 @@ export interface CommunityPostRow {
 /** Resolves what an "article card" (Home's "Gợi ý cho bạn", Community's
  * pinned slot) should actually show for a pinned post — staff's curated
  * override when set, otherwise the post's own title/text/first image. */
+/** A pin only occupies the pinned slot in the markets it was pinned FOR —
+ * `pinnedMarkets` null means every market the post reaches (pins created
+ * before per-market pinning). */
+export function isPinnedForMarket(post: CommunityPostRow, market: StoreMarket): boolean {
+  if (!post.pinned) return false;
+  return !post.pinnedMarkets?.length || post.pinnedMarkets.includes(market);
+}
+
 export function pinnedDisplay(post: CommunityPostRow): { title: string; content: string; thumbnailUrl: string | null } {
   return {
     title: post.pinnedTitle || post.title || post.text,
@@ -142,6 +153,13 @@ interface RawPost {
   pinned: boolean;
   pinned_title: string | null;
   pinned_content: string | null;
+  pinned_markets: string[] | null;
+  pinned_title_us: string | null;
+  pinned_content_us: string | null;
+  pinned_thumbnail_url_us: string | null;
+  pinned_title_malay: string | null;
+  pinned_content_malay: string | null;
+  pinned_thumbnail_url_malay: string | null;
   pinned_thumbnail_url: string | null;
   post_type: string;
   progress_snapshot: ProgressSnapshot | null;
@@ -190,9 +208,10 @@ function mapPost(r: RawPost, market: StoreMarket, reactionCounts = emptyReaction
     commentsCount: r.comments_count,
     savesCount: r.saves_count,
     pinned: r.pinned,
-    pinnedTitle: r.pinned_title,
-    pinnedContent: r.pinned_content,
-    pinnedThumbnailUrl: r.pinned_thumbnail_url,
+    pinnedTitle: (market === 'US' ? r.pinned_title_us : market === 'MALAY' ? r.pinned_title_malay : null) || r.pinned_title,
+    pinnedContent: (market === 'US' ? r.pinned_content_us : market === 'MALAY' ? r.pinned_content_malay : null) || r.pinned_content,
+    pinnedMarkets: r.pinned_markets,
+    pinnedThumbnailUrl: (market === 'US' ? r.pinned_thumbnail_url_us : market === 'MALAY' ? r.pinned_thumbnail_url_malay : null) || r.pinned_thumbnail_url,
     postType: (r.post_type as PostType) ?? 'text',
     progressSnapshot: r.progress_snapshot,
     createdAt: r.created_at,
@@ -202,7 +221,7 @@ function mapPost(r: RawPost, market: StoreMarket, reactionCounts = emptyReaction
 
 const POSTS_KEY = ['community_posts'] as const;
 const POST_COLUMNS =
-  'id, author_id, is_official, author_name, author_avatar_url, title, text, image_url, media_urls, media_feed_urls, media_thumbnail_urls, media_poster_urls, media_widths, media_heights, tag, day_milestone, phase_milestone, likes_count, comments_count, saves_count, pinned, pinned_title, pinned_content, pinned_thumbnail_url, post_type, progress_snapshot, created_at, status, target_markets, title_us, text_us, title_malay, text_malay';
+  'id, author_id, is_official, author_name, author_avatar_url, title, text, image_url, media_urls, media_feed_urls, media_thumbnail_urls, media_poster_urls, media_widths, media_heights, tag, day_milestone, phase_milestone, likes_count, comments_count, saves_count, pinned, pinned_title, pinned_content, pinned_thumbnail_url, pinned_markets, pinned_title_us, pinned_content_us, pinned_thumbnail_url_us, pinned_title_malay, pinned_content_malay, pinned_thumbnail_url_malay, post_type, progress_snapshot, created_at, status, target_markets, title_us, text_us, title_malay, text_malay';
 
 /** Vietnamese-friendly message for the shared anti-spam trigger (see
  * enforce_content_rate_limit in the community_moderation_and_notifications

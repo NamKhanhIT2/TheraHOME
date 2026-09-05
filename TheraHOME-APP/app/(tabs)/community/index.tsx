@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
+import { useMarket } from '@/hooks/useMarket';
 import { useProfile } from '@/hooks/useProfile';
 import {
   useCommunityPosts,
@@ -19,6 +20,7 @@ import {
   useBlockCommunityUser,
   friendlyCommunityError,
   pinnedDisplay,
+  isPinnedForMarket,
   DEFAULT_POSTS_PAGE_SIZE,
   type CommunityPostRow,
   type PostReaction,
@@ -137,6 +139,7 @@ function ChallengeBanner({ userId, onShareCompletion, onDismiss }: { userId: str
 }
 
 export default function CommunityScreen() {
+  const market = useMarket();
   const theme = useTheme();
   const { t } = useI18n();
   const reportReasons: { key: ReportReason; label: string }[] = [
@@ -207,7 +210,7 @@ export default function CommunityScreen() {
   // sorting inline among regular posts — so it's excluded here to avoid
   // showing it twice. The "TheraHOME" filter tab still lists it inline
   // alongside every other official post, same as before.
-  const pinnedPost = posts.find((p) => p.isOfficial && p.pinned && !hiddenPostIds.has(p.id)) ?? null;
+  const pinnedPost = posts.find((p) => p.isOfficial && isPinnedForMarket(p, market) && !hiddenPostIds.has(p.id)) ?? null;
   const pinnedPostDisplay = pinnedPost ? pinnedDisplay(pinnedPost) : null;
   const filteredPosts = useMemo(() => {
     const eligible = posts.filter(

@@ -20,7 +20,7 @@ import { PainScaleModal } from '@/components/PainScaleModal';
 import { useWaterLog, useSetWaterLog } from '@/hooks/useWaterLog';
 import { useProfile } from '@/hooks/useProfile';
 import { useNotifications } from '@/hooks/useNotifications';
-import { useCommunityPosts, pinnedDisplay } from '@/hooks/useCommunity';
+import { useCommunityPosts, pinnedDisplay, isPinnedForMarket } from '@/hooks/useCommunity';
 import { prefetchStoreCategories } from '@/hooks/useStore';
 import { useMarket } from '@/hooks/useMarket';
 import { ArticleCard } from '@/components/community/ArticleCard';
@@ -87,7 +87,7 @@ export default function HomeScreen() {
     catalogProducts.find((p) => p.id === effectiveChartProductId) ?? program?.product;
   const chartProgram = activatedPrograms.find((p) => p.productId === effectiveChartProductId);
   const officialPosts = (officialPostsQuery.data ?? []).filter((post) => post.isOfficial);
-  const pinnedOfficialPost = officialPosts.find((post) => post.pinned);
+  const pinnedOfficialPost = officialPosts.find((post) => isPinnedForMarket(post, market));
   // Only the currently-pinned post — matches Community's pinned slot
   // exactly instead of also surfacing a separate "newest" card that could
   // show a different post than what's actually pinned. Falls back to the
@@ -264,7 +264,16 @@ export default function HomeScreen() {
               <View style={[styles.heroActions, { marginTop: 16 }]}>
                 <Pressable
                   style={[styles.heroBtnOutline, { borderColor: 'rgba(255,255,255,0.5)', borderRadius: theme.radius.md }]}
-                  onPress={() => WebBrowser.openBrowserAsync(appConfig.get('home_intro_video_url'))}
+                  onPress={() => {
+                    // Video của CHÍNH ngày đang hiện trên thẻ (đã phân giải
+                    // theo thị trường trong usePrograms). `today` luôn là
+                    // ngày còn truy cập được — hero đã lùi về ngày cuối
+                    // reachable khi giai đoạn sau còn khoá — nên mở video ở
+                    // đây không vượt qua paywall. Không có video ngày thì
+                    // quay về link giới thiệu chung trong app_config.
+                    const url = today?.video?.trim() || appConfig.get('home_intro_video_url');
+                    if (url) void WebBrowser.openBrowserAsync(url);
+                  }}
                 >
                   <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>{t('quickGuide')}</Text>
                 </Pressable>

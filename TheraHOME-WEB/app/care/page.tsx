@@ -12,6 +12,7 @@ import { UsersView } from "@/components/views/UsersView";
 import { NotificationsAdminView } from "@/components/views/NotificationsAdminView";
 import { ReportsView } from "@/components/views/ReportsView";
 import { CommunityView } from "@/components/views/CommunityView";
+import { InsightsView } from "@/components/views/InsightsView";
 
 export default function CarePage() {
   return (
@@ -21,8 +22,9 @@ export default function CarePage() {
           <>
             {active === "chat" && <ChatView />}
             {active === "activation" && <ActivationView />}
-            {active === "community" && <CommunityView pinOnly />}
+            {active === "community" && <CommunityView />}
             {active === "reports" && <ReportsView />}
+            {active === "insights" && <InsightsView />}
             {active === "notifications" && <NotificationsAdminView />}
             {active === "users" && <UsersView role="care" />}
           </>

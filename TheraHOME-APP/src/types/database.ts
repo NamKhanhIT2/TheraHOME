@@ -385,8 +385,15 @@ export type Database = {
           phase_milestone: string | null
           pinned: boolean
           pinned_content: string | null
+          pinned_content_malay: string | null
+          pinned_content_us: string | null
+          pinned_markets: string[] | null
           pinned_thumbnail_url: string | null
+          pinned_thumbnail_url_malay: string | null
+          pinned_thumbnail_url_us: string | null
           pinned_title: string | null
+          pinned_title_malay: string | null
+          pinned_title_us: string | null
           post_type: string
           progress_snapshot: Json | null
           saves_count: number
@@ -422,8 +429,15 @@ export type Database = {
           phase_milestone?: string | null
           pinned?: boolean
           pinned_content?: string | null
+          pinned_content_malay?: string | null
+          pinned_content_us?: string | null
+          pinned_markets?: string[] | null
           pinned_thumbnail_url?: string | null
+          pinned_thumbnail_url_malay?: string | null
+          pinned_thumbnail_url_us?: string | null
           pinned_title?: string | null
+          pinned_title_malay?: string | null
+          pinned_title_us?: string | null
           post_type?: string
           progress_snapshot?: Json | null
           saves_count?: number
@@ -459,8 +473,15 @@ export type Database = {
           phase_milestone?: string | null
           pinned?: boolean
           pinned_content?: string | null
+          pinned_content_malay?: string | null
+          pinned_content_us?: string | null
+          pinned_markets?: string[] | null
           pinned_thumbnail_url?: string | null
+          pinned_thumbnail_url_malay?: string | null
+          pinned_thumbnail_url_us?: string | null
           pinned_title?: string | null
+          pinned_title_malay?: string | null
+          pinned_title_us?: string | null
           post_type?: string
           progress_snapshot?: Json | null
           saves_count?: number
@@ -2097,6 +2118,14 @@ export type Database = {
         Returns: boolean
       }
       normalize_phone_vn: { Args: { p_phone: string }; Returns: string }
+      notification_copy: {
+        Args: { p_key: string; p_language: string; p_n?: number }
+        Returns: {
+          body: string
+          title: string
+        }[]
+      }
+      profile_language: { Args: { p_user_id: string }; Returns: string }
       provision_product_for_user: {
         Args: { p_product_id: string; p_user_id: string }
         Returns: undefined
@@ -2109,16 +2138,34 @@ export type Database = {
         Args: { p_username: string }
         Returns: string
       }
-      set_official_post_pinned: {
-        Args: {
-          p_content?: string
-          p_pinned: boolean
-          p_post_id: string
-          p_thumbnail_url?: string
-          p_title?: string
-        }
-        Returns: undefined
-      }
+      set_official_post_pinned:
+        | {
+            Args: {
+              p_content?: string
+              p_pinned: boolean
+              p_post_id: string
+              p_thumbnail_url?: string
+              p_title?: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_content?: string
+              p_content_malay?: string
+              p_content_us?: string
+              p_markets?: string[]
+              p_pinned: boolean
+              p_post_id: string
+              p_thumbnail_url?: string
+              p_thumbnail_url_malay?: string
+              p_thumbnail_url_us?: string
+              p_title?: string
+              p_title_malay?: string
+              p_title_us?: string
+            }
+            Returns: undefined
+          }
       touch_last_login: { Args: never; Returns: undefined }
       truncate_with_ellipsis: {
         Args: { p_max: number; p_text: string }

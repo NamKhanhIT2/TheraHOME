@@ -1251,13 +1251,45 @@ export interface PinnedDisplay {
   thumbnailUrl: string | null;
 }
 
+/** Pin card copy per market, plus which markets the pin is live in
+ * (null = every market the post targets). Added 2026-09-05 — a single card
+ * used to be shown to all three markets. */
+export interface PinnedMarketDisplay {
+  markets: AdminMarket[] | null;
+  vn: PinnedDisplay;
+  us: PinnedDisplay;
+  malay: PinnedDisplay;
+}
+
+/** The post's own content per market — the edit modal needs all three, not
+ * just the VN base. */
+export interface PostMarketContent {
+  titleUs: string;
+  textUs: string;
+  titleMalay: string;
+  textMalay: string;
+}
+
 export type PostModerationStatus = "pending" | "approved" | "rejected";
 
-export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay; targetMarkets: string[] | null })[]> {
+type CommunityPostRowExtras = {
+  pinned: boolean;
+  hidden: boolean;
+  status: PostModerationStatus;
+  imageUrl: string | null;
+  pinnedDisplay: PinnedDisplay;
+  pinnedMarketDisplay: PinnedMarketDisplay;
+  marketContent: PostMarketContent;
+  targetMarkets: string[] | null;
+};
+
+export async function fetchCommunityPosts(): Promise<(CommunityPost & CommunityPostRowExtras)[]> {
   const [{ data: posts, error: postErr }, { data: comments, error: commentErr }] = await Promise.all([
     supabase
       .from("community_posts")
-      .select("id, is_official, author_name, title, tag, text, image_url, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url, target_markets")
+      .select(
+        "id, is_official, author_name, title, tag, text, image_url, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url, pinned_markets, pinned_title_us, pinned_content_us, pinned_thumbnail_url_us, pinned_title_malay, pinned_content_malay, pinned_thumbnail_url_malay, target_markets, title_us, text_us, title_malay, text_malay",
+      )
       .order("created_at", { ascending: false }),
     supabase.from("post_comments").select("id, post_id, author_name, text, created_at, hidden").order("created_at"),
   ]);
@@ -1265,7 +1297,7 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: 
   if (commentErr) throw commentErr;
 
   return (posts ?? []).map(
-    (p): CommunityPost & { pinned: boolean; hidden: boolean; status: PostModerationStatus; imageUrl: string | null; pinnedDisplay: PinnedDisplay; targetMarkets: string[] | null } => ({
+    (p): CommunityPost & CommunityPostRowExtras => ({
       id: p.id,
       official: p.is_official,
       name: p.author_name || "TheraHOME",
@@ -1279,6 +1311,18 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & { pinned: 
       hidden: p.hidden,
       status: (p.status as PostModerationStatus) ?? "approved",
       pinnedDisplay: { title: p.pinned_title, content: p.pinned_content, thumbnailUrl: p.pinned_thumbnail_url },
+      pinnedMarketDisplay: {
+        markets: (p.pinned_markets as AdminMarket[] | null) ?? null,
+        vn: { title: p.pinned_title, content: p.pinned_content, thumbnailUrl: p.pinned_thumbnail_url },
+        us: { title: p.pinned_title_us, content: p.pinned_content_us, thumbnailUrl: p.pinned_thumbnail_url_us },
+        malay: { title: p.pinned_title_malay, content: p.pinned_content_malay, thumbnailUrl: p.pinned_thumbnail_url_malay },
+      },
+      marketContent: {
+        titleUs: p.title_us ?? "",
+        textUs: p.text_us ?? "",
+        titleMalay: p.title_malay ?? "",
+        textMalay: p.text_malay ?? "",
+      },
       // null = hiển thị ở mọi thị trường; ngược lại chỉ các thị trường liệt kê.
       targetMarkets: p.target_markets ?? null,
       commentsList: (comments ?? [])
@@ -1367,22 +1411,68 @@ export async function createOfficialPost(input: {
   }
   return String(postId);
 }
-export async function updateCommunityPost(idKey: string, patch: { meta?: string; title?: string; text?: string; pinned?: boolean; hidden?: boolean; imageUrl?: string | null }) {
+export async function updateCommunityPost(
+  idKey: string,
+  patch: {
+    meta?: string;
+    title?: string;
+    text?: string;
+    pinned?: boolean;
+    hidden?: boolean;
+    imageUrl?: string | null;
+    // Per-market variants — the edit modal used to write only the VN base,
+    // so a UK/ML version could never be corrected after publishing.
+    titleUs?: string | null;
+    textUs?: string | null;
+    titleMalay?: string | null;
+    textMalay?: string | null;
+    targetMarkets?: AdminMarket[] | null;
+  },
+) {
   const { error } = await supabase
     .from("community_posts")
     // undefined keys are stripped by supabase-js, so only fields the caller
     // actually passed get updated (imageUrl: null clears the image).
-    .update({ tag: patch.meta, title: patch.title, text: patch.text, pinned: patch.pinned, hidden: patch.hidden, image_url: patch.imageUrl })
+    .update({
+      tag: patch.meta,
+      title: patch.title,
+      text: patch.text,
+      pinned: patch.pinned,
+      hidden: patch.hidden,
+      image_url: patch.imageUrl,
+      title_us: patch.titleUs,
+      text_us: patch.textUs,
+      title_malay: patch.titleMalay,
+      text_malay: patch.textMalay,
+      target_markets: patch.targetMarkets,
+    })
     .eq("id", idKey);
   if (error) throw error;
 }
-export async function setOfficialPostPinned(idKey: string, pinned: boolean, display?: { title: string; content: string; thumbnailUrl: string | null }) {
+export async function setOfficialPostPinned(
+  idKey: string,
+  pinned: boolean,
+  display?: {
+    markets?: AdminMarket[] | null;
+    vn: { title: string; content: string; thumbnailUrl: string | null };
+    us?: { title: string; content: string; thumbnailUrl: string | null };
+    malay?: { title: string; content: string; thumbnailUrl: string | null };
+  },
+) {
   const { error } = await supabase.rpc("set_official_post_pinned", {
     p_post_id: idKey,
     p_pinned: pinned,
-    p_title: display?.title ?? null,
-    p_content: display?.content ?? null,
-    p_thumbnail_url: display?.thumbnailUrl ?? null,
+    p_title: display?.vn.title ?? null,
+    p_content: display?.vn.content ?? null,
+    p_thumbnail_url: display?.vn.thumbnailUrl ?? null,
+    // null = pin in every market the post targets (pre-2026-09-05 behaviour).
+    p_markets: display?.markets?.length ? display.markets : null,
+    p_title_us: display?.us?.title ?? null,
+    p_content_us: display?.us?.content ?? null,
+    p_thumbnail_url_us: display?.us?.thumbnailUrl ?? null,
+    p_title_malay: display?.malay?.title ?? null,
+    p_content_malay: display?.malay?.content ?? null,
+    p_thumbnail_url_malay: display?.malay?.thumbnailUrl ?? null,
   });
   if (error) throw error;
 }
