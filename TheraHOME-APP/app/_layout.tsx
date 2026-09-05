@@ -3,7 +3,7 @@ import { AppState, LogBox, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import {
   useFonts,
   Inter_400Regular,
@@ -356,6 +356,21 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontError && __DEV__) console.warn('Unable to load Inter fonts; using system fallback:', fontError);
   }, [fontError]);
+
+  // React Query's focus refetching is a no-op in React Native until
+  // `focusManager` is wired to AppState. Without it, admin-managed reference
+  // data (the product list, a roadmap's phases) was fetched once per app
+  // launch and never again — deleting a phase in WEB Admin left it on screen
+  // for everyone who already had the app open, until they force-quit it
+  // (owner-reported 2026-09-05). Registered here rather than at module scope:
+  // a module-scope listener is never removed, and Fast Refresh leaves the old
+  // one bound to a dead module instance.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      focusManager.setFocused(state === 'active');
+    });
+    return () => sub.remove();
+  }, []);
 
   return (
     <SafeAreaProvider>

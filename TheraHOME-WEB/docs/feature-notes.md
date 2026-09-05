@@ -912,3 +912,15 @@ thêm `totalDays` (con số app đếm tới: "NGÀY 12 / 14").
   trường" (hợp với cách dùng 1 link YouTube auto-dubbing cho mọi thị trường).
 - Modal "Sửa thông tin" bỏ khối tên giai đoạn (đã có editor riêng), thay bằng
   ô Thời lượng lộ trình.
+
+## Chọn quốc gia khi tạo tài khoản TheraHOME (2026-09-05, tối)
+
+Tài khoản do Admin cấp (App Review, tester, đối tác…) không đi qua màn chọn
+quốc gia lúc onboarding, nên `profiles.country` bỏ trống và app phải đoán thị
+trường theo ngôn ngữ máy — sai với quy tắc "nội dung theo quốc gia, chữ theo
+ngôn ngữ". Nay modal Tạo tài khoản và modal Chỉnh sửa đều có ô **Quốc gia /
+Thị trường** (VN / UK / ML, mặc định VN), bảng có thêm cột Thị trường.
+`admin-manage-account` (v25) nhận `country`, kiểm tra thuộc VN/US/MALAY
+(thiếu thì mặc định VN để caller cũ không vỡ) và ghi vào `profiles.country`
+cạnh `country_confirmed`. `COUNTRY_META` / `COUNTRY_OPTIONS` ở
+`adminMockData.ts`.

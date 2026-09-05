@@ -51,7 +51,11 @@ export function useProducts() {
         roadmapPublished: p.roadmap_published !== false,
       }));
     },
-    staleTime: Infinity,
+    // Admin-managed, so not truly static: publishing/hiding/deleting a
+    // roadmap in WEB must reach open apps. Paired with the AppState →
+    // focusManager wiring in _layout.tsx, this refetches when the user comes
+    // back to the app rather than only on a cold launch.
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -259,7 +263,9 @@ export function useProgramDays(userProgramId: string | undefined, productId: str
       return data.map((phase) => ({ ...phase, name: localizePhaseName(phase.name, language, phase) }));
     },
     enabled: !!productId,
-    staleTime: Infinity,
+    // Same reason as useProducts: a phase added, renamed or deleted in WEB
+    // Admin has to show up without force-quitting the app.
+    staleTime: 5 * 60 * 1000,
   });
 
   return useQuery({

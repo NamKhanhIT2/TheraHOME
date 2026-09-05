@@ -120,12 +120,25 @@ export const ROLE_META: Record<SampleUserRole, [string, string, string]> = {
 export type TheraAccountType = "admin" | "admin_issued" | "review" | "staff" | "partner" | "tester" | "cskh";
 export type TheraAccessLevel = "free" | "premium" | "admin_granted";
 
+/** Market the account's app content follows (profiles.country). */
+export type TheraAccountCountry = "VN" | "US" | "MALAY";
+
+/** Labels match the market tabs used across Admin (VN / UK / ML). */
+export const COUNTRY_META: Record<TheraAccountCountry, string> = {
+  VN: "VN · Việt Nam",
+  US: "UK · Anh / EU / Mỹ",
+  MALAY: "ML · Malaysia",
+};
+
+export const COUNTRY_OPTIONS: TheraAccountCountry[] = ["VN", "US", "MALAY"];
+
 export interface TheraAccount {
   id: string;
   username: string;
   fullName: string;
   accountType: TheraAccountType;
   accessLevel: TheraAccessLevel;
+  country: TheraAccountCountry;
   locked: boolean;
   expiresAt: string | null;
   onboardingCompleted: boolean;

@@ -3533,6 +3533,20 @@ Khảo sát & Upsell. Hiện `phase_promos` của neck-plus rỗng.
 Roadmap app chỉ còn Phase 1 + Phase 2 với đủ 7 ngày mỗi giai đoạn; Home hiện
 "DAY 14 / 14".
 
+**Cache app không cập nhật khi Admin đổi lộ trình (2026-09-05, tối):** chủ
+sở hữu báo simulator vẫn thấy Giai đoạn 3 sau khi đã xoá. Nguyên nhân:
+`useProducts` và query `program_phases` để `staleTime: Infinity`, và
+`focusManager` của React Query chưa nối với `AppState` — trên React Native
+refetch-on-focus không tự chạy. Hệ quả: dữ liệu do Admin quản chỉ nạp một
+lần mỗi lần mở app, phải thoát hẳn app mới thấy thay đổi.
+
+Sửa: hai query đổi sang `staleTime: 5 phút`; `_layout.tsx` đăng ký
+`AppState → focusManager.setFocused(state === 'active')` **trong `useEffect`
+có cleanup**, không phải ở phạm vi module. Bản đầu tôi đặt ở module scope và
+app crash ngay ("Property 'focusManager' doesn't exist") — Fast Refresh giữ
+lại listener cũ trỏ vào module instance đã chết, và listener đó không bao
+giờ được gỡ. Đây là bẫy cần nhớ cho mọi listener toàn cục khác.
+
 **WEB (`fetchUsers` / `fetchUserPrograms`):** rút ngắn lộ trình để lại
 `user_programs.current_day` vượt quá `total_days` (1 tài khoản còn ở 15), nên
 cả hai hàm nay `Math.min(current_day, total_days)` trước khi hiển thị và

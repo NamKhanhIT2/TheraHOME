@@ -16,6 +16,7 @@ import type {
   ChatMessage,
   TheraAccount,
   TheraAccountType,
+  TheraAccountCountry,
   TheraAccessLevel,
 } from "./adminMockData";
 
@@ -1293,7 +1294,7 @@ export async function deleteUserProgram(userProgramId: string) {
 export async function fetchTheraAccounts(): Promise<TheraAccount[]> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, full_name, account_type, access_level, locked, expires_at, onboarding_completed, created_at, last_login_at, notes")
+    .select("id, username, full_name, account_type, access_level, country, locked, expires_at, onboarding_completed, created_at, last_login_at, notes")
     .neq("account_type", "normal")
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -1303,6 +1304,7 @@ export async function fetchTheraAccounts(): Promise<TheraAccount[]> {
     fullName: r.full_name ?? "",
     accountType: r.account_type as TheraAccountType,
     accessLevel: r.access_level as TheraAccessLevel,
+    country: (r.country as TheraAccountCountry | null) ?? "VN",
     locked: r.locked,
     expiresAt: r.expires_at,
     onboardingCompleted: r.onboarding_completed,
@@ -1318,6 +1320,7 @@ export async function updateTheraAccount(
     full_name: string;
     account_type: TheraAccountType;
     access_level: TheraAccessLevel;
+    country: TheraAccountCountry;
     expires_at: string | null;
     locked: boolean;
     notes: string | null;
@@ -1327,12 +1330,18 @@ export async function updateTheraAccount(
   if (error) throw error;
 }
 
+/** `country` decides which market's store prices, product links, program
+ * videos and pinned community cards the account sees. Thera-issued accounts
+ * never pass through the onboarding country screen, so without it the app
+ * fell back to guessing the market from the UI language (owner rule: country
+ * decides content, language decides wording). Added 2026-09-05. */
 export interface CreateTheraAccountInput {
   username: string;
   password: string;
   full_name: string;
   account_type: TheraAccountType;
   access_level: TheraAccessLevel;
+  country: TheraAccountCountry;
   expires_at: string | null;
   onboarding_required: boolean;
   notes: string | null;

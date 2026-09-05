@@ -13,6 +13,9 @@ import {
   ACCESS_LEVEL_META,
   type TheraAccount,
   type TheraAccountType,
+  type TheraAccountCountry,
+  COUNTRY_META,
+  COUNTRY_OPTIONS,
   type TheraAccessLevel,
 } from "@/lib/adminMockData";
 import {
@@ -92,6 +95,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
   const [confirmPassword, setConfirmPassword] = useState("");
   const [accountType, setAccountType] = useState<TheraAccountType>("admin_issued");
   const [accessLevel, setAccessLevel] = useState<TheraAccessLevel>("free");
+  const [country, setCountry] = useState<TheraAccountCountry>("VN");
   const [expiresAt, setExpiresAt] = useState("");
   const [onboardingRequired, setOnboardingRequired] = useState(true);
   const [notes, setNotes] = useState("");
@@ -120,6 +124,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
         full_name: fullName.trim(),
         account_type: accountType,
         access_level: accessLevel,
+        country,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         onboarding_required: onboardingRequired,
         notes: notes.trim() || null,
@@ -164,6 +169,16 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
           <option key={k} value={k}>{ACCESS_LEVEL_META[k]}</option>
         ))}
       </select>
+      <FieldLabel>Quốc gia / Thị trường</FieldLabel>
+      <select value={country} onChange={(e) => setCountry(e.target.value as TheraAccountCountry)} style={{ ...inputStyle, marginBottom: 6 }}>
+        {COUNTRY_OPTIONS.map((k) => (
+          <option key={k} value={k}>{COUNTRY_META[k]}</option>
+        ))}
+      </select>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+        Quyết định giá bán, link sản phẩm, video lộ trình và bài ghim mà tài khoản này thấy trong app.
+        Ngôn ngữ hiển thị vẫn theo máy của người dùng, không theo ô này.
+      </div>
       <FieldLabel>Ngày hết hạn (tùy chọn)</FieldLabel>
       <input value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} type="date" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Yêu cầu onboarding</FieldLabel>
@@ -199,6 +214,7 @@ function EditAccountModal({ account, onClose, onSave }: { account: TheraAccount;
   const [fullName, setFullName] = useState(account.fullName);
   const [accountType, setAccountType] = useState(account.accountType);
   const [accessLevel, setAccessLevel] = useState(account.accessLevel);
+  const [country, setCountry] = useState<TheraAccountCountry>(account.country);
   const [expiresAt, setExpiresAt] = useState(toDateInputValue(account.expiresAt));
   const [notes, setNotes] = useState(account.notes ?? "");
   const [submitting, setSubmitting] = useState(false);
@@ -210,6 +226,7 @@ function EditAccountModal({ account, onClose, onSave }: { account: TheraAccount;
         full_name: fullName.trim(),
         account_type: accountType,
         access_level: accessLevel,
+        country,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         notes: notes.trim() || null,
       });
@@ -257,6 +274,16 @@ function EditAccountModal({ account, onClose, onSave }: { account: TheraAccount;
           <option key={k} value={k}>{ACCESS_LEVEL_META[k]}</option>
         ))}
       </select>
+      <FieldLabel>Quốc gia / Thị trường</FieldLabel>
+      <select value={country} onChange={(e) => setCountry(e.target.value as TheraAccountCountry)} style={{ ...inputStyle, marginBottom: 6 }}>
+        {COUNTRY_OPTIONS.map((k) => (
+          <option key={k} value={k}>{COUNTRY_META[k]}</option>
+        ))}
+      </select>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+        Quyết định giá bán, link sản phẩm, video lộ trình và bài ghim mà tài khoản này thấy trong app.
+        Ngôn ngữ hiển thị vẫn theo máy của người dùng, không theo ô này.
+      </div>
       <FieldLabel>Ngày hết hạn (gia hạn tại đây)</FieldLabel>
       <input value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} type="date" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Ghi chú</FieldLabel>
@@ -387,7 +414,7 @@ export function TheraAccountsView() {
     <TableShell
       subtitle="Tài khoản do Admin cấp trực tiếp — App Review, nhân viên, đối tác, tester, chăm sóc khách hàng. Đăng nhập bằng Username/Password, không dùng Google/Apple."
       action={<PrimaryBtn icon="plus" onClick={() => setCreating(true)}>Tạo tài khoản</PrimaryBtn>}
-      columns={["Tài khoản", "Tên người dùng", "Loại tài khoản", "Quyền truy cập", "Trạng thái", "Ngày hết hạn", "Onboarding", "Ngày tạo", "Lần đăng nhập cuối", ""]}
+      columns={["Tài khoản", "Tên người dùng", "Loại tài khoản", "Quyền truy cập", "Thị trường", "Trạng thái", "Ngày hết hạn", "Onboarding", "Ngày tạo", "Lần đăng nhập cuối", ""]}
       modals={
         <Fragment>
           {creating ? <CreateAccountModal onClose={() => setCreating(false)} onCreate={handleCreate} /> : null}
@@ -406,6 +433,7 @@ export function TheraAccountsView() {
             <Badge color="var(--color-primary)" bg="var(--color-primary-tint-10)">{ACCOUNT_TYPE_META[a.accountType]}</Badge>
           </td>
           <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{ACCESS_LEVEL_META[a.accessLevel]}</td>
+          <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{COUNTRY_META[a.country].split("·")[0].trim()}</td>
           <td style={{ padding: "12px 20px" }}>
             {a.locked ? (
               <Badge color="var(--error)" bg="rgba(220,60,60,0.12)">Đã khóa</Badge>

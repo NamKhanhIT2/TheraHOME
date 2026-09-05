@@ -19,6 +19,11 @@ const corsHeaders = {
 // profiles also backs this as a hard invariant, not just an API-level check.
 const ACCOUNT_TYPES = ["admin_issued", "review", "staff", "partner", "tester", "cskh"];
 const ACCESS_LEVELS = ["free", "premium", "admin_granted"];
+// profiles.country -- decides which market's store prices, product links and
+// program videos the account sees. Thera-issued accounts skip the onboarding
+// country screen, so Admin picks it at creation (2026-09-05); older callers
+// that send nothing keep the previous behaviour of defaulting to VN.
+const COUNTRIES = ["VN", "US", "MALAY"];
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 
 // TheraHOME-issued accounts log in with a plain username, not a real email
@@ -88,6 +93,7 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
   const accessLevel = String(payload.access_level ?? "");
   const expiresAt = payload.expires_at ? String(payload.expires_at) : null;
   const onboardingRequired = Boolean(payload.onboarding_required);
+  const country = payload.country ? String(payload.country) : "VN";
   const notes = payload.notes ? String(payload.notes) : null;
 
   if (!username || !password || !fullName) {
@@ -101,6 +107,9 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
   }
   if (!ACCESS_LEVELS.includes(accessLevel)) {
     return jsonResponse({ error: "invalid_access_level" }, 400);
+  }
+  if (!COUNTRIES.includes(country)) {
+    return jsonResponse({ error: "invalid_country" }, 400);
   }
   if (password.length < 8) {
     return jsonResponse({ error: "password_too_short" }, 400);
@@ -135,9 +144,12 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
       expires_at: expiresAt,
       onboarding_completed: !onboardingRequired,
       // Thera-issued accounts never see the country screen (RootNavigator
-      // skips it for them), so mark it done — a false default sent old app
-      // builds to an unregistered /country route (blank screen).
+      // skips it for them), so mark it done -- a false default sent old app
+      // builds to an unregistered /country route (blank screen). `country`
+      // is what useMarket() reads, so Admin's choice lands here instead of
+      // the app guessing the market from the UI language.
       country_confirmed: true,
+      country,
       notes,
       created_by: createdBy,
       locked: false,
