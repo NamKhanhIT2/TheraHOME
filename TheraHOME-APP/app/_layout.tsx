@@ -183,8 +183,11 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // activated programs the reminder follows the one the user actually has
   // selected (falling back to the first), matching Home/Roadmap.
   const selectedProductIdForReminder = useAppStore((s) => s.selectedProductId);
+  // Only PUBLISHED roadmaps can be reminded about — an owner of a device
+  // whose roadmap is still "coming soon" has no day to be reminded of.
+  const publishedPrograms = programsQuery.data?.filter((p) => p.product.roadmapPublished);
   const reminderProgram =
-    programsQuery.data?.find((p) => p.productId === selectedProductIdForReminder) ?? programsQuery.data?.[0];
+    publishedPrograms?.find((p) => p.productId === selectedProductIdForReminder) ?? publishedPrograms?.[0];
   const accessibleProgress = useAccessibleProgress(userId, reminderProgram);
   // undefined until the lock/purchase queries settle — the effect below
   // must not run on the provisional (possibly uncapped) value, because

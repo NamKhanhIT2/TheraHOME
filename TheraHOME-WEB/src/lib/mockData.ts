@@ -38,6 +38,9 @@ export interface Product {
   nameMs: string;
   accent: string;
   totalDays: number;
+  /** Admin publish switch (products.roadmap_published). False = draft:
+   * hidden in the app except for customers who already own the device. */
+  roadmapPublished: boolean;
   phases: ProgramPhase[];
   days: ProgramDay[];
   painLevels: number[];

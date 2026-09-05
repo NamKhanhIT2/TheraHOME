@@ -1233,6 +1233,7 @@ export type Database = {
           name: string
           name_en: string | null
           name_ms: string | null
+          roadmap_published: boolean
           total_days: number
         }
         Insert: {
@@ -1243,6 +1244,7 @@ export type Database = {
           name: string
           name_en?: string | null
           name_ms?: string | null
+          roadmap_published?: boolean
           total_days?: number
         }
         Update: {
@@ -1253,6 +1255,7 @@ export type Database = {
           name?: string
           name_en?: string | null
           name_ms?: string | null
+          roadmap_published?: boolean
           total_days?: number
         }
         Relationships: []
@@ -2138,34 +2141,40 @@ export type Database = {
         Args: { p_username: string }
         Returns: string
       }
-      set_official_post_pinned:
-        | {
-            Args: {
-              p_content?: string
-              p_pinned: boolean
-              p_post_id: string
-              p_thumbnail_url?: string
-              p_title?: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_content?: string
-              p_content_malay?: string
-              p_content_us?: string
-              p_markets?: string[]
-              p_pinned: boolean
-              p_post_id: string
-              p_thumbnail_url?: string
-              p_thumbnail_url_malay?: string
-              p_thumbnail_url_us?: string
-              p_title?: string
-              p_title_malay?: string
-              p_title_us?: string
-            }
-            Returns: undefined
-          }
+      roadmap_readiness: {
+        Args: { p_product_id: string }
+        Returns: {
+          days_with_video: number
+          duplicate_days: number[]
+          market: string
+          missing_days: number[]
+          total_days: number
+        }[]
+      }
+      roadmap_ready_copy: {
+        Args: { p_language: string; p_product_name: string }
+        Returns: {
+          body: string
+          title: string
+        }[]
+      }
+      set_official_post_pinned: {
+        Args: {
+          p_content?: string
+          p_content_malay?: string
+          p_content_us?: string
+          p_markets?: string[]
+          p_pinned: boolean
+          p_post_id: string
+          p_thumbnail_url?: string
+          p_thumbnail_url_malay?: string
+          p_thumbnail_url_us?: string
+          p_title?: string
+          p_title_malay?: string
+          p_title_us?: string
+        }
+        Returns: undefined
+      }
       touch_last_login: { Args: never; Returns: undefined }
       truncate_with_ellipsis: {
         Args: { p_max: number; p_text: string }

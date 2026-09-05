@@ -8,7 +8,12 @@
 // a NOT NULL check constraint.
 import { Fragment, useEffect, useState } from "react";
 import type { Product, ProgramDay, ProgramPhase, MarketContent } from "@/lib/mockData";
-import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updateProductInfo, saveLocalizedNames, createProgramDay, updateProgramDay, deleteProgramDay } from "@/lib/db";
+import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updateProductInfo, saveLocalizedNames, createProgramDay, updateProgramDay, deleteProgramDay,
+  fetchRoadmapReadiness,
+  setRoadmapPublished,
+  deleteRoutineProduct,
+  type RoadmapReadiness,
+} from "@/lib/db";
 import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs, MarketSelect } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -20,6 +25,8 @@ import { PhaseContentModal } from "@/components/views/PhaseContentModal";
 type DayModalState = "new" | number | null;
 type MarketKey = "vn" | "us" | "malay";
 const MARKET_TABS: Array<[MarketKey, string]> = [["vn", "VN"], ["us", "UK"], ["malay", "ML"]];
+// Readiness rows come back keyed by the DB market codes.
+const MARKET_LABEL: Record<string, string> = { VN: "VN", US: "UK", MALAY: "ML" };
 const EMPTY_MARKET_CONTENT: MarketContent = { vn: "", us: "", malay: "" };
 
 /** Content across the 3 markets must be all-filled or all-empty — a day
@@ -38,6 +45,12 @@ export function RoutineView() {
   // below), just opened at the selected market's tab.
   const [viewMarket, setViewMarket] = useState<MarketKey>("vn");
   const [storeLinks, setStoreLinks] = useState<Record<string, string>>({});
+  // Publish switch + readiness readout (2026-09-05): the app lists a roadmap
+  // only when `roadmapPublished`; this panel tells Admin how complete the
+  // videos are before flipping it.
+  const [readiness, setReadiness] = useState<RoadmapReadiness[] | null>(null);
+  const [publishAction, setPublishAction] = useState<"publish" | "unpublish" | "delete" | null>(null);
+  const [publishBusy, setPublishBusy] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [newProductName, setNewProductName] = useState("");
@@ -114,6 +127,44 @@ export function RoutineView() {
     setInfoLink(storeLinks[product.id] ?? "");
     setEditInfo(true);
   }
+  useEffect(() => {
+    if (!productId) return;
+    fetchRoadmapReadiness(productId).then(setReadiness).catch(() => setReadiness(null));
+  }, [productId, products]);
+
+  async function runPublishAction() {
+    if (!product || !publishAction) return;
+    setPublishBusy(true);
+    try {
+      if (publishAction === "delete") {
+        await deleteRoutineProduct(product.id);
+        setPublishAction(null);
+        pushToast("Đã xoá lộ trình " + product.name);
+        setProductId(null);
+        reload();
+        return;
+      }
+      const { pushError } = await setRoadmapPublished(product.id, publishAction === "publish");
+      setPublishAction(null);
+      pushToast(
+        publishAction === "publish"
+          ? pushError
+            ? "Đã xuất bản — hộp thư trong app đã có thông báo, nhưng push THẤT BẠI"
+            : "Đã xuất bản lộ trình — khách đã kích hoạt được thông báo"
+          : "Đã ẩn lộ trình khỏi app (khách đã kích hoạt thấy thẻ 'đang hoàn thiện')",
+      );
+      reload(product.id);
+    } catch (error) {
+      pushToast(
+        error instanceof Error && error.message === "has_owners"
+          ? "Không xoá được: đã có khách kích hoạt lộ trình này. Hãy dùng 'Ẩn lộ trình' thay vì xoá."
+          : "Không thể cập nhật trạng thái lộ trình",
+      );
+    } finally {
+      setPublishBusy(false);
+    }
+  }
+
   async function saveInfo() {
     if (!product) return;
     try {
@@ -122,7 +173,7 @@ export function RoutineView() {
         productId: product.id,
         productNameEn: infoNameEn,
         productNameMs: infoNameMs,
-        phases: phaseNames.map((ph) => ({ id: ph.id, nameEn: ph.nameEn, nameMs: ph.nameMs })),
+        phases: phaseNames.map((ph) => ({ id: ph.id, name: ph.name, nameEn: ph.nameEn, nameMs: ph.nameMs })),
       });
       setEditInfo(false);
       pushToast("Đã lưu thông tin " + infoName);
@@ -216,12 +267,38 @@ export function RoutineView() {
               }}
             >
               {p.name.split("·")[1] ? p.name.split("·")[1].trim() : p.name}
+              {!p.roadmapPublished ? <span style={{ marginLeft: 6, fontSize: 10.5, opacity: 0.85 }}>· nháp</span> : null}
             </button>
           ))}
         </div>
         <PrimaryBtn icon="plus" onClick={openNewProduct}>Thêm sản phẩm mới</PrimaryBtn>
       </div>
-      <SectionCard title={product.name} action={<GhostBtn onClick={openEditInfo}>Sửa thông tin</GhostBtn>}>
+      <SectionCard
+        title={product.name}
+        action={
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span
+              style={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                padding: "3px 9px",
+                borderRadius: 999,
+                color: product.roadmapPublished ? "#2BB673" : "#B9860B",
+                background: product.roadmapPublished ? "rgba(43,182,115,0.12)" : "rgba(185,134,11,0.12)",
+              }}
+            >
+              {product.roadmapPublished ? "Đang hiển thị trên app" : "Nháp · chưa hiển thị"}
+            </span>
+            <GhostBtn onClick={openEditInfo}>Sửa thông tin</GhostBtn>
+            {product.roadmapPublished ? (
+              <GhostBtn onClick={() => setPublishAction("unpublish")}>Ẩn lộ trình</GhostBtn>
+            ) : (
+              <PrimaryBtn onClick={() => setPublishAction("publish")}>Xuất bản lộ trình</PrimaryBtn>
+            )}
+            <GhostBtn color="var(--error)" onClick={() => setPublishAction("delete")}>Xoá</GhostBtn>
+          </div>
+        }
+      >
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13.5, color: "var(--text-secondary)" }}>
           <div>
             <strong style={{ color: "var(--text-primary)" }}>{dayList.length}</strong>/{product.totalDays} ngày · {product.phases.length} giai đoạn
@@ -234,6 +311,27 @@ export function RoutineView() {
               <span style={{ color: "var(--text-muted)" }}>Chưa có link</span>
             )}
           </div>
+        </div>
+        {readiness ? (
+          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+            {readiness.map((r) => {
+              const complete = r.missingDays.length === 0 && r.duplicateDays.length === 0 && r.daysWithVideo > 0;
+              return (
+                <div key={r.market} style={{ background: "var(--bg-card-alt)", borderRadius: 10, padding: "10px 12px", fontSize: 12.5 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <strong style={{ color: "var(--text-primary)" }}>Video {MARKET_LABEL[r.market]}</strong>
+                    <span style={{ fontWeight: 700, color: complete ? "#2BB673" : "#B9860B" }}>{r.daysWithVideo}/{r.totalDays} ngày</span>
+                  </div>
+                  {r.missingDays.length ? <div style={{ color: "var(--text-secondary)", marginTop: 4 }}>Thiếu video: ngày {r.missingDays.join(", ")}</div> : null}
+                  {r.duplicateDays.length ? <div style={{ color: "#B9860B", marginTop: 4 }}>Lặp video ngày trước: ngày {r.duplicateDays.join(", ")}</div> : null}
+                  {complete ? <div style={{ color: "#2BB673", marginTop: 4 }}>Đủ video, không trùng.</div> : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+        <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
+          App chỉ liệt kê lộ trình <strong>đang hiển thị</strong>. Lộ trình nháp bị ẩn với mọi người trừ khách đã kích hoạt thiết bị đó — họ thấy thẻ &quot;đang hoàn thiện&quot; và sẽ nhận thông báo khi bạn xuất bản.
         </div>
       </SectionCard>
       <SectionCard title="Giai đoạn · Khảo sát & Upsell">
@@ -361,14 +459,18 @@ export function RoutineView() {
             </div>
           </div>
 
-          <FieldLabel>Tên các giai đoạn theo ngôn ngữ</FieldLabel>
+          <FieldLabel>Tên các giai đoạn</FieldLabel>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
-            Để trống ô UK/ML thì app sẽ hiển thị tên tiếng Việt cho người dùng thị trường đó.
-            Nhớ cập nhật lại đây mỗi khi đổi tên giai đoạn.
+            Dòng đầu là tên tiếng Việt (bắt buộc). Để trống ô UK/ML thì app hiển thị tên tiếng Việt cho thị trường đó.
           </div>
           {phaseNames.map((ph, index) => (
             <div key={ph.id} style={{ background: "var(--bg-card-alt)", borderRadius: 10, padding: 12, marginBottom: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 }}>{ph.name}</div>
+              <input
+                value={ph.name}
+                placeholder="Tên giai đoạn (VN)"
+                onChange={(e) => setPhaseNames((current) => current.map((item, i) => (i === index ? { ...item, name: e.target.value } : item)))}
+                style={{ ...inputStyle, marginBottom: 8, fontWeight: 600 }}
+              />
               <div style={{ display: "flex", gap: 10 }}>
                 <input
                   value={ph.nameEn}
@@ -458,7 +560,23 @@ export function RoutineView() {
         </Modal>
       ) : null}
       {phaseContentTarget ? (
-        <PhaseContentModal phase={phaseContentTarget} onClose={() => setPhaseContentTarget(null)} />
+        <PhaseContentModal phase={phaseContentTarget} productId={product.id} onClose={() => setPhaseContentTarget(null)} />
+      ) : null}
+      {publishAction ? (
+        <ConfirmModal
+          title={publishAction === "publish" ? "Xuất bản lộ trình" : publishAction === "unpublish" ? "Ẩn lộ trình khỏi app" : "Xoá lộ trình"}
+          message={
+            publishAction === "publish"
+              ? `Xuất bản "${product.name}"? Lộ trình hiện lên app cho mọi người, và MỌI khách đã kích hoạt thiết bị này nhận thông báo "lộ trình đã sẵn sàng".${readiness?.some((r) => r.missingDays.length || r.duplicateDays.length) ? " Lưu ý: bảng bên trên cho thấy còn ngày thiếu video hoặc lặp video." : ""}`
+              : publishAction === "unpublish"
+                ? `Ẩn "${product.name}" khỏi app? Khách chưa kích hoạt sẽ không thấy; khách đã kích hoạt thấy thẻ "đang hoàn thiện" thay cho các ngày tập.`
+                : `Xoá hẳn "${product.name}" cùng toàn bộ ngày tập và giai đoạn? Chỉ xoá được khi chưa có khách kích hoạt. Không thể hoàn tác.`
+          }
+          confirmLabel={publishAction === "publish" ? "Xuất bản" : publishAction === "unpublish" ? "Ẩn lộ trình" : "Xoá vĩnh viễn"}
+          busy={publishBusy}
+          onConfirm={runPublishAction}
+          onCancel={() => setPublishAction(null)}
+        />
       ) : null}
       {deleteDayConfirm !== null ? (
         <ConfirmModal

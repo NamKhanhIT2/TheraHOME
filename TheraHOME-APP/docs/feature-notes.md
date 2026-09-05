@@ -3423,3 +3423,46 @@ kích thước/vị trí → dòng trống chiếm chỗ, footer đo ở vị tr
 `entering` khỏi dòng bài (giữ FadeIn ở cấp danh sách). Store/Roadmap vẫn
 giữ hiệu ứng vì chúng `map` trong ScrollView, không ảo hoá. Kiểm chứng bằng
 `expo run:ios --configuration Release` trên simulator.
+
+## Xuất bản lộ trình: chỉ TheraNECK+ có nội dung thật (2026-09-05)
+
+**Hiện trạng phát hiện:** cả 4 sản phẩm dùng CHUNG 28 link video của
+TheraNECK+ (NECK PRO / BACK+ / BACK PRO là bản sao); ngay NECK+ thì ngày
+15–28 lặp lại video ngày 1–14. Dropdown thiết bị trên app đọc theo cờ
+"nhóm chính" của CỬA HÀNG (`store_categories.is_primary`), nên Admin không
+có cách nào giữ một lộ trình chưa xong ra khỏi app; tài khoản review được
+cấp cả 4 lộ trình → reviewer mở TheraBACK và thấy video cổ. Rủi ro Apple
+2.1 (placeholder) / 2.3 (nội dung sai thiết bị).
+
+**Quyết định chủ sở hữu:** chỉ NECK+ có lộ trình; PRO không dùng chung
+video được; khách đã mua BACK/PRO thấy thẻ "đang hoàn thiện" + được báo
+khi mở; giai đoạn 3 NECK+ là placeholder, phải chặn mở bán khi còn thiếu/
+lặp video. Tab Lộ trình trên web tách khỏi tab Sản phẩm, CRUD độc lập.
+
+**Sửa (migration 202609051600):**
+- `products.roadmap_published` (default FALSE = nháp; NECK+ = true). Xoá
+  các URL sao chép ở 3 sản phẩm còn lại để bảng sẵn-sàng trung thực (0/28).
+- `roadmap_readiness(product_id)` (staff): theo thị trường — số ngày có
+  video, danh sách ngày thiếu (bỏ ngày nghỉ), danh sách ngày LẶP video của
+  ngày trước (dấu hiệu placeholder).
+- Trigger publish false→true → ghi inbox `roadmap_ready` (loại mới, có
+  CHECK) cho mọi khách đang có `user_programs` của sản phẩm đó, đúng ngôn
+  ngữ (`roadmap_ready_copy`), loại review/admin/cskh. Push qua
+  `dispatch-push` mode `roadmap_ready` (v27) do WEB gọi ngay sau khi bật.
+
+**App:** `useRoadmapProducts(products, activatedIds, isReview)` thay
+`usePrimaryProducts` ở Home + Roadmap: liệt kê lộ trình đã xuất bản, cộng
+lộ trình nháp mà khách ĐÃ kích hoạt (không áp cho review). Roadmap:
+`RoadmapComingSoonCard` thay danh sách ngày; Home: hero đổi sang trạng thái
+"đang hoàn thiện" và ưu tiên chọn program đã xuất bản khi chưa chọn tay;
+màn Ngày redirect về roadmap; nhắc tập chỉ cho program đã xuất bản; inbox/
+push `roadmap_ready` → chọn sản phẩm rồi mở tab Lộ trình.
+
+**WEB Lộ trình:** badge "Đang hiển thị / Nháp"; bảng sẵn-sàng 3 thị trường;
+nút Xuất bản (confirm, cảnh báo nếu còn thiếu/lặp) · Ẩn lộ trình · Xoá
+(chặn khi đã có khách kích hoạt → hướng sang Ẩn); sửa được tên giai đoạn
+tiếng Việt. Khảo sát & Upsell: KHÔNG cho bật "Đang mở bán" khi giai đoạn
+còn ngày thiếu video hoặc lặp video ngày trước (VN làm chuẩn). Kích hoạt:
+badge "Lộ trình chưa xuất bản" để CSKH biết khách sẽ thấy thẻ chờ.
+
+**App Review:** review account chỉ còn thấy TheraNECK+ — khớp test path.

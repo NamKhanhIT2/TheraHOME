@@ -1,5 +1,6 @@
 // Phase 3: real per-user program data, replacing the Phase 1 mock store's
 // activatedProductIds/productPainLevels/loggedDays. See CLAUDE.md.
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ThemeColors } from '@/theme/colors';
@@ -26,9 +27,13 @@ export interface ProductInfo {
   name: string;
   accent: keyof ThemeColors;
   totalDays: number;
+  /** Admin's publish switch (products.roadmap_published). Unpublished
+   * roadmaps are hidden from everyone who has not activated the device,
+   * and owners see a "coming soon" card instead of days. */
+  roadmapPublished: boolean;
 }
 
-const FALLBACK_PRODUCT = (id: string): ProductInfo => ({ id, name: id, accent: 'primary', totalDays: 28 });
+const FALLBACK_PRODUCT = (id: string): ProductInfo => ({ id, name: id, accent: 'primary', totalDays: 28, roadmapPublished: true });
 
 // Reference data — 4 rows, admin-managed, effectively static.
 export function useProducts() {
@@ -36,17 +41,36 @@ export function useProducts() {
   return useQuery({
     queryKey: ['products', language],
     queryFn: async (): Promise<ProductInfo[]> => {
-      const { data, error } = await supabase.from('products').select('id, name, name_en, name_ms, accent_color_key, total_days');
+      const { data, error } = await supabase.from('products').select('id, name, name_en, name_ms, accent_color_key, total_days, roadmap_published');
       if (error) throw error;
       return data.map((p) => ({
         id: p.id,
         name: localizeProductName(p.id, p.name, language, p),
         accent: p.accent_color_key as keyof ThemeColors,
         totalDays: p.total_days,
+        roadmapPublished: p.roadmap_published !== false,
       }));
     },
     staleTime: Infinity,
   });
+}
+
+/** The devices the Home/Roadmap dropdowns list (owner rule 2026-09-05).
+ * Driven by Admin's `roadmap_published` switch in the WEB Lộ trình tab —
+ * NOT by the Store's "nhóm chính" flag anymore, so the storefront and the
+ * roadmaps are managed independently. An UNPUBLISHED device is listed only
+ * for a customer who has already activated it (they own the hardware and
+ * get the "coming soon" card); review accounts never see it, so App Review
+ * only meets roadmaps with real content. */
+export function useRoadmapProducts(
+  products: ProductInfo[],
+  activatedProductIds: string[],
+  isReviewAccount: boolean,
+): ProductInfo[] {
+  return useMemo(
+    () => products.filter((p) => p.roadmapPublished || (!isReviewAccount && activatedProductIds.includes(p.id))),
+    [products, activatedProductIds, isReviewAccount],
+  );
 }
 
 export interface PrimaryProductsInfo {

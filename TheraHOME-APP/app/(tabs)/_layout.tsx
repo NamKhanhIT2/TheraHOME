@@ -145,6 +145,9 @@ export default function TabsLayout() {
         router.push('/chat/human');
       } else if (data.type === 'inactivity') {
         router.push('/home');
+      } else if (data.type === 'roadmap_ready') {
+        if (typeof data.productId === 'string') useAppStore.getState().selectProduct(data.productId);
+        router.push('/roadmap');
       } else if (data.dayNumber != null && typeof data.productId === 'string') {
         router.push({ pathname: '/day/[dayId]', params: { dayId: String(data.dayNumber), productId: data.productId } });
       } else {

@@ -10,6 +10,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
 import { translate, useI18n, type TranslationKey } from '@/lib/i18n';
+import { useAppStore } from '@/store/useAppStore';
 import type { AppLanguage } from '@/store/useAppStore';
 import { RemoteImage } from '@/components/ui/RemoteImage';
 
@@ -86,6 +87,7 @@ export default function NotificationInboxScreen() {
     comment_reaction: { icon: 'heart', color: theme.colors.error, bg: 'rgba(220,60,60,0.10)' },
     streak_milestone: { icon: 'trending-up', color: '#D98200', bg: 'rgba(217,130,0,0.12)' },
     post_moderation: { icon: 'shield-check', color: '#2BB673', bg: 'rgba(43,182,115,0.12)' },
+    roadmap_ready: { icon: 'calendar', color: theme.colors.primary, bg: theme.colors.primaryTint10 },
   };
 
   const sections = useMemo(() => {
@@ -108,6 +110,10 @@ export default function NotificationInboxScreen() {
       router.push({ pathname: '/community/[postId]', params: { postId: notification.relatedPostId } });
     } else if (notification.type === 'schedule' && notification.relatedDayNumber != null && notification.relatedProductId) {
       router.push({ pathname: '/day/[dayId]', params: { dayId: String(notification.relatedDayNumber), productId: notification.relatedProductId } });
+    } else if (notification.type === 'roadmap_ready') {
+      // Jump straight to the roadmap that just got published.
+      if (notification.relatedProductId) useAppStore.getState().selectProduct(notification.relatedProductId);
+      router.push('/roadmap');
     } else if (notification.type === 'ad') {
       router.push(notification.destination === 'community' ? '/community' : notification.destination === 'roadmap' ? '/roadmap' : notification.destination === 'home' ? '/home' : '/store');
     } else if (notification.type === 'blog') {

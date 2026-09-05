@@ -17,6 +17,7 @@ import {
   type QuizLanguageContent,
   type PhasePromoAdmin,
   type PhasePromoTranslation,
+  fetchRoadmapReadiness,
 } from "@/lib/db";
 import { GhostBtn, PrimaryBtn, FieldLabel, inputStyle, PillTabs } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
@@ -214,7 +215,7 @@ const PROMO_LANG_TABS: Array<[PromoLangTab, string]> = [["vi", "VN"], ["en", "EN
  * IDs are shared across languages and only shown on the VN tab. */
 type PromoTextKey = keyof PhasePromoTranslation;
 
-function PromoTab({ phaseId }: { phaseId: string }) {
+function PromoTab({ phaseId, productId, phaseRange }: { phaseId: string; productId: string; phaseRange: [number, number] }) {
   const [promo, setPromo] = useState<PhasePromoAdmin | null>(null);
   const [langTab, setLangTab] = useState<PromoLangTab>("vi");
   const [saving, setSaving] = useState(false);
@@ -290,6 +291,22 @@ function PromoTab({ phaseId }: { phaseId: string }) {
           };
           toSave = { ...promo, translations: { en: merge("en"), ms: merge("ms") } };
           setPromo(toSave);
+        }
+      }
+      // Selling a phase whose days lack videos or merely repeat earlier days'
+      // videos (the phase-3 placeholder state, owner 2026-09-05) would charge
+      // customers for empty content — hard block, VN market as the baseline.
+      if (toSave.salesEnabled) {
+        const readiness = await fetchRoadmapReadiness(productId);
+        const vn = readiness.find((r) => r.market === "VN");
+        const inPhase = (day: number) => day >= phaseRange[0] && day <= phaseRange[1];
+        const missing = vn?.missingDays.filter(inPhase) ?? [];
+        const duplicated = vn?.duplicateDays.filter(inPhase) ?? [];
+        if (missing.length || duplicated.length) {
+          pushToast(
+            `Chưa thể mở bán: giai đoạn này ${missing.length ? `thiếu video ngày ${missing.join(", ")}` : ""}${missing.length && duplicated.length ? "; " : ""}${duplicated.length ? `lặp lại video ngày trước ở ngày ${duplicated.join(", ")}` : ""}. Bổ sung video ở tab Lộ trình rồi mới bật.`,
+          );
+          return;
         }
       }
       await savePhasePromo(phaseId, toSave);
@@ -415,7 +432,7 @@ function PromoTab({ phaseId }: { phaseId: string }) {
   );
 }
 
-export function PhaseContentModal({ phase, onClose }: { phase: ProgramPhase; onClose: () => void }) {
+export function PhaseContentModal({ phase, productId, onClose }: { phase: ProgramPhase; productId: string; onClose: () => void }) {
   const [tab, setTab] = useState<ContentTab>("quiz");
 
   return (
@@ -430,7 +447,7 @@ export function PhaseContentModal({ phase, onClose }: { phase: ProgramPhase; onC
           onChange={setTab}
         />
       </div>
-      {tab === "quiz" ? <QuizTab phaseId={phase.id} /> : <PromoTab phaseId={phase.id} />}
+      {tab === "quiz" ? <QuizTab phaseId={phase.id} /> : <PromoTab phaseId={phase.id} productId={productId} phaseRange={phase.range} />}
     </Modal>
   );
 }

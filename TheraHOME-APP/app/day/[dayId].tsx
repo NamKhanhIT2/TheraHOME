@@ -51,6 +51,11 @@ export default function DayDetailScreen() {
   const lockDataReady = !d || phaseIds.length === 0 || (lockRequirementsQuery.isFetched && (!userId || purchasesQuery.isFetched));
   const lockRequirement = d ? lockRequirementsQuery.data?.get(d.phaseId) : undefined;
   const phaseLocked = !!d && !isReviewAccount && lockDataReady && !!lockRequirement && !purchasesQuery.data?.has(d.phaseId);
+  // Unpublished roadmap (Admin switch): its days are not content yet.
+  const productUnpublished = !!program && program.product.roadmapPublished === false;
+  useEffect(() => {
+    if (productUnpublished) router.replace('/(tabs)/roadmap');
+  }, [productUnpublished]);
   useEffect(() => {
     if (!phaseLocked || !d) return;
     if (lockRequirement?.salesEnabled) router.replace({ pathname: '/paywall/[phaseId]', params: { phaseId: d.phaseId } });
@@ -116,7 +121,7 @@ export default function DayDetailScreen() {
     );
   }
   if (!d) return null;
-  if (!lockDataReady || phaseLocked) {
+  if (!lockDataReady || phaseLocked || productUnpublished) {
     return (
       <ScreenContainer>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

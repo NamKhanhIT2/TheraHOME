@@ -12,7 +12,8 @@ import { supabase } from '@/lib/supabase';
 export type NotificationType =
   | 'schedule' | 'inactivity' | 'ad' | 'blog' | 'chat' | 'streak_milestone'
   | 'post_reaction' | 'post_comment' | 'comment_reply' | 'comment_reaction'
-  | 'post_moderation';
+  | 'post_moderation'
+  | 'roadmap_ready';
 
 export interface NotificationRow {
   id: string;

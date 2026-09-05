@@ -5,7 +5,8 @@ import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, usePrimaryProducts, useProducts } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, useProducts, useRoadmapProducts } from '@/hooks/usePrograms';
+import { RoadmapComingSoonCard } from '@/components/roadmap/RoadmapComingSoonCard';
 import { useRequestDay } from '@/hooks/useRequestDay';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
@@ -48,7 +49,6 @@ export default function RoadmapScreen() {
   const productsQuery = useProducts();
   const programsQuery = useActivatedPrograms(userId);
   const defaultProductQuery = useDefaultProductId(userId);
-  const primaryQuery = usePrimaryProducts();
   const requestDayGate = useRequestDay();
   const activatedPrograms = programsQuery.data ?? [];
   // Memoized (not a fresh `?? []` per render) — feeds the dropdownProducts
@@ -60,13 +60,11 @@ export default function RoadmapScreen() {
   // viewer's market's store item row (admin fills them per market in the
   // Sản Phẩm tab). Falls back to the full catalog while the flag data
   // loads (or if admin flagged nothing yet).
-  const dropdownProducts = useMemo(() => {
-    const info = primaryQuery.data;
-    if (!info || info.ids.length === 0) return catalogProducts;
-    const filtered = catalogProducts.filter((p) => info.ids.includes(p.id));
-    const base = filtered.length ? filtered : catalogProducts;
-    return base.map((p) => ({ ...p, name: info.nameById[p.id] ?? p.name }));
-  }, [catalogProducts, primaryQuery.data]);
+  // Published roadmaps + the unpublished ones this customer already owns —
+  // see useRoadmapProducts. (Was: the Store's "nhóm chính" flag, which tied
+  // roadmap visibility to storefront grouping.)
+  const activatedProductIds = useMemo(() => activatedPrograms.map((p) => p.productId), [activatedPrograms]);
+  const dropdownProducts = useRoadmapProducts(catalogProducts, activatedProductIds, isReviewAccount);
   // Prefer the product the user actually ordered over just "first activated
   // program" — only kicks in when they haven't explicitly picked one via
   // the dropdown yet (`selectedProductId` always wins once set).
@@ -236,6 +234,13 @@ export default function RoadmapScreen() {
               {t('retry')}
             </Button>
           </View>
+        ) : selectedProduct && !selectedProduct.roadmapPublished ? (
+          // Owner of a device whose roadmap Admin hasn't published yet (only
+          // TheraNECK+ has real videos as of 2026-09-05). No days, no
+          // survey, no promos — just the honest "coming soon" state.
+          <Reanimated.View entering={fadeUpEntering(90)} style={{ marginTop: 16 }}>
+            <RoadmapComingSoonCard productName={selectedProduct.name} />
+          </Reanimated.View>
         ) : selectedProduct && !program ? (
           // Device not yet activated for this account — the activation
           // input sits INLINE in the card (per explicit request, no detour

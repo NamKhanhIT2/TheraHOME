@@ -22,6 +22,8 @@ type RequestBody =
       targetMarkets?: Market[]; titleUs?: string; bodyUs?: string; titleMalay?: string; bodyMalay?: string;
     }
   | { mode: 'chat'; threadId: string; senderType: 'user' | 'specialist'; preview?: string; attachment?: boolean }
+  // Admin published a roadmap: tell every customer who owns that device.
+  | { mode: 'roadmap_ready'; productId: string }
   | { mode: 'social'; event: 'reaction' | 'comment' | 'reply'; postId: string; commentId?: string; parentCommentId?: string; targetType?: 'post' | 'comment'; preview?: string };
 
 const COPY: Record<Lang, {
@@ -117,6 +119,26 @@ Deno.serve(async (request) => {
         if (recipient.market === 'MALAY' && (input.titleMalay || input.bodyMalay)) return { title: input.titleMalay || input.title, body: input.bodyMalay || input.body };
         return { title: input.title, body: input.body };
       };
+    } else if (input.mode === 'roadmap_ready') {
+      if (!isStaff) return json({ error: 'staff_required' }, 403);
+      const { data: product, error: productError } = await admin.from('products').select('id, name, name_en, name_ms').eq('id', input.productId).single();
+      if (productError) throw productError;
+      const { data: owners, error: ownersError } = await admin
+        .from('user_programs')
+        .select('user_id, profiles!inner(account_type)')
+        .eq('product_id', input.productId);
+      if (ownersError) throw ownersError;
+      recipientIds = (owners ?? [])
+        // deno-lint-ignore no-explicit-any
+        .filter((row: any) => !['review', 'admin', 'cskh'].includes(row.profiles?.account_type))
+        // deno-lint-ignore no-explicit-any
+        .map((row: any) => row.user_id as string);
+      data = { type: 'roadmap_ready', productId: input.productId };
+      const nameFor = (lang: Lang) => (lang === 'en' ? product.name_en : lang === 'ms' ? product.name_ms : null) || product.name;
+      compose = (r) => ({
+        title: r.lang === 'en' ? `Your ${nameFor('en')} roadmap is ready` : r.lang === 'ms' ? `Pelan ${nameFor('ms')} anda sudah sedia` : `Lộ trình ${nameFor('vi')} đã sẵn sàng`,
+        body: r.lang === 'en' ? 'The exercise videos are live. Open the Roadmap tab to start Day 1.' : r.lang === 'ms' ? 'Video senaman telah tersedia. Buka tab Pelan untuk memulakan Hari 1.' : 'Video bài tập đã có. Mở tab Lộ trình để bắt đầu Ngày 1 nhé.',
+      });
     } else if (input.mode === 'social') {
       const { data: post, error: postError } = await admin
         .from('community_posts')

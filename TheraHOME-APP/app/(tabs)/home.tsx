@@ -13,7 +13,7 @@ import { fadeUpEntering } from '@/lib/motion';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
-import { useActivatedPrograms, useDefaultProductId, usePainLogs, usePrimaryProducts, useProducts, useProgramDays } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useDefaultProductId, usePainLogs, useProducts, useProgramDays, useRoadmapProducts } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useRequestDay } from '@/hooks/useRequestDay';
 import { PainScaleModal } from '@/components/PainScaleModal';
@@ -74,8 +74,13 @@ export default function HomeScreen() {
   // Prefer the product the user actually ordered over just "first activated
   // program" — only kicks in when they haven't explicitly picked one via
   // the dropdown yet (`selectedProductId` always wins once set).
+  // When nothing is explicitly selected, prefer a PUBLISHED roadmap so a
+  // customer who owns TheraNECK+ and a not-yet-ready TheraBACK lands on the
+  // one with content.
   const program =
     activatedPrograms.find((p) => p.productId === selectedProductId) ??
+    activatedPrograms.find((p) => p.productId === defaultProductQuery.data && p.product.roadmapPublished) ??
+    activatedPrograms.find((p) => p.product.roadmapPublished) ??
     activatedPrograms.find((p) => p.productId === defaultProductQuery.data) ??
     activatedPrograms[0];
   const catalogProducts = productsQuery.data ?? [];
@@ -101,22 +106,15 @@ export default function HomeScreen() {
   const waterQuery = useWaterLog(userId);
   const setWaterMutation = useSetWaterLog(userId);
   const requestDayGate = useRequestDay();
-  const primaryQuery = usePrimaryProducts();
-
   // Hero "Ngày N/X" — X counts only reachable (non-IAP-locked) phases;
   // shared with the Profile header and share snapshot via this hook.
   const progress = useAccessibleProgress(userId, program);
 
   // Home's device dropdown mirrors the Roadmap's: primary-group devices
   // with the viewer's market's store names (VN fallback).
-  const dropdownProducts = useMemo(() => {
-    const catalog = productsQuery.data ?? [];
-    const info = primaryQuery.data;
-    if (!info || info.ids.length === 0) return catalog;
-    const filtered = catalog.filter((p) => info.ids.includes(p.id));
-    const base = filtered.length ? filtered : catalog;
-    return base.map((p) => ({ ...p, name: info.nameById[p.id] ?? p.name }));
-  }, [productsQuery.data, primaryQuery.data]);
+  // Published roadmaps + unpublished ones this customer owns (useRoadmapProducts).
+  const activatedProductIds = useMemo(() => activatedPrograms.map((p) => p.productId), [activatedPrograms]);
+  const dropdownProducts = useRoadmapProducts(catalogProducts, activatedProductIds, profile?.accountType === 'review');
 
   // `programsQuery` and `daysQuery` are dependent queries. In TanStack Query
   // v5 a disabled query is still `isPending`, even though it is not fetching.
@@ -246,7 +244,15 @@ export default function HomeScreen() {
               accessible-progress numbers are provisional (28 instead of 14)
               and `today` could point into a locked phase — hold the hero
               instead of exposing "Bắt đầu" / "Hướng dẫn nhanh" for it. */}
-          {program && !progress.isReady ? (
+          {program && !program.product.roadmapPublished ? (
+            // Owner of a device whose roadmap Admin hasn't published yet:
+            // no day counter, no Start/Quick guide — those would open an
+            // empty program. Same copy as the Roadmap tab's card.
+            <View style={{ minHeight: 150, justifyContent: 'center' }}>
+              <Text style={[theme.type.h2, { color: '#fff' }]}>{t('roadmapComingSoonTitle', { product: program.product.name })}</Text>
+              <Text style={[theme.type.body, { color: 'rgba(255,255,255,0.85)', marginTop: 8 }]}>{t('roadmapComingSoonBody')}</Text>
+            </View>
+          ) : program && !progress.isReady ? (
             <View style={{ minHeight: 150, alignItems: 'center', justifyContent: 'center' }}>
               <ActivityIndicator color="#fff" />
             </View>

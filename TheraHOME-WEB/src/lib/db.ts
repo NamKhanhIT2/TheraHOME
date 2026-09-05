@@ -105,7 +105,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 
 export async function fetchRoutineProducts(): Promise<Product[]> {
   const [{ data: products, error: pErr }, { data: phases, error: phErr }, { data: days, error: dErr }] = await Promise.all([
-    supabase.from("products").select("id, name, name_en, name_ms, accent_color_key, total_days").order("id"),
+    supabase.from("products").select("id, name, name_en, name_ms, accent_color_key, total_days, roadmap_published").order("id"),
     supabase.from("program_phases").select("id, product_id, name, name_en, name_ms, day_start, day_end, sort_order").order("sort_order"),
     supabase
       .from("program_days")
@@ -140,11 +140,69 @@ export async function fetchRoutineProducts(): Promise<Product[]> {
       nameMs: p.name_ms ?? "",
       accent: accentFromKey(p.accent_color_key),
       totalDays: p.total_days,
+      roadmapPublished: p.roadmap_published !== false,
       phases: productPhases,
       days: productDays,
       painLevels: [],
     };
   });
+}
+
+// ---- Roadmap publishing (2026-09-05) --------------------------------------
+// The app's device dropdown reads products.roadmap_published — NOT the
+// Store's "nhóm chính" flag — so roadmaps are managed here independently
+// of the storefront. A DB trigger writes a `roadmap_ready` inbox row for
+// every owner when a roadmap flips to published; the push goes through
+// dispatch-push (mode roadmap_ready) right after.
+
+export interface RoadmapReadiness {
+  market: AdminMarket;
+  totalDays: number;
+  daysWithVideo: number;
+  /** Non-rest days with no video for this market. */
+  missingDays: number[];
+  /** Days whose video is identical to an EARLIER day's video (placeholder tell-tale). */
+  duplicateDays: number[];
+}
+
+export async function fetchRoadmapReadiness(productId: string): Promise<RoadmapReadiness[]> {
+  const { data, error } = await supabase.rpc("roadmap_readiness", { p_product_id: productId });
+  if (error) throw error;
+  type Row = { market: string; total_days: number; days_with_video: number; missing_days: number[] | null; duplicate_days: number[] | null };
+  return ((data ?? []) as Row[]).map((row) => ({
+    market: row.market as AdminMarket,
+    totalDays: row.total_days,
+    daysWithVideo: row.days_with_video,
+    missingDays: row.missing_days ?? [],
+    duplicateDays: row.duplicate_days ?? [],
+  }));
+}
+
+export async function setRoadmapPublished(productId: string, published: boolean): Promise<{ pushError: string | null }> {
+  const { error } = await supabase.from("products").update({ roadmap_published: published }).eq("id", productId);
+  if (error) throw error;
+  if (!published) return { pushError: null };
+  const { error: pushErr } = await supabase.functions.invoke("dispatch-push", { body: { mode: "roadmap_ready", productId } });
+  if (pushErr) console.error("dispatch-push roadmap_ready failed", productId, pushErr);
+  return { pushError: pushErr ? String(pushErr.message ?? pushErr) : null };
+}
+
+/** Number of customer accounts that already activated this product — a
+ * roadmap with owners must be UNPUBLISHED, never deleted (deleting would
+ * orphan their user_programs). */
+export async function countRoadmapOwners(productId: string): Promise<number> {
+  const { count, error } = await supabase.from("user_programs").select("id", { count: "exact", head: true }).eq("product_id", productId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function deleteRoutineProduct(productId: string) {
+  const owners = await countRoadmapOwners(productId);
+  if (owners > 0) throw new Error("has_owners");
+  // program_phases / program_days / product_activation_contacts cascade;
+  // store_items.product_id is set null (the storefront row survives).
+  const { error } = await supabase.from("products").delete().eq("id", productId);
+  if (error) throw error;
 }
 
 export async function createRoutineProduct(input: { name: string; category: "neck" | "back"; totalDays: number; link: string }) {
@@ -169,7 +227,8 @@ export async function saveLocalizedNames(input: {
   productId: string;
   productNameEn: string;
   productNameMs: string;
-  phases: Array<{ id: string; nameEn: string; nameMs: string }>;
+  /** `name` (VN) is optional: when present the phase's base name is renamed too. */
+  phases: Array<{ id: string; name?: string; nameEn: string; nameMs: string }>;
 }) {
   const { error } = await supabase
     .from("products")
@@ -180,7 +239,11 @@ export async function saveLocalizedNames(input: {
   for (const phase of input.phases) {
     const { error: phaseErr } = await supabase
       .from("program_phases")
-      .update({ name_en: phase.nameEn.trim() || null, name_ms: phase.nameMs.trim() || null })
+      .update({
+        ...(phase.name?.trim() ? { name: phase.name.trim() } : {}),
+        name_en: phase.nameEn.trim() || null,
+        name_ms: phase.nameMs.trim() || null,
+      })
       .eq("id", phase.id);
     if (phaseErr) throw phaseErr;
   }
@@ -505,12 +568,14 @@ export async function uploadStoreItemImage(itemId: string, file: File) {
 export interface ActivationProduct {
   id: string;
   name: string;
+  /** False = roadmap still a draft: owners see a "coming soon" card after activating. */
+  roadmapPublished: boolean;
 }
 
 export async function fetchActivationProducts(): Promise<ActivationProduct[]> {
-  const { data, error } = await supabase.from("products").select("id, name").order("id");
+  const { data, error } = await supabase.from("products").select("id, name, roadmap_published").order("id");
   if (error) throw error;
-  return (data ?? []).map((p) => ({ id: p.id, name: p.name }));
+  return (data ?? []).map((p) => ({ id: p.id, name: p.name, roadmapPublished: p.roadmap_published !== false }));
 }
 
 export interface ActivationContact {

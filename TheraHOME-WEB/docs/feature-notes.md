@@ -867,3 +867,11 @@ chat ký URL ảnh theo lô; sửa target markets đối chiếu pin; bình lu�
 có badge + bỏ ẩn; hủy Upsale/lưu prompt/khoá tài khoản báo đúng kết quả;
 onboarding tạo được bản ngôn ngữ thiếu; quiz đồng bộ số option 3 ngôn ngữ;
 đăng bài báo khi push lỗi; nav parent "notifications-group"; lint 0 error.
+
+## Lộ trình tách khỏi Sản phẩm; xuất bản/ẩn/xoá độc lập (2026-09-05)
+
+App không còn đọc "nhóm chính" của Cửa hàng để quyết định lộ trình nào
+hiện; đọc `products.roadmap_published` do tab Lộ trình quản. Tab có badge
+trạng thái, bảng sẵn-sàng video theo thị trường, Xuất bản/Ẩn/Xoá (xoá bị
+chặn khi đã có khách), sửa tên giai đoạn VN, và khoá "Đang mở bán" cho giai
+đoạn thiếu/lặp video. Chi tiết ở `TheraHOME-APP/docs/feature-notes.md`.

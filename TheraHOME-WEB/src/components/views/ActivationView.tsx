@@ -117,7 +117,16 @@ export function ActivationView() {
           <SectionCard
             key={product.id}
             title={product.name}
-            action={<span style={{ fontSize: 12, color: "var(--text-muted)" }}>{total} liên hệ</span>}
+            action={
+              <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "var(--text-muted)" }}>
+                {!product.roadmapPublished ? (
+                  <span title="Khách kích hoạt sẽ thấy thẻ 'Lộ trình đang hoàn thiện' cho tới khi Admin xuất bản ở tab Lộ trình" style={{ fontWeight: 700, color: "#B9860B", background: "rgba(185,134,11,0.12)", borderRadius: 999, padding: "2px 8px" }}>
+                    Lộ trình chưa xuất bản
+                  </span>
+                ) : null}
+                {total} liên hệ
+              </span>
+            }
           >
             <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
               <input
