@@ -3513,3 +3513,28 @@ mô tả trong YouTube Studio cho 14 video.
 được bản âm thanh nào phát — YouTube chọn theo ngôn ngữ tài khoản/máy của
 người xem (đổi được ở bánh răng); phụ đề là lớp dự phòng chắc chắn.
 Cần test trên máy thật đặt tiếng Anh sau khi Studio đã có bản dịch.
+
+## Lộ trình NECK+ rút còn 14 ngày, bỏ giai đoạn 3 (2026-09-05, tối)
+
+Chủ sở hữu chốt: mới quay xong 14 ngày nên xoá hẳn "Giai đoạn 3 · Mở rộng
+toàn diện" và đặt `products.total_days = 14`.
+
+**Đã xoá theo (CASCADE từ `program_phases`):** 13 ngày tập (ngày 15–27, vốn
+là video lặp của ngày trước), 98 dòng tiến trình `user_program_days`, 1
+`pain_logs`, và 1 `phase_purchases` — dòng mua này là `platform =
+'admin_granted'` và đã `revoked_at` từ 30/8, không phải giao dịch tiền thật.
+
+**Hệ quả cần nhớ khi làm giai đoạn 3 sau này:** `phase_promos` của giai đoạn
+3 mất theo, nên phải tạo lại thẻ Upsell + `apple_product_id`
+`ai.therahome.neckplus.phase3unlock` (và `google_product_id`) trong tab
+Khảo sát & Upsell. Hiện `phase_promos` của neck-plus rỗng.
+
+**Kiểm tra sau khi xoá:** 14/14 ngày có video ở cả VN/UK/ML, không lặp;
+Roadmap app chỉ còn Phase 1 + Phase 2 với đủ 7 ngày mỗi giai đoạn; Home hiện
+"DAY 14 / 14".
+
+**WEB (`fetchUsers` / `fetchUserPrograms`):** rút ngắn lộ trình để lại
+`user_programs.current_day` vượt quá `total_days` (1 tài khoản còn ở 15), nên
+cả hai hàm nay `Math.min(current_day, total_days)` trước khi hiển thị và
+trước khi dò giai đoạn hiện tại — app vốn đã tự cap theo lịch, chỉ trang
+Admin là hiện "Ngày 15 / 14".

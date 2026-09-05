@@ -1074,7 +1074,7 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
   const [{ data: profiles, error: pErr }, { data: contacts, error: cErr }, { data: programs, error: upErr }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, phone, treatment_area, app_role, locked, created_at, account_type").is("deleted_at", null),
     supabase.from("user_access_contacts").select("user_id, contact_value"),
-    supabase.from("user_programs").select("user_id, current_day, adherence_pct"),
+    supabase.from("user_programs").select("user_id, product_id, current_day, adherence_pct"),
   ]);
   if (pErr) throw pErr;
   if (cErr) throw cErr;
@@ -1083,9 +1083,19 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
   const contactByUser = new Map((contacts ?? []).map((c) => [c.user_id, c.contact_value]));
   const programCountByUser = new Map<string, number>();
   const firstProgramByUser = new Map<string, { current_day: number; adherence_pct: number }>();
+  // Same cap as fetchUserPrograms: a roadmap that was shortened leaves stored
+  // current_day values past its new length.
+  const { data: productDays } = await supabase.from("products").select("id, total_days");
+  const totalDaysByProduct = new Map((productDays ?? []).map((p) => [p.id, p.total_days]));
   for (const program of programs ?? []) {
     programCountByUser.set(program.user_id, (programCountByUser.get(program.user_id) ?? 0) + 1);
-    if (!firstProgramByUser.has(program.user_id)) firstProgramByUser.set(program.user_id, program);
+    if (!firstProgramByUser.has(program.user_id)) {
+      const cap = totalDaysByProduct.get(program.product_id);
+      firstProgramByUser.set(program.user_id, {
+        current_day: cap ? Math.min(program.current_day, cap) : program.current_day,
+        adherence_pct: program.adherence_pct,
+      });
+    }
   }
 
   return (profiles ?? [])
@@ -1225,12 +1235,16 @@ export async function fetchUserPrograms(userId: string): Promise<UserProgramRow[
   return (programs ?? []).map((p) => {
     const product = productById.get(p.product_id);
     const productPhases = phasesByProduct.get(p.product_id) ?? [];
-    const currentPhase = productPhases.find((ph) => p.current_day >= ph.dayStart && p.current_day <= ph.dayEnd);
+    // Shortening a roadmap (dropping a phase, lowering total_days) leaves
+    // stored current_day values past the end — the app already caps its own
+    // calendar-derived day the same way, so never show "Ngày 15 / 14".
+    const currentDay = Math.min(p.current_day, product?.total_days ?? p.current_day);
+    const currentPhase = productPhases.find((ph) => currentDay >= ph.dayStart && currentDay <= ph.dayEnd);
     return {
       userProgramId: p.id,
       productId: p.product_id,
       productName: product?.name ?? p.product_id,
-      currentDay: p.current_day,
+      currentDay,
       totalDays: product?.total_days ?? p.current_day,
       streak: p.streak,
       adherencePct: Math.round(Number(p.adherence_pct)),
