@@ -924,3 +924,24 @@ Thị trường** (VN / UK / ML, mặc định VN), bảng có thêm cột Thị
 (thiếu thì mặc định VN để caller cũ không vỡ) và ghi vào `profiles.country`
 cạnh `country_confirmed`. `COUNTRY_META` / `COUNTRY_OPTIONS` ở
 `adminMockData.ts`.
+
+## Lộ trình đọc theo thị trường + tự dịch nháp tên (2026-09-05, tối)
+
+Chủ sở hữu báo: chọn thị trường UK nhưng tab Lộ trình vẫn hiện toàn tiếng
+Việt; và mong muốn chung là "tạo nội dung VN xong thì các thị trường khác tự
+dịch sẵn bản nháp để sửa sau".
+
+- `marketText(vn, en, ms, market)` mới: tên sản phẩm, tên giai đoạn, cột
+  Giai đoạn trong bảng ngày, và `<select>` giai đoạn trong modal Ngày đều đọc
+  theo thị trường đang chọn. Giá trị LƯU vẫn là tên VN (vì
+  `createProgramDay`/`updateProgramDay` tra giai đoạn theo tên) — chỉ đổi
+  phần hiển thị. Thiếu bản UK/ML thì hiện bản VN kèm chú thích vàng
+  "Chưa có bản UK — đang hiện bản VN."
+- `translateDrafts` (Edge Function `translate-content`, Groq — đã có sẵn và
+  đang dùng ở Cộng đồng / Upsell / FAQ / Quiz / AI Prompts) nay nối vào tab
+  Lộ trình: lưu giai đoạn hoặc lưu thông tin sản phẩm mà ô UK/ML trống thì
+  hệ thống tự dịch từ bản VN và điền nháp. Dịch lỗi thì vẫn lưu bản VN,
+  không chặn thao tác lưu.
+
+**Còn thiếu (chưa nối `translateDrafts`):** Cửa hàng (tên/mô tả/giá sản
+phẩm) và Onboarding vẫn phải tự điền bản UK/ML.

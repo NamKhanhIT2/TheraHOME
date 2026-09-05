@@ -27,6 +27,7 @@ import { HeaderAccessory } from "@/components/shell/HeaderAccessory";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 import { PhaseContentModal } from "@/components/views/PhaseContentModal";
+import { translateDrafts } from "@/lib/translate";
 
 type DayModalState = "new" | number | null;
 type MarketKey = "vn" | "us" | "malay";
@@ -35,6 +36,16 @@ const MARKET_TABS: Array<[MarketKey, string]> = [["vn", "VN"], ["us", "UK"], ["m
 const MARKET_LABEL: Record<string, string> = { VN: "VN", US: "UK", MALAY: "ML" };
 const MARKET_DB_CODE: Record<MarketKey, string> = { vn: "VN", us: "US", malay: "MALAY" };
 const EMPTY_MARKET_CONTENT: MarketContent = { vn: "", us: "", malay: "" };
+
+/** Names are stored VN + optional EN/MS. The tab is scoped to one market by
+ * the header dropdown, so it must read in that market's language instead of
+ * always showing Vietnamese (owner 2026-09-05); `fallback` flags a variant
+ * that was never authored, so the row can say so rather than look translated. */
+function marketText(vn: string, en: string, ms: string, market: MarketKey): { text: string; fallback: boolean } {
+  const variant = market === "us" ? en : market === "malay" ? ms : "";
+  if (market === "vn") return { text: vn, fallback: false };
+  return variant.trim() ? { text: variant.trim(), fallback: false } : { text: vn, fallback: true };
+}
 
 export function RoutineView() {
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -184,11 +195,29 @@ export function RoutineView() {
     }
     setPhaseBusy(true);
     try {
-      const input = { name, nameEn: phaseNameEn, nameMs: phaseNameMs, dayStart: start, dayEnd: end };
+      // Empty UK/ML names are machine-drafted from the VN name, same pattern
+      // as the quiz/upsell editors — staff can edit the draft later, and a
+      // translator outage just saves VN-only rather than blocking the save.
+      let nameEn = phaseNameEn;
+      let nameMs = phaseNameMs;
+      let drafted = false;
+      if (!nameEn.trim() || !nameMs.trim()) {
+        const drafts = await translateDrafts({ name });
+        if (drafts) {
+          if (!nameEn.trim()) nameEn = drafts.en.name ?? "";
+          if (!nameMs.trim()) nameMs = drafts.ms.name ?? "";
+          drafted = true;
+        }
+      }
+      const input = { name, nameEn, nameMs, dayStart: start, dayEnd: end };
       if (editingId) await updateProgramPhase(editingId, input);
       else await createProgramPhase(product.id, input);
       setPhaseModal(null);
-      pushToast(editingId ? "Đã lưu giai đoạn" : "Đã thêm giai đoạn");
+      pushToast(
+        drafted
+          ? (editingId ? "Đã lưu giai đoạn" : "Đã thêm giai đoạn") + " + tự dịch nháp UK/ML (kiểm tra lại)"
+          : editingId ? "Đã lưu giai đoạn" : "Đã thêm giai đoạn",
+      );
       reload(product.id);
     } catch {
       pushToast("Không thể lưu giai đoạn");
@@ -272,16 +301,29 @@ export function RoutineView() {
     }
     try {
       await updateProductInfo(product.id, { name: infoName, link: infoLink, totalDays });
+      // Same auto-draft rule as the phase editor: a blank UK/ML name is
+      // machine-translated from the VN one and stays editable here.
+      let nameEn = infoNameEn;
+      let nameMs = infoNameMs;
+      let drafted = false;
+      if (!nameEn.trim() || !nameMs.trim()) {
+        const drafts = await translateDrafts({ name: infoName });
+        if (drafts) {
+          if (!nameEn.trim()) nameEn = drafts.en.name ?? "";
+          if (!nameMs.trim()) nameMs = drafts.ms.name ?? "";
+          drafted = true;
+        }
+      }
       // Phase names now live in the phase editor; this only carries the
       // product's own EN/MS names.
       await saveLocalizedNames({
         productId: product.id,
-        productNameEn: infoNameEn,
-        productNameMs: infoNameMs,
+        productNameEn: nameEn,
+        productNameMs: nameMs,
         phases: [],
       });
       setEditInfo(false);
-      pushToast("Đã lưu thông tin " + infoName);
+      pushToast(drafted ? "Đã lưu thông tin + tự dịch nháp tên UK/ML (kiểm tra lại)" : "Đã lưu thông tin " + infoName);
       reload(product.id);
     } catch {
       pushToast("Không thể lưu thông tin");
@@ -352,6 +394,14 @@ export function RoutineView() {
   const marketComplete =
     !!marketReadiness && marketReadiness.missingDays.length === 0 && marketReadiness.duplicateDays.length === 0 && marketReadiness.daysWithVideo > 0;
   const phaseList = [...product.phases].sort((a, b) => a.range[0] - b.range[0]);
+  const productLabel = marketText(product.name, product.nameEn, product.nameMs, viewMarket);
+  /** Day rows store the phase by its VN name; this maps that to the label for
+   * the market being viewed without touching the stored value. */
+  const phaseLabel = (vnName: string) => {
+    const ph = phaseList.find((p) => p.name === vnName);
+    return ph ? marketText(ph.name, ph.nameEn, ph.nameMs, viewMarket) : { text: vnName, fallback: false };
+  };
+  const missingVariantHint = viewMarket === "vn" ? "" : `Chưa có bản ${viewMarketLabel} — đang hiện bản VN.`;
   const daysOutOfPhaseRange = dayList.filter((d) => {
     const phase = phaseList.find((ph) => ph.name === d.phase);
     return !phase || d.id < phase.range[0] || d.id > phase.range[1];
@@ -381,7 +431,10 @@ export function RoutineView() {
                 cursor: "pointer",
               }}
             >
-              {p.name.split("·")[1] ? p.name.split("·")[1].trim() : p.name}
+              {(() => {
+                const label = marketText(p.name, p.nameEn, p.nameMs, viewMarket).text;
+                return label.split("·")[1] ? label.split("·")[1].trim() : label;
+              })()}
               {!p.roadmapPublished ? <span style={{ marginLeft: 6, fontSize: 10.5, opacity: 0.85 }}>· nháp</span> : null}
             </button>
           ))}
@@ -389,7 +442,7 @@ export function RoutineView() {
         <PrimaryBtn icon="plus" onClick={openNewProduct}>Thêm sản phẩm mới</PrimaryBtn>
       </div>
       <SectionCard
-        title={product.name}
+        title={productLabel.text}
         action={
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span
@@ -473,13 +526,13 @@ export function RoutineView() {
             return (
               <div key={ph.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--bg-card-alt)", flexWrap: "wrap" }}>
                 <div style={{ minWidth: 200 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)" }}>{ph.name}</div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)" }}>
+                    {marketText(ph.name, ph.nameEn, ph.nameMs, viewMarket).text}
+                  </div>
                   <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
                     Ngày {ph.range[0]}–{ph.range[1]} · {phaseDays.length} ngày đã tạo
-                    {ph.nameEn || ph.nameMs ? (
-                      <span style={{ color: "var(--text-muted)" }}>
-                        {" · "}UK: {ph.nameEn || "theo VN"} · ML: {ph.nameMs || "theo VN"}
-                      </span>
+                    {marketText(ph.name, ph.nameEn, ph.nameMs, viewMarket).fallback ? (
+                      <span style={{ color: "#B9860B" }}>{" · " + missingVariantHint}</span>
                     ) : null}
                   </div>
                 </div>
@@ -525,7 +578,7 @@ export function RoutineView() {
             {dayList.map((d) => (
               <tr key={d.id} style={{ borderTop: "1px solid var(--divider)" }}>
                 <td style={{ padding: "10px 8px", fontWeight: 600, color: "var(--text-primary)" }}>Ngày {d.id}</td>
-                <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>{d.phase}</td>
+                <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>{phaseLabel(d.phase).text}</td>
                 <td style={{ padding: "10px 8px" }}>
                   {d.type === "rest" ? (
                     <Badge color="#B9860B" bg="rgba(185,134,11,0.12)">Nghỉ</Badge>
@@ -620,6 +673,9 @@ export function RoutineView() {
               <input value={infoNameMs} onChange={(e) => setInfoNameMs(e.target.value)} placeholder={infoName} style={inputStyle} />
             </div>
           </div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: -8, marginBottom: 14 }}>
+            Để trống ô UK/ML thì khi lưu hệ thống tự dịch từ bản VN thành bản nháp — bạn sửa lại lúc nào cũng được.
+          </div>
 
           <FieldLabel>Thời lượng lộ trình (ngày)</FieldLabel>
           <input type="number" min={1} max={365} value={infoTotalDays} onChange={(e) => setInfoTotalDays(e.target.value)} style={{ ...inputStyle, marginBottom: 4 }} />
@@ -647,7 +703,7 @@ export function RoutineView() {
           <FieldLabel>Giai đoạn</FieldLabel>
           <select value={phase} onChange={(e) => setPhase(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }}>
             {product.phases.map((ph) => (
-              <option key={ph.name} value={ph.name}>{ph.name}</option>
+              <option key={ph.name} value={ph.name}>{marketText(ph.name, ph.nameEn, ph.nameMs, viewMarket).text}</option>
             ))}
           </select>
           <FieldLabel>Loại ngày</FieldLabel>
@@ -763,7 +819,7 @@ export function RoutineView() {
             </div>
           </div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
-            Để trống ô UK/ML thì app hiển thị tên tiếng Việt cho thị trường đó.
+            Để trống ô UK/ML thì khi lưu hệ thống tự dịch từ bản VN thành bản nháp — bạn sửa lại lúc nào cũng được.
           </div>
           <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
             <div style={{ flex: 1 }}>
