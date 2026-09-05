@@ -42,7 +42,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "TheraHOME cần quyền truy cập thư viện ảnh để bạn thêm ảnh vào bài viết."
+          "photosPermission": "TheraHOME cần quyền truy cập thư viện ảnh để bạn thêm ảnh vào bài viết.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [
