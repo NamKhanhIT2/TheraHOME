@@ -37,6 +37,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 import { translateDrafts } from "@/lib/translate";
+import { fetchActivationProducts, type ActivationProduct } from "@/lib/db";
 
 const MARKET_TABS: Array<[AdminMarket, string]> = [["VN", "VN"], ["US", "UK"], ["MALAY", "ML"]];
 const MARKET_LABEL: Record<AdminMarket, string> = { VN: "VN", US: "UK", MALAY: "ML" };
@@ -115,6 +116,11 @@ export function ProductsView() {
   const [deleteAllMarkets, setDeleteAllMarkets] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [translating, setTranslating] = useState(false);
+  // Roadmap products available to link a storefront entry to. Until now
+  // nothing in Admin wrote store_items.product_id, so the Lộ trình tab could
+  // never show a link for any product created after the seeded four.
+  const [roadmapProducts, setRoadmapProducts] = useState<ActivationProduct[]>([]);
+  const [itemProductId, setItemProductId] = useState<string>("");
 
   function emptyCategoryFields(): Record<AdminMarket, { title: string; hasTrial: boolean }> {
     return { VN: { title: "", hasTrial: false }, US: { title: "", hasTrial: false }, MALAY: { title: "", hasTrial: false } };
@@ -127,6 +133,9 @@ export function ProductsView() {
     fetchStoreCategoryGroups().then(setGroups).catch(() => pushToast("Không thể tải danh mục sản phẩm"));
   }
   useEffect(reload, []);
+  useEffect(() => {
+    fetchActivationProducts().then(setRoadmapProducts).catch(() => setRoadmapProducts([]));
+  }, []);
 
   function openNewCategory() {
     setCategoryTab(viewMarket);
@@ -237,6 +246,7 @@ export function ProductsView() {
   }
 
   function openNewItem(categoryGroupKey: string) {
+    setItemProductId("");
     setItemTab(viewMarket);
     setItemFields(emptyItemFields());
     setItemImageFiles({});
@@ -244,6 +254,7 @@ export function ProductsView() {
     setItemModal({ categoryGroupKey, groupKey: "new" });
   }
   function openEditItem(categoryGroupKey: string, item: StoreItemGroup) {
+    setItemProductId(item.productId ?? "");
     setItemTab(viewMarket);
     const fields = emptyItemFields();
     for (const [code] of MARKET_TABS) {
@@ -286,7 +297,7 @@ export function ProductsView() {
           resolvedFields[code] = { ...resolvedFields[code], imageUrl: await uploadStoreItemImage(placeholderId, file) };
         }
       }
-      await saveStoreItemGroup(itemModal.categoryGroupKey, itemModal.groupKey, resolvedFields);
+      await saveStoreItemGroup(itemModal.categoryGroupKey, itemModal.groupKey, resolvedFields, itemProductId || null);
       setItemModal(null);
       pushToast("Đã lưu sản phẩm");
       reload();
@@ -523,6 +534,16 @@ export function ProductsView() {
             </Fragment>
           }
         >
+          <FieldLabel>Lộ trình liên kết</FieldLabel>
+          <select value={itemProductId} onChange={(e) => setItemProductId(e.target.value)} style={{ ...inputStyle, marginBottom: 6 }}>
+            <option value="">Không gắn lộ trình (phụ kiện)</option>
+            {roadmapProducts.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+            Gắn mục bán hàng này với một lộ trình để tab Lộ trình hiển thị đúng &quot;Link sản phẩm&quot;. Áp dụng cho cả 3 thị trường.
+          </div>
           <PillTabs
             options={MARKET_TABS.map(([code, label]): [AdminMarket, string] => [code, itemFields[code].name.trim() || itemFields[code].price.trim() ? label : `${label} · trống`])}
             value={itemTab}

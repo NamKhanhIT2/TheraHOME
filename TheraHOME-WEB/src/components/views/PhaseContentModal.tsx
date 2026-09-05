@@ -327,7 +327,7 @@ function PromoTab({ phaseId, productId, phaseRange }: { phaseId: string; product
       <PillTabs options={PROMO_LANG_TABS} value={langTab} onChange={setLangTab} />
       {!isVi ? (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12, marginTop: -6 }}>
-          Bản dịch cho người dùng {langTab === "en" ? "tiếng Anh (thị trường UK)" : "tiếng Malay (thị trường ML)"}. Trường nào để trống, app sẽ dùng bản VN. Ảnh và Apple/Google Product ID dùng chung — chỉnh ở tab VN.
+          Tab {langTab === "en" ? "EN" : "MS"} phục vụ hai việc: chữ hiển thị cho người dùng đặt ngôn ngữ {langTab === "en" ? "tiếng Anh" : "tiếng Malay"}, VÀ giá + link mua cho khách thuộc thị trường {langTab === "en" ? "UK" : "ML"} (giá/link đi theo QUỐC GIA của khách, không theo ngôn ngữ app). Trường nào để trống, app sẽ dùng bản VN. Ảnh và Apple/Google Product ID dùng chung — chỉnh ở tab VN.
         </div>
       ) : null}
       {isVi ? (

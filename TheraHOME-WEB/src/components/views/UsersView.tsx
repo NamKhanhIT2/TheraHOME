@@ -9,7 +9,7 @@
 // cover the same need now; see CLAUDE.md. The table itself and
 // current_web_roles()'s check on it are untouched, just no UI to manage it.
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ROLE_META, USER_ROLE_OPTIONS, type SampleUser, type SampleUserRole } from "@/lib/adminMockData";
+import { ROLE_META, USER_ROLE_OPTIONS, COUNTRY_META, COUNTRY_OPTIONS, type SampleUser, type SampleUserRole, type TheraAccountCountry } from "@/lib/adminMockData";
 import {
   fetchAppUsers,
   updateAppUser,
@@ -79,6 +79,7 @@ function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact
 
 function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onClose: () => void; readOnly: boolean; onSave: (patch: Partial<SampleUser>) => Promise<boolean> }) {
   const [permRole, setPermRole] = useState<SampleUserRole>(user.role);
+  const [permCountry, setPermCountry] = useState<TheraAccountCountry>(user.country ?? "VN");
   const [trend, setTrend] = useState<number[]>([]);
   const [programs, setPrograms] = useState<UserProgramRow[] | null>(null);
   const [orders, setOrders] = useState<UserOrderRow[] | null>(null);
@@ -89,6 +90,7 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
   const [phaseSelections, setPhaseSelections] = useState<Record<string, string>>({});
   const [savingPhaseFor, setSavingPhaseFor] = useState<string | null>(null);
   const roleDirty = permRole !== user.role;
+  const countryDirty = permCountry !== (user.country ?? "VN");
   const contactDirty = email !== (user.email ?? "") || phone !== (user.phone ?? "");
   // Same backdrop-click fix as `Modal.tsx` (this drawer predates that shared
   // component and hand-rolls the same backdrop pattern): a plain
@@ -162,6 +164,12 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
   }
   async function saveRole() {
     if (await onSave({ role: permRole })) pushToast("Đã cập nhật phân quyền cho " + user.name + ": " + (ROLE_META[permRole] || ROLE_META.user)[0]);
+  }
+
+  async function saveCountry() {
+    if (await onSave({ country: permCountry })) {
+      pushToast("Đã đổi thị trường của " + user.name + " sang " + COUNTRY_META[permCountry] + " — app cập nhật trong ít phút");
+    }
   }
 
   return (
@@ -358,6 +366,35 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
                   {roleDirty ? "Lưu phân quyền" : "Đang áp dụng"}
                 </button>
               </div>
+              <div style={{ background: "#fff", borderRadius: 12, padding: 16, boxShadow: "var(--shadow-card)", marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>Quốc gia / Thị trường</div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+                  Quyết định giá bán, link sản phẩm, video lộ trình và bài ghim khách này thấy. Sửa ở đây khi khách chọn nhầm lúc onboarding.
+                </div>
+                <select value={permCountry} onChange={(e) => setPermCountry(e.target.value as TheraAccountCountry)} style={{ ...inputStyle, marginBottom: 10 }}>
+                  {COUNTRY_OPTIONS.map((k) => (
+                    <option key={k} value={k}>{COUNTRY_META[k]}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={saveCountry}
+                  disabled={!countryDirty}
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    background: countryDirty ? "var(--color-primary)" : "var(--color-primary-tint-10)",
+                    color: countryDirty ? "#fff" : "var(--color-primary)",
+                    borderRadius: 10,
+                    padding: "9px 0",
+                    fontFamily: "var(--font-family)",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: countryDirty ? "pointer" : "default",
+                  }}
+                >
+                  {countryDirty ? "Lưu thị trường" : "Đang áp dụng"}
+                </button>
+              </div>
               <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
                 <button
                   onClick={toggleLock}
@@ -390,7 +427,7 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
 
   async function updateUser(id: SampleUser["id"], patch: Partial<SampleUser>): Promise<boolean> {
     try {
-      await updateAppUser(String(id), { app_role: patch.role, locked: patch.locked });
+      await updateAppUser(String(id), { app_role: patch.role, locked: patch.locked, country: patch.country ?? undefined });
       setUsers((us) => (us ? us.map((u) => (u.id === id ? { ...u, ...patch } : u)) : us));
       return true;
     } catch {

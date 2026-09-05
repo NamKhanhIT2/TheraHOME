@@ -494,6 +494,11 @@ const EMPTY_STORE_ITEM_MARKET_FIELDS: StoreItemMarketFields = { name: "", desc: 
 export interface StoreItemGroup {
   groupKey: string;
   accent: string;
+  /** `store_items.product_id` — links this storefront entry to a roadmap
+   * product. Nothing in Admin used to write it, so a product created after
+   * the seeded four could never be linked, and the Lộ trình tab's "Link sản
+   * phẩm" stayed "Chưa có link" forever. One value per group (all markets). */
+  productId: string | null;
   byMarket: Record<AdminMarket, StoreItemMarketFields & { itemId: string | null }>;
 }
 
@@ -510,7 +515,7 @@ export interface StoreCategoryGroup {
 export async function fetchStoreCategoryGroups(): Promise<StoreCategoryGroup[]> {
   const [{ data: cats, error: cErr }, { data: items, error: iErr }] = await Promise.all([
     supabase.from("store_categories").select("id, title, has_trial, sort_order, market, group_key, is_primary").order("sort_order"),
-    supabase.from("store_items").select("id, category_id, name, description, price_text, accent_color_key, external_link, preview_url, image_url, market, group_key").order("sort_order"),
+    supabase.from("store_items").select("id, category_id, name, description, price_text, accent_color_key, external_link, preview_url, image_url, market, group_key, product_id").order("sort_order"),
   ]);
   if (cErr) throw cErr;
   if (iErr) throw iErr;
@@ -546,7 +551,12 @@ export async function fetchStoreCategoryGroups(): Promise<StoreCategoryGroup[]> 
           ];
         })
       ) as StoreItemGroup["byMarket"];
-      return { groupKey: itemGroupKey, accent: accentFromKey(rows[0]?.accent_color_key), byMarket: itemByMarket };
+      return {
+        groupKey: itemGroupKey,
+        accent: accentFromKey(rows[0]?.accent_color_key),
+        productId: rows.find((r) => r.product_id)?.product_id ?? null,
+        byMarket: itemByMarket,
+      };
     });
 
     return { groupKey, isPrimary, byMarket, items: itemGroups };
@@ -623,7 +633,12 @@ export async function deleteStoreCategoryMarket(groupKey: string, market: AdminM
  * that already has a row is refused (`market_has_data_<MARKET>`) — use the
  * trash icon while viewing that market. A filled market whose category
  * has no row there throws `missing_category_for_market_<MARKET>`. */
-export async function saveStoreItemGroup(categoryGroupKey: string, groupKey: string | "new", byMarket: Record<AdminMarket, StoreItemMarketFields>): Promise<string> {
+export async function saveStoreItemGroup(
+  categoryGroupKey: string,
+  groupKey: string | "new",
+  byMarket: Record<AdminMarket, StoreItemMarketFields>,
+  productId: string | null = null
+): Promise<string> {
   const finalGroupKey = groupKey === "new" ? `item-${Date.now()}` : groupKey;
   const [{ data: catRows, error: catErr }, { data: existingItems, error: existingErr }] = await Promise.all([
     supabase.from("store_categories").select("id, market").eq("group_key", categoryGroupKey),
@@ -653,6 +668,7 @@ export async function saveStoreItemGroup(categoryGroupKey: string, groupKey: str
       preview_url: fields.previewLink || null,
       image_url: fields.imageUrl || null,
       category_id: categoryId,
+      product_id: productId,
     };
     const existingId = existingIdByMarket.get(market);
     if (existingId) {
@@ -1110,7 +1126,7 @@ export async function uploadPhasePromoImage(phaseId: string, kind: "cross-sell" 
 // which aren't patients and are managed there instead.
 export async function fetchAppUsers(): Promise<SampleUser[]> {
   const [{ data: profiles, error: pErr }, { data: contacts, error: cErr }, { data: programs, error: upErr }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, email, phone, treatment_area, app_role, locked, created_at, account_type").is("deleted_at", null),
+    supabase.from("profiles").select("id, full_name, email, phone, treatment_area, app_role, locked, created_at, account_type, country").is("deleted_at", null),
     supabase.from("user_access_contacts").select("user_id, contact_value"),
     supabase.from("user_programs").select("user_id, product_id, current_day, adherence_pct"),
   ]);
@@ -1146,6 +1162,7 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
         name: p.full_name || p.email || "Người dùng",
         contact: contactByUser.get(p.id) ?? p.email ?? p.phone ?? "N/A",
         area: p.treatment_area || "N/A",
+        country: (p.country as SampleUser["country"]) ?? null,
         day: program?.current_day ?? null,
         adherence: program ? Math.round(Number(program.adherence_pct)) : null,
         status: p.locked ? "inactive" : activated ? "active" : "unactivated",
@@ -1158,7 +1175,12 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
     });
 }
 
-export async function updateAppUser(id: string, patch: { app_role?: SampleUserRole; locked?: boolean }) {
+/** `country` is included because it decides the customer's whole market
+ * (prices, product links, program videos, pinned posts) and a wrong pick at
+ * onboarding was previously only fixable with raw SQL. The profile guard
+ * trigger lets `admin` through and blocks `cskh` from changing anyone's
+ * market but their own. */
+export async function updateAppUser(id: string, patch: { app_role?: SampleUserRole; locked?: boolean; country?: "VN" | "US" | "MALAY" }) {
   const { error } = await supabase.from("profiles").update(patch).eq("id", id);
   if (error) throw error;
 }

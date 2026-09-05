@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
+import { useMarket, type StoreMarket } from '@/hooks/useMarket';
 
 // Payment gating is PER PLATFORM: apple_product_id gates iOS,
 // google_product_id gates Android. A phase with only one of them set is
@@ -83,10 +84,19 @@ export interface PhasePromo {
  * viewer's language (en/ms), falling back per-field to the VN base columns
  * when a translation is missing — same fallback shape as the WEB Admin's
  * VN/EN/MS Upsell editor promises. Images and apple_product_id are shared. */
+/** Which `translations` bucket holds a MARKET's commercial content. Staff
+ * author one bucket per market in the WEB Upsell editor, whose own tab
+ * labels read "EN (thị trường UK)" / "MS (thị trường ML)", so the market maps
+ * onto the same bucket the wording uses. */
+function marketBucket(market: StoreMarket): string | null {
+  return market === 'US' ? 'en' : market === 'MALAY' ? 'ms' : null;
+}
+
 export function usePhasePromo(phaseId: string | undefined) {
   const language = useAppStore((state) => state.language);
+  const market = useMarket();
   return useQuery({
-    queryKey: ['phase_promo', phaseId, language],
+    queryKey: ['phase_promo', phaseId, language, market],
     queryFn: async (): Promise<PhasePromo | null> => {
       const { data, error } = await supabase
         .from('phase_promos')
@@ -97,14 +107,21 @@ export function usePhasePromo(phaseId: string | undefined) {
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      const overrides =
-        language === 'vi'
-          ? null
-          : ((data.translations as Record<string, Record<string, unknown>> | null)?.[language] ?? null);
-      const pick = (base: string | null, key: string): string | null => {
-        const value = overrides?.[key];
+      const buckets = data.translations as Record<string, Record<string, unknown>> | null;
+      // Wording follows the UI LANGUAGE; anything commercial follows the
+      // user's COUNTRY (owner rule: prices and buy-links belong to the market,
+      // not to whichever language the app is displayed in). Before this, a
+      // Vietnamese customer reading the app in English was shown the UK price
+      // label and the UK storefront link.
+      const overrides = language === 'vi' ? null : (buckets?.[language] ?? null);
+      const marketKey = marketBucket(market);
+      const marketOverrides = marketKey ? (buckets?.[marketKey] ?? null) : null;
+      const pickFrom = (source: Record<string, unknown> | null, base: string | null, key: string): string | null => {
+        const value = source?.[key];
         return typeof value === 'string' && value.trim() ? value : base;
       };
+      const pick = (base: string | null, key: string): string | null => pickFrom(overrides, base, key);
+      const pickMarket = (base: string | null, key: string): string | null => pickFrom(marketOverrides, base, key);
       const baseBenefits = Array.isArray(data.unlock_benefits)
         ? data.unlock_benefits.filter((b): b is string => typeof b === 'string')
         : null;
@@ -118,7 +135,7 @@ export function usePhasePromo(phaseId: string | undefined) {
         crossSellBadge: pick(data.cross_sell_badge, 'cross_sell_badge'),
         crossSellTitle: pick(data.cross_sell_title, 'cross_sell_title'),
         crossSellDescription: pick(data.cross_sell_description, 'cross_sell_description'),
-        crossSellCtaUrl: pick(data.cross_sell_cta_url, 'cross_sell_cta_url'),
+        crossSellCtaUrl: pickMarket(data.cross_sell_cta_url, 'cross_sell_cta_url'),
         crossSellVideoUrl: pick(data.cross_sell_video_url, 'cross_sell_video_url'),
         unlockImageUrl: data.unlock_image_url,
         unlockDescription: pick(data.unlock_description, 'unlock_description'),
@@ -131,7 +148,7 @@ export function usePhasePromo(phaseId: string | undefined) {
         unlockBenefits: benefits,
         unlockPackageName: pick(data.unlock_package_name, 'unlock_package_name'),
         unlockPackageDesc: pick(data.unlock_package_desc, 'unlock_package_desc'),
-        unlockPriceLabel: pick(data.unlock_price_label, 'unlock_price_label'),
+        unlockPriceLabel: pickMarket(data.unlock_price_label, 'unlock_price_label'),
         productName:
           (data.program_phases as { products: { name: string } | null } | null)?.products?.name ?? null,
         salesEnabled: data.sales_enabled !== false,

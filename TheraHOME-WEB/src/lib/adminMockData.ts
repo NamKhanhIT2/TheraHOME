@@ -101,6 +101,10 @@ export interface SampleUser {
    * user_access_contacts value, read-only, used for order matching). */
   email: string | null;
   phone: string | null;
+  /** profiles.country — the market whose prices, product links, program
+   * videos and pinned posts this customer sees. Editable from the user
+   * drawer so a wrong pick at onboarding does not need a SQL fix. */
+  country: TheraAccountCountry | null;
 }
 
 export const ROLE_META: Record<SampleUserRole, [string, string, string]> = {
