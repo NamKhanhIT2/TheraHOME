@@ -474,7 +474,7 @@ export function ProductsView() {
             ))}
           </div>
           <div style={{ marginTop: -6, marginBottom: 14, fontSize: 12, color: "var(--text-muted)" }}>
-            Nhóm chính = thiết bị có lộ trình; sản phẩm trong nhóm chính hiển thị ở danh sách chọn thiết bị trên tab Lộ trình của mobile app. Nhóm phụ = phụ kiện, chỉ hiện trong Cửa hàng.
+            Nhóm chính = thiết bị có lộ trình tập; nhóm phụ = phụ kiện. Lưu ý: danh sách chọn thiết bị trên tab Lộ trình của app KHÔNG đọc cờ này — nó đọc trạng thái Xuất bản ở tab Lộ trình. Cờ này chỉ phân nhóm trong Cửa hàng.
           </div>
           <PillTabs
             options={MARKET_TABS.map(([code, label]): [AdminMarket, string] => [code, categoryFields[code].title.trim() ? label : `${label} · trống`])}

@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, usePrimaryProducts } from '@/hooks/usePrograms';
-import { useCommunityPosts, useCommunityProfile, useMyPostSaves } from '@/hooks/useCommunity';
+import { useAuthorPosts, useCommunityProfile, useSavedPosts } from '@/hooks/useCommunity';
 import { CommunityAvatar } from '@/components/CommunityAvatar';
 import { ProgressShareCard } from '@/components/ProgressShareCard';
 import { MediaGrid } from '@/components/community/MediaGrid';
@@ -27,16 +27,15 @@ export default function CommunityProfileScreen() {
   const official = userId === 'official';
   const ownProfile = !official && userId === session?.user.id;
   const profileQuery = useCommunityProfile(official ? undefined : userId);
-  const postsQuery = useCommunityPosts(100);
-  const savedPostsQuery = useMyPostSaves(ownProfile ? userId : undefined);
+  const postsQuery = useAuthorPosts(official ? undefined : userId, official);
+  const savedPostsQuery = useSavedPosts(ownProfile ? userId : undefined);
   const programsQuery = useActivatedPrograms(ownProfile ? userId : undefined);
   const primaryQuery = usePrimaryProducts();
   const [tab, setTab] = useState<ProfileTab>('posts');
 
   const profile = profileQuery.data;
-  const allPosts = postsQuery.data ?? [];
-  const posts = allPosts.filter((post) => official ? post.isOfficial : post.authorId === userId);
-  const savedPosts = ownProfile ? allPosts.filter((post) => savedPostsQuery.data?.has(post.id)) : [];
+  const posts = postsQuery.data ?? [];
+  const savedPosts = ownProfile ? (savedPostsQuery.data ?? []) : [];
   const journeyPosts = posts.filter((post) => post.progressSnapshot || post.dayMilestone || post.phaseMilestone);
   const programs = programsQuery.data ?? [];
   const achievements = [

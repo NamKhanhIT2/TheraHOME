@@ -463,7 +463,19 @@ export function RoutineView() {
             {product.roadmapPublished ? (
               <GhostBtn onClick={() => setPublishAction("unpublish")}>Ẩn lộ trình</GhostBtn>
             ) : (
-              <PrimaryBtn onClick={() => setPublishAction("publish")}>Xuất bản lộ trình</PrimaryBtn>
+              <PrimaryBtn
+                onClick={() => {
+                  // Publishing with zero days leaves every owner on a blank
+                  // roadmap and a Home card that cannot finish loading.
+                  if (dayList.length === 0) {
+                    pushToast("Chưa có ngày tập nào — thêm ít nhất 1 ngày trước khi xuất bản.");
+                    return;
+                  }
+                  setPublishAction("publish");
+                }}
+              >
+                Xuất bản lộ trình
+              </PrimaryBtn>
             )}
             <GhostBtn
               color="var(--error)"
@@ -491,6 +503,11 @@ export function RoutineView() {
             )}
           </div>
         </div>
+        {!marketReadiness && dayList.length === 0 ? (
+          <div style={{ marginTop: 14, background: "rgba(185,134,11,0.10)", borderRadius: 10, padding: "10px 12px", fontSize: 12.5, color: "#B9860B" }}>
+            <strong>Chưa có ngày tập nào.</strong> Thêm ngày ở bảng bên dưới rồi mới xuất bản được — lộ trình rỗng làm app của khách kẹt ở màn hình chờ.
+          </div>
+        ) : null}
         {marketReadiness ? (
           <div style={{ marginTop: 14, background: "var(--bg-card-alt)", borderRadius: 10, padding: "10px 12px", fontSize: 12.5 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -776,6 +793,10 @@ export function RoutineView() {
           message={
             publishAction === "publish"
               ? `Xuất bản "${product.name}"? Lộ trình hiện lên app cho mọi người, và MỌI khách đã kích hoạt thiết bị này nhận thông báo "lộ trình đã sẵn sàng".${
+                  dayList.length < product.totalDays
+                    ? ` CẢNH BÁO: mới có ${dayList.length}/${product.totalDays} ngày tập.`
+                    : ""
+                }${
                   marketsWithGaps.length
                     ? ` Lưu ý: thị trường ${marketsWithGaps.map((r) => MARKET_LABEL[r.market]).join(", ")} còn ngày thiếu video hoặc lặp video.`
                     : ""

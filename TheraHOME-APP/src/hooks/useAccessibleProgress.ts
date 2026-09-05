@@ -40,9 +40,16 @@ export function useAccessibleProgress(
   return useMemo(() => {
     const requirements = lockRequirementsQuery.data;
     const purchased = purchasesQuery.data;
+    // Readiness means "the queries have settled", NOT "there is data". A
+    // published roadmap with no program_days yet yields zero days, and the
+    // old `days.length > 0` test then left this false forever: Home's hero
+    // span an ActivityIndicator that never resolved, and _layout.tsx's
+    // reminder scheduling — which waits on isReady — silently never ran for
+    // that account. `usePhaseLockRequirements` is itself disabled when there
+    // are no phase ids, so it can never report isFetched in that case.
+    const lockSettled = phaseIds.length === 0 || lockRequirementsQuery.isFetched;
     const isReady =
-      !program ||
-      (days.length > 0 && lockRequirementsQuery.isFetched && (!userId || purchasesQuery.isFetched));
+      !program || (daysQuery.isFetched && lockSettled && (!userId || purchasesQuery.isFetched));
     const accessible =
       !requirements || requirements.size === 0
         ? days.length
@@ -59,5 +66,5 @@ export function useAccessibleProgress(
       day = Math.min(totalDays, Math.max(day, activity + 1));
     }
     return { day, totalDays, isReady };
-  }, [days, lockRequirementsQuery.data, lockRequirementsQuery.isFetched, purchasesQuery.data, purchasesQuery.isFetched, program, isReviewAccount, painLogsQuery.data, userId]);
+  }, [days, phaseIds.length, daysQuery.isFetched, lockRequirementsQuery.data, lockRequirementsQuery.isFetched, purchasesQuery.data, purchasesQuery.isFetched, program, isReviewAccount, painLogsQuery.data, userId]);
 }

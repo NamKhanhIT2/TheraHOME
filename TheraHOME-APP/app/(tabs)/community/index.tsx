@@ -245,14 +245,14 @@ export default function CommunityScreen() {
     } else if (action === 'report') {
       setReportTarget(post);
     } else if (action === 'hide') {
-      hidePost.mutate(post.id, { onSuccess: () => showToast(t('postHidden')), onError: () => showToast(t('noContent')) });
+      hidePost.mutate(post.id, { onSuccess: () => showToast(t('postHidden')), onError: () => showToast(t('errGeneric')) });
     } else if (action === 'block' && post.authorId) {
       Alert.alert(t('blockUserConfirmTitle'), t('blockUserConfirmBody', { name: post.authorName }), [
         { text: t('cancel'), style: 'cancel' },
-        { text: t('blockUser'), style: 'destructive', onPress: () => { if (post.authorId) blockUser.mutate(post.authorId, { onSuccess: () => showToast(t('blockUser')), onError: () => showToast(t('noContent')) }); } },
+        { text: t('blockUser'), style: 'destructive', onPress: () => { if (post.authorId) blockUser.mutate(post.authorId, { onSuccess: () => showToast(t('userBlocked')), onError: () => showToast(t('errGeneric')) }); } },
       ]);
     } else if (action === 'delete') {
-      Alert.alert(t('deletePost'), t('deletePost'), [
+      Alert.alert(t('deletePost'), t('deletePostConfirmBody'), [
         { text: t('cancel'), style: 'cancel' },
         {
           text: t('delete'),
@@ -260,7 +260,7 @@ export default function CommunityScreen() {
           onPress: () =>
             deletePost.mutate(post.id, {
               onSuccess: () => showToast(t('postDeleted')),
-              onError: () => showToast(t('noContent')),
+              onError: () => showToast(t('errGeneric')),
             }),
         },
       ]);
@@ -526,7 +526,7 @@ export default function CommunityScreen() {
             {filter === 'all' ? <Pressable onPress={() => router.push('/community/create')} style={[styles.emptyCta, { backgroundColor: theme.colors.primary }]}><Icon name="plus" size={17} color="#fff" /><Text style={[theme.type.caption, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]}>{t('createFirstPost')}</Text></Pressable> : null}
           </View>
         )}
-        ListFooterComponent={postsQuery.isFetching && !postsQuery.isRefetching ? <View style={styles.loadingMore}><ActivityIndicator color={theme.colors.primary} /><Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>{t('loadingMore')}</Text></View> : filteredPosts.length ? <Text style={[theme.type.captionSm, styles.feedEnd, { color: theme.colors.textMuted }]}>{t('seenAllPosts')}</Text> : null}
+        ListFooterComponent={postsQuery.isFetching && !manualRefreshing ? <View style={styles.loadingMore}><ActivityIndicator color={theme.colors.primary} /><Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>{t('loadingMore')}</Text></View> : filteredPosts.length ? <Text style={[theme.type.captionSm, styles.feedEnd, { color: theme.colors.textMuted }]}>{t('seenAllPosts')}</Text> : null}
       />
       </Reanimated.View>
 

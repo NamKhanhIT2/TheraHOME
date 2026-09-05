@@ -256,6 +256,13 @@ export default function RoadmapScreen() {
           <Reanimated.View entering={fadeUpEntering(90)} style={{ marginTop: 16 }}>
             <ProductActivateCard key={selectedProduct.id} productId={selectedProduct.id} />
           </Reanimated.View>
+        ) : selectedProduct && days.length === 0 ? (
+          // Published, activated, but Admin has not added any days yet. The
+          // list would otherwise render as a blank screen under the product
+          // picker with nothing to explain it.
+          <Reanimated.View entering={fadeUpEntering(90)} style={{ marginTop: 16 }}>
+            <RoadmapComingSoonCard productName={selectedProduct.name} />
+          </Reanimated.View>
         ) : selectedProduct ? (
           <View style={{ marginTop: 8 }}>
             {days.map((d, index) => {

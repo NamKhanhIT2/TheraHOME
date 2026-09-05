@@ -178,9 +178,22 @@ interface RawPost {
  * shown everywhere with just its base content) and a targeted post whose
  * variant for this market simply isn't filled in. */
 function resolvePostMarketContent(r: RawPost, market: StoreMarket): { title: string | null; text: string } {
-  if (market === 'US' && r.title_us) return { title: r.title_us, text: r.text_us ?? r.text };
-  if (market === 'MALAY' && r.title_malay) return { title: r.title_malay, text: r.text_malay ?? r.text };
+  // Each field falls back on its own. Keying the whole variant off the TITLE
+  // meant a post translated in the body but left title-less served the
+  // Vietnamese body to UK/ML readers — a title is optional on these posts,
+  // so that combination is legitimate, not a half-filled mistake.
+  if (market === 'US' && (r.title_us || r.text_us)) {
+    return { title: r.title_us ?? r.title, text: r.text_us || r.text };
+  }
+  if (market === 'MALAY' && (r.title_malay || r.text_malay)) {
+    return { title: r.title_malay ?? r.title, text: r.text_malay || r.text };
+  }
   return { title: r.title, text: r.text };
+}
+
+function mediaOrLegacyImage(media: string[] | null | undefined, imageUrl: string | null): string[] {
+  if (media?.length) return media;
+  return imageUrl ? [imageUrl] : [];
 }
 
 function mapPost(r: RawPost, market: StoreMarket, reactionCounts = emptyReactionCounts()): CommunityPostRow {
@@ -194,9 +207,14 @@ function mapPost(r: RawPost, market: StoreMarket, reactionCounts = emptyReaction
     title,
     text,
     imageUrl: r.image_url,
-    mediaUrls: r.media_urls ?? [],
-    mediaFeedUrls: r.media_feed_urls?.length ? r.media_feed_urls : (r.media_urls ?? []),
-    mediaThumbnailUrls: r.media_thumbnail_urls?.length ? r.media_thumbnail_urls : (r.media_urls ?? []),
+    // `image_url` is the single-image column CSKH's post editor writes (the
+    // app's own composer writes `media_urls`). Nothing rendered `image_url`,
+    // so an image staff attached to an official post was invisible in the
+    // feed. Treat it as a one-item media array when there is no real media,
+    // never overwriting a member's uploads.
+    mediaUrls: mediaOrLegacyImage(r.media_urls, r.image_url),
+    mediaFeedUrls: r.media_feed_urls?.length ? r.media_feed_urls : mediaOrLegacyImage(r.media_urls, r.image_url),
+    mediaThumbnailUrls: r.media_thumbnail_urls?.length ? r.media_thumbnail_urls : mediaOrLegacyImage(r.media_urls, r.image_url),
     mediaPosterUrls: r.media_poster_urls ?? [],
     mediaWidths: r.media_widths ?? [],
     mediaHeights: r.media_heights ?? [],
@@ -251,6 +269,7 @@ export const DEFAULT_POSTS_PAGE_SIZE = 20;
  * useInfiniteQuery's paged shape, which would ripple through every mutation
  * that currently does a flat-array optimistic update. */
 export function useCommunityPosts(limit: number = DEFAULT_POSTS_PAGE_SIZE) {
+  const reactionRefetch = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
   const channelId = useRef(`community_posts_${Math.random().toString(36).slice(2)}`);
   const market = useMarket();
@@ -265,11 +284,18 @@ export function useCommunityPosts(limit: number = DEFAULT_POSTS_PAGE_SIZE) {
       // react only reached this client via the likes_count bump on the
       // post row — and a reaction SWITCH (upsert like→heart) bumps nothing,
       // so counts sat stale until some unrelated refetch.
+      // Debounced: this fires for EVERY reaction by every user on every post,
+      // and each invalidation costs a feed query, a reactions aggregation and
+      // an image prefetch. A burst now collapses into one refetch.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
-        queryClient.invalidateQueries({ queryKey: POSTS_KEY });
+        if (reactionRefetch.current) clearTimeout(reactionRefetch.current);
+        reactionRefetch.current = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: POSTS_KEY });
+        }, 1500);
       })
       .subscribe();
     return () => {
+      if (reactionRefetch.current) clearTimeout(reactionRefetch.current);
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
@@ -320,6 +346,57 @@ export function useCommunityPosts(limit: number = DEFAULT_POSTS_PAGE_SIZE) {
         .filter((url): url is string => !!url && !isVideoUri(url));
       if (prefetchUrls.length) void ExpoImage.prefetch(Array.from(new Set(prefetchUrls)), { cachePolicy: 'disk' }).catch(() => {});
       return posts;
+    },
+  });
+}
+
+/** A profile's own posts, queried by author instead of filtered out of the
+ * global feed. The profile screen used to take `useCommunityPosts(100)` and
+ * filter it, so once the community passed 100 posts a member's own posts
+ * quietly disappeared from their profile while the header count above still
+ * showed the true total. `official` lists TheraHOME's posts the same way. */
+export function useAuthorPosts(userId: string | undefined, official = false) {
+  const market = useMarket();
+  return useQuery({
+    queryKey: ['community_author_posts', official ? 'official' : userId, market],
+    enabled: official || !!userId,
+    queryFn: async (): Promise<CommunityPostRow[]> => {
+      let query = supabase
+        .from('community_posts')
+        .select(POST_COLUMNS)
+        .or(`target_markets.is.null,target_markets.cs.{${market}}`)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      query = official ? query.eq('is_official', true) : query.eq('author_id', userId!);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data as RawPost[]).map((row) => mapPost(row, market));
+    },
+  });
+}
+
+/** The posts a user saved, resolved by id rather than intersected with the
+ * feed's newest page — a saved post older than that page used to vanish. */
+export function useSavedPosts(userId: string | undefined) {
+  const market = useMarket();
+  return useQuery({
+    queryKey: ['community_saved_posts', userId, market],
+    enabled: !!userId,
+    queryFn: async (): Promise<CommunityPostRow[]> => {
+      const { data: saves, error: savesError } = await supabase
+        .from('post_saves')
+        .select('post_id')
+        .eq('user_id', userId!);
+      if (savesError) throw savesError;
+      const ids = (saves ?? []).map((s) => s.post_id);
+      if (!ids.length) return [];
+      const { data, error } = await supabase
+        .from('community_posts')
+        .select(POST_COLUMNS)
+        .in('id', ids)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data as RawPost[]).map((row) => mapPost(row, market));
     },
   });
 }
@@ -557,12 +634,21 @@ export function useTogglePostSave(userId: string | undefined) {
       );
       return { previous };
     },
-    onError: (_err, _vars, context) => {
+    onError: (_err, vars, context) => {
       if (context?.previous) queryClient.setQueryData(savesKey, context.previous);
+      // onMutate also bumped savesCount on the feed and the detail row; undo
+      // both, otherwise a failed save leaves the count permanently high.
+      queryClient.setQueriesData<CommunityPostRow[]>({ queryKey: POSTS_KEY }, (posts) =>
+        posts?.map((p) => (p.id === vars.postId ? { ...p, savesCount: Math.max(0, p.savesCount + (vars.saved ? 1 : -1)) } : p)),
+      );
+      queryClient.setQueriesData<CommunityPostRow | null>({ queryKey: ['community_post', vars.postId] }, (post) =>
+        post ? { ...post, savesCount: Math.max(0, post.savesCount + (vars.saved ? 1 : -1)) } : post,
+      );
     },
-    onSettled: () => {
+    onSettled: (_data, _err, vars) => {
       queryClient.invalidateQueries({ queryKey: savesKey });
       queryClient.invalidateQueries({ queryKey: POSTS_KEY });
+      queryClient.invalidateQueries({ queryKey: ['community_post', vars.postId] });
     },
   });
 }

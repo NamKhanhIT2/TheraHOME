@@ -3533,6 +3533,82 @@ Khảo sát & Upsell. Hiện `phase_promos` của neck-plus rỗng.
 Roadmap app chỉ còn Phase 1 + Phase 2 với đủ 7 ngày mỗi giai đoạn; Home hiện
 "DAY 14 / 14".
 
+## Rà soát toàn diện đợt 2 (2026-09-05, khuya)
+
+Chạy 3 nhóm rà soát song song (vòng đời sản phẩm mới, tab Cộng đồng, đồng bộ
+web↔app) cộng với advisor của Supabase. Những mục ĐÃ SỬA:
+
+**Bảo mật (migration 202609051800 + 202609051810):** hàm trigger và hàm phụ
+trợ (`notify_roadmap_published`, `provision_*`, `auto_claim_*`,
+`profile_language`) vẫn gọi được qua `/rest/v1/rpc`; `set_official_post_pinned`
+/ `roadmap_readiness` / `create_official_community_post` gọi được ẩn danh.
+BÀI HỌC: `revoke ... from anon, authenticated` KHÔNG đủ — Postgres cấp
+EXECUTE cho `PUBLIC` theo mặc định, phải `revoke ... from public` rồi grant
+lại đúng vai trò. `resolve_thera_login_email` giữ quyền anon vì đăng nhập cần.
+
+**Lộ trình rỗng làm treo app (nặng nhất):** `useAccessibleProgress` đặt
+`isReady` là `days.length > 0 && ...`. Sản phẩm đã xuất bản nhưng chưa có ngày
+tập nào → `isReady` false vĩnh viễn → thẻ Home quay vòng mãi VÀ nhắc tập
+không bao giờ được đặt lịch (vì `_layout.tsx` chờ `isReady`). Nay điều kiện
+là "các query đã settle" (`daysQuery.isFetched`), có xử lý riêng việc
+`usePhaseLockRequirements` bị `enabled:false` khi không có phase nào. Kèm
+theo: Roadmap hiện thẻ "đang hoàn thiện" thay vì màn trắng; WEB CHẶN xuất bản
+khi 0 ngày và cảnh báo khi số ngày < `total_days`.
+
+**Guard `has_orders` là code chết:** `orders` bật RLS mà không có policy nào,
+nên `select count` từ client luôn trả 0. Thêm RPC `product_order_count`
+(migration 202609051820, gated admin/cskh) để guard thật sự chạy.
+
+**Cộng đồng:**
+- Ảnh CSKH gắn vào bài chính thức KHÔNG BAO GIỜ hiện: web ghi `image_url`,
+  app chỉ render `media_urls`. Nay `mapPost` coi `image_url` như media 1 phần
+  tử KHI `media_urls` rỗng (không bao giờ đè media của thành viên).
+- `resolvePostMarketContent` khoá cả biến thể theo TITLE → bài dịch phần thân
+  nhưng không có tiêu đề vẫn ra tiếng Việt. Nay mỗi trường fallback riêng.
+- Tab hồ sơ lọc bài từ 100 bài mới nhất của feed chung → quá 100 bài thì bài
+  của chính mình biến mất trong khi số đếm ở header vẫn đúng. Thêm
+  `useAuthorPosts` / `useSavedPosts` truy vấn theo tác giả và theo lượt lưu.
+- `useTogglePostSave` không hoàn tác `savesCount` khi lỗi và không invalidate
+  key chi tiết bài.
+- Toast lỗi dùng nhầm chuỗi "Chưa có nội dung."; toast chặn người dùng dùng
+  nhãn mệnh lệnh; hộp thoại xoá bài có tiêu đề trùng nội dung.
+- Chân trang "Đang tải thêm" không bao giờ hiện (điều kiện `isRefetching` sai
+  hướng khi dùng `keepPreviousData`), thay vào đó hiện "đã xem hết".
+- Màn chi tiết bài: lỗi mạng hiện thành "không tìm thấy bài viết", không có
+  nút thử lại, kéo làm mới không refetch chính bài đó; ẩn bài và báo cáo
+  không có phản hồi gì.
+- Deep-link tới bình luận cuộn lại + nháy highlight mỗi lần refetch nền.
+- Feed refetch mỗi khi BẤT KỲ ai thả cảm xúc ở BẤT KỲ bài nào → nay debounce
+  1.5s.
+
+**Còn TỒN ĐỌNG, chưa sửa (xếp theo mức độ):**
+1. `usePhasePromo` chọn nội dung upsell/paywall theo NGÔN NGỮ chứ không theo
+   QUỐC GIA, trong đó có `unlock_price_label` và `cross_sell_cta_url` — tức
+   GIÁ và LINK MUA. Hiện chưa lộ vì `phase_promos` đang rỗng, nhưng sẽ sai
+   ngay khi soạn nội dung IAP. Cần sửa TRƯỚC khi bật bán.
+2. RLS cho `cskh` ghi được `app_config`, `faq_items`, `legal_documents`,
+   `onboarding_question_texts`, `ai_prompts` — đều là tab chỉ có trong nav
+   Admin. CSKH có thể sửa prompt AI và văn bản pháp lý qua API.
+3. CSKH sửa được `country` / `email` / `full_name` của mọi khách qua API
+   (trigger chỉ chặn `account_type`/`access_level`/`expires_at`/...). Ngược
+   lại, Admin KHÔNG có UI nào sửa `country` cho khách thường — khách chọn sai
+   quốc gia lúc onboarding phải sửa bằng SQL.
+4. Không có UI nào ghi `store_items.product_id`, nên sản phẩm mới không bao
+   giờ gắn được với mục bán hàng (ô link ở "Sửa thông tin" ghi 0 dòng, im
+   lặng).
+5. Phân trang bình luận: nút "Xem thêm" tính sai ngưỡng, bấm vào thì trắng
+   màn (thiếu `keepPreviousData`), và sắp xếp cũ→mới nên bình luận mới của
+   chính mình bị cắt mất ở bài đông.
+6. Xoá 1 ngày giữa lộ trình để lại lỗ hổng số ngày; nhiều nơi giả định ngày
+   liên tục bắt đầu từ 1 (`complete_day` tìm ngày kế bằng `day_number + 1`).
+7. `total_days` không được đối chiếu với số dòng `program_days`; lệch thì
+   Roadmap mất hẳn dấu "Hôm nay".
+8. CSKH duyệt bài mà không thấy ảnh/video của bài (`fetchCommunityPosts`
+   không select `media_urls`).
+9. Broadcast từ app staff bỏ qua thị trường và chỉ gửi tiếng Việt.
+10. `adminContent.ts` / `paywallHeroes.ts` còn tham chiếu 3 sản phẩm đã xoá;
+    docs còn ghi "4 sản phẩm / 28 ngày / 12 phases".
+
 **Cache app không cập nhật khi Admin đổi lộ trình (2026-09-05, tối):** chủ
 sở hữu báo simulator vẫn thấy Giai đoạn 3 sau khi đã xoá. Nguyên nhân:
 `useProducts` và query `program_phases` để `staleTime: Infinity`, và

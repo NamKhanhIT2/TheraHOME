@@ -199,10 +199,12 @@ export async function countRoadmapOwners(productId: string): Promise<number> {
 }
 
 export async function deleteRoutineProduct(productId: string) {
-  // Real orders reference the product and must survive — refuse those.
-  const { count, error: orderErr } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("product_id", productId);
+  // Real orders reference the product and must survive. Counted through an
+  // RPC, not a table read: `orders` has RLS on with no policies, so a direct
+  // count always came back 0 and this guard could never fire.
+  const { data: orderCount, error: orderErr } = await supabase.rpc("product_order_count", { p_product_id: productId });
   if (orderErr) throw orderErr;
-  if ((count ?? 0) > 0) throw new Error("has_orders");
+  if ((orderCount ?? 0) > 0) throw new Error("has_orders");
   // Cascades: program_phases / program_days (with quiz + promo content),
   // product_activation_contacts and every user_programs row (with its
   // progress and pain logs); store_items.product_id is set null so the
