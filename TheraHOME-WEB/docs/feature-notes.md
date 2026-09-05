@@ -885,3 +885,30 @@ sản phẩm đã có `orders` (`has_orders`); confirm xoá hiện số tài kho
 mất tiến trình (`countRoadmapOwners`). Tab Kích hoạt đọc cùng bảng
 `products` nên danh sách sản phẩm luôn khớp tab Lộ trình. Chi tiết ở
 `TheraHOME-APP/docs/feature-notes.md`.
+
+## Giai đoạn: thêm/sửa/xoá; bảng sẵn sàng theo 1 thị trường (2026-09-05, tối)
+
+**Yêu cầu chủ sở hữu:** (1) cho thêm/sửa/xoá giai đoạn — hiện mới làm 14
+ngày nên phải bỏ được giai đoạn 3; (2) đang chọn thị trường VN mà bảng vẫn
+hiện UK/ML thì rối, các thị trường quản lý độc lập.
+
+**db.ts:** `createProgramPhase` / `updateProgramPhase` / `deleteProgramPhase`
+/ `fetchPhaseDeleteImpact` / `reassignDaysToPhases`. `updateProductInfo` nhận
+thêm `totalDays` (con số app đếm tới: "NGÀY 12 / 14").
+
+**RoutineView:**
+- Thẻ Giai đoạn có nút Thêm giai đoạn, mỗi dòng có bút sửa + thùng rác, hiện
+  số ngày đã tạo và tên UK/ML. Modal sửa: tên VN/UK/ML + ngày bắt đầu/kết
+  thúc; chặn trùng tên (vì `createProgramDay` tra giai đoạn theo tên) và
+  chặn trùng khoảng ngày.
+- Xoá giai đoạn: confirm nêu rõ số ngày tập, số lượt mua và số lượt khảo sát
+  sẽ mất (tất cả đều CASCADE từ `program_phases`).
+- Ngày lệch khoảng giai đoạn → hiện cảnh báo + nút "Gán lại ngày theo khoảng
+  giai đoạn" (`reassignDaysToPhases`), không tự đổi ngầm.
+- Bảng sẵn sàng video chỉ hiện thị trường đang chọn ở đầu trang. Confirm
+  Xuất bản mới là nơi nêu tên thị trường còn thiếu/lặp video.
+- Ô "Nội dung theo thị trường" trong modal Ngày bỏ ràng buộc điền đủ cả 3 —
+  lưu riêng từng thị trường được; thêm nút "Dùng link này cho cả 3 thị
+  trường" (hợp với cách dùng 1 link YouTube auto-dubbing cho mọi thị trường).
+- Modal "Sửa thông tin" bỏ khối tên giai đoạn (đã có editor riêng), thay bằng
+  ô Thời lượng lộ trình.

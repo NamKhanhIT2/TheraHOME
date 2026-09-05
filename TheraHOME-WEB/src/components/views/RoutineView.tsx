@@ -13,6 +13,11 @@ import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updat
   setRoadmapPublished,
   deleteRoutineProduct,
   countRoadmapOwners,
+  createProgramPhase,
+  updateProgramPhase,
+  deleteProgramPhase,
+  fetchPhaseDeleteImpact,
+  reassignDaysToPhases,
   type RoadmapReadiness,
 } from "@/lib/db";
 import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs, MarketSelect } from "@/components/ui/primitives";
@@ -28,16 +33,8 @@ type MarketKey = "vn" | "us" | "malay";
 const MARKET_TABS: Array<[MarketKey, string]> = [["vn", "VN"], ["us", "UK"], ["malay", "ML"]];
 // Readiness rows come back keyed by the DB market codes.
 const MARKET_LABEL: Record<string, string> = { VN: "VN", US: "UK", MALAY: "ML" };
+const MARKET_DB_CODE: Record<MarketKey, string> = { vn: "VN", us: "US", malay: "MALAY" };
 const EMPTY_MARKET_CONTENT: MarketContent = { vn: "", us: "", malay: "" };
-
-/** Content across the 3 markets must be all-filled or all-empty — a day
- * can legitimately have no video at all (e.g. a rest day), but can't have
- * it for only some markets, which is exactly the gap that left UK/ML users
- * with an empty roadmap in practice. */
-function isMarketContentComplete(content: MarketContent): boolean {
-  const filled = [content.vn, content.us, content.malay].filter((value) => value.trim());
-  return filled.length === 0 || filled.length === 3;
-}
 
 export function RoutineView() {
   const [products, setProducts] = useState<Product[] | null>(null);
@@ -66,9 +63,21 @@ export function RoutineView() {
   // users back to Vietnamese names.
   const [infoNameEn, setInfoNameEn] = useState("");
   const [infoNameMs, setInfoNameMs] = useState("");
-  const [phaseNames, setPhaseNames] = useState<Array<{ id: string; name: string; nameEn: string; nameMs: string }>>([]);
   const [infoName, setInfoName] = useState("");
   const [infoLink, setInfoLink] = useState("");
+  const [infoTotalDays, setInfoTotalDays] = useState("28");
+  // Phase editor (2026-09-05): phases used to be fixed at 3, created with the
+  // product and renameable only. Now add/edit/delete, since a roadmap that
+  // only has 14 days of video should not carry an empty phase 3.
+  const [phaseModal, setPhaseModal] = useState<"new" | ProgramPhase | null>(null);
+  const [phaseName, setPhaseName] = useState("");
+  const [phaseNameEn, setPhaseNameEn] = useState("");
+  const [phaseNameMs, setPhaseNameMs] = useState("");
+  const [phaseStart, setPhaseStart] = useState("1");
+  const [phaseEnd, setPhaseEnd] = useState("7");
+  const [phaseBusy, setPhaseBusy] = useState(false);
+  const [deletePhaseTarget, setDeletePhaseTarget] = useState<ProgramPhase | null>(null);
+  const [deletePhaseImpact, setDeletePhaseImpact] = useState<{ days: number; purchases: number; quizAttempts: number } | null>(null);
   const [dayModal, setDayModal] = useState<DayModalState>(null);
   const [phaseContentTarget, setPhaseContentTarget] = useState<ProgramPhase | null>(null);
   const [dayMarketTab, setDayMarketTab] = useState<MarketKey>("vn");
@@ -125,9 +134,96 @@ export function RoutineView() {
     setInfoName(product.name);
     setInfoNameEn(product.nameEn);
     setInfoNameMs(product.nameMs);
-    setPhaseNames(product.phases.map((ph) => ({ id: ph.id, name: ph.name, nameEn: ph.nameEn, nameMs: ph.nameMs })));
     setInfoLink(storeLinks[product.id] ?? "");
+    setInfoTotalDays(String(product.totalDays));
     setEditInfo(true);
+  }
+
+  function openNewPhase() {
+    if (!product) return;
+    const lastEnd = product.phases.reduce((max, ph) => Math.max(max, ph.range[1]), 0);
+    setPhaseModal("new");
+    setPhaseName("");
+    setPhaseNameEn("");
+    setPhaseNameMs("");
+    setPhaseStart(String(lastEnd + 1));
+    setPhaseEnd(String(lastEnd + 7));
+  }
+  function openEditPhase(ph: ProgramPhase) {
+    setPhaseModal(ph);
+    setPhaseName(ph.name);
+    setPhaseNameEn(ph.nameEn);
+    setPhaseNameMs(ph.nameMs);
+    setPhaseStart(String(ph.range[0]));
+    setPhaseEnd(String(ph.range[1]));
+  }
+  async function savePhase() {
+    if (!product || !phaseModal) return;
+    const name = phaseName.trim();
+    const start = Number.parseInt(phaseStart, 10);
+    const end = Number.parseInt(phaseEnd, 10);
+    if (!name) {
+      pushToast("Vui lòng nhập tên giai đoạn (VN)");
+      return;
+    }
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start || end > 365) {
+      pushToast("Khoảng ngày không hợp lệ — ngày bắt đầu phải ≥ 1 và ≤ ngày kết thúc");
+      return;
+    }
+    const editingId = phaseModal === "new" ? null : phaseModal.id;
+    // createProgramDay/updateProgramDay resolve a phase by (product, name),
+    // so two phases of one product may not share a name.
+    if (product.phases.some((ph) => ph.id !== editingId && ph.name.trim().toLowerCase() === name.toLowerCase())) {
+      pushToast("Đã có giai đoạn trùng tên trong lộ trình này");
+      return;
+    }
+    const overlap = product.phases.find((ph) => ph.id !== editingId && start <= ph.range[1] && end >= ph.range[0]);
+    if (overlap) {
+      pushToast(`Khoảng ngày trùng với "${overlap.name}" (ngày ${overlap.range[0]}–${overlap.range[1]})`);
+      return;
+    }
+    setPhaseBusy(true);
+    try {
+      const input = { name, nameEn: phaseNameEn, nameMs: phaseNameMs, dayStart: start, dayEnd: end };
+      if (editingId) await updateProgramPhase(editingId, input);
+      else await createProgramPhase(product.id, input);
+      setPhaseModal(null);
+      pushToast(editingId ? "Đã lưu giai đoạn" : "Đã thêm giai đoạn");
+      reload(product.id);
+    } catch {
+      pushToast("Không thể lưu giai đoạn");
+    } finally {
+      setPhaseBusy(false);
+    }
+  }
+  function askDeletePhase(ph: ProgramPhase) {
+    setDeletePhaseImpact(null);
+    setDeletePhaseTarget(ph);
+    fetchPhaseDeleteImpact(ph.id).then(setDeletePhaseImpact).catch(() => setDeletePhaseImpact(null));
+  }
+  async function confirmDeletePhase() {
+    if (!product || !deletePhaseTarget) return;
+    setPhaseBusy(true);
+    try {
+      await deleteProgramPhase(deletePhaseTarget.id);
+      setDeletePhaseTarget(null);
+      pushToast("Đã xoá " + deletePhaseTarget.name);
+      reload(product.id);
+    } catch {
+      pushToast("Không thể xoá giai đoạn");
+    } finally {
+      setPhaseBusy(false);
+    }
+  }
+  async function runReassignDays() {
+    if (!product) return;
+    try {
+      const moved = await reassignDaysToPhases(product.id);
+      pushToast(moved ? `Đã gán lại ${moved} ngày theo khoảng giai đoạn` : "Không có ngày nào cần gán lại");
+      reload(product.id);
+    } catch {
+      pushToast("Không thể gán lại ngày tập");
+    }
   }
   useEffect(() => {
     if (!productId) return;
@@ -169,13 +265,20 @@ export function RoutineView() {
 
   async function saveInfo() {
     if (!product) return;
+    const totalDays = Number.parseInt(infoTotalDays, 10);
+    if (!Number.isInteger(totalDays) || totalDays < 1 || totalDays > 365) {
+      pushToast("Thời lượng lộ trình phải từ 1 đến 365 ngày");
+      return;
+    }
     try {
-      await updateProductInfo(product.id, { name: infoName, link: infoLink });
+      await updateProductInfo(product.id, { name: infoName, link: infoLink, totalDays });
+      // Phase names now live in the phase editor; this only carries the
+      // product's own EN/MS names.
       await saveLocalizedNames({
         productId: product.id,
         productNameEn: infoNameEn,
         productNameMs: infoNameMs,
-        phases: phaseNames.map((ph) => ({ id: ph.id, name: ph.name, nameEn: ph.nameEn, nameMs: ph.nameMs })),
+        phases: [],
       });
       setEditInfo(false);
       pushToast("Đã lưu thông tin " + infoName);
@@ -205,10 +308,9 @@ export function RoutineView() {
     if (!product) return;
     const trimmedVideo: MarketContent = { vn: video.vn.trim(), us: video.us.trim(), malay: video.malay.trim() };
     const trimmedSupportToolsUrl: MarketContent = { vn: supportToolsUrl.vn.trim(), us: supportToolsUrl.us.trim(), malay: supportToolsUrl.malay.trim() };
-    if (!isMarketContentComplete(trimmedVideo) || !isMarketContentComplete(trimmedSupportToolsUrl)) {
-      pushToast("Vui lòng điền đầy đủ Video/Dụng cụ hỗ trợ cho cả 3 thị trường (VN/UK/ML), hoặc để trống cả 3.");
-      return;
-    }
+    // Markets are managed independently (owner rule 2026-09-05) — a day may
+    // be filled for VN only. The per-market readiness panel and the publish
+    // confirm are what flag a market that is still short of videos.
     try {
       if (dayModal === "new") {
         const nextDayNumber = product.days.length ? Math.max(...product.days.map((d) => d.id)) + 1 : 1;
@@ -244,6 +346,17 @@ export function RoutineView() {
 
   const dayList = [...product.days].sort((a, b) => a.id - b.id);
   const viewMarketLabel = MARKET_TABS.find(([key]) => key === viewMarket)?.[1] ?? "VN";
+  // Only the market being viewed — showing all 3 side by side read as noise
+  // when the header already scopes the page to one (owner, 2026-09-05).
+  const marketReadiness = readiness?.find((r) => r.market === MARKET_DB_CODE[viewMarket]) ?? null;
+  const marketComplete =
+    !!marketReadiness && marketReadiness.missingDays.length === 0 && marketReadiness.duplicateDays.length === 0 && marketReadiness.daysWithVideo > 0;
+  const phaseList = [...product.phases].sort((a, b) => a.range[0] - b.range[0]);
+  const daysOutOfPhaseRange = dayList.filter((d) => {
+    const phase = phaseList.find((ph) => ph.name === d.phase);
+    return !phase || d.id < phase.range[0] || d.id > phase.range[1];
+  });
+  const marketsWithGaps = (readiness ?? []).filter((r) => r.missingDays.length || r.duplicateDays.length || r.daysWithVideo === 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -323,39 +436,77 @@ export function RoutineView() {
             )}
           </div>
         </div>
-        {readiness ? (
-          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
-            {readiness.map((r) => {
-              const complete = r.missingDays.length === 0 && r.duplicateDays.length === 0 && r.daysWithVideo > 0;
-              return (
-                <div key={r.market} style={{ background: "var(--bg-card-alt)", borderRadius: 10, padding: "10px 12px", fontSize: 12.5 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <strong style={{ color: "var(--text-primary)" }}>Video {MARKET_LABEL[r.market]}</strong>
-                    <span style={{ fontWeight: 700, color: complete ? "#2BB673" : "#B9860B" }}>{r.daysWithVideo}/{r.totalDays} ngày</span>
-                  </div>
-                  {r.missingDays.length ? <div style={{ color: "var(--text-secondary)", marginTop: 4 }}>Thiếu video: ngày {r.missingDays.join(", ")}</div> : null}
-                  {r.duplicateDays.length ? <div style={{ color: "#B9860B", marginTop: 4 }}>Lặp video ngày trước: ngày {r.duplicateDays.join(", ")}</div> : null}
-                  {complete ? <div style={{ color: "#2BB673", marginTop: 4 }}>Đủ video, không trùng.</div> : null}
-                </div>
-              );
-            })}
+        {marketReadiness ? (
+          <div style={{ marginTop: 14, background: "var(--bg-card-alt)", borderRadius: 10, padding: "10px 12px", fontSize: 12.5 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <strong style={{ color: "var(--text-primary)" }}>Video thị trường {viewMarketLabel}</strong>
+              <span style={{ fontWeight: 700, color: marketComplete ? "#2BB673" : "#B9860B" }}>
+                {marketReadiness.daysWithVideo}/{marketReadiness.totalDays} ngày
+              </span>
+            </div>
+            {marketReadiness.missingDays.length ? (
+              <div style={{ color: "var(--text-secondary)", marginTop: 4 }}>Thiếu video: ngày {marketReadiness.missingDays.join(", ")}</div>
+            ) : null}
+            {marketReadiness.duplicateDays.length ? (
+              <div style={{ color: "#B9860B", marginTop: 4 }}>Lặp video ngày trước: ngày {marketReadiness.duplicateDays.join(", ")}</div>
+            ) : null}
+            {marketComplete ? <div style={{ color: "#2BB673", marginTop: 4 }}>Đủ video, không trùng.</div> : null}
+            <div style={{ color: "var(--text-muted)", marginTop: 6 }}>
+              Mỗi thị trường quản lý riêng — đổi thị trường ở đầu trang để xem VN / UK / ML.
+            </div>
           </div>
         ) : null}
         <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
           App chỉ liệt kê lộ trình <strong>đang hiển thị</strong>. Lộ trình nháp bị ẩn với mọi người trừ khách đã kích hoạt thiết bị đó — họ thấy thẻ &quot;đang hoàn thiện&quot; và sẽ nhận thông báo khi bạn xuất bản.
         </div>
       </SectionCard>
-      <SectionCard title="Giai đoạn · Khảo sát & Upsell">
+      <SectionCard
+        title="Giai đoạn · Khảo sát & Upsell"
+        action={<PrimaryBtn icon="plus" onClick={openNewPhase}>Thêm giai đoạn</PrimaryBtn>}
+      >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {product.phases.map((ph) => (
-            <div key={ph.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--bg-card-alt)" }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)" }}>{ph.name}</div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>Ngày {ph.range[0]}–{ph.range[1]}</div>
+          {phaseList.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Chưa có giai đoạn nào — thêm giai đoạn trước khi thêm ngày tập.</div>
+          ) : null}
+          {phaseList.map((ph) => {
+            const phaseDays = dayList.filter((d) => d.phase === ph.name);
+            return (
+              <div key={ph.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", borderRadius: 10, background: "var(--bg-card-alt)", flexWrap: "wrap" }}>
+                <div style={{ minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)" }}>{ph.name}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                    Ngày {ph.range[0]}–{ph.range[1]} · {phaseDays.length} ngày đã tạo
+                    {ph.nameEn || ph.nameMs ? (
+                      <span style={{ color: "var(--text-muted)" }}>
+                        {" · "}UK: {ph.nameEn || "theo VN"} · ML: {ph.nameMs || "theo VN"}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <GhostBtn onClick={() => setPhaseContentTarget(ph)}>Quản lý Khảo sát &amp; Upsell</GhostBtn>
+                  <button onClick={() => openEditPhase(ph)} title="Sửa giai đoạn" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                    <Icon name="pencil" size={16} color="var(--color-primary)" />
+                  </button>
+                  <button onClick={() => askDeletePhase(ph)} title="Xoá giai đoạn" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                    <Icon name="trash-2" size={16} color="var(--error)" />
+                  </button>
+                </div>
               </div>
-              <GhostBtn onClick={() => setPhaseContentTarget(ph)}>Quản lý Khảo sát &amp; Upsell</GhostBtn>
+            );
+          })}
+        </div>
+        {daysOutOfPhaseRange.length ? (
+          <div style={{ marginTop: 12, fontSize: 12.5, color: "#B9860B", background: "rgba(185,134,11,0.10)", borderRadius: 10, padding: "10px 12px" }}>
+            <strong>{daysOutOfPhaseRange.length} ngày</strong> đang thuộc giai đoạn không khớp khoảng ngày (ngày{" "}
+            {daysOutOfPhaseRange.map((d) => d.id).join(", ")}).
+            <div style={{ marginTop: 8 }}>
+              <GhostBtn onClick={runReassignDays}>Gán lại ngày theo khoảng giai đoạn</GhostBtn>
             </div>
-          ))}
+          </div>
+        ) : null}
+        <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
+          Xoá một giai đoạn sẽ xoá luôn các ngày tập, câu hỏi khảo sát và thẻ Upsell thuộc giai đoạn đó.
         </div>
       </SectionCard>
       <SectionCard title={"Lịch trình " + product.totalDays + " ngày"} action={<PrimaryBtn icon="plus" onClick={openNewDay}>Thêm ngày mới</PrimaryBtn>}>
@@ -470,38 +621,11 @@ export function RoutineView() {
             </div>
           </div>
 
-          <FieldLabel>Tên các giai đoạn</FieldLabel>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
-            Dòng đầu là tên tiếng Việt (bắt buộc). Để trống ô UK/ML thì app hiển thị tên tiếng Việt cho thị trường đó.
+          <FieldLabel>Thời lượng lộ trình (ngày)</FieldLabel>
+          <input type="number" min={1} max={365} value={infoTotalDays} onChange={(e) => setInfoTotalDays(e.target.value)} style={{ ...inputStyle, marginBottom: 4 }} />
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+            Con số app đếm tới — &quot;NGÀY 12 / {infoTotalDays || "…"}&quot;. Hiện có {dayList.length} ngày đã tạo.
           </div>
-          {phaseNames.map((ph, index) => (
-            <div key={ph.id} style={{ background: "var(--bg-card-alt)", borderRadius: 10, padding: 12, marginBottom: 10 }}>
-              <input
-                value={ph.name}
-                placeholder="Tên giai đoạn (VN)"
-                onChange={(e) => setPhaseNames((current) => current.map((item, i) => (i === index ? { ...item, name: e.target.value } : item)))}
-                style={{ ...inputStyle, marginBottom: 8, fontWeight: 600 }}
-              />
-              <div style={{ display: "flex", gap: 10 }}>
-                <input
-                  value={ph.nameEn}
-                  placeholder="UK"
-                  onChange={(e) =>
-                    setPhaseNames((current) => current.map((item, i) => (i === index ? { ...item, nameEn: e.target.value } : item)))
-                  }
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <input
-                  value={ph.nameMs}
-                  placeholder="ML"
-                  onChange={(e) =>
-                    setPhaseNames((current) => current.map((item, i) => (i === index ? { ...item, nameMs: e.target.value } : item)))
-                  }
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-              </div>
-            </div>
-          ))}
 
           <FieldLabel>Link trang sản phẩm</FieldLabel>
           <input value={infoLink} onChange={(e) => setInfoLink(e.target.value)} placeholder="https://..." style={inputStyle} />
@@ -552,22 +676,34 @@ export function RoutineView() {
           <FieldLabel>Nội dung theo thị trường</FieldLabel>
           <PillTabs options={MARKET_TABS} value={dayMarketTab} onChange={setDayMarketTab} />
           <div style={{ marginBottom: 8, fontSize: 12, color: "var(--text-muted)" }}>
-            Điền đầy đủ cho cả 3 thị trường (hoặc để trống cả 3 — ví dụ ngày nghỉ không cần video).
+            Mỗi thị trường lưu riêng — có thể chỉ điền VN. Thị trường bỏ trống sẽ hiện trong bảng &quot;Thiếu video&quot;.
           </div>
-          <FieldLabel>Link video</FieldLabel>
+          <FieldLabel>Link video ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
           <input
             value={video[dayMarketTab]}
             onChange={(e) => setVideo((v) => ({ ...v, [dayMarketTab]: e.target.value }))}
             placeholder="https://..."
-            style={{ ...inputStyle, marginBottom: 14 }}
+            style={{ ...inputStyle, marginBottom: 6 }}
           />
-          <FieldLabel>Link Dụng cụ hỗ trợ tập luyện</FieldLabel>
+          <div style={{ marginBottom: 14 }}>
+            <GhostBtn onClick={() => setVideo({ vn: video[dayMarketTab], us: video[dayMarketTab], malay: video[dayMarketTab] })}>
+              Dùng link này cho cả 3 thị trường
+            </GhostBtn>
+          </div>
+          <FieldLabel>Link Dụng cụ hỗ trợ tập luyện ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
           <input
             value={supportToolsUrl[dayMarketTab]}
             onChange={(e) => setSupportToolsUrl((v) => ({ ...v, [dayMarketTab]: e.target.value }))}
             placeholder="https://..."
-            style={inputStyle}
+            style={{ ...inputStyle, marginBottom: 6 }}
           />
+          <GhostBtn
+            onClick={() =>
+              setSupportToolsUrl({ vn: supportToolsUrl[dayMarketTab], us: supportToolsUrl[dayMarketTab], malay: supportToolsUrl[dayMarketTab] })
+            }
+          >
+            Dùng link này cho cả 3 thị trường
+          </GhostBtn>
         </Modal>
       ) : null}
       {phaseContentTarget ? (
@@ -578,7 +714,11 @@ export function RoutineView() {
           title={publishAction === "publish" ? "Xuất bản lộ trình" : publishAction === "unpublish" ? "Ẩn lộ trình khỏi app" : "Xoá lộ trình"}
           message={
             publishAction === "publish"
-              ? `Xuất bản "${product.name}"? Lộ trình hiện lên app cho mọi người, và MỌI khách đã kích hoạt thiết bị này nhận thông báo "lộ trình đã sẵn sàng".${readiness?.some((r) => r.missingDays.length || r.duplicateDays.length) ? " Lưu ý: bảng bên trên cho thấy còn ngày thiếu video hoặc lặp video." : ""}`
+              ? `Xuất bản "${product.name}"? Lộ trình hiện lên app cho mọi người, và MỌI khách đã kích hoạt thiết bị này nhận thông báo "lộ trình đã sẵn sàng".${
+                  marketsWithGaps.length
+                    ? ` Lưu ý: thị trường ${marketsWithGaps.map((r) => MARKET_LABEL[r.market]).join(", ")} còn ngày thiếu video hoặc lặp video.`
+                    : ""
+                }`
               : publishAction === "unpublish"
                 ? `Ẩn "${product.name}" khỏi app? Khách chưa kích hoạt sẽ không thấy; khách đã kích hoạt thấy thẻ "đang hoàn thiện" thay cho các ngày tập.`
                 : `Xoá hẳn "${product.name}" cùng toàn bộ ngày tập, giai đoạn và danh sách kích hoạt?${
@@ -589,6 +729,73 @@ export function RoutineView() {
           busy={publishBusy}
           onConfirm={runPublishAction}
           onCancel={() => setPublishAction(null)}
+        />
+      ) : null}
+      {phaseModal ? (
+        <Modal
+          title={phaseModal === "new" ? "Thêm giai đoạn" : "Sửa giai đoạn"}
+          onClose={() => setPhaseModal(null)}
+          width={440}
+          footer={
+            <Fragment>
+              <GhostBtn onClick={() => setPhaseModal(null)}>Hủy</GhostBtn>
+              <PrimaryBtn onClick={savePhase} disabled={phaseBusy}>
+                {phaseBusy ? "Đang lưu..." : phaseModal === "new" ? "Thêm giai đoạn" : "Lưu thay đổi"}
+              </PrimaryBtn>
+            </Fragment>
+          }
+        >
+          <FieldLabel>Tên giai đoạn (VN)</FieldLabel>
+          <input
+            value={phaseName}
+            onChange={(e) => setPhaseName(e.target.value)}
+            placeholder="Ví dụ: Giai đoạn 1 · Giảm khó chịu & làm quen"
+            style={{ ...inputStyle, marginBottom: 10 }}
+          />
+          <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+            <div style={{ flex: 1 }}>
+              <FieldLabel>Tên (UK)</FieldLabel>
+              <input value={phaseNameEn} onChange={(e) => setPhaseNameEn(e.target.value)} placeholder={phaseName} style={inputStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <FieldLabel>Tên (ML)</FieldLabel>
+              <input value={phaseNameMs} onChange={(e) => setPhaseNameMs(e.target.value)} placeholder={phaseName} style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+            Để trống ô UK/ML thì app hiển thị tên tiếng Việt cho thị trường đó.
+          </div>
+          <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+            <div style={{ flex: 1 }}>
+              <FieldLabel>Ngày bắt đầu</FieldLabel>
+              <input type="number" min={1} max={365} value={phaseStart} onChange={(e) => setPhaseStart(e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <FieldLabel>Ngày kết thúc</FieldLabel>
+              <input type="number" min={1} max={365} value={phaseEnd} onChange={(e) => setPhaseEnd(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            Khoảng ngày không được trùng với giai đoạn khác. Sau khi đổi khoảng, dùng nút &quot;Gán lại ngày theo khoảng giai đoạn&quot; nếu có ngày báo lệch.
+          </div>
+        </Modal>
+      ) : null}
+      {deletePhaseTarget ? (
+        <ConfirmModal
+          title="Xoá giai đoạn"
+          message={
+            `Xoá "${deletePhaseTarget.name}" (ngày ${deletePhaseTarget.range[0]}–${deletePhaseTarget.range[1]}) khỏi ${product.name}?` +
+            (deletePhaseImpact
+              ? ` Sẽ xoá luôn ${deletePhaseImpact.days} ngày tập cùng câu hỏi khảo sát và thẻ Upsell của giai đoạn này.` +
+                (deletePhaseImpact.purchases ? ` CẢNH BÁO: ${deletePhaseImpact.purchases} lượt mua giai đoạn này cũng bị xoá.` : "") +
+                (deletePhaseImpact.quizAttempts ? ` ${deletePhaseImpact.quizAttempts} lượt làm khảo sát của khách cũng bị xoá.` : "")
+              : " Đang kiểm tra dữ liệu liên quan...") +
+            " Không thể hoàn tác."
+          }
+          confirmLabel="Xoá vĩnh viễn"
+          busy={phaseBusy}
+          onConfirm={confirmDeletePhase}
+          onCancel={() => setDeletePhaseTarget(null)}
         />
       ) : null}
       {deleteDayConfirm !== null ? (

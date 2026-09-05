@@ -253,9 +253,17 @@ export async function saveLocalizedNames(input: {
   }
 }
 
-export async function updateProductInfo(productId: string, patch: { name?: string; link?: string }) {
-  if (patch.name !== undefined) {
-    const { error } = await supabase.from("products").update({ name: patch.name }).eq("id", productId);
+export async function updateProductInfo(productId: string, patch: { name?: string; link?: string; totalDays?: number }) {
+  // `total_days` is what the app counts against ("NGÀY 12 / 14"), so it is
+  // editable here — a roadmap that only has 14 days recorded should say 14.
+  if (patch.name !== undefined || patch.totalDays !== undefined) {
+    const { error } = await supabase
+      .from("products")
+      .update({
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.totalDays !== undefined ? { total_days: patch.totalDays } : {}),
+      })
+      .eq("id", productId);
     if (error) throw error;
   }
   // Link: the Sửa thông tin modal only shows the VN storefront link, so only
@@ -297,6 +305,93 @@ export async function updateProgramDay(productId: string, dayNumber: number, pha
 export async function deleteProgramDay(productId: string, dayNumber: number) {
   const { error } = await supabase.from("program_days").delete().eq("product_id", productId).eq("day_number", dayNumber);
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Phases (program_phases) — full CRUD, added 2026-09-05. Until then the only
+// phases a product could ever have were the 3 created at product creation,
+// and only their names were editable. The owner needs to drop phase 3 while
+// only 14 days of video exist, so add/edit/delete are all exposed.
+// ---------------------------------------------------------------------------
+
+export interface PhaseInput {
+  name: string;
+  nameEn: string;
+  nameMs: string;
+  dayStart: number;
+  dayEnd: number;
+}
+
+export async function createProgramPhase(productId: string, input: PhaseInput) {
+  const { data: existing, error: readErr } = await supabase.from("program_phases").select("sort_order").eq("product_id", productId);
+  if (readErr) throw readErr;
+  const nextSort = (existing ?? []).reduce((max, row) => Math.max(max, row.sort_order), 0) + 1;
+  const { error } = await supabase.from("program_phases").insert({
+    product_id: productId,
+    name: input.name.trim(),
+    name_en: input.nameEn.trim() || null,
+    name_ms: input.nameMs.trim() || null,
+    day_start: input.dayStart,
+    day_end: input.dayEnd,
+    sort_order: nextSort,
+  });
+  if (error) throw error;
+}
+
+export async function updateProgramPhase(phaseId: string, input: PhaseInput) {
+  const { error } = await supabase
+    .from("program_phases")
+    .update({
+      name: input.name.trim(),
+      name_en: input.nameEn.trim() || null,
+      name_ms: input.nameMs.trim() || null,
+      day_start: input.dayStart,
+      day_end: input.dayEnd,
+    })
+    .eq("id", phaseId);
+  if (error) throw error;
+}
+
+/** What a phase delete takes with it. `program_days`, `quiz_questions`,
+ * `phase_promos`, `phase_purchases` and `user_quiz_attempts` all cascade off
+ * `program_phases`, so the confirm has to spell this out. */
+export async function fetchPhaseDeleteImpact(phaseId: string): Promise<{ days: number; purchases: number; quizAttempts: number }> {
+  const [days, purchases, attempts] = await Promise.all([
+    supabase.from("program_days").select("id", { count: "exact", head: true }).eq("phase_id", phaseId),
+    supabase.from("phase_purchases").select("id", { count: "exact", head: true }).eq("phase_id", phaseId),
+    supabase.from("user_quiz_attempts").select("id", { count: "exact", head: true }).eq("phase_id", phaseId),
+  ]);
+  if (days.error) throw days.error;
+  if (purchases.error) throw purchases.error;
+  if (attempts.error) throw attempts.error;
+  return { days: days.count ?? 0, purchases: purchases.count ?? 0, quizAttempts: attempts.count ?? 0 };
+}
+
+export async function deleteProgramPhase(phaseId: string) {
+  const { error } = await supabase.from("program_phases").delete().eq("id", phaseId);
+  if (error) throw error;
+}
+
+/** Moves every day of a product into the phase whose range covers its
+ * `day_number`. Editing a phase's range leaves days pointing at the old
+ * phase, so the view offers this as an explicit repair rather than
+ * reshuffling rows behind the admin's back. */
+export async function reassignDaysToPhases(productId: string): Promise<number> {
+  const [{ data: phases, error: phErr }, { data: days, error: dErr }] = await Promise.all([
+    supabase.from("program_phases").select("id, day_start, day_end").eq("product_id", productId),
+    supabase.from("program_days").select("id, day_number, phase_id").eq("product_id", productId),
+  ]);
+  if (phErr) throw phErr;
+  if (dErr) throw dErr;
+  let moved = 0;
+  for (const day of days ?? []) {
+    const target = (phases ?? []).find((ph) => day.day_number >= ph.day_start && day.day_number <= ph.day_end);
+    if (!target || target.id === day.phase_id) continue;
+    const { error } = await supabase.from("program_days").update({ phase_id: target.id }).eq("id", day.id);
+    if (error) throw error;
+    moved += 1;
+  }
+  return moved;
 }
 
 // ---------------------------------------------------------------------------
