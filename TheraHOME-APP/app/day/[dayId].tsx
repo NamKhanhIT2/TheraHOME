@@ -18,10 +18,11 @@ import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
 import { ExternalLinkModal } from '@/components/ExternalLinkModal';
 import { useI18n } from '@/lib/i18n';
+import { youtubePlayerLangParams } from '@/lib/youtubePlayerLang';
 
 export default function DayDetailScreen() {
   const theme = useTheme();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { dayId, productId } = useLocalSearchParams<{ dayId: string; productId?: string }>();
   const { session } = useSession();
   const userId = session?.user.id;
@@ -217,7 +218,7 @@ export default function DayDetailScreen() {
                 if (state === 'playing') recordWatch();
               }}
               onError={() => setVideoError(true)}
-              initialPlayerParams={{ playsinline: true, controls: true, rel: false }}
+              initialPlayerParams={{ playsinline: true, controls: true, rel: false, ...youtubePlayerLangParams(language) }}
               webViewProps={{
                 allowsFullscreenVideo: true,
                 allowsInlineMediaPlayback: true,

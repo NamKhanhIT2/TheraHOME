@@ -3499,3 +3499,17 @@ này: tạo → nháp → đủ video → Xuất bản.
 ("Ready to Submit", không đính vào version) — không xoá vì mất Product ID
 vĩnh viễn; `storekit/Configuration.storekit` vẫn khai báo đủ 4 để test.
 `src/lib/adminContent.ts` còn bản dịch dự phòng cho 3 id cũ — vô hại.
+
+## Video theo ngôn ngữ nhờ YouTube, không quay lại (2026-09-05, tối)
+
+**Chốt:** video chỉ quay tiếng Việt một lần (14 ngày giai đoạn 1–2; giai
+đoạn 3 chưa làm). Tiếng Anh/Malay lấy từ YouTube: chủ kênh bật
+**Auto-dubbing** (bản âm thanh AI), thêm phụ đề dịch và bản dịch tiêu đề/
+mô tả trong YouTube Studio cho 14 video.
+
+**App (`src/lib/youtubePlayerLang.ts`):** player nhúng ở màn Ngày tập và
+`ProductVideoModal` truyền `playerLang` + `cc_lang_pref` theo ngôn ngữ app,
+`showClosedCaptions` bật cho en/ms và tắt cho vi. Player nhúng KHÔNG ép
+được bản âm thanh nào phát — YouTube chọn theo ngôn ngữ tài khoản/máy của
+người xem (đổi được ở bánh răng); phụ đề là lớp dự phòng chắc chắn.
+Cần test trên máy thật đặt tiếng Anh sau khi Studio đã có bản dịch.

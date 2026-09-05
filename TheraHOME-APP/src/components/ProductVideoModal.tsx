@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { useTheme } from '@/theme';
 import { useI18n } from '@/lib/i18n';
+import { youtubePlayerLangParams } from '@/lib/youtubePlayerLang';
 import { Icon } from '@/components/icons/Icon';
 
 interface ProductVideoModalProps {
@@ -27,7 +28,7 @@ function normalizedUrl(url: string | null): string {
 
 export function ProductVideoModal({ title, url, onClose }: ProductVideoModalProps) {
   const theme = useTheme();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [width, setWidth] = useState(0);
   const [failed, setFailed] = useState(false);
   const previewUrl = normalizedUrl(url);
@@ -56,7 +57,7 @@ export function ProductVideoModal({ title, url, onClose }: ProductVideoModalProp
                 width={width}
                 videoId={videoId}
                 onError={() => setFailed(true)}
-                initialPlayerParams={{ playsinline: true, controls: true, rel: false }}
+                initialPlayerParams={{ playsinline: true, controls: true, rel: false, ...youtubePlayerLangParams(language) }}
                 webViewProps={{ allowsFullscreenVideo: true, allowsInlineMediaPlayback: true }}
               />
             ) : videoId && !failed ? (
