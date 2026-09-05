@@ -14,8 +14,9 @@ phase) — most tables now have real queries reading/writing them; some are
 still waiting on their phase:
 
 - **Reference/admin-managed** (public read, no client write, pre-seeded):
-  `products` (4 rows: neck-plus/neck-pro/back-plus/back-pro), `program_phases`
-  (12 rows), `program_days` (112 rows — the 28-day template per product),
+  `products` (1 row as of 2026-09-05: neck-plus — neck-pro/back-plus/back-pro
+  were deleted), `program_phases` (2 rows), `program_days` (14 rows — the
+  14-day template; `products.total_days` is the number the app counts to),
   `store_categories` (3) + `store_items` (8, real, read by
   `useStoreCategories` — see `app/(tabs)/store.tsx`), `articles` (5, not
   wired to a screen yet).

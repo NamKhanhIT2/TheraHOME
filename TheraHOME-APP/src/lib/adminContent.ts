@@ -1,11 +1,13 @@
 import type { AppLanguage } from '@/store/useAppStore';
 
 type Localized = Record<Exclude<AppLanguage, 'vi'>, string>;
+// Legacy id-keyed fallback for the ORIGINAL product, kept only for rows
+// whose name_en/name_ms were never filled. Products created since
+// 2026-09-05 get machine-drafted EN/MS names at creation, so nothing new
+// belongs here. Entries for neck-pro/back-plus/back-pro were removed with
+// those products.
 const products: Record<string, Localized> = {
   'neck-plus': { en: 'Neck support device · TheraNECK+', ms: 'Peranti sokongan leher · TheraNECK+' },
-  'neck-pro': { en: 'Neck support device · TheraNECK PRO', ms: 'Peranti sokongan leher · TheraNECK PRO' },
-  'back-plus': { en: 'Back support device · TheraBACK+', ms: 'Peranti sokongan belakang · TheraBACK+' },
-  'back-pro': { en: 'Back support device · TheraBACK PRO', ms: 'Peranti sokongan belakang · TheraBACK PRO' },
 };
 const phases: Record<string, Localized> = {
   'Giai đoạn 1 · Giảm khó chịu & làm quen': { en: 'Phase 1 · Reduce discomfort & adapt', ms: 'Fasa 1 · Kurangkan ketidakselesaan & penyesuaian' },

@@ -871,15 +871,27 @@ export function usePostComments(postId: string | undefined, limit: number = DEFA
 
   return useQuery({
     queryKey: [...key, limit],
-    queryFn: async (): Promise<CommentRow[]> => {
+    // Growing the limit must not blank the screen: without this the key change
+    // put the query back into `isPending` and the whole detail view was
+    // replaced by a spinner, losing scroll position.
+    placeholderData: keepPreviousData,
+    queryFn: async (): Promise<{ comments: CommentRow[]; hasMore: boolean }> => {
+      // Newest-first with one extra row, then flipped for display. Fetching
+      // the OLDEST `limit` meant that on a post with more comments than the
+      // page size a user's own new comment was outside the window — they
+      // posted and nothing appeared. The extra row is what tells us whether
+      // "xem thêm" should show at all; comparing root count against the row
+      // limit hid the button whenever the page contained replies.
       const { data, error } = await supabase
         .from('post_comments')
         .select('id, author_id, parent_comment_id, author_name, author_avatar_url, text, image_url, likes_count, created_at')
         .eq('post_id', postId!)
-        .order('created_at', { ascending: true })
-        .limit(limit);
+        .order('created_at', { ascending: false })
+        .limit(limit + 1);
       if (error) throw error;
-      const rows = data as RawComment[];
+      const fetched = data as RawComment[];
+      const hasMore = fetched.length > limit;
+      const rows = fetched.slice(0, limit).reverse();
       const commentIds = rows.map((row) => row.id);
       const countsByComment = new Map<string, Record<PostReaction, number>>();
       if (commentIds.length) {
@@ -907,7 +919,7 @@ export function usePostComments(postId: string | undefined, limit: number = DEFA
         if (parent && parent.id !== comment.id) parent.replies.push(comment);
         else roots.push(comment);
       }
-      return roots;
+      return { comments: roots, hasMore };
     },
     enabled: !!postId,
   });

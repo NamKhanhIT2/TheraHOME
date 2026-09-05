@@ -30,8 +30,10 @@ working on its area** instead of guessing:
 ## What this is
 
 TheraHOME is a Vietnamese-language companion app for TheraHOME's physical
-rehab devices (TheraNECK+/PRO neck support, TheraBACK+/PRO back support). Core
-loop: intake questionnaire → device activation → a 28-day guided program
+rehab devices. Only TheraNECK+ has a published roadmap as of 2026-09-05;
+TheraNECK PRO / TheraBACK+ / TheraBACK PRO were deleted until their own
+videos exist. Core loop: intake questionnaire → device activation → a guided
+day-by-day program (currently 14 days, see `products.total_days`)
 (daily exercise video + 0–10 pain self-report) → water tracking, a community
 feed, and AI + human support chat.
 

@@ -93,7 +93,7 @@ export default function PostDetailScreen() {
     const withoutHidden = (items: CommentRow[]): CommentRow[] => items
       .filter((item) => !hiddenCommentIds.has(item.id))
       .map((item) => ({ ...item, replies: withoutHidden(item.replies) }));
-    return withoutHidden(commentsQuery.data ?? []);
+    return withoutHidden(commentsQuery.data?.comments ?? []);
   }, [commentsQuery.data, hiddenCommentIds]);
   const targetId = commentId ?? parentCommentId;
 
@@ -226,7 +226,7 @@ export default function PostDetailScreen() {
         />
       </View>
       <View style={styles.commentsTitle}><Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('commentsTitle')}</Text></View>
-      {comments.length ? comments.map((comment, index) => renderComment(comment, false, index)) : <Text style={[theme.type.caption, { color: theme.colors.textMuted, textAlign: 'center', marginVertical: 28 }]}>{t('noCommentsYet')}</Text>}{comments.length >= limit ? <Pressable onPress={() => setLimit((v) => v + DEFAULT_COMMENTS_PAGE_SIZE)} style={[styles.load, { borderColor: theme.colors.borderInput }]}><Text style={[theme.type.caption, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>{t('viewMoreComments')}</Text></Pressable> : null}
+      {comments.length ? comments.map((comment, index) => renderComment(comment, false, index)) : <Text style={[theme.type.caption, { color: theme.colors.textMuted, textAlign: 'center', marginVertical: 28 }]}>{t('noCommentsYet')}</Text>}{commentsQuery.data?.hasMore ? <Pressable onPress={() => setLimit((v) => v + DEFAULT_COMMENTS_PAGE_SIZE)} style={[styles.load, { borderColor: theme.colors.borderInput }]}><Text style={[theme.type.caption, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>{t('viewMoreComments')}</Text></Pressable> : null}
     </ScrollView>
     {(replyTo || editing) ? <View style={[styles.banner, { backgroundColor: theme.colors.primaryTint10 }]}><Text style={[theme.type.caption, { color: theme.colors.primaryDark, fontFamily: theme.fontFamily.semiBold }]}>{editing ? t('editingComment') : t('replyingTo', { name: replyTo!.name })}</Text><Pressable onPress={() => { setReplyTo(null); setEditing(null); setText(''); }}><Icon name="x" size={16} color={theme.colors.primaryDark} /></Pressable></View> : null}
     {imageUri ? <View style={[styles.imagePreview, { borderTopColor: theme.colors.divider }]}>{isVideoAttachment ? <View style={[styles.preview, styles.videoPreview, { borderRadius: theme.radius.sm, backgroundColor: theme.colors.bgCardAlt }]}><Icon name="film" size={18} color={theme.colors.textSecondary} /></View> : <Image source={{ uri: imageUri }} style={[styles.preview, { borderRadius: theme.radius.sm }]} />}<Pressable onPress={() => { setImageUri(null); setImageMimeType(null); }} style={[styles.remove, { backgroundColor: theme.colors.textPrimary }]}><Icon name="x" size={12} color="#fff" /></Pressable></View> : null}

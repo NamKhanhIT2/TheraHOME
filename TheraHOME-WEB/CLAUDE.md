@@ -15,8 +15,8 @@ design rationale and gotchas are there. Backend details shared with mobile
 ## What this is
 
 TheraHOME WEB is the browser counterpart to `TheraHOME-APP` (the Expo/React
-Native companion app for TheraHOME's rehab devices — TheraNECK+/PRO,
-TheraBACK+/PRO). It is a **Next.js app implementing the Admin + Customer
+Native companion app for TheraHOME's rehab devices; only TheraNECK+ has a
+published roadmap as of 2026-09-05). It is a **Next.js app implementing the Admin + Customer
 Care (CSKH) surfaces** — originally planned in this file, since built; see
 `docs/feature-notes.md` for the full build log.
 

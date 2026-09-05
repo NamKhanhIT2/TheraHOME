@@ -8,6 +8,8 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { marketForLanguage, type StoreMarket } from '@/hooks/useMarket';
+import type { AppLanguage } from '@/store/useAppStore';
 
 export type NotificationType =
   | 'schedule' | 'inactivity' | 'ad' | 'blog' | 'chat' | 'streak_milestone'
@@ -260,13 +262,40 @@ export function useNotificationCampaigns() {
   });
 }
 
+/** Staff broadcast from the mobile app.
+ *
+ * Two things this used to get wrong: it wrote the inbox row for EVERY
+ * profile — review, admin and CSKH accounts included, unlike every other
+ * dispatch path — and it ignored markets entirely, so a Vietnamese message
+ * landed on UK and Malaysia customers. Staff compose in one language, so the
+ * honest fix is to let them choose which markets receive it (matching what
+ * `dispatch-push` already accepts) rather than machine-translating here.
+ * `markets` null = everyone. */
 export function useSendNotificationBroadcast() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { type: BroadcastNotificationType; title: string; body: string }): Promise<number> => {
-      const { data: profiles, error: profilesError } = await supabase.from('profiles').select('id').is('deleted_at', null);
+    mutationFn: async (input: {
+      type: BroadcastNotificationType;
+      title: string;
+      body: string;
+      markets?: StoreMarket[] | null;
+    }): Promise<number> => {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, country, language, account_type')
+        .is('deleted_at', null);
       if (profilesError) throw profilesError;
-      const userIds = (profiles ?? []).map((r) => r.id);
+      const wanted = input.markets?.length ? input.markets : null;
+      const userIds = (profiles ?? [])
+        .filter((r) => !['review', 'admin', 'cskh'].includes(r.account_type ?? ''))
+        .filter((r) => {
+          if (!wanted) return true;
+          // Same resolution as useMarket and dispatch-push: country first,
+          // language only as a fallback for accounts that never picked one.
+          const market = (r.country as StoreMarket | null) ?? marketForLanguage((r.language as AppLanguage) ?? 'vi');
+          return wanted.includes(market);
+        })
+        .map((r) => r.id);
       if (!userIds.length) return 0;
       const createdAt = new Date().toISOString();
       const { error } = await supabase

@@ -7,12 +7,12 @@
 // twins added ~7MB of app size for no visual gain.
 import type { ImageSourcePropType } from 'react-native';
 
+// Only TheraNECK+ exists as of 2026-09-05. The PRO/BACK entries were removed
+// with their products — each `require()` ships its JPEG in the bundle whether
+// or not anything can match it. The images are still in assets/paywall/, so
+// restoring a line here is all it takes when those devices return.
 const HEROES: { match: RegExp; source: ImageSourcePropType }[] = [
-  // Order matters: PRO patterns must be tested before their non-PRO device.
-  { match: /neck.*pro/i, source: require('../../assets/paywall/theraneck-pro-hero.jpg') },
   { match: /neck/i, source: require('../../assets/paywall/theraneck-phase-3-hero.jpg') },
-  { match: /back.*pro/i, source: require('../../assets/paywall/theraback-pro-hero.jpg') },
-  { match: /back/i, source: require('../../assets/paywall/theraback-plus-hero.jpg') },
 ];
 
 /** Resolve the bundled hero for a product by its catalog name (e.g.

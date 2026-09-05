@@ -3581,7 +3581,56 @@ nên `select count` từ client luôn trả 0. Thêm RPC `product_order_count`
 - Feed refetch mỗi khi BẤT KỲ ai thả cảm xúc ở BẤT KỲ bài nào → nay debounce
   1.5s.
 
-**Còn TỒN ĐỌNG, chưa sửa (xếp theo mức độ):**
+## Đã xử lý hết 10 mục tồn đọng (2026-09-05, khuya — đợt 3)
+
+1. **Giá & link mua theo QUỐC GIA.** `usePhasePromo` tách hai đường: chữ đọc
+   theo NGÔN NGỮ, còn `unlock_price_label` + `cross_sell_cta_url` đọc theo
+   THỊ TRƯỜNG (`marketBucket`: US→bucket `en`, MALAY→`ms`, VN→cột gốc). Khách
+   VN đặt app tiếng Anh không còn thấy giá và link UK. Query key thêm market.
+   Nhãn tab trong `PhaseContentModal` viết lại cho đúng ý nghĩa kép.
+2. **RLS (migration 202609051830):** `app_config`, `faq_items`,
+   `legal_documents`, `onboarding_question_texts`, `ai_prompts` chỉ còn
+   `admin` được GHI. An toàn vì `current_web_roles()` fallback theo
+   `profiles.account_type`, và 'admin' ở đó trả về {admin,cskh}.
+   `system_notification_templates` GIỮ staff-wide vì tab đó nằm trong nav CSKH.
+3. **Cột thị trường/danh tính (migration 202609051840):** trigger
+   `protect_privileged_profile_columns` chặn thêm `country`,
+   `country_confirmed`, `email` khi người sửa KHÔNG phải chính chủ. Admin vẫn
+   qua được. Bù lại: tab User trên Admin có thẻ "Quốc gia / Thị trường" để sửa
+   khi khách chọn nhầm lúc onboarding (trước phải sửa bằng SQL).
+4. **`store_items.product_id`:** modal sản phẩm trong Cửa hàng có ô "Lộ trình
+   liên kết"; `saveStoreItemGroup` nhận và ghi `product_id` cho cả 3 thị
+   trường. Trước đây KHÔNG có UI nào ghi cột này.
+5. **Phân trang bình luận:** lấy `limit + 1` bản ghi MỚI NHẤT rồi đảo chiều để
+   hiển thị (trước lấy cũ nhất nên bình luận vừa gửi của chính mình bị cắt);
+   `hasMore` từ bản ghi dư quyết định nút "Xem thêm" (trước so số ROOT với số
+   DÒNG nên có reply là nút biến mất); thêm `keepPreviousData` để bấm xem thêm
+   không trắng màn.
+6. **Lỗ hổng số ngày (migration 202609051850):** `complete_day` tìm ngày kế
+   bằng `day_number > hiện tại ORDER BY day_number LIMIT 1` thay vì `+1`, và
+   `current_day` nhảy tới số ngày CÓ THẬT. Một lỗ hổng trước đây làm đứt hẳn
+   chuỗi mở ngày. WEB thêm cảnh báo + nút "Đánh số lại các ngày"
+   (`renumberProgramDays`) — cố ý để admin bấm, vì đánh số lại đổi bài tập mà
+   khách đang tập dở nhìn thấy.
+7. **Lệch `total_days`:** marker "Hôm nay" trên Roadmap tự bám vào ngày CÓ
+   THẬT gần nhất (trước `current_day` vượt số ngày là mất hẳn marker).
+8. **CSKH duyệt bài thấy ảnh/video:** `fetchCommunityPosts` select thêm
+   `media_urls` / `media_feed_urls` / `media_poster_urls`, hàng bài hiện dải
+   thumbnail 84px bấm mở bản gốc.
+9. **Broadcast từ app staff:** loại `review`/`admin`/`cskh` khỏi danh sách
+   nhận (trước gửi cho tất cả), và thêm chip chọn thị trường VN/UK/ML — nhân
+   viên gõ một thứ tiếng nên phải chọn thị trường đọc được thứ tiếng đó.
+10. **Dọn tham chiếu chết:** `adminContent.ts` bỏ 3 sản phẩm đã xoá;
+    `paywallHeroes.ts` bỏ 3 matcher (3 file JPEG không còn nằm trong bundle,
+    ảnh vẫn ở `assets/paywall/` nếu sau này cần); `docs/backend.md`,
+    hai `CLAUDE.md`, `usePrograms.ts`, `shopify-order-webhook` sửa lại số
+    "4 sản phẩm / 28 ngày / 12 phases".
+
+**Ghi chú:** advisor Supabase còn cảnh báo `resolve_thera_login_email` gọi
+được ẩn danh — ĐÚNG THIẾT KẾ, đăng nhập cần nó trước khi có session. Và
+"Leaked Password Protection" vẫn phải bật tay trong dashboard Supabase Auth.
+
+**(Lịch sử) Danh sách tồn đọng trước khi xử lý:**
 1. `usePhasePromo` chọn nội dung upsell/paywall theo NGÔN NGỮ chứ không theo
    QUỐC GIA, trong đó có `unlock_price_label` và `cross_sell_cta_url` — tức
    GIÁ và LINK MUA. Hiện chưa lộ vì `phase_promos` đang rỗng, nhưng sẽ sai

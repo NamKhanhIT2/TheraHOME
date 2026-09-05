@@ -35,7 +35,7 @@ export interface ProductInfo {
 
 const FALLBACK_PRODUCT = (id: string): ProductInfo => ({ id, name: id, accent: 'primary', totalDays: 28, roadmapPublished: true });
 
-// Reference data — 4 rows, admin-managed, effectively static.
+// Reference data — one row per device (just TheraNECK+ today), admin-managed.
 export function useProducts() {
   const language = useAppStore((state) => state.language);
   return useQuery({

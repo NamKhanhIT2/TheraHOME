@@ -40,6 +40,9 @@ type PinnedPost = CommunityPost & {
   hidden: boolean;
   status: PostModerationStatus;
   imageUrl: string | null;
+  mediaUrls: string[];
+  mediaFeedUrls: string[];
+  mediaPosterUrls: string[];
   pinnedDisplay: PinnedDisplay;
   pinnedMarketDisplay: PinnedMarketDisplay;
   marketContent: PostMarketContent;
@@ -1096,6 +1099,31 @@ export function CommunityView() {
                 </Fragment>
               );
             })()}
+            {/* Attached photos/videos. Moderation was text-only, so a
+                photo-only report was approved or rejected sight unseen. */}
+            {it.mediaFeedUrls.length ? (
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                {it.mediaFeedUrls.map((url, index) => {
+                  const poster = it.mediaPosterUrls[index];
+                  const isVideo = !poster && /\.(mp4|mov|m4v|webm)(\?|$)/i.test(url);
+                  const href = it.mediaUrls[index] ?? url;
+                  return (
+                    <a key={url + index} href={href} target="_blank" rel="noopener" title="Mở kích thước đầy đủ" style={{ display: "block", position: "relative" }}>
+                      {isVideo ? (
+                        <div style={{ width: 84, height: 84, borderRadius: 8, background: "var(--bg-card-alt)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--text-secondary)" }}>
+                          Video ↗
+                        </div>
+                      ) : (
+                          <img src={poster || url} alt="" style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 8, display: "block" }} />
+                      )}
+                      {poster ? (
+                        <span style={{ position: "absolute", right: 4, bottom: 4, fontSize: 10, color: "#fff", background: "rgba(0,0,0,0.55)", borderRadius: 4, padding: "1px 4px" }}>▶</span>
+                      ) : null}
+                    </a>
+                  );
+                })}
+              </div>
+            ) : null}
             {/* Which markets actually see this post — without it staff had
                 no way to tell a VN-only post from a UK-only one, and no way
                 to know which market a pin belongs to (pins are per-market

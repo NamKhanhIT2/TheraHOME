@@ -16,7 +16,7 @@ const SHOPIFY_WEBHOOK_SECRET = Deno.env.get("SHOPIFY_WEBHOOK_SECRET");
 // Every synced order defaults to this product regardless of what was
 // actually purchased. TheraHOME Vietnam's Shopify catalog only has
 // TheraNECK+ as a real matching device today — TheraPillow/Combo don't map
-// to any of the app's 4 programs, and the product decision (see CLAUDE.md)
+// to any of the app's programs, and the product decision (see CLAUDE.md)
 // is "bought anything -> can get into the app" rather than strict product
 // matching. Revisit once TheraNECK PRO / TheraBACK+/PRO exist as real
 // Shopify products worth mapping individually.

@@ -18,6 +18,7 @@ import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updat
   deleteProgramPhase,
   fetchPhaseDeleteImpact,
   reassignDaysToPhases,
+  renumberProgramDays,
   type RoadmapReadiness,
 } from "@/lib/db";
 import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs, MarketSelect } from "@/components/ui/primitives";
@@ -246,6 +247,17 @@ export function RoutineView() {
       setPhaseBusy(false);
     }
   }
+  async function runRenumberDays() {
+    if (!product) return;
+    try {
+      const moved = await renumberProgramDays(product.id);
+      pushToast(moved ? `Đã đánh số lại ${moved} ngày cho liền mạch` : "Các ngày đã liền mạch, không cần đánh số lại");
+      reload(product.id);
+    } catch {
+      pushToast("Không thể đánh số lại các ngày");
+    }
+  }
+
   async function runReassignDays() {
     if (!product) return;
     try {
@@ -409,6 +421,10 @@ export function RoutineView() {
     return !phase || d.id < phase.range[0] || d.id > phase.range[1];
   });
   const marketsWithGaps = (readiness ?? []).filter((r) => r.missingDays.length || r.duplicateDays.length || r.daysWithVideo === 0);
+  // Deleting a day mid-roadmap leaves a hole, and new days resume at max+1.
+  // Provisioning marks day 1 'current' and customers read "Ngày N", so a
+  // roadmap that jumps 1,2,4 is a real inconsistency, not just cosmetic.
+  const dayNumberGaps = dayList.some((d, index) => d.id !== index + 1);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -633,6 +649,14 @@ export function RoutineView() {
             ))}
           </tbody>
         </table>
+        {dayNumberGaps ? (
+          <div style={{ marginTop: 12, fontSize: 12.5, color: "#B9860B", background: "rgba(185,134,11,0.10)", borderRadius: 10, padding: "10px 12px" }}>
+            <strong>Số ngày không liền mạch</strong> (đang là {dayList.map((d) => d.id).join(", ")}). Khách đọc &quot;Ngày N&quot; nên nên đánh số lại cho liền từ 1.
+            <div style={{ marginTop: 8 }}>
+              <GhostBtn onClick={runRenumberDays}>Đánh số lại các ngày</GhostBtn>
+            </div>
+          </div>
+        ) : null}
         <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 10 }}>{dayList.length} ngày</div>
       </SectionCard>
       {newProductOpen ? (

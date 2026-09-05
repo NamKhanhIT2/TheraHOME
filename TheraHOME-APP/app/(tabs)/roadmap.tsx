@@ -83,7 +83,7 @@ export default function RoadmapScreen() {
   // Same review-aware "Ngày N" the Home hero and Profile use — keeps the
   // roadmap's "Hôm nay" marker on the day the reviewer actually reached.
   const accessibleProgress = useAccessibleProgress(userId, program);
-  const todayMarkerDay = isReviewAccount ? accessibleProgress.day : program?.currentDay;
+  const rawTodayMarker = isReviewAccount ? accessibleProgress.day : program?.currentDay;
 
   // Pin the first resolved device as the explicit (persisted) selection so
   // reopening the app always lands on the same roadmap — before this, an
@@ -110,6 +110,16 @@ export default function RoadmapScreen() {
   // Stable reference (not a fresh `?? []` array each render) so the memos
   // below that key off `days` don't recompute every render.
   const days = useMemo(() => daysQuery.data ?? [], [daysQuery.data]);
+  // Snap the "Hôm nay" marker onto a day that actually exists. `current_day`
+  // is capped at products.total_days, which can exceed the number of days
+  // Admin created (or land in a gap left by a deleted day) — the marker then
+  // matched no node and the roadmap showed no "Hôm nay" at all.
+  const todayMarkerDay = useMemo(() => {
+    if (!rawTodayMarker || !days.length) return rawTodayMarker;
+    if (days.some((d) => d.id === rawTodayMarker)) return rawTodayMarker;
+    const before = days.filter((d) => d.id <= rawTodayMarker);
+    return (before.length ? before[before.length - 1] : days[0]).id;
+  }, [rawTodayMarker, days]);
   const focusFadeStyle = useTabFocusFade();
   // No global gate anymore (per explicit request): the device dropdown
   // always shows — even for a brand-new account with nothing activated —

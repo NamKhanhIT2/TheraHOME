@@ -1,6 +1,8 @@
 // CSKH "Thông báo" tab — broadcast composer + recent campaigns. Mirrors
 // TheraHOME WEB's NotificationsAdminView, simplified: no per-product
-// targeting (always "all users") for this first mobile pass. See CLAUDE.md.
+// targeting for this mobile pass. It DOES target markets (2026-09-05):
+// staff type one language, and sending that to every market shipped
+// Vietnamese copy to UK and Malaysia customers. See CLAUDE.md.
 import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTheme } from '@/theme';
@@ -10,6 +12,7 @@ import {
   type BroadcastNotificationType,
   type NotificationCampaign,
 } from '@/hooks/useNotifications';
+import type { StoreMarket } from '@/hooks/useMarket';
 import { Button } from '@/components/ui/Button';
 
 const TYPE_OPTIONS: { key: BroadcastNotificationType; label: string }[] = [
@@ -18,16 +21,26 @@ const TYPE_OPTIONS: { key: BroadcastNotificationType; label: string }[] = [
   { key: 'ad', label: 'Khuyến mãi' },
 ];
 
+const MARKET_OPTIONS: { key: StoreMarket; label: string }[] = [
+  { key: 'VN', label: 'VN' },
+  { key: 'US', label: 'UK' },
+  { key: 'MALAY', label: 'ML' },
+];
+
 function ComposeForm({ onSent }: { onSent: () => void }) {
   const theme = useTheme();
   const [type, setType] = useState<BroadcastNotificationType>('blog');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  // Staff compose in one language, so the message must be aimed at the
+  // markets that read it. Sending to everyone shipped Vietnamese copy to UK
+  // and Malaysia customers.
+  const [markets, setMarkets] = useState<StoreMarket[]>(['VN']);
   const sendBroadcast = useSendNotificationBroadcast();
 
   async function submit() {
-    if (!title.trim() || !body.trim() || sendBroadcast.isPending) return;
-    await sendBroadcast.mutateAsync({ type, title: title.trim(), body: body.trim() });
+    if (!title.trim() || !body.trim() || !markets.length || sendBroadcast.isPending) return;
+    await sendBroadcast.mutateAsync({ type, title: title.trim(), body: body.trim(), markets });
     setTitle('');
     setBody('');
     onSent();
@@ -42,6 +55,26 @@ function ComposeForm({ onSent }: { onSent: () => void }) {
             <Pressable
               key={opt.key}
               onPress={() => setType(opt.key)}
+              style={[styles.typeChip, { backgroundColor: active ? theme.colors.primary : theme.colors.bgCardAlt }]}
+            >
+              <Text style={[theme.type.captionSm, { color: active ? '#fff' : theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={styles.typeRow}>
+        {MARKET_OPTIONS.map((opt) => {
+          const active = markets.includes(opt.key);
+          return (
+            <Pressable
+              key={opt.key}
+              onPress={() =>
+                setMarkets((current) =>
+                  current.includes(opt.key) ? current.filter((m) => m !== opt.key) : [...current, opt.key],
+                )
+              }
               style={[styles.typeChip, { backgroundColor: active ? theme.colors.primary : theme.colors.bgCardAlt }]}
             >
               <Text style={[theme.type.captionSm, { color: active ? '#fff' : theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>

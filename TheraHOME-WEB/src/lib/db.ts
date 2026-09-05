@@ -340,6 +340,34 @@ export async function updateProgramDay(productId: string, dayNumber: number, pha
   if (error) throw error;
 }
 
+/** Closes gaps in `day_number` after a mid-roadmap delete, keeping the days
+ * contiguous from 1. Several consumers assume that: provisioning marks day 1
+ * 'current', and `complete_day` used to look for `day_number + 1` (now
+ * gap-tolerant, but the numbering users see should still read 1..N).
+ * Explicit, never automatic — renumbering shifts which exercise a customer
+ * mid-program sees, so it is the admin's decision. Returns how many moved. */
+export async function renumberProgramDays(productId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("program_days")
+    .select("id, day_number")
+    .eq("product_id", productId)
+    .order("day_number");
+  if (error) throw error;
+  const rows = data ?? [];
+  let moved = 0;
+  // Ascending order with a temporary offset would be needed if we shrank into
+  // occupied numbers; going in order and only ever lowering a number means the
+  // target is always already free.
+  for (let i = 0; i < rows.length; i += 1) {
+    const target = i + 1;
+    if (rows[i].day_number === target) continue;
+    const { error: updErr } = await supabase.from("program_days").update({ day_number: target }).eq("id", rows[i].id);
+    if (updErr) throw updErr;
+    moved += 1;
+  }
+  return moved;
+}
+
 export async function deleteProgramDay(productId: string, dayNumber: number) {
   const { error } = await supabase.from("program_days").delete().eq("product_id", productId).eq("day_number", dayNumber);
   if (error) throw error;
@@ -1533,6 +1561,12 @@ type CommunityPostRowExtras = {
   hidden: boolean;
   status: PostModerationStatus;
   imageUrl: string | null;
+  /** Photos and videos the member attached. Moderation used to show text
+   * only, so approve/reject was pressed blind on exactly the content class
+   * that most needs review. `mediaFeedUrls` are the downsized copies. */
+  mediaUrls: string[];
+  mediaFeedUrls: string[];
+  mediaPosterUrls: string[];
   pinnedDisplay: PinnedDisplay;
   pinnedMarketDisplay: PinnedMarketDisplay;
   marketContent: PostMarketContent;
@@ -1544,7 +1578,7 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & CommunityP
     supabase
       .from("community_posts")
       .select(
-        "id, is_official, author_name, title, tag, text, image_url, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url, pinned_markets, pinned_title_us, pinned_content_us, pinned_thumbnail_url_us, pinned_title_malay, pinned_content_malay, pinned_thumbnail_url_malay, target_markets, title_us, text_us, title_malay, text_malay",
+        "id, is_official, author_name, title, tag, text, image_url, media_urls, media_feed_urls, media_poster_urls, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url, pinned_markets, pinned_title_us, pinned_content_us, pinned_thumbnail_url_us, pinned_title_malay, pinned_content_malay, pinned_thumbnail_url_malay, target_markets, title_us, text_us, title_malay, text_malay",
       )
       .order("created_at", { ascending: false }),
     supabase.from("post_comments").select("id, post_id, author_name, text, created_at, hidden").order("created_at"),
@@ -1561,6 +1595,9 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & CommunityP
       title: p.title ?? undefined,
       text: p.text,
       imageUrl: p.image_url,
+      mediaUrls: p.media_urls ?? [],
+      mediaFeedUrls: p.media_feed_urls?.length ? p.media_feed_urls : (p.media_urls ?? []),
+      mediaPosterUrls: p.media_poster_urls ?? [],
       likes: p.likes_count,
       comments: p.comments_count,
       pinned: p.pinned,
