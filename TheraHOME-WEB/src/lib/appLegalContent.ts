@@ -138,7 +138,7 @@ Theo quy định pháp luật về bảo vệ dữ liệu cá nhân, bạn có c
 \t• Quyền yêu cầu hạn chế, phản đối việc xử lý dữ liệu.
 \t• Quyền khiếu nại, tố cáo, khởi kiện theo quy định pháp luật.
 8.1 Cách xoá tài khoản ngay trong Ứng dụng
-Bạn có thể tự xoá tài khoản trực tiếp trong Ứng dụng tại: Hồ sơ → Cài đặt → Quản lý tài khoản → Xoá tài khoản, không cần liên hệ bộ phận hỗ trợ. Khi xác nhận xoá, toàn bộ dữ liệu cá nhân gắn với tài khoản sẽ được xoá hoặc ẩn danh hoá theo Mục 7. Nếu gặp khó khăn, bạn có thể liên hệ support@therahomeai.com.
+Bạn có thể tự xoá tài khoản trực tiếp trong Ứng dụng tại: Hồ sơ → Xoá tài khoản (nút ở cuối trang Hồ sơ), không cần liên hệ bộ phận hỗ trợ. Khi xác nhận xoá, toàn bộ dữ liệu cá nhân gắn với tài khoản sẽ được xoá hoặc ẩn danh hoá theo Mục 7. Nếu gặp khó khăn, bạn có thể liên hệ support@therahomeai.com.
 9. Bảo mật dữ liệu
 Chúng tôi áp dụng các biện pháp kỹ thuật và tổ chức phù hợp để bảo vệ dữ liệu cá nhân khỏi truy cập, sử dụng, tiết lộ trái phép. Chi tiết các biện pháp bảo mật được trình bày trong Chính sách bảo mật thông tin riêng của chúng tôi.
 10. Trẻ em
@@ -339,7 +339,7 @@ Under personal-data-protection law, you have the following rights over your pers
 \t• The right to request restriction of, or to object to, data processing.
 \t• The right to complain, report or initiate legal proceedings as provided by law.
 8.1 How to delete your account directly in the App
-You can delete your account yourself directly in the App at: Profile → Settings → Account management → Delete account, with no need to contact support. Once you confirm deletion, all personal data linked to the account is deleted or anonymized as described in Section 7. If you run into any difficulty, you can contact support@therahomeai.com.
+You can delete your account yourself directly in the App at: Profile → Delete account (the button at the bottom of the Profile screen), with no need to contact support. Once you confirm deletion, all personal data linked to the account is deleted or anonymized as described in Section 7. If you run into any difficulty, you can contact support@therahomeai.com.
 9. Data security
 We apply appropriate technical and organizational measures to protect personal data from unauthorized access, use or disclosure. Details of these measures are set out in our separate Information Security Policy.
 10. Children
@@ -540,7 +540,7 @@ Menurut undang-undang perlindungan data peribadi, anda mempunyai hak berikut ke 
 \t• Hak untuk meminta pengehadan atau membantah pemprosesan data.
 \t• Hak untuk membuat aduan, laporan atau tindakan undang-undang menurut peraturan yang berkuat kuasa.
 8.1 Cara memadam akaun terus dalam Aplikasi
-Anda boleh memadam akaun sendiri terus dalam Aplikasi di: Profil → Tetapan → Pengurusan akaun → Padam akaun, tanpa perlu menghubungi pasukan sokongan. Apabila pemadaman disahkan, semua data peribadi yang berkaitan dengan akaun akan dipadam atau dianonimkan menurut Seksyen 7. Jika menghadapi masalah, sila hubungi support@therahomeai.com.
+Anda boleh memadam akaun sendiri terus dalam Aplikasi di: Profil → Padam akaun (butang di bahagian bawah skrin Profil), tanpa perlu menghubungi pasukan sokongan. Apabila pemadaman disahkan, semua data peribadi yang berkaitan dengan akaun akan dipadam atau dianonimkan menurut Seksyen 7. Jika menghadapi masalah, sila hubungi support@therahomeai.com.
 9. Keselamatan data
 Kami mengambil langkah teknikal dan organisasi yang sesuai untuk melindungi data peribadi daripada capaian, penggunaan atau pendedahan tanpa kebenaran. Butiran langkah keselamatan dinyatakan dalam Dasar Keselamatan Maklumat kami yang berasingan.
 10. Kanak-kanak

@@ -36,10 +36,19 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://nyjvtvmllwbyfokldgtj.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_xvZg2672xJuBDcHJtzgeDg_zqd__LAo",
         "EXPO_PUBLIC_WEBSITE_DOMAIN": "therahomeai.com"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
   }
 }

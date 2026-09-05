@@ -125,5 +125,14 @@ export const introVideo = 'https://www.youtube.com/watch?v=DHuAzpoV0XQ';
 // existing Supabase ones (see .env.example).
 export const websiteDomain = process.env.EXPO_PUBLIC_WEBSITE_DOMAIN ?? 'therahomeai.com';
 export const landingPage = `https://${websiteDomain}`;
-export const privacyPolicy = `https://${websiteDomain}/privacy`;
 export const supportEmail = `support@${websiteDomain}`;
+
+// Public, unauthenticated web copies of the legal documents — served by
+// TheraHOME-WEB (app/privacy, app/terms, app/account-deletion) on the admin
+// subdomain, NOT on the storefront domain, which has no such pages.
+// App Store Connect needs the privacy URL; Play Console needs the privacy URL
+// *and* a web account-deletion URL (an in-app delete alone is not enough).
+export const legalWebBase = `https://ad.${websiteDomain}`;
+export const privacyPolicy = `${legalWebBase}/privacy`;
+export const termsOfUse = `${legalWebBase}/terms`;
+export const accountDeletionPage = `${legalWebBase}/account-deletion`;
