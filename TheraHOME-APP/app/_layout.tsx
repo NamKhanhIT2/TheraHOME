@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, LogBox, Text, View } from 'react-native';
+import { AppState, LogBox, Platform, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -262,10 +262,17 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // own device-locale-detected default (see useAppStore.ts) back to
   // Vietnamese for any account (including every pre-existing one) that has
   // never actually picked a language.
+  // Read as plain values rather than off `profile` inside the effect, so the
+  // dependency list can name exactly what it uses instead of the whole object
+  // (which changes identity on every refetch).
+  const profileLanguage = profile?.language;
+  const profileLanguageExplicit = profile?.languageExplicit;
+  const profileAccountType = profile?.accountType;
+  const profileCountry = profile?.country;
   useEffect(() => {
-    if (profile?.languageExplicit) {
-      if (profile.language === 'vi' || profile.language === 'en' || profile.language === 'ms') {
-        setLanguage(profile.language as AppLanguage, { auto: false });
+    if (profileLanguageExplicit) {
+      if (profileLanguage === 'vi' || profileLanguage === 'en' || profileLanguage === 'ms') {
+        setLanguage(profileLanguage as AppLanguage, { auto: false });
       }
       return;
     }
@@ -275,12 +282,12 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     // onboarding questionnaire, in Vietnamese. The market an Admin picked for
     // the account IS the deliberate choice here, so derive from it. Normal
     // accounts keep the device-locale default until the user picks for real.
-    if (profile && profile.accountType !== 'normal' && profile.country) {
+    if (profileAccountType && profileAccountType !== 'normal' && profileCountry) {
       const fromMarket: AppLanguage | null =
-        profile.country === 'VN' ? 'vi' : profile.country === 'US' ? 'en' : profile.country === 'MALAY' ? 'ms' : null;
+        profileCountry === 'VN' ? 'vi' : profileCountry === 'US' ? 'en' : profileCountry === 'MALAY' ? 'ms' : null;
       if (fromMarket) setLanguage(fromMarket, { auto: false });
     }
-  }, [profile?.language, profile?.languageExplicit, profile?.accountType, profile?.country, setLanguage]);
+  }, [profileLanguage, profileLanguageExplicit, profileAccountType, profileCountry, setLanguage]);
 
   if (!fontsReady || sessionLoading || profileLoading || !minimumSplashElapsed) {
     return <AppSplashScreen />;
@@ -308,7 +315,12 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bgApp }}>
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }}>
+      {/* Android's native-stack default is a fade-and-scale, so tapping a
+          roadmap day made the next screen bloom in place while the same tap
+          on iOS pushed it in from the right. Matched to iOS on request.
+          Scoped to Android: iOS already slides, and leaving it on `default`
+          there keeps UIKit's own push/modal behaviour untouched. */}
+      <Stack screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'slide_from_right' : 'default' }}>
         {/* Stable cold-launch/deep-link entry. Kept outside every protected
             group so `/` always exists while auth/profile guards switch. */}
         <Stack.Screen name="index" />
@@ -322,12 +334,12 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="profile/notifications-settings" />
           <Stack.Screen name="profile/account" />
           <Stack.Screen name="profile/help" />
-          <Stack.Screen name="profile/delete-account" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="profile/delete-account" options={{ presentation: 'modal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'default' }} />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="community/[postId]" />
           <Stack.Screen name="community/profile/[userId]" />
           <Stack.Screen name="community/article/[articleId]" />
-          <Stack.Screen name="community/create" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="community/create" options={{ presentation: 'modal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'default' }} />
           <Stack.Screen name="chat/ai" />
           <Stack.Screen name="chat/human" />
           <Stack.Screen name="quiz/[phaseId]" />
@@ -351,7 +363,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         {/* Legal docs are reachable from onboarding (pre-auth) as well as
             Profile settings (post-auth), so this route is registered
             unconditionally rather than inside either Stack.Protected group. */}
-        <Stack.Screen name="profile/legal/[doc]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="profile/legal/[doc]" options={{ presentation: 'modal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'default' }} />
       </Stack>
     </View>
   );
