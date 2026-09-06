@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
@@ -7,6 +7,8 @@ import { useDeleteNotification, useMarkAllNotificationsRead, useMarkNotification
 import { POST_REACTIONS } from '@/hooks/useCommunity';
 import { timeAgo } from '@/lib/timeAgo';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { SkeletonRow } from '@/components/ui/Skeleton';
+import { useSteadyLoading } from '@/hooks/useSteadyLoading';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
 import { translate, useI18n, type TranslationKey } from '@/lib/i18n';
@@ -68,6 +70,7 @@ export default function NotificationInboxScreen() {
   const { session } = useSession();
   const userId = session?.user.id;
   const notificationsQuery = useNotifications(userId);
+  const showSkeleton = useSteadyLoading(notificationsQuery.isPending);
   const notifications = notificationsQuery.data ?? [];
   const markRead = useMarkNotificationRead(userId);
   const markAllRead = useMarkAllNotificationsRead(userId);
@@ -169,7 +172,13 @@ export default function NotificationInboxScreen() {
           </Pressable>
         ) : null}
       />
-      {notificationsQuery.isPending ? <View style={styles.loading}><ActivityIndicator color={theme.colors.primary} /></View> : (
+      {showSkeleton ? (
+        // The inbox is a uniform list of icon + two lines, which is the shape
+        // a skeleton stands in for most convincingly.
+        <View style={styles.skeletonBody}>
+          {[0, 1, 2, 3, 4].map((row) => <SkeletonRow key={row} />)}
+        </View>
+      ) : (
         <ScrollView contentContainerStyle={styles.body}>
           {sections.length === 0 ? <View style={styles.emptyState}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="bell" size={25} color={theme.colors.primary} /></View>
@@ -236,6 +245,11 @@ export default function NotificationInboxScreen() {
 }
 
 const styles = StyleSheet.create({
+  skeletonBody: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    gap: 22,
+  },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   body: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 40 },
   markAll: { paddingVertical: 8, paddingLeft: 8 },

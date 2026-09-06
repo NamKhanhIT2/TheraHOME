@@ -25,6 +25,8 @@ import { prefetchStoreCategories } from '@/hooks/useStore';
 import { useMarket } from '@/hooks/useMarket';
 import { ArticleCard } from '@/components/community/ArticleCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { SkeletonBlock, SkeletonCard } from '@/components/ui/Skeleton';
+import { useSteadyLoading } from '@/hooks/useSteadyLoading';
 import { Icon } from '@/components/icons/Icon';
 import { AvatarImg } from '@/components/AvatarImg';
 import { ProductDropdown } from '@/components/ProductDropdown';
@@ -132,11 +134,26 @@ export default function HomeScreen() {
   // while a request is actually in flight.
   const isLoading = productsQuery.isLoading || programsQuery.isLoading || (!!program && daysQuery.isLoading);
   const loadError = productsQuery.error ?? programsQuery.error ?? (program ? daysQuery.error : null);
-  if (isLoading) {
+  const showSkeleton = useSteadyLoading(isLoading);
+  if (isLoading || showSkeleton) {
     return (
       <ScreenContainer edges={['top']}>
-        <View style={styles.loadingBox}>
-          <ActivityIndicator color={theme.colors.primary} />
+        {/* Home waits on three queries, so this used to be a spinner in an
+            otherwise empty screen for a few seconds after every cold start.
+            Standing in for the real cards keeps the layout still when they
+            land instead of everything appearing at once. */}
+        <View style={styles.skeletonBody}>
+          <SkeletonBlock width="52%" height={30} />
+          <SkeletonBlock height={54} radius={16} />
+          <SkeletonCard>
+            <SkeletonBlock width="45%" height={18} />
+            <SkeletonBlock height={148} radius={12} />
+          </SkeletonCard>
+          <SkeletonCard>
+            <SkeletonBlock width="38%" height={24} />
+            <SkeletonBlock width="70%" height={14} />
+            <SkeletonBlock height={44} radius={12} />
+          </SkeletonCard>
         </View>
       </ScreenContainer>
     );
@@ -407,6 +424,12 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  skeletonBody: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    gap: 16,
+  },
   scrollBody: {
     paddingHorizontal: 20,
     paddingBottom: 140,

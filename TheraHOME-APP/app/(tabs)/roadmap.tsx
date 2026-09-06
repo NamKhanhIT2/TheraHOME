@@ -1,5 +1,5 @@
 import React, { Fragment, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
@@ -13,6 +13,8 @@ import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
 import { usePhasePurchases } from '@/hooks/usePhasePurchase';
 import { useQuizResolvedMap } from '@/hooks/useQuiz';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { useSteadyLoading } from '@/hooks/useSteadyLoading';
 import { ProductDropdown } from '@/components/ProductDropdown';
 import { PainScaleModal } from '@/components/PainScaleModal';
 import { ProductActivateCard } from '@/components/roadmap/ProductActivateCard';
@@ -107,6 +109,7 @@ export default function RoadmapScreen() {
   const isLoading =
     productsQuery.isLoading || programsQuery.isLoading || (!!selectedProduct && daysQuery.isLoading);
   const loadError = productsQuery.error ?? programsQuery.error ?? (selectedProduct ? daysQuery.error : null);
+  const showSkeleton = useSteadyLoading(isLoading);
   // Stable reference (not a fresh `?? []` array each render) so the memos
   // below that key off `days` don't recompute every render.
   const days = useMemo(() => daysQuery.data ?? [], [daysQuery.data]);
@@ -230,9 +233,22 @@ export default function RoadmapScreen() {
           </Reanimated.View>
         ) : null}
 
-        {isLoading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={theme.colors.primary} />
+        {showSkeleton ? (
+          /* Three dependent queries: measured around six seconds on a real
+             Galaxy A12, all of it a spinner in an empty column. */
+          <View style={styles.skeletonBody}>
+            <SkeletonBlock height={54} radius={16} />
+            {[0, 1].map((phase) => (
+              <View key={phase} style={styles.skeletonPhase}>
+                <SkeletonBlock width="64%" height={15} />
+                {[0, 1, 2].map((day) => (
+                  <View key={day} style={styles.skeletonDay}>
+                    <SkeletonBlock width={40} height={40} radius={20} />
+                    <SkeletonBlock width="46%" height={14} />
+                  </View>
+                ))}
+              </View>
+            ))}
           </View>
         ) : loadError ? (
           <View style={styles.errorBox}>
@@ -415,6 +431,18 @@ export default function RoadmapScreen() {
 }
 
 const styles = StyleSheet.create({
+  skeletonBody: {
+    gap: 22,
+    paddingTop: 4,
+  },
+  skeletonPhase: {
+    gap: 16,
+  },
+  skeletonDay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
   scrollBody: {
     paddingHorizontal: 20,
     paddingBottom: 140,
