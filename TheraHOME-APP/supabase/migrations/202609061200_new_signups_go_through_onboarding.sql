@@ -1,0 +1,16 @@
+-- `onboarding_completed` was added (202608181200) with DEFAULT true, so that
+-- adding the column would not drag EXISTING users back through the intake
+-- questions. But the default also applies to every new row, and
+-- `handle_new_user` inserts only id/email/full_name/avatar_url — so every
+-- Google/Apple signup since then has been created as "already onboarded" and
+-- the questionnaire was unreachable for them. Only admin-issued accounts
+-- created with "Yêu cầu onboarding = Có" ever saw it.
+--
+-- New rows now default to false, which is what the app's gate expects. This
+-- changes nothing for existing rows: a DEFAULT applies only on INSERT, and
+-- every current profile already holds true.
+--
+-- Staff and other TheraHOME-issued accounts are unaffected either way: the
+-- app's RootNavigator skips onboarding for them by account_type, and
+-- admin-manage-account always writes this column explicitly.
+alter table public.profiles alter column onboarding_completed set default false;

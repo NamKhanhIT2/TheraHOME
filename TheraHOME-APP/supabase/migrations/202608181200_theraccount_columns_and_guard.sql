@@ -13,9 +13,11 @@ alter table public.profiles
   add column if not exists access_level text not null default 'free'
     check (access_level in ('free', 'premium', 'admin_granted')),
   add column if not exists expires_at timestamptz,
-  -- Defaults true so every existing row and every future Google/Apple
-  -- signup is unaffected — only Admin-issued accounts are ever created with
-  -- this false.
+  -- Defaults true so adding the column leaves every EXISTING row alone.
+  -- NOTE (2026-09-06): this default also applied to new rows, which meant
+  -- Google/Apple signups were created as "already onboarded" and never saw
+  -- the intake questions. Migration 202609061200 changes the default to
+  -- false; keep that in mind when reading this line.
   add column if not exists onboarding_completed boolean not null default true,
   add column if not exists created_by uuid references auth.users(id) on delete set null,
   add column if not exists notes text,

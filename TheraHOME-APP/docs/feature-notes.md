@@ -3639,6 +3639,32 @@ bộ codebase thiếu trong bảng `ICONS` của `Icon.tsx`, nên rơi vào plac
 Đã map. (Đã viết script đối chiếu 43 tên đang dùng với 80 tên trong bảng để
 chắc chắn không còn tên nào thiếu.)
 
+## Tài khoản Google mới KHÔNG hề thấy onboarding (2026-09-06)
+
+Chủ sở hữu đăng nhập Google bằng tài khoản mới và không thấy màn câu hỏi.
+
+**Nguyên nhân:** `profiles.onboarding_completed` được thêm ở migration
+202608181200 với `default true`, lý do ghi trong chính migration đó là "để
+mọi dòng ĐANG CÓ không bị kéo ngược vào onboarding". Nhưng DEFAULT áp cho cả
+dòng MỚI, và `handle_new_user` chỉ insert id/email/full_name/avatar_url nên
+lấy đúng mặc định đó. Cổng trong `_layout.tsx` là
+`onboardingPending = ... && profile?.onboardingCompleted === false`, nên
+điều kiện không bao giờ đúng với người đăng ký Google/Apple.
+
+Hệ quả: kể từ 18/08, bộ câu hỏi intake CHỈ tài khoản admin cấp với "Yêu cầu
+onboarding = Có" mới thấy. Khách thật chưa từng thấy. Lưu ý stack onboarding
+có `initialRouteName: 'login'`, nên câu hỏi nằm SAU đăng nhập chứ không phải
+trước — không có đường nào khác để tới màn đó.
+
+**Sửa (migration 202609061200):** `alter column onboarding_completed set
+default false`. DEFAULT chỉ áp khi INSERT nên dòng cũ giữ nguyên `true`,
+không ai đang dùng bị kéo lại. Tài khoản staff/TheraHOME cấp vẫn bỏ qua
+onboarding vì cổng lọc theo `account_type`, và `admin-manage-account` luôn
+ghi cột này tường minh.
+
+Đã đặt lại `onboarding_completed = false` cho tài khoản test
+`khanhsiuit2@gmail.com` để kiểm tra ngay.
+
 ## Gỡ ô chọn quốc gia khỏi app — chống lách giá (2026-09-06)
 
 Chủ sở hữu chỉ ra rằng ô "Quốc gia / Khu vực" trong Cài đặt tài khoản là do
