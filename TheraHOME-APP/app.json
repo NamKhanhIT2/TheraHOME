@@ -63,7 +63,8 @@
         }
       ],
       "expo-video",
-      "expo-image"
+      "expo-image",
+      "./plugins/withAndroidUploadSigning"
     ],
     "extra": {
       "router": {},
