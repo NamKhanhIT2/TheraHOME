@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useMarket } from '@/hooks/useMarket';
@@ -140,6 +141,9 @@ function ChallengeBanner({ userId, onShareCompletion, onDismiss }: { userId: str
 export default function CommunityScreen() {
   const market = useMarket();
   const theme = useTheme();
+  // Modals draw under the Android navigation bar (edge-to-edge), so the
+  // report sheet keeps the bottom inset clear — same as AssistantBubble.
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const reportReasons: { key: ReportReason; label: string }[] = [
     { key: 'spam', label: t('reportReasonSpam') },
@@ -608,7 +612,7 @@ export default function CommunityScreen() {
       </Modal>
 
       <Modal visible={!!reportTarget} transparent animationType="fade" onRequestClose={() => setReportTarget(null)}>
-        <Pressable style={styles.reportBackdrop} onPress={() => setReportTarget(null)}>
+        <Pressable style={[styles.reportBackdrop, { paddingBottom: 28 + insets.bottom }]} onPress={() => setReportTarget(null)}>
           <Pressable style={[styles.reportSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginBottom: 4 }]}>{t('reportPost')}</Text>
             <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginBottom: 14 }]}>{t('chooseReportReason')}</Text>
@@ -849,7 +853,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    paddingBottom: 28,
   },
   reportSheet: {
     width: '100%',

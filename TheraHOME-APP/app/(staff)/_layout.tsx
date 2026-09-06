@@ -6,7 +6,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useWebRoles } from '@/hooks/useWebRoles';
@@ -47,11 +47,20 @@ function StaffHeader() {
 
 function StaffTabBar({ state, navigation }: Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0]) {
   const theme = useTheme();
+  // Same hazard the patient tab bar in (tabs)/_layout.tsx already handles:
+  // Android draws edge-to-edge, so without the bottom inset the 3-button
+  // navigation bar (or the gesture pill) sits on top of the tab labels.
+  const insets = useSafeAreaInsets();
   return (
     <View
       style={[
         styles.bar,
-        { backgroundColor: theme.dark ? theme.colors.bgCard : '#fff', borderTopColor: theme.colors.borderLight },
+        {
+          backgroundColor: theme.dark ? theme.colors.bgCard : '#fff',
+          borderTopColor: theme.colors.borderLight,
+          height: 76 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 8),
+        },
       ]}
     >
       {state.routes.map((route, index) => {
@@ -110,8 +119,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 84,
-    paddingBottom: 8,
   },
   tabBtn: {
     flex: 1,

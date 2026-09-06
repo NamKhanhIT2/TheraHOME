@@ -45,7 +45,28 @@ export async function registerUpsaleNotificationActions(): Promise<void> {
 /** Requests notification permission and, if granted, registers this
  * device's Expo push token in `push_tokens`. Returns whether permission was
  * granted (independent of whether the token round-trip itself succeeded). */
+// The single Android channel every TheraHOME notification lands on — push
+// (dispatch-push sends this id) AND the two local reminders. 'default-v2',
+// not 'default': Android channel settings are immutable once created, so
+// switching the sound to ting.wav required a fresh channel id (devices that
+// already created 'default' would otherwise keep the old default sound
+// forever).
+export const ANDROID_CHANNEL_ID = 'default-v2';
+
+async function ensureAndroidChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    name: translate(useAppStore.getState().language, 'notificationChannelName'),
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 180, 250],
+    sound: 'ting.wav',
+  }).catch(() => undefined);
+}
+
 export async function registerForPushNotifications(userId: string): Promise<boolean> {
+  // Channel first, before the permission prompt: on Android 13+ the system
+  // permission dialog only appears once the app has at least one channel.
+  await ensureAndroidChannel();
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   if (existingStatus !== 'granted') {
@@ -53,19 +74,6 @@ export async function registerForPushNotifications(userId: string): Promise<bool
     finalStatus = status;
   }
   if (finalStatus !== 'granted') return false;
-
-  if (Platform.OS === 'android') {
-    // 'default-v2', not 'default': Android channel settings are immutable
-    // once created, so switching the sound to ting.wav required a fresh
-    // channel id (devices that already created 'default' would otherwise
-    // keep the old default sound forever). dispatch-push sends the same id.
-    await Notifications.setNotificationChannelAsync('default-v2', {
-      name: translate(useAppStore.getState().language, 'notificationChannelName'),
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 180, 250],
-      sound: 'ting.wav',
-    });
-  }
 
   try {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
@@ -130,6 +138,12 @@ async function scheduleReminder(identifier: string, enabled: boolean, time: stri
   const [hour, minute] = time.split(':').map(Number);
   if (Number.isNaN(hour) || Number.isNaN(minute)) return;
 
+  // Android: without an explicit channelId expo-notifications drops the
+  // reminder onto its auto-created "Miscellaneous" channel — default sound,
+  // default importance — while pushes arrive on the configured one. The
+  // `content.sound` below is what iOS honours; Android takes the sound from
+  // the channel.
+  await ensureAndroidChannel();
   await Notifications.scheduleNotificationAsync({
     identifier,
     content: {
@@ -138,7 +152,12 @@ async function scheduleReminder(identifier: string, enabled: boolean, time: stri
       sound: 'ting.wav',
       data: { type: 'schedule', destination: 'roadmap', reminderKind },
     },
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      hour,
+      minute,
+      ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+    },
   });
 }
 

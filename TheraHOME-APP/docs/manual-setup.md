@@ -73,6 +73,15 @@ open on Android and vice versa). Manual steps before purchases verify:
 7. Firebase project + `google-services.json` (→ `android.googleServicesFile`
    in app.json) — without it Android remote push silently gets no token;
    local reminders still work.
+8. **FCM V1 credentials on EAS** (still pending, 2026-09-06). The
+   `google-services.json` only lets the *device* obtain a token; Expo's push
+   service also needs the Firebase **service-account JSON** to talk to FCM.
+   Firebase console → Project settings → Service accounts → "Generate new
+   private key", then `eas credentials` → Android → production → "Google
+   Service Account Key for Push Notifications (FCM V1)" → upload. Until this
+   is done, Android pushes are accepted by the Expo API but never delivered,
+   and the app shows no error (token registration failures are swallowed
+   in `pushNotifications.ts`).
 
 **Google sign-in** — until all three are done, tapping "Đăng nhập với Google"
 fails with a friendly Vietnamese error (`login.tsx` catches and displays it)

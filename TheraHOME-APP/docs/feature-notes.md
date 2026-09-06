@@ -3891,3 +3891,84 @@ giờ được gỡ. Đây là bẫy cần nhớ cho mọi listener toàn cục 
 cả hai hàm nay `Math.min(current_day, total_days)` trước khi hiển thị và
 trước khi dò giai đoạn hiện tại — app vốn đã tự cap theo lịch, chỉ trang
 Admin là hiện "Ngày 15 / 14".
+
+## 2026-09-06 — Rà soát iOS/Android: không xung đột cấu hình, sửa 4 điểm chỉ lộ trên Android
+
+Yêu cầu: "đảm bảo bản iOS và Android không có conflict, bug và hoạt động
+mượt mà". Cách làm: `expo-doctor` (16 gói lệch patch → `expo install --fix`,
+21/21 đạt), đối chiếu `app.json`/`eas.json`/manifest Android sinh ra/
+`google-services.json`, một lượt quét code riêng cho khác biệt nền tảng
+(kiểm chứng từng điểm trên source thư viện trong `node_modules`), rồi build
+lên máy Samsung Galaxy A12 (Android 11) thật.
+
+**Đã xác nhận đúng, không phải sửa:** Apple Sign-In chỉ bật trên iOS; IAP
+đã tách SKU/`verify-google-purchase` cho Google Play; kênh thông báo
+`default-v2` được tạo trong code; ảnh/âm thanh thông báo, adaptive icon,
+`POST_NOTIFICATIONS`, scheme `therahome://` đều có trong manifest; image
+picker trên Android 13+ không cần quyền; thanh tab bệnh nhân đã chừa
+`insets.bottom`; `expo-status-bar`, font, haptics, `expo-video`/`expo-image`
+đều cross-platform.
+
+**Sửa (chỉ ảnh hưởng Android, iOS giữ nguyên):**
+
+1. **Nhắc nhở hằng ngày rơi vào kênh "Miscellaneous"** —
+   `scheduleReminder` không truyền `channelId`, nên expo-notifications tự
+   tạo kênh dự phòng: chuông mặc định, độ ưu tiên thấp, trong khi push đến
+   đúng kênh `default-v2` (`ting.wav`, MAX). Nay `ensureAndroidChannel()`
+   dùng chung, gọi trước cả hộp thoại xin quyền (Android 13+ chỉ hiện hộp
+   thoại khi app đã có ít nhất một kênh) và trước mỗi lần lên lịch; trigger
+   DAILY kèm `channelId` trên Android.
+2. **Thanh tab của tài khoản staff (`(staff)/_layout.tsx`) bị thanh điều
+   hướng Android đè lên** — thiếu `useSafeAreaInsets` mà `(tabs)/_layout`
+   đã xử lý; nay `height: 76 + insets.bottom`.
+3. **Hai sheet "Báo cáo" (feed + chi tiết bài) vẽ dưới thanh điều hướng** —
+   RN 0.86 với edge-to-edge làm mọi `<Modal>` tràn cả hai thanh hệ thống;
+   thêm `insets.bottom` vào padding đáy như `AssistantBubble` đã làm.
+4. **`SYSTEM_ALERT_WINDOW` xuất hiện trong manifest release** — do template
+   prebuild của Expo thêm sẵn; Play liệt kê nó là quyền nhạy cảm ("hiển thị
+   trên ứng dụng khác") dù app không dùng. Chặn bằng
+   `android.blockedPermissions` trong `app.json`.
+
+**Chưa làm, cần chủ sở hữu:** upload khoá service-account Firebase lên EAS
+(FCM V1) — không có nó push Android nhận token nhưng không bao giờ được
+giao, xem `docs/manual-setup.md` mục 8. App Links `https://therahomeai.com`
+mở app không được cấu hình (cả hai nền tảng) — cần `assetlinks.json` trên
+domain nếu muốn.
+
+**Lưu ý môi trường build local:** `expo run:android` thất bại với JDK 25 của
+Android Studio ("A restricted method in java.lang.System has been called" ở
+bước CMake của nitro-modules/worklets). Dùng OpenJDK 17
+(`brew install openjdk@17`, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home`).
+EAS dùng JDK 17 sẵn nên build cloud không bị ảnh hưởng.
+
+### Cùng ngày — iOS bất ngờ về màn đăng nhập sau khi reload: lưu phiên trong SecureStore bị "hồi sinh" phiên cũ
+
+Hiện tượng: simulator đang ở Home (đã đăng nhập Google lúc 04:16Z), reload
+lúc 04:55Z thì về màn đăng nhập. Auth log Supabase ghi 3 lần
+`refresh_token_not_found` từ chính client đó, trong khi phiên 04:16Z vẫn còn
+nguyên trong `auth.sessions` (1 token, chưa từng refresh). Tức là app đã
+khôi phục một phiên KHÁC, cũ hơn, từ bộ nhớ. Cùng mẫu này lặp lại trong log:
+sau mỗi lần đăng nhập mới, vài phút sau client lại refresh phiên cũ, và lần
+"đăng xuất" 04:15:56Z xoá phiên cũ chứ không xoá phiên `user2@thera.local`
+vừa đăng nhập.
+
+Nguyên nhân trong adapter `src/lib/supabase.ts` (cũ): phiên lớn (Google,
+>1800 ký tự) lưu thành manifest `${key}_chunks` + các mảnh; phiên nhỏ lưu
+thẳng vào `key`. `getItem` ưu tiên manifest nếu nó tồn tại, còn `setItem`
+xoá manifest bằng `deleteItemAsync(...).catch(() => {})`. Khi lệnh xoá đó
+không thành công (nuốt lỗi), manifest cũ vẫn còn → lần đọc kế tiếp trả về
+phiên cũ dù `key` đã có phiên mới. Ngoài ra `getItem` đọc thiếu mảnh thì
+*xoá luôn* toàn bộ, và các thao tác không được xếp hàng trong khi supabase-js
+đọc storage ở mỗi `getSession()`.
+
+Sửa: tách thành `src/lib/secureSessionStorage.ts` (thuần TS, không import
+RN để test được bằng Node): entry `key` là nguồn sự thật — hoặc chứa giá
+trị, hoặc header `__chunked__:<n>` ghi SAU CÙNG khi n mảnh `${key}_c<i>` đã
+ghi xong; ghi mới luôn *set* `key` nên không phụ thuộc lệnh xoá; đọc thiếu
+mảnh trả `null` chứ không xoá; mọi thao tác qua một hàng đợi; `removeItem`
+xoá `key` trước và KHÔNG nuốt lỗi để supabase-js biết đăng xuất chưa thành.
+Layout cũ vẫn đọc được (người dùng hiện tại không bị đăng xuất khi cập nhật)
+và được dọn ở lần ghi đầu tiên. Harness 13 tình huống (round trip, xoá
+thất bại, migrate layout cũ, manifest cũ + `key` mới, đọc xen kẽ ghi) đều
+đạt. Cần xác nhận thêm trên máy thật: đăng nhập → tắt hẳn app → mở lại
+vẫn giữ phiên.
