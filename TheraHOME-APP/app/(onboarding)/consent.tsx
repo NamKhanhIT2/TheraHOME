@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensio
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/hooks/useSession';
 import { useUpdateProfile } from '@/hooks/useProfile';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -39,6 +40,7 @@ export default function ConsentScreen() {
   // takes it to Home once the mutation's invalidation refetches it.
   const { session } = useSession();
   const updateProfile = useUpdateProfile(session?.user.id);
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
 
@@ -57,6 +59,15 @@ export default function ConsentScreen() {
     }
     try {
       await updateProfile.mutateAsync({ onboarding_completed: true });
+      // Flipping the flag unregisters the whole (onboarding) group, pulling
+      // this screen out from under the router. RootNavigator only *actively*
+      // navigates when onboarding or the country step is still pending, and
+      // every Admin-issued account already has country_confirmed — so nothing
+      // moved and the button span forever. Wait for the refreshed profile
+      // (navigating on the stale cache would bounce back to /questions), then
+      // let `/` route on current data.
+      await queryClient.invalidateQueries({ queryKey: ['profile', session.user.id] });
+      router.replace('/');
     } catch {
       // Was an unhandled rejection: the screen simply did nothing and the
       // user had no way to know why.
