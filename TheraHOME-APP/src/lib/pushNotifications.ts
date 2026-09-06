@@ -218,6 +218,15 @@ const REMINDER_BACKFILL_KEY_PREFIX = 'thera_reminder_backfilled_';
  * "does today's row already exist" without an extra round trip on every
  * check) — safe to call as often as needed, it's a no-op once today's key
  * is set or before the scheduled time has actually passed. */
+/** Keys currently being backfilled in THIS process. The AsyncStorage marker
+ * alone was check-then-act: `_layout.tsx` calls the backfill on mount and
+ * again on the AppState 'active' event, and both calls read "not written
+ * yet" before either finished writing, so both inserted. Verified in
+ * production — duplicate reminder rows 0.00s apart. The RPC also dedupes
+ * server-side now (migration 202609061000); this stops the wasted round trip
+ * and covers any caller added later. */
+const backfillInFlight = new Set<string>();
+
 async function backfillTodayReminderIfDue(kind: ReminderKind, enabled: boolean, time: string, title: string, body: string, destination: string): Promise<void> {
   if (!enabled) return;
   const [hour, minute] = time.split(':').map(Number);
@@ -228,14 +237,20 @@ async function backfillTodayReminderIfDue(kind: ReminderKind, enabled: boolean, 
 
   const dateKey = localDateString(now);
   const storageKey = `${REMINDER_BACKFILL_KEY_PREFIX}${kind}_${dateKey}`;
+  if (backfillInFlight.has(storageKey)) return;
   const already = await AsyncStorage.getItem(storageKey).catch(() => null);
   if (already) return;
 
-  const { error } = await supabase.rpc('record_local_reminder_notification', { p_title: title, p_body: body, p_destination: destination });
-  if (!error) {
-    await AsyncStorage.setItem(storageKey, '1').catch(() => {});
-  } else if (__DEV__) {
-    console.warn('Failed to backfill local reminder in notification center:', error);
+  backfillInFlight.add(storageKey);
+  try {
+    const { error } = await supabase.rpc('record_local_reminder_notification', { p_title: title, p_body: body, p_destination: destination });
+    if (!error) {
+      await AsyncStorage.setItem(storageKey, '1').catch(() => {});
+    } else if (__DEV__) {
+      console.warn('Failed to backfill local reminder in notification center:', error);
+    }
+  } finally {
+    backfillInFlight.delete(storageKey);
   }
 }
 
