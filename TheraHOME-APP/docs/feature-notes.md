@@ -3639,6 +3639,25 @@ bộ codebase thiếu trong bảng `ICONS` của `Icon.tsx`, nên rơi vào plac
 Đã map. (Đã viết script đối chiếu 43 tên đang dùng với 80 tên trong bảng để
 chắc chắn không còn tên nào thiếu.)
 
+## Gỡ ô chọn quốc gia khỏi app — chống lách giá (2026-09-06)
+
+Chủ sở hữu chỉ ra rằng ô "Quốc gia / Khu vực" trong Cài đặt tài khoản là do
+TÔI tự thêm (commit 3fe3a9d, lúc tách market khỏi language), không phải yêu
+cầu — và nó mở đúng một lỗ hổng thương mại: khách nước ngoài chọn VN là thấy
+GIÁ VN và LINK MUA VN, rẻ hơn.
+
+**Sửa hai lớp:**
+1. `app/profile/account.tsx`: ô chọn thành nhãn CHỈ ĐỌC hiện khu vực hiện
+   tại, kèm câu "cần đổi thì liên hệ TheraHOME qua mục Trợ giúp"
+   (`countryRegionLocked`).
+2. Migration `202609061100`: trigger `protect_privileged_profile_columns`
+   chỉ cho chính chủ ghi `country` khi `country_confirmed` CÒN false — tức
+   đúng một lần ở màn onboarding. Sau đó chỉ `admin` (hoặc service_role) đổi
+   được. Gỡ nút thôi là chưa đủ vì REST API vẫn nhận lệnh ghi.
+
+CSKH muốn đổi khu vực cho khách thì nhờ Admin — thẻ "Quốc gia / Thị trường"
+trong ngăn kéo User của tab Admin (thêm ngày 2026-09-05) vẫn làm được.
+
 ## Quét lớp lỗi "bấm hai lần" — phần còn lại (2026-09-06)
 
 Hoàn tất ~30 mục hạng thấp trong hai báo cáo quét. Mẫu áp dụng ở mọi nơi:

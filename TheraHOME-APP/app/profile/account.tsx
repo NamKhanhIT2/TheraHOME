@@ -10,7 +10,7 @@ import { Icon } from '@/components/icons/Icon';
 import type { LegalDocKey } from '@/lib/legalContent';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 import { countryQuestion } from '@/lib/mockData';
-import { localFromMarket, marketForCountryOption, useMarket, type StoreMarket } from '@/hooks/useMarket';
+import { marketForCountryOption, useMarket } from '@/hooks/useMarket';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 
 const LEGAL_ROWS: { key: LegalDocKey; icon: string; labelKey: TranslationKey }[] = [
@@ -45,7 +45,11 @@ export default function AccountSettingsScreen() {
   const updateProfile = useUpdateProfile(userId);
   const language = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
-  const setMarket = useAppStore((s) => s.setMarket);
+  // Label for the read-only region row: the onboarding option whose code
+  // matches the profile's stored country.
+  const currentCountryLabel =
+    countryQuestion[language].options.find((option) => marketForCountryOption(option) === market)
+    ?? countryQuestion[language].options[0];
   const market = useMarket();
 
   const shareData = profile?.dataSharingEnabled ?? false;
@@ -112,39 +116,28 @@ export default function AccountSettingsScreen() {
               <Icon name="globe" size={20} color={theme.colors.primary} />
               <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('countryRegion')}</Text>
             </View>
-            <View style={styles.langOptions}>
-              {countryQuestion[language].options.map((option) => {
-                const code: StoreMarket = marketForCountryOption(option);
-                const active = market === code;
-                return (
-                  <Pressable
-                    key={option}
-                    onPress={() => {
-                      const previous = market;
-                      setMarket(localFromMarket(code));
-                      updateProfile.mutate(
-                        { country: code },
-                        { onError: () => { setMarket(localFromMarket(previous)); Alert.alert(t('errGeneric'), t('tryAgainBody')); } },
-                      );
-                    }}
-                    style={[
-                      styles.langBtn,
-                      {
-                        borderWidth: active ? 2 : 1,
-                        borderColor: active ? theme.colors.primary : theme.colors.borderInput,
-                        backgroundColor: active ? theme.colors.primaryTint10 : theme.colors.bgCard,
-                        borderRadius: theme.radius.md,
-                      },
-                    ]}
-                  >
-                    <Text style={[theme.type.body, { color: active ? theme.colors.primary : theme.colors.textPrimary, fontFamily: theme.fontFamily.semiBold }]}>
-                      {option}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+            {/* READ-ONLY on purpose (owner, 2026-09-06). This used to be a
+                picker, which let anyone switch their region to VN and buy
+                through the cheaper Vietnamese product links. The region is
+                set once at onboarding; changing it afterwards goes through
+                CSKH, who can do it from the Admin user drawer. */}
+            <View
+              style={[
+                styles.langBtn,
+                {
+                  borderWidth: 1,
+                  borderColor: theme.colors.borderInput,
+                  backgroundColor: theme.colors.bgCardAlt,
+                  borderRadius: theme.radius.md,
+                  alignSelf: 'flex-start',
+                },
+              ]}
+            >
+              <Text style={[theme.type.body, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.semiBold }]}>
+                {currentCountryLabel}
+              </Text>
             </View>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginTop: 8 }]}>{t('countryRegionHint')}</Text>
+            <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginTop: 8 }]}>{t('countryRegionLocked')}</Text>
           </View>
 
           <ToggleRow
