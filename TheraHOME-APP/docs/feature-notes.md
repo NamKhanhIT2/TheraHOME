@@ -3581,6 +3581,38 @@ nên `select count` từ client luôn trả 0. Thêm RPC `product_order_count`
 - Feed refetch mỗi khi BẤT KỲ ai thả cảm xúc ở BẤT KỲ bài nào → nay debounce
   1.5s.
 
+## Hoàn thiện đợt 4 (2026-09-06)
+
+**Cộng đồng (app):**
+- Tab "Tất cả" giờ CÓ bài chính thức (trước lọc bỏ hết, chỉ đọc được ở tab
+  TheraHOME hoặc thẻ ghim). Bài đang làm thẻ ghim vẫn bị loại để không trùng.
+- Chặn người dùng nay chặn cả BÌNH LUẬN của họ, không chỉ bài viết.
+- Báo cáo xong bài tự ẩn khỏi feed của người báo cáo; thêm unique index
+  `content_reports_unique_reporter_item` (migration 202609060900) để một người
+  không spam được cùng một nội dung, lỗi trùng dịch thành "Bạn đã báo cáo rồi".
+- Thả cảm xúc không còn làm feed tự sắp xếp lại: thứ hạng đọc `myReactions` /
+  `savedSet` qua ref, chỉ tính lại khi DANH SÁCH BÀI đổi.
+- Nút đăng bài đổi từ "Tiếp" sang "Chia sẻ"; thoát giữa chừng có hỏi lại.
+- Hồ sơ cộng đồng có kéo-làm-mới và trạng thái lỗi mạng kèm nút thử lại.
+- Tên thiết bị trên thẻ chia sẻ và hồ sơ lấy cùng nguồn với ô chọn lộ trình
+  (`products.name`), trước lấy từ tên hàng trong Cửa hàng nên lệch nhau.
+
+**Hiệu năng:** khay cảm xúc chỉ setState khi biểu tượng đang trỏ ĐỔI (trước
+mỗi cử động ngón tay là vẽ lại toàn bộ thẻ đang hiển thị); trình xem ảnh toàn
+màn giới hạn `windowSize=3` nên không dựng 5 trình phát video cùng lúc; timer
+toast được dọn khi unmount; bấm ảnh mở bản GỐC thay vì bản feed thu nhỏ.
+
+**CSKH (web):** `fetchCommunityPosts` giới hạn 200 bài và chỉ lấy bình luận
+của đúng số bài đó (trước tải TOÀN BỘ bài + TOÀN BỘ bình luận sau mỗi thao
+tác). Bài chính thức thiếu bản dịch cho thị trường nó nhắm tới có badge
+"Thiếu bản UK / ML". Tab Báo cáo trên app nhân viên mở được nội dung bị báo
+cáo và hai nút không còn quay cùng lúc.
+
+**Nhãn trung thực:** ô "Phân quyền tài khoản" ghi rõ app CHƯA đọc trường này
+nên "Hạn chế" không hạn chế gì, muốn chặn thật thì dùng Khóa tài khoản.
+`TheraHOME-WEB/CLAUDE.md` sửa lại mô tả cấp quyền: đơn Shopify KHÔNG tự cấp
+quyền dùng app, vẫn phải nhập contact ở tab Kích hoạt (đúng thiết kế).
+
 ## Đã xử lý hết 10 mục tồn đọng (2026-09-05, khuya — đợt 3)
 
 1. **Giá & link mua theo QUỐC GIA.** `usePhasePromo` tách hai đường: chữ đọc

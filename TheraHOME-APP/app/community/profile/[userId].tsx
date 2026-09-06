@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
@@ -31,6 +31,7 @@ export default function CommunityProfileScreen() {
   const savedPostsQuery = useSavedPosts(ownProfile ? userId : undefined);
   const programsQuery = useActivatedPrograms(ownProfile ? userId : undefined);
   const [tab, setTab] = useState<ProfileTab>('posts');
+  const [refreshing, setRefreshing] = useState(false);
 
   const profile = profileQuery.data;
   const posts = postsQuery.data ?? [];
@@ -45,6 +46,22 @@ export default function CommunityProfileScreen() {
 
   if ((!official && profileQuery.isPending) || postsQuery.isPending) {
     return <ScreenContainer><BackBar onBack={() => router.back()} title={t('communityProfile')} /><View style={styles.loading}><ActivityIndicator color={theme.colors.primary} /></View></ScreenContainer>;
+  }
+  // A failed request used to render as "Chưa có nội dung" — indistinguishable
+  // from an empty profile, with no way to retry.
+  if (profileQuery.isError || postsQuery.isError) {
+    return (
+      <ScreenContainer>
+        <BackBar onBack={() => router.back()} title={t('communityProfile')} />
+        <View style={styles.loading}>
+          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('homeLoadErrorTitle')}</Text>
+          <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }]}>{t('checkNetworkRetry')}</Text>
+          <Pressable onPress={() => { void profileQuery.refetch(); void postsQuery.refetch(); }} style={{ marginTop: 14 }}>
+            <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('retry')}</Text>
+          </Pressable>
+        </View>
+      </ScreenContainer>
+    );
   }
   if (!official && !profile) {
     return <ScreenContainer><BackBar onBack={() => router.back()} title={t('communityProfile')} /><View style={styles.loading}><Text style={{ color: theme.colors.textMuted }}>{t('profileNotFound')}</Text></View></ScreenContainer>;
@@ -62,7 +79,23 @@ export default function CommunityProfileScreen() {
   return (
     <ScreenContainer>
       <BackBar onBack={() => router.back()} title={official ? 'TheraHOME' : ownProfile ? t('myCommunityProfile') : t('communityProfile')} />
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView
+        contentContainerStyle={styles.body}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={theme.colors.primary}
+            onRefresh={async () => {
+              setRefreshing(true);
+              try {
+                await Promise.all([profileQuery.refetch(), postsQuery.refetch(), savedPostsQuery.refetch()]);
+              } finally {
+                setRefreshing(false);
+              }
+            }}
+          />
+        }
+      >
         <View style={[styles.profileCard, theme.shadows.card, { backgroundColor: official ? theme.colors.primaryTint10 : theme.colors.bgCard, borderColor: official ? theme.colors.primary : theme.colors.borderLight }]}> 
           <CommunityAvatar name={name} authorId={official ? null : userId} avatarUrl={avatarUrl} size={76} isOfficial={official} />
           <View style={styles.nameRow}>

@@ -140,8 +140,14 @@ and one account owns one contact. The order is only checked, never activated
 or mutated. An enabled, pre-provisioned `admin` or `cskh` contact in
 `web_access_contacts` bypasses the purchase check and is bound to the first
 Google identity that claims the exact contact. Both mobile and web call this
-same RPC. A successful claim provisions every current product program, while database
-triggers provision products/days added later. Admin's app-user list reads
+same RPC. For a STAFF contact a successful claim provisions every current
+product program; an ordinary customer is provisioned only the products their
+phone/email is listed against in the "Kích hoạt" tab (`product_activation_contacts`),
+one product at a time. Database triggers back-fill days added later, and add a
+newly created product only to staff/review accounts. A Shopify order does NOT
+by itself grant app access: `shopify-order-webhook` writes `orders` only, so
+CSKH still enters the contact in the Kích hoạt tab (2026-09-05: verified, and
+intentional under per-product activation). Admin's app-user list reads
 `user_access_contacts`, so an OAuth login alone is not counted as an active
 app user. The migration is stored in
 `TheraHOME-APP/supabase/migrations/202608180001_unique_contact_catalog_access.sql`.

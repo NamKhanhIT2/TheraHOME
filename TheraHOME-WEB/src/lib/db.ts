@@ -1573,17 +1573,31 @@ type CommunityPostRowExtras = {
   targetMarkets: string[] | null;
 };
 
+/** Moderation queue. Bounded on purpose: this used to pull EVERY post and
+ * EVERY comment in the database and re-run after each save/pin/hide/delete,
+ * so the page got slower with every post the community wrote — and PostgREST
+ * would silently cap the rows anyway once either table passed its max-rows
+ * limit. Comments are fetched only for the posts actually on screen. */
+const COMMUNITY_MODERATION_PAGE_SIZE = 200;
+
 export async function fetchCommunityPosts(): Promise<(CommunityPost & CommunityPostRowExtras)[]> {
-  const [{ data: posts, error: postErr }, { data: comments, error: commentErr }] = await Promise.all([
-    supabase
-      .from("community_posts")
-      .select(
-        "id, is_official, author_name, title, tag, text, image_url, media_urls, media_feed_urls, media_poster_urls, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url, pinned_markets, pinned_title_us, pinned_content_us, pinned_thumbnail_url_us, pinned_title_malay, pinned_content_malay, pinned_thumbnail_url_malay, target_markets, title_us, text_us, title_malay, text_malay",
-      )
-      .order("created_at", { ascending: false }),
-    supabase.from("post_comments").select("id, post_id, author_name, text, created_at, hidden").order("created_at"),
-  ]);
+  const { data: posts, error: postErr } = await supabase
+    .from("community_posts")
+    .select(
+      "id, is_official, author_name, title, tag, text, image_url, media_urls, media_feed_urls, media_poster_urls, likes_count, comments_count, pinned, hidden, status, pinned_title, pinned_content, pinned_thumbnail_url, pinned_markets, pinned_title_us, pinned_content_us, pinned_thumbnail_url_us, pinned_title_malay, pinned_content_malay, pinned_thumbnail_url_malay, target_markets, title_us, text_us, title_malay, text_malay",
+    )
+    .order("created_at", { ascending: false })
+    .limit(COMMUNITY_MODERATION_PAGE_SIZE);
   if (postErr) throw postErr;
+
+  const postIds = (posts ?? []).map((p) => p.id);
+  const { data: comments, error: commentErr } = postIds.length
+    ? await supabase
+        .from("post_comments")
+        .select("id, post_id, author_name, text, created_at, hidden")
+        .in("post_id", postIds)
+        .order("created_at")
+    : { data: [], error: null };
   if (commentErr) throw commentErr;
 
   return (posts ?? []).map(

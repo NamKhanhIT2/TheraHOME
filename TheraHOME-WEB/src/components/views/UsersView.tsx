@@ -341,7 +341,11 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
           {!readOnly ? (
             <Fragment>
               <div style={{ background: "#fff", borderRadius: 12, padding: 16, boxShadow: "var(--shadow-card)", marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 10 }}>Phân quyền tài khoản</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>Phân quyền tài khoản</div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+                  Hiện chỉ là nhãn phân loại nội bộ — app CHƯA đọc trường này, nên chọn &quot;Hạn chế&quot; không giới hạn quyền gì.
+                  Muốn chặn thật thì dùng nút &quot;Khóa tài khoản&quot; bên dưới.
+                </div>
                 <select value={permRole} onChange={(e) => setPermRole(e.target.value as SampleUserRole)} style={{ ...inputStyle, marginBottom: 10 }}>
                   {USER_ROLE_OPTIONS.map(([k, l]) => (
                     <option key={k} value={k}>{l}</option>

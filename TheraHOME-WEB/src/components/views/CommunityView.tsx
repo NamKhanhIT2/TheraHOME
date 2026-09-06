@@ -1137,6 +1137,22 @@ export function CommunityView() {
                 </Badge>
               </span>
             ) : null}
+            {/* An official post reaching UK/ML with no variant for that market
+                serves the Vietnamese text to those readers. Flag it here so
+                staff can see which legacy rows still need translating. */}
+            {it.official ? (() => {
+              const reaches = (code: "US" | "MALAY") =>
+                it.targetMarkets === null || it.targetMarkets.length === 0 || it.targetMarkets.includes(code);
+              const missing = [
+                reaches("US") && !it.marketContent.titleUs.trim() && !it.marketContent.textUs.trim() ? "UK" : null,
+                reaches("MALAY") && !it.marketContent.titleMalay.trim() && !it.marketContent.textMalay.trim() ? "ML" : null,
+              ].filter(Boolean);
+              return missing.length ? (
+                <span style={{ marginLeft: 8 }}>
+                  <Badge color="#B9860B" bg="rgba(185,134,11,0.12)">Thiếu bản {missing.join(" · ")}</Badge>
+                </span>
+              ) : null;
+            })() : null}
             {it.hidden ? (
               <span style={{ marginLeft: 8 }}>
                 <Badge color="#8A93A3" bg="rgba(138,147,163,0.12)">Đã ẩn</Badge>
