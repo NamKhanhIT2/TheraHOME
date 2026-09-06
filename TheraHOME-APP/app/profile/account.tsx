@@ -9,8 +9,6 @@ import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
 import type { LegalDocKey } from '@/lib/legalContent';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
-import { countryQuestion } from '@/lib/mockData';
-import { marketForCountryOption, useMarket } from '@/hooks/useMarket';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 
 const LEGAL_ROWS: { key: LegalDocKey; icon: string; labelKey: TranslationKey }[] = [
@@ -45,12 +43,6 @@ export default function AccountSettingsScreen() {
   const updateProfile = useUpdateProfile(userId);
   const language = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
-  // Label for the read-only region row: the onboarding option whose code
-  // matches the profile's stored country.
-  const currentCountryLabel =
-    countryQuestion[language].options.find((option) => marketForCountryOption(option) === market)
-    ?? countryQuestion[language].options[0];
-  const market = useMarket();
 
   const shareData = profile?.dataSharingEnabled ?? false;
 
@@ -111,34 +103,11 @@ export default function AccountSettingsScreen() {
             </View>
           </View>
 
-          <View style={[styles.langBlock, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}>
-            <View style={styles.langHeader}>
-              <Icon name="globe" size={20} color={theme.colors.primary} />
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('countryRegion')}</Text>
-            </View>
-            {/* READ-ONLY on purpose (owner, 2026-09-06). This used to be a
-                picker, which let anyone switch their region to VN and buy
-                through the cheaper Vietnamese product links. The region is
-                set once at onboarding; changing it afterwards goes through
-                CSKH, who can do it from the Admin user drawer. */}
-            <View
-              style={[
-                styles.langBtn,
-                {
-                  borderWidth: 1,
-                  borderColor: theme.colors.borderInput,
-                  backgroundColor: theme.colors.bgCardAlt,
-                  borderRadius: theme.radius.md,
-                  alignSelf: 'flex-start',
-                },
-              ]}
-            >
-              <Text style={[theme.type.body, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.semiBold }]}>
-                {currentCountryLabel}
-              </Text>
-            </View>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginTop: 8 }]}>{t('countryRegionLocked')}</Text>
-          </View>
+          {/* No country/region row here, on purpose (owner, 2026-09-06):
+              the market is set once at onboarding and is not shown or
+              editable in the app — a picker here once let anyone switch to
+              VN and buy through the cheaper Vietnamese links. Changes go
+              through CSKH from the Admin user drawer. */}
 
           <ToggleRow
             icon="external-link"

@@ -3973,3 +3973,12 @@ và được dọn ở lần ghi đầu tiên. Harness 13 tình huống (round t
 thất bại, migrate layout cũ, manifest cũ + `key` mới, đọc xen kẽ ghi) đều
 đạt. Cần xác nhận thêm trên máy thật: đăng nhập → tắt hẳn app → mở lại
 vẫn giữ phiên.
+
+### Cùng ngày — bỏ hẳn khối "Quốc gia/Khu vực" trong Cài đặt tài khoản
+
+Yêu cầu chủ sở hữu: không hiển thị thị trường trong app (trước đó là hàng
+chỉ-đọc). Thị trường vẫn được chọn một lần ở onboarding, khoá ở DB (migration
+202609061100) và chỉ CSKH đổi được từ ngăn người dùng trên Admin.
+`app/profile/account.tsx` chỉ còn Google account, Ngôn ngữ, Chia sẻ dữ liệu
+và mục Pháp lý. Khoá i18n `countryRegion`/`countryRegionLocked` giữ lại vì
+Admin/onboarding còn dùng nhãn tương tự.
