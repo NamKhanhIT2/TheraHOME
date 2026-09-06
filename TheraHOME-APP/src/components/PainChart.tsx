@@ -165,6 +165,23 @@ export function PainChart({ data }: PainChartProps) {
           />
         );
       })}
+      {/* A single logged day leaves no line and no area to fill, so the chart
+          read as an empty grid with one floating dot. A dropline anchors that
+          dot to the axis — the same convention the axis labels already use to
+          say "this reading belongs to this day". Only for the one-point case:
+          with two or more, the line and its gradient fill do this job. */}
+      {pts.length === 1 ? (
+        <Line
+          x1={pts[0][0]}
+          x2={pts[0][0]}
+          y1={pts[0][1] + 10}
+          y2={H - pad}
+          stroke={theme.colors.borderInput}
+          strokeWidth={1.5}
+          strokeDasharray="4,5"
+          strokeLinecap="round"
+        />
+      ) : null}
       {areaPath ? <Path d={areaPath} fill="url(#painAreaGrad)" stroke="none" /> : null}
       {linePath ? (
         <Path d={linePath} fill="none" stroke="url(#painVGrad)" strokeWidth={3} strokeLinecap="round" />
