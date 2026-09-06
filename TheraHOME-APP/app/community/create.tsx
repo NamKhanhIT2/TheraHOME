@@ -246,7 +246,7 @@ export default function CreatePostScreen() {
         <View style={[styles.addRow, { borderColor: theme.colors.borderInput, borderRadius: theme.radius.md }]}>
           <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('addToPost')}</Text>
           <View style={styles.addIcons}>
-            <Pressable onPress={pickMedia} disabled={media.length >= MAX_MEDIA}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('a11yPickMedia')} onPress={pickMedia} disabled={media.length >= MAX_MEDIA}>
               <Icon name="image" size={20} color={media.length >= MAX_MEDIA ? '#9AA5B1' : '#2BB673'} />
             </Pressable>
           </View>

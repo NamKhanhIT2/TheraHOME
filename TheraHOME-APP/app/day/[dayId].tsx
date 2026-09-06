@@ -28,6 +28,11 @@ export default function DayDetailScreen() {
   const userId = session?.user.id;
   const markWatched = useMarkDayWatched();
   const [videoError, setVideoError] = useState(false);
+  // YoutubePlayer mounts its own WebView and paints it black for several
+  // seconds before the iframe paints. The fallback branch below is already
+  // gone by then (videoWidth > 0), so without this the screen just shows a
+  // black rectangle with no sign that anything is loading.
+  const [videoReady, setVideoReady] = useState(false);
   const [videoWidth, setVideoWidth] = useState(0);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
 
@@ -210,6 +215,7 @@ export default function DayDetailScreen() {
           ]}
         >
           {videoId && !videoError && videoWidth > 0 ? (
+            <>
             <YoutubePlayer
               key={videoId}
               height={videoWidth * 9 / 16}
@@ -219,6 +225,7 @@ export default function DayDetailScreen() {
                 if (state === 'playing') recordWatch();
               }}
               onError={() => setVideoError(true)}
+              onReady={() => setVideoReady(true)}
               initialPlayerParams={{ playsinline: true, controls: true, rel: false, ...youtubePlayerLangParams(language) }}
               webViewProps={{
                 allowsFullscreenVideo: true,
@@ -226,6 +233,13 @@ export default function DayDetailScreen() {
                 mediaPlaybackRequiresUserAction: true,
               }}
             />
+            {!videoReady ? (
+              <View style={[styles.videoLoadingOverlay, { backgroundColor: theme.colors.bgCardAlt }]}>
+                <ActivityIndicator color={theme.colors.primary} />
+                <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{t('loadingVideo')}</Text>
+              </View>
+            ) : null}
+            </>
           ) : videoError ? (
             <View style={styles.videoFallback}>
               <Icon name="film" size={28} color={theme.colors.textMuted} />
@@ -347,6 +361,16 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 20,
     overflow: 'hidden',
+  },
+  videoLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
   videoFallback: {
     alignItems: 'center',

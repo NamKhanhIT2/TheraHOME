@@ -31,6 +31,9 @@ export function ProductVideoModal({ title, url, onClose }: ProductVideoModalProp
   const { t, language } = useI18n();
   const [width, setWidth] = useState(0);
   const [failed, setFailed] = useState(false);
+  // Same black-WebView gap as the day screen: the player mounts long before
+  // it paints, and the branch below has already stopped rendering the spinner.
+  const [ready, setReady] = useState(false);
   const previewUrl = normalizedUrl(url);
   const videoId = youtubeVideoId(previewUrl);
 
@@ -52,14 +55,22 @@ export function ProductVideoModal({ title, url, onClose }: ProductVideoModalProp
             style={[styles.video, { backgroundColor: theme.colors.bgCardAlt }]}
           >
             {videoId && width > 0 && !failed ? (
+              <>
               <YoutubePlayer
                 height={width * 9 / 16}
                 width={width}
                 videoId={videoId}
                 onError={() => setFailed(true)}
+                onReady={() => setReady(true)}
                 initialPlayerParams={{ playsinline: true, controls: true, rel: false, ...youtubePlayerLangParams(language) }}
                 webViewProps={{ allowsFullscreenVideo: true, allowsInlineMediaPlayback: true }}
               />
+              {!ready ? (
+                <View style={[styles.centered, { backgroundColor: theme.colors.bgCardAlt }]}>
+                  <ActivityIndicator color={theme.colors.primary} />
+                </View>
+              ) : null}
+              </>
             ) : videoId && !failed ? (
               <ActivityIndicator color={theme.colors.primary} />
             ) : previewUrl ? (
@@ -84,6 +95,15 @@ export function ProductVideoModal({ title, url, onClose }: ProductVideoModalProp
 }
 
 const styles = StyleSheet.create({
+  centered: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   backdrop: { flex: 1, backgroundColor: 'rgba(20,24,34,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   card: { width: '100%', maxWidth: 520, padding: 16, overflow: 'hidden' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
