@@ -964,3 +964,83 @@ dịch sẵn bản nháp để sửa sau".
 **Cố ý KHÔNG nối:** Nội dung pháp lý (`LegalContentView`). Bản tiếng Anh và
 Malay đã được viết tay sẵn trong `appLegalContent.ts`, editor mở ra là đúng
 ngôn ngữ đó rồi; máy dịch đè lên văn bản pháp lý là hạ chất lượng và rủi ro.
+
+## 2026-09-06 — "Xoá rồi vẫn hiện" + bộ lọc thị trường VN/UK/ML
+
+### Vì sao xoá xong vẫn thấy
+
+Hai chỗ, hai nguyên nhân khác nhau, đều kiểm chứng bằng code chứ không đoán:
+
+1. **Tài khoản TheraHOME — nút "Xóa" không hề xoá.** `deleteAccount` gọi
+   `updateTheraAccount(id, { locked: true })`, tức là đúng việc mà nút "Khóa"
+   ngay bên cạnh đã làm (và làm được cả chiều ngược lại). Dòng ở lại bảng với
+   nhãn "Đã khóa". Nay xoá thật: `admin-manage-account` (v27) có thêm action
+   `delete` chạy bằng service role — RLS không cấp được quyền xoá
+   `auth.users`. Chặn 3 trường hợp: tài khoản admin gốc (được seed bằng
+   migration, có partial unique index), chính tài khoản đang đăng nhập, và
+   tài khoản khách thường (`account_type = 'normal'`, khách tự xoá trong app).
+   Xoá `auth.users` kéo theo profiles, user_programs + tiến độ, nhật ký
+   đau/nước, hội thoại + tin nhắn, thông báo, push token, kết quả khảo sát,
+   liên hệ truy cập. `community_posts.author_id` là SET NULL nên bài đã đăng
+   vẫn còn, chỉ mất tên tác giả. `upsell_campaigns.created_by` là RESTRICT
+   nên tài khoản từng tạo chiến dịch sẽ báo lỗi thay vì xoá — thông báo tiếng
+   Việt riêng cho trường hợp này. Hộp xác nhận đổi từ `window.confirm` sang
+   `ConfirmModal` liệt kê rõ hậu quả và nhắc dùng "Khóa" nếu chỉ muốn tạm chặn.
+
+2. **Hàng đợi Báo cáo — xoá nội dung nhưng báo cáo vẫn "Đang chờ".** Ẩn/xoá
+   nội dung hay khoá tác giả đều không đụng tới `content_reports.status`, nên
+   dòng báo cáo nằm lại với ô nội dung ghi "(Nội dung đã bị xoá)". Nay mỗi
+   thao tác xử lý xong sẽ tự đánh dấu `resolved` (best-effort: việc kiểm
+   duyệt đã thành công rồi, không được báo lỗi chỉ vì đóng báo cáo thất bại);
+   "Khoá tài khoản" cũng gọi `reload()` — trước đó nó là thao tác duy nhất
+   không làm mới bảng.
+
+### Chặn tận gốc: xoá 0 dòng không còn im lặng
+
+PostgREST trả `error: null` cho lệnh DELETE bị RLS lọc còn 0 dòng — không
+phân biệt được với xoá thành công, nên giao diện báo "Đã xoá", tải lại, và
+dòng vẫn nguyên đó. Thêm helper `runDelete()` trong `db.ts`: mọi lệnh xoá
+kèm `.select("id")` và ném lỗi `blocked_or_already_deleted` nếu không có
+dòng nào bị xoá. Áp dụng cho 13 hàm: products, program_days, program_phases,
+store_categories/store_items (cả nhóm và từng thị trường),
+product_activation_contacts, quiz_questions, user_programs, community_posts,
+post_comments, ai_suggested_replies, faq_items. Riêng `deleteLegalOverride`
+giữ nguyên vì "khôi phục bản gốc" khi chưa có bản ghi đè là hợp lệ. Ở tab
+Báo cáo, lỗi này được nuốt có chủ đích: báo cáo thường sống lâu hơn nội dung
+nó tố, không còn gì để xoá chính là kết quả mong muốn.
+
+### Bộ lọc thị trường VN / UK / ML
+
+Nguyên tắc chọn chỗ đặt: chỉ nơi dữ liệu THẬT SỰ có chiều thị trường, và
+không chồng lên các màn đã có sẵn tab ngôn ngữ VN/EN/MS (Thông báo hệ thống,
+FAQ, Pháp lý, Onboarding, Prompt AI, Nội dung ứng dụng — đó là trục ngôn ngữ,
+không phải trục thị trường). Lộ trình và Cửa hàng đã có sẵn `MarketSelect`,
+không đụng vào.
+
+| Màn | Kiểu lọc | Cột dữ liệu |
+| --- | --- | --- |
+| Người dùng | lọc dòng + thêm cột "Thị trường" | `profiles.country` |
+| Trò chuyện (CSKH) | lọc dòng | `country` đã có sẵn trên mỗi thread |
+| Cộng đồng | lọc dòng + cột "Thị trường" | `community_posts.target_markets` |
+| Thống kê (khảo sát + giao dịch) | lọc dòng + cột | `profiles.country`, thêm vào 2 hàm fetch |
+| Tài khoản TheraHOME | lọc dòng | `profiles.country` (cột đã có) |
+
+Chi tiết đáng nhớ:
+- Nhãn UI là **UK** nhưng mã trong DB là **US** — giữ đúng ánh xạ mà
+  RoutineView/ProductsView đang dùng.
+- `target_markets = null` nghĩa là bài tới MỌI thị trường (mọi bài của người
+  dùng đều vậy), nên khi lọc theo UK thì bài null vẫn phải hiện. Bộ lọc trả
+  lời câu "bảng tin thị trường này gồm những gì", không phải "bài nào chỉ
+  dành riêng cho nó".
+- Khách chưa xác nhận quốc gia có `country = null`; Người dùng và Thống kê
+  có thêm lựa chọn "Chưa chọn" để nhóm này không biến mất khỏi danh sách.
+- Bảng tổng hợp đáp án khảo sát cũng chạy theo bộ lọc — "câu nào khách UK
+  trả lời sai nhiều nhất" là câu hỏi khác với số liệu toàn cầu.
+
+### Lỗi phụ sửa kèm
+
+`RoutineView` gọi `fetchStoreCategories()` không truyền thị trường nên luôn
+rơi vào mặc định "VN": dòng "Link sản phẩm" hiển thị link VN ngay cả khi
+dropdown đang chọn UK/ML. Nay tải link của cả ba thị trường và hiển thị theo
+thị trường đang xem (có ghi rõ trong nhãn). Modal "Sửa thông tin" vẫn chỉ
+sửa link VN — đúng như `updateProductInfo` đã ghi chú từ 2026-09-05.

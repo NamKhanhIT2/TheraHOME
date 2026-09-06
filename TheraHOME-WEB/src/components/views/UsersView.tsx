@@ -22,9 +22,25 @@ import {
   type UserProgramRow,
   type UserOrderRow,
 } from "@/lib/db";
-import { Avatar, StatusPill, Badge, PrimaryBtn, GhostBtn, FieldLabel, inputStyle } from "@/components/ui/primitives";
+import { Avatar, StatusPill, Badge, PrimaryBtn, GhostBtn, FieldLabel, MarketSelect, inputStyle } from "@/components/ui/primitives";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
+
+// Market filter (2026-09-06). `profiles.country` is what decides which
+// market's prices, product links, videos and pinned posts a customer sees,
+// so it is the axis the owner manages by. "US" is the DB code for the
+// UK/EU market — the label everywhere in the UI is "UK". "Chưa chọn" is a
+// real state: rows whose country_confirmed is still false have no country,
+// and they must not silently vanish from the list.
+type UserMarketFilter = "ALL" | TheraAccountCountry | "NONE";
+const USER_MARKET_TABS: Array<[UserMarketFilter, string]> = [
+  ["ALL", "Tất cả"],
+  ["VN", "VN"],
+  ["US", "UK"],
+  ["MALAY", "ML"],
+  ["NONE", "Chưa chọn"],
+];
+const MARKET_SHORT_LABEL: Record<TheraAccountCountry, string> = { VN: "VN", US: "UK", MALAY: "ML" };
 
 function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact?: boolean; onOpenUser: (u: SampleUser) => void }) {
   return (
@@ -32,6 +48,7 @@ function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact
       <thead>
         <tr style={{ textAlign: "left", color: "var(--text-muted)", fontSize: 12, textTransform: "uppercase", letterSpacing: ".03em" }}>
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Người dùng</th>
+          <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Thị trường</th>
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Vùng tập</th>
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Ngày</th>
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Tuân thủ</th>
@@ -53,6 +70,9 @@ function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact
                     <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{u.contact}</div>
                   </div>
                 </div>
+              </td>
+              <td style={{ padding: "12px 8px", color: u.country ? "var(--text-secondary)" : "var(--text-muted)" }}>
+                {u.country ? MARKET_SHORT_LABEL[u.country] : "Chưa chọn"}
               </td>
               <td style={{ padding: "12px 8px", color: "var(--text-secondary)" }}>{u.area}</td>
               <td style={{ padding: "12px 8px", color: "var(--text-secondary)" }}>{u.day != null ? `Ngày ${u.day}` : "N/A"}</td>
@@ -444,13 +464,18 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
   const [users, setUsers] = useState<SampleUser[] | null>(null);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | SampleUser["status"]>("all");
+  const [market, setMarket] = useState<UserMarketFilter>("ALL");
   const [openId, setOpenId] = useState<SampleUser["id"] | null>(null);
 
   useEffect(() => {
     fetchAppUsers().then(setUsers).catch(() => setUsers([]));
   }, []);
 
-  const rows = (users ?? []).filter((u) => (status === "all" || u.status === status) && u.name.toLowerCase().includes(q.toLowerCase()));
+  const matchesMarket = (u: SampleUser) =>
+    market === "ALL" || (market === "NONE" ? !u.country : u.country === market);
+  const rows = (users ?? []).filter(
+    (u) => (status === "all" || u.status === status) && matchesMarket(u) && u.name.toLowerCase().includes(q.toLowerCase()),
+  );
   const openUser = (users ?? []).find((u) => u.id === openId);
 
   async function updateUser(id: SampleUser["id"], patch: Partial<SampleUser>): Promise<boolean> {
@@ -497,9 +522,14 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
               {l}
             </button>
           ))}
+          <MarketSelect options={USER_MARKET_TABS} value={market} onChange={setMarket} />
         </div>
         {users === null ? (
           <div style={{ color: "var(--text-secondary)", padding: 20 }}>Đang tải...</div>
+        ) : rows.length === 0 ? (
+          <div style={{ color: "var(--text-muted)", padding: "36px 20px", textAlign: "center" }}>
+            Không có khách hàng nào khớp bộ lọc.
+          </div>
         ) : (
           <UsersTable rows={rows} onOpenUser={(u) => setOpenId(u.id)} />
         )}

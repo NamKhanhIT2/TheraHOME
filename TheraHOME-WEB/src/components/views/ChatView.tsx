@@ -11,13 +11,21 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { deleteSpecialistMessage, editSpecialistMessage, fetchChatThreads, markThreadMessagesRead, sendSpecialistMessage, toggleSpecialistReaction, uploadSpecialistChatImage } from "@/lib/db";
 import type { ChatMessage, ChatThread } from "@/lib/adminMockData";
-import { Avatar } from "@/components/ui/primitives";
+import { Avatar, inputStyle } from "@/components/ui/primitives";
 
 /** Customer's app language + market at a glance, so the specialist answers
  * in the language the customer actually reads (the AI assistant follows the
  * same profiles.language; CSKH is a human, so it needs to be visible). */
 const LANG_LABEL: Record<string, string> = { vi: "Tiếng Việt", en: "English", ms: "Bahasa Melayu" };
 const MARKET_LABEL: Record<string, string> = { VN: "VN", US: "UK", MALAY: "ML" };
+// "US" is the DB code for the UK/EU market; the label shown is "UK".
+type ChatMarketFilter = "ALL" | "VN" | "US" | "MALAY";
+const CHAT_MARKET_TABS: Array<[ChatMarketFilter, string]> = [
+  ["ALL", "Mọi thị trường"],
+  ["VN", "VN"],
+  ["US", "UK"],
+  ["MALAY", "ML"],
+];
 function LangBadge({ thread, compact = false }: { thread: ChatThread; compact?: boolean }) {
   const lang = thread.language ?? "vi";
   const highlight = lang !== "vi";
@@ -45,6 +53,11 @@ export function ChatView() {
   const [threads, setThreads] = useState<ChatThread[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  // Market filter (2026-09-06): `country` already rides along on every
+  // thread, so a specialist who handles one market can work just that inbox
+  // instead of scanning the badges. Threads whose customer never confirmed a
+  // country have none, and are only shown under "Tất cả".
+  const [marketFilter, setMarketFilter] = useState<ChatMarketFilter>("ALL");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [attachment, setAttachment] = useState<File | null>(null);
@@ -90,7 +103,9 @@ export function ChatView() {
     };
   }, []);
 
-  const list = threads ? (filter === "unread" ? threads.filter((t) => t.unread) : threads) : [];
+  const list = (threads ?? []).filter(
+    (t) => (filter !== "unread" || t.unread) && (marketFilter === "ALL" || t.country === marketFilter),
+  );
   const active = threads?.find((t) => t.id === activeId);
 
   useEffect(() => {
@@ -185,7 +200,23 @@ export function ChatView() {
             </button>
           ))}
         </div>
+        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--divider)" }}>
+          <select
+            value={marketFilter}
+            onChange={(e) => setMarketFilter(e.target.value as ChatMarketFilter)}
+            style={{ ...inputStyle, width: "100%", padding: "7px 10px", fontSize: 12.5, fontWeight: 600, background: "#fff", cursor: "pointer" }}
+          >
+            {CHAT_MARKET_TABS.map(([key, label]) => (
+              <option key={key} value={key}>{key === "ALL" ? label : `Thị trường ${label}`}</option>
+            ))}
+          </select>
+        </div>
         <div style={{ flex: 1, overflowY: "auto" }}>
+          {list.length === 0 ? (
+            <div style={{ padding: "28px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: 12.5 }}>
+              Không có cuộc trò chuyện nào khớp bộ lọc.
+            </div>
+          ) : null}
           {list.map((t) => (
             <button
               key={t.id}

@@ -7,9 +7,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { TableShell } from "@/components/ui/TableShell";
 import { Modal } from "@/components/ui/Modal";
-import { GhostBtn, Badge } from "@/components/ui/primitives";
+import { GhostBtn, Badge, MarketSelect } from "@/components/ui/primitives";
 import { pushToast } from "@/components/ui/Toast";
 import { fetchSurveyAttempts, fetchPhasePurchases, type SurveyAttempt, type PurchaseRow } from "@/lib/db";
+import type { TheraAccountCountry } from "@/lib/adminMockData";
+
+// Market filter (2026-09-06). "US" is the DB code for the UK/EU market.
+// "Chưa chọn" covers customers who never confirmed a country.
+type InsightsMarket = "ALL" | TheraAccountCountry | "NONE";
+const INSIGHTS_MARKET_TABS: Array<[InsightsMarket, string]> = [
+  ["ALL", "Tất cả"],
+  ["VN", "VN"],
+  ["US", "UK"],
+  ["MALAY", "ML"],
+  ["NONE", "Chưa chọn"],
+];
+const MARKET_SHORT: Record<TheraAccountCountry, string> = { VN: "VN", US: "UK", MALAY: "ML" };
 
 type Tab = "surveys" | "purchases";
 const TABS: Array<[Tab, string]> = [
@@ -33,17 +46,40 @@ export function InsightsView() {
   const [purchases, setPurchases] = useState<PurchaseRow[] | null>(null);
   const [detail, setDetail] = useState<SurveyAttempt | null>(null);
   const [q, setQ] = useState("");
+  const [market, setMarket] = useState<InsightsMarket>("ALL");
 
   useEffect(() => {
     fetchSurveyAttempts().then(setSurveys).catch(() => pushToast("Không thể tải kết quả khảo sát"));
     fetchPhasePurchases().then(setPurchases).catch(() => pushToast("Không thể tải giao dịch"));
   }, []);
 
+  const inMarket = (country: TheraAccountCountry | null) =>
+    market === "ALL" || (market === "NONE" ? !country : country === market);
+  const filteredSurveys = (surveys ?? []).filter(
+    (s) =>
+      inMarket(s.country) &&
+      (!q.trim() ||
+        s.userName.toLowerCase().includes(q.toLowerCase()) ||
+        s.phaseName.toLowerCase().includes(q.toLowerCase()) ||
+        s.productName.toLowerCase().includes(q.toLowerCase())),
+  );
+  const filteredPurchases = (purchases ?? []).filter(
+    (p) =>
+      inMarket(p.country) &&
+      (!q.trim() ||
+        p.userName.toLowerCase().includes(q.toLowerCase()) ||
+        p.productName.toLowerCase().includes(q.toLowerCase())),
+  );
+
   // Most-picked answer per question — the actual reason to look at surveys:
-  // it shows which guidance people are getting wrong at scale.
+  // it shows which guidance people are getting wrong at scale. Declared after
+  // `filteredSurveys` because it reads it: a useMemo body runs during the
+  // same render pass, so referencing a `const` declared below would throw.
+  // Follows the market filter too — "câu nào người UK trả lời sai nhiều
+  // nhất" is a different question from the global one.
   const answerStats = useMemo(() => {
     const byQuestion = new Map<string, Map<string, number>>();
-    for (const attempt of surveys ?? []) {
+    for (const attempt of filteredSurveys) {
       for (const a of attempt.answers) {
         if (!a.question) continue;
         const counts = byQuestion.get(a.question) ?? new Map<string, number>();
@@ -56,19 +92,8 @@ export function InsightsView() {
       const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
       return { question, total, options: sorted };
     });
-  }, [surveys]);
-
-  const filteredSurveys = (surveys ?? []).filter((s) =>
-    !q.trim() ||
-    s.userName.toLowerCase().includes(q.toLowerCase()) ||
-    s.phaseName.toLowerCase().includes(q.toLowerCase()) ||
-    s.productName.toLowerCase().includes(q.toLowerCase()),
-  );
-  const filteredPurchases = (purchases ?? []).filter((p) =>
-    !q.trim() ||
-    p.userName.toLowerCase().includes(q.toLowerCase()) ||
-    p.productName.toLowerCase().includes(q.toLowerCase()),
-  );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surveys, market, q]);
 
   const tabSwitcher = (
     <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
@@ -91,6 +116,9 @@ export function InsightsView() {
           {label}
         </button>
       ))}
+      <div style={{ marginLeft: "auto" }}>
+        <MarketSelect options={INSIGHTS_MARKET_TABS} value={market} onChange={setMarket} />
+      </div>
     </div>
   );
 
@@ -104,14 +132,17 @@ export function InsightsView() {
           searchPlaceholder="Tìm theo người dùng hoặc sản phẩm..."
           searchValue={q}
           onSearchChange={setQ}
-          columns={["Người dùng", "Sản phẩm · Giai đoạn", "Nguồn", "Thời điểm", "Trạng thái"]}
+          columns={["Người dùng", "Thị trường", "Sản phẩm · Giai đoạn", "Nguồn", "Thời điểm", "Trạng thái"]}
         >
           {purchases === null ? null : filteredPurchases.length === 0 ? (
-            <tr><td colSpan={5} style={{ padding: "24px 20px", color: "var(--text-muted)" }}>Chưa có giao dịch nào.</td></tr>
+            <tr><td colSpan={6} style={{ padding: "24px 20px", color: "var(--text-muted)" }}>Chưa có giao dịch nào.</td></tr>
           ) : (
             filteredPurchases.map((p) => (
               <tr key={p.id} style={{ borderTop: "1px solid var(--divider)" }}>
                 <td style={{ padding: "14px 20px", fontWeight: 600, color: "var(--text-primary)" }}>{p.userName}</td>
+                <td style={{ padding: "14px 20px", color: p.country ? "var(--text-secondary)" : "var(--text-muted)" }}>
+                  {p.country ? MARKET_SHORT[p.country] : "Chưa chọn"}
+                </td>
                 <td style={{ padding: "14px 20px", color: "var(--text-secondary)" }}>
                   <div>{p.productName}</div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{p.phaseName}</div>
@@ -170,7 +201,7 @@ export function InsightsView() {
         searchPlaceholder="Tìm theo người dùng, sản phẩm hoặc giai đoạn..."
         searchValue={q}
         onSearchChange={setQ}
-        columns={["Người dùng", "Sản phẩm · Giai đoạn", "Số câu", "Thời điểm", "Thao tác"]}
+        columns={["Người dùng", "Thị trường", "Sản phẩm · Giai đoạn", "Số câu", "Thời điểm", "Thao tác"]}
         modals={
           detail ? (
             <Modal
@@ -193,11 +224,14 @@ export function InsightsView() {
         }
       >
         {surveys === null ? null : filteredSurveys.length === 0 ? (
-          <tr><td colSpan={5} style={{ padding: "24px 20px", color: "var(--text-muted)" }}>Chưa có khảo sát nào được nộp.</td></tr>
+          <tr><td colSpan={6} style={{ padding: "24px 20px", color: "var(--text-muted)" }}>Chưa có khảo sát nào được nộp.</td></tr>
         ) : (
           filteredSurveys.map((s) => (
             <tr key={s.id} style={{ borderTop: "1px solid var(--divider)" }}>
               <td style={{ padding: "14px 20px", fontWeight: 600, color: "var(--text-primary)" }}>{s.userName}</td>
+              <td style={{ padding: "14px 20px", color: s.country ? "var(--text-secondary)" : "var(--text-muted)" }}>
+                {s.country ? MARKET_SHORT[s.country] : "Chưa chọn"}
+              </td>
               <td style={{ padding: "14px 20px", color: "var(--text-secondary)" }}>
                 <div>{s.productName}</div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{s.phaseName}</div>

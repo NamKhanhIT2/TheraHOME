@@ -27,7 +27,7 @@ import {
   type PostMarketContent,
   type PostModerationStatus,
 } from "@/lib/db";
-import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, Avatar, PillTabs } from "@/components/ui/primitives";
+import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, Avatar, PillTabs, MarketSelect } from "@/components/ui/primitives";
 import { translateDrafts } from "@/lib/translate";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -175,6 +175,18 @@ function ChallengesAdminView() {
 
 const MARKET_TABS: Array<[AdminMarket, string]> = [["VN", "VN"], ["US", "UK"], ["MALAY", "ML"]];
 const MARKET_LABEL: Record<AdminMarket, string> = { VN: "VN", US: "UK", MALAY: "ML" };
+
+// List filter (2026-09-06): "bảng tin của thị trường này trông ra sao".
+type PostMarketFilter = "ALL" | AdminMarket;
+const POST_MARKET_TABS: Array<[PostMarketFilter, string]> = [["ALL", "Tất cả"], ...MARKET_TABS];
+
+/** `target_markets` null = the post reaches every market (see the app's
+ * community feed query), which is the case for every user-written post. */
+function targetMarketLabel(markets: string[] | null): string {
+  if (!markets || markets.length === 0) return "Mọi thị trường";
+  if (markets.length === MARKET_TABS.length) return "Mọi thị trường";
+  return markets.map((m) => MARKET_LABEL[m as AdminMarket] ?? m).join(" · ");
+}
 
 function PinDisplayModal({
   post,
@@ -381,6 +393,7 @@ export function CommunityView() {
   // regular app-user posts read as different content, so browsing one
   // shouldn't require scrolling past rows of the other.
   const [authorTab, setAuthorTab] = useState<AuthorTab>("official");
+  const [postMarket, setPostMarket] = useState<PostMarketFilter>("ALL");
   const [pinning, setPinning] = useState<PinnedPost | null>(null);
   // Long posts used to be printed in full inside the table cell, which made
   // one article push every other row off-screen. Clamp to 3 lines and let
@@ -783,7 +796,11 @@ export function CommunityView() {
   const filtered = items.filter((it) => {
     const matchesQuery = !q.trim() || it.text.toLowerCase().includes(q.trim().toLowerCase()) || it.name.toLowerCase().includes(q.trim().toLowerCase());
     const matchesAuthor = authorTab === "official" ? it.official : !it.official;
-    return matchesQuery && matchesAuthor;
+    // "Bài nào tới thị trường này", not "bài nào chỉ dành riêng cho nó":
+    // a null target_markets means the post reaches every market, so it must
+    // stay visible under each one.
+    const matchesMarket = postMarket === "ALL" || !it.targetMarkets || it.targetMarkets.includes(postMarket);
+    return matchesQuery && matchesAuthor && matchesMarket;
   });
   // Pinned first (official tab); pending-review first (user tab) so new
   // member posts waiting on CSKH sit at the top of the moderation queue.
@@ -1018,6 +1035,9 @@ export function CommunityView() {
             {k === "users" && pendingCount > 0 ? ` · ${pendingCount} chờ duyệt` : ""}
           </button>
         ))}
+        <div style={{ marginLeft: "auto" }}>
+          <MarketSelect options={POST_MARKET_TABS} value={postMarket} onChange={setPostMarket} />
+        </div>
       </div>
       <TableShell
       subtitle={
@@ -1046,7 +1066,7 @@ export function CommunityView() {
           ) : null}
         </Fragment>
       }
-      columns={["Ghim", "Tác giả", "Nội dung", "Lượt thích", "Bình luận", "Thao tác"]}
+      columns={["Ghim", "Tác giả", "Thị trường", "Nội dung", "Lượt thích", "Bình luận", "Thao tác"]}
     >
       {sorted.map((it) => (
         <tr key={it.id} style={{ borderTop: "1px solid var(--divider)", background: it.pinned ? "var(--color-primary-tint-10)" : "none" }}>
@@ -1086,6 +1106,9 @@ export function CommunityView() {
                 {it.official ? <span style={{ color: "var(--color-primary)" }}> ✓</span> : null}
               </div>
             </div>
+          </td>
+          <td style={{ padding: "14px 20px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+            {targetMarketLabel(it.targetMarkets)}
           </td>
           <td style={{ padding: "14px 20px", color: "var(--text-secondary)", maxWidth: 420, verticalAlign: "top" }}>
             {it.title ? <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 3 }}>{it.title}</div> : null}

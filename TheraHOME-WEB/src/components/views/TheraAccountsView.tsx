@@ -23,9 +23,12 @@ import {
   updateTheraAccount,
   createTheraAccount,
   resetTheraAccountPassword,
+  deleteTheraAccount,
+  theraAccountDeleteMessage,
   type CreateTheraAccountInput,
 } from "@/lib/db";
-import { Badge, PrimaryBtn, GhostBtn, FieldLabel, inputStyle } from "@/components/ui/primitives";
+import { Badge, PrimaryBtn, GhostBtn, FieldLabel, MarketSelect, inputStyle } from "@/components/ui/primitives";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal } from "@/components/ui/Modal";
 import { TableShell } from "@/components/ui/TableShell";
 import { Icon } from "@/components/ui/Icon";
@@ -37,6 +40,16 @@ import { useWebAccess } from "@/components/AccessGate";
 // creatable here.
 const ACCOUNT_TYPE_OPTIONS: TheraAccountType[] = ["admin_issued", "review", "staff", "partner", "tester", "cskh"];
 const ACCESS_LEVEL_OPTIONS: TheraAccessLevel[] = ["free", "premium", "admin_granted"];
+
+// Market filter. The DB code for the UK/EU/US market is "US" while the label
+// everywhere in the UI is "UK" — same mapping RoutineView/ProductsView use.
+type MarketFilter = "ALL" | TheraAccountCountry;
+const MARKET_FILTER_TABS: Array<[MarketFilter, string]> = [
+  ["ALL", "Tất cả"],
+  ["VN", "VN"],
+  ["US", "UK"],
+  ["MALAY", "ML"],
+];
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
@@ -334,6 +347,9 @@ export function TheraAccountsView() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<TheraAccount | null>(null);
   const [resetting, setResetting] = useState<TheraAccount | null>(null);
+  const [deleting, setDeleting] = useState<TheraAccount | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>("ALL");
 
   function reload() {
     fetchTheraAccounts().then(setAccounts).catch(() => setAccounts([]));
@@ -398,33 +414,68 @@ export function TheraAccountsView() {
     }
   }
 
-  async function deleteAccount(a: TheraAccount) {
-    if (!window.confirm("Xóa (khóa vĩnh viễn) tài khoản " + a.username + "?")) return;
+  // Real delete (2026-09-06). This used to set `locked` and nothing else, so
+  // the row stayed in the table marked "Đã khóa" — "Khóa" already does that,
+  // reversibly, right next to it. Confirmed through ConfirmModal rather than
+  // window.confirm so the consequences are spelled out.
+  async function confirmDeleteAccount() {
+    if (!deleting || deleteBusy) return;
+    setDeleteBusy(true);
     try {
-      await updateTheraAccount(a.id, { locked: true });
-      pushToast("Đã khoá vĩnh viễn tài khoản " + a.username);
+      await deleteTheraAccount(deleting.id);
+      pushToast("Đã xoá tài khoản " + deleting.username);
+      setDeleting(null);
       reload();
-    } catch {
-      pushToast("Không thể xóa tài khoản");
+    } catch (e) {
+      pushToast(theraAccountDeleteMessage(e));
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
   if (!accounts) return <div style={{ color: "var(--text-secondary)", padding: 20 }}>Đang tải...</div>;
 
+  const visibleAccounts = accounts.filter((a) => marketFilter === "ALL" || a.country === marketFilter);
+
   return (
     <TableShell
       subtitle="Tài khoản do Admin cấp trực tiếp — App Review, nhân viên, đối tác, tester, chăm sóc khách hàng. Đăng nhập bằng Username/Password, không dùng Google/Apple."
-      action={<PrimaryBtn icon="plus" onClick={() => setCreating(true)}>Tạo tài khoản</PrimaryBtn>}
+      action={
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <MarketSelect options={MARKET_FILTER_TABS} value={marketFilter} onChange={setMarketFilter} />
+          <PrimaryBtn icon="plus" onClick={() => setCreating(true)}>Tạo tài khoản</PrimaryBtn>
+        </div>
+      }
       columns={["Tài khoản", "Tên người dùng", "Loại tài khoản", "Quyền truy cập", "Thị trường", "Trạng thái", "Ngày hết hạn", "Onboarding", "Ngày tạo", "Lần đăng nhập cuối", ""]}
       modals={
         <Fragment>
           {creating ? <CreateAccountModal onClose={() => setCreating(false)} onCreate={handleCreate} /> : null}
           {editing ? <EditAccountModal account={editing} onClose={() => setEditing(null)} onSave={(patch) => handleSave(editing.id, patch)} /> : null}
           {resetting ? <ResetPasswordModal account={resetting} onClose={() => setResetting(null)} onReset={(password) => handleReset(resetting.id, password)} /> : null}
+          {deleting ? (
+            <ConfirmModal
+              title="Xoá tài khoản"
+              message={
+                `Xoá vĩnh viễn tài khoản "${deleting.username}"? Tài khoản sẽ không đăng nhập được nữa và toàn bộ lộ trình, tiến độ, nhật ký đau/nước, hội thoại và thông báo của tài khoản này bị xoá theo. ` +
+                "Bài viết đã đăng trong Cộng đồng vẫn còn nhưng không còn tên tác giả. Không thể hoàn tác — nếu chỉ muốn tạm chặn đăng nhập, hãy dùng \"Khóa\"."
+              }
+              confirmLabel="Xoá vĩnh viễn"
+              busy={deleteBusy}
+              onConfirm={confirmDeleteAccount}
+              onCancel={() => setDeleting(null)}
+            />
+          ) : null}
         </Fragment>
       }
     >
-      {accounts.map((a) => {
+      {visibleAccounts.length === 0 ? (
+        <tr>
+          <td colSpan={11} style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-muted)" }}>
+            Không có tài khoản nào ở thị trường này.
+          </td>
+        </tr>
+      ) : null}
+      {visibleAccounts.map((a) => {
         const isSingletonAdmin = a.accountType === "admin";
         return (
         <tr key={a.id} style={{ borderTop: "1px solid var(--divider)" }}>
@@ -457,7 +508,7 @@ export function TheraAccountsView() {
               ) : (
                 <Fragment>
                   <GhostBtn onClick={() => toggleLocked(a)}>{a.locked ? "Mở khóa" : "Khóa"}</GhostBtn>
-                  <GhostBtn color="var(--error)" onClick={() => deleteAccount(a)}>Xóa</GhostBtn>
+                  <GhostBtn color="var(--error)" onClick={() => setDeleting(a)}>Xóa</GhostBtn>
                 </Fragment>
               )}
             </div>

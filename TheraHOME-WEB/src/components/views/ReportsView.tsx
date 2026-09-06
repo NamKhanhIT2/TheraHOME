@@ -49,13 +49,24 @@ export function ReportsView() {
   // One flag per row: every action here writes, and none was guarded.
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const busyFor = (r: ContentReport) => rowBusy === String(r.id);
+  // Acting on a report closes it (2026-09-06). Hiding or deleting the
+  // content used to leave the report sitting in "Đang chờ" with its text
+  // column reading "(Nội dung đã bị xoá)", so the queue never emptied and
+  // the owner saw content they had already deleted still listed here. The
+  // resolve is best-effort: the moderation action itself already succeeded,
+  // so a failure to stamp the report must not report the whole thing failed.
+  async function markResolved(r: ContentReport) {
+    if (r.status === "pending") await resolveContentReport(r.id, "resolved").catch(() => undefined);
+  }
+
   async function hideContent(r: ContentReport) {
     if (rowBusy) return;
     setRowBusy(String(r.id));
     try {
       if (r.contentType === "post") await updateCommunityPost(r.contentId, { hidden: true });
       else await hideCommunityComment(r.contentId, true);
-      pushToast("Đã ẩn nội dung");
+      await markResolved(r);
+      pushToast("Đã ẩn nội dung — báo cáo chuyển sang Đã xử lý");
       reload();
     } catch {
       pushToast("Không thể ẩn nội dung (có thể đã bị xoá)");
@@ -70,9 +81,18 @@ export function ReportsView() {
     if (!window.confirm("Xoá vĩnh viễn nội dung này?")) return;
     setRowBusy(String(r.id));
     try {
-      if (r.contentType === "post") await deleteCommunityPost(r.contentId);
-      else await deleteCommunityComment(r.contentId);
-      pushToast("Đã xoá nội dung");
+      try {
+        if (r.contentType === "post") await deleteCommunityPost(r.contentId);
+        else await deleteCommunityComment(r.contentId);
+      } catch (error) {
+        // A report often outlives its content (the author deleted the post,
+        // or it was removed from Cộng đồng). Nothing left to delete is the
+        // outcome the moderator wanted, so close the report instead of
+        // failing; anything else is a real error.
+        if (!(error instanceof Error) || error.message !== "blocked_or_already_deleted") throw error;
+      }
+      await markResolved(r);
+      pushToast("Đã xoá nội dung — báo cáo chuyển sang Đã xử lý");
       reload();
     } catch {
       pushToast("Không thể xoá nội dung");
@@ -87,7 +107,9 @@ export function ReportsView() {
     setRowBusy(String(r.id));
     try {
       await updateAppUser(r.contentAuthorId, { locked: true });
+      await markResolved(r);
       pushToast("Đã khoá tài khoản " + (r.contentAuthorName || ""));
+      reload();
     } catch {
       pushToast("Không thể khoá tài khoản");
     } finally {

@@ -55,6 +55,7 @@ export function RoutineView() {
   // below), just opened at the selected market's tab.
   const [viewMarket, setViewMarket] = useState<MarketKey>("vn");
   const [storeLinks, setStoreLinks] = useState<Record<string, string>>({});
+  const [storeLinksByMarket, setStoreLinksByMarket] = useState<Record<string, Record<string, string>>>({});
   // Publish switch + readiness readout (2026-09-05): the app lists a roadmap
   // only when `roadmapPublished`; this panel tells Admin how complete the
   // videos are before flipping it.
@@ -108,13 +109,26 @@ export function RoutineView() {
   const [deletingDay, setDeletingDay] = useState(false);
 
   function reload(selectId?: string) {
-    Promise.all([fetchRoutineProducts(), fetchStoreCategories()])
-      .then(([prods, cats]) => {
+    // All three markets, not just VN: the header line shows the link of the
+    // market currently selected in the dropdown, while "Sửa thông tin" keeps
+    // editing the VN one (updateProductInfo writes market = 'VN' only).
+    Promise.all([
+      fetchRoutineProducts(),
+      fetchStoreCategories("VN"),
+      fetchStoreCategories("US"),
+      fetchStoreCategories("MALAY"),
+    ])
+      .then(([prods, catsVn, catsUs, catsMalay]) => {
         setProducts(prods);
-        const links: Record<string, string> = {};
-        // Keyed by products.id (what this view looks up), not store_items.id.
-        for (const c of cats) for (const it of c.items) if (it.link) links[it.productId ?? it.id] = it.link;
+        const linksFor = (cats: typeof catsVn) => {
+          const map: Record<string, string> = {};
+          // Keyed by products.id (what this view looks up), not store_items.id.
+          for (const c of cats) for (const it of c.items) if (it.link) map[it.productId ?? it.id] = it.link;
+          return map;
+        };
+        const links = linksFor(catsVn);
         setStoreLinks(links);
+        setStoreLinksByMarket({ VN: links, US: linksFor(catsUs), MALAY: linksFor(catsMalay) });
         if (selectId) setProductId(selectId);
         else if (!productId && prods.length) setProductId(prods[0].id);
       })
@@ -428,6 +442,7 @@ export function RoutineView() {
 
   const dayList = [...product.days].sort((a, b) => a.id - b.id);
   const viewMarketLabel = MARKET_TABS.find(([key]) => key === viewMarket)?.[1] ?? "VN";
+  const marketStoreLink = storeLinksByMarket[MARKET_DB_CODE[viewMarket]]?.[product.id] ?? "";
   // Only the market being viewed — showing all 3 side by side read as noise
   // when the header already scopes the page to one (owner, 2026-09-05).
   const marketReadiness = readiness?.find((r) => r.market === MARKET_DB_CODE[viewMarket]) ?? null;
@@ -537,9 +552,13 @@ export function RoutineView() {
             <strong style={{ color: "var(--text-primary)" }}>{dayList.length}</strong>/{product.totalDays} ngày · {product.phases.length} giai đoạn
           </div>
           <div>
-            Link sản phẩm:{" "}
-            {storeLinks[product.id] ? (
-              <a href={storeLinks[product.id]} target="_blank" rel="noopener">Xem trang sản phẩm ↗</a>
+            {/* Follows the market dropdown above. This used to always show
+                the VN link even while viewing UK/ML, because the fetch never
+                passed a market (audit 2026-09-06). The Sửa thông tin modal
+                still edits the VN link only — see updateProductInfo. */}
+            Link sản phẩm ({viewMarketLabel}):{" "}
+            {marketStoreLink ? (
+              <a href={marketStoreLink} target="_blank" rel="noopener">Xem trang sản phẩm ↗</a>
             ) : (
               <span style={{ color: "var(--text-muted)" }}>Chưa có link</span>
             )}

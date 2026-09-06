@@ -21,6 +21,21 @@ import type {
   TheraAccessLevel,
 } from "./adminMockData";
 
+/** PostgREST answers a DELETE that RLS filtered down to zero rows with
+ * `error: null` and no other signal, so a blocked delete was indistinguishable
+ * from a successful one: the view toasted "Đã xoá", reloaded, and the row was
+ * still sitting there (owner report, 2026-09-06). Asking for the deleted ids
+ * back turns that silence into a real error the existing catch blocks already
+ * surface. `blocked_or_already_deleted` also covers the harmless case of two
+ * tabs deleting the same row, which is why the toast wording stays neutral. */
+async function runDelete(
+  builder: PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
+): Promise<void> {
+  const { data, error } = await builder;
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("blocked_or_already_deleted");
+}
+
 const ACCENT_COLORS: Record<string, string> = {
   primary: "var(--color-primary)",
   accentOrange: "var(--accent-orange)",
@@ -209,8 +224,7 @@ export async function deleteRoutineProduct(productId: string) {
   // product_activation_contacts and every user_programs row (with its
   // progress and pain logs); store_items.product_id is set null so the
   // storefront row survives; notifications lose the product/day reference.
-  const { error } = await supabase.from("products").delete().eq("id", productId);
-  if (error) throw error;
+  await runDelete(supabase.from("products").delete().eq("id", productId).select("id"));
 }
 
 /** Creates the product and its starter phases. The storefront link is NOT
@@ -369,8 +383,7 @@ export async function renumberProgramDays(productId: string): Promise<number> {
 }
 
 export async function deleteProgramDay(productId: string, dayNumber: number) {
-  const { error } = await supabase.from("program_days").delete().eq("product_id", productId).eq("day_number", dayNumber);
-  if (error) throw error;
+  await runDelete(supabase.from("program_days").delete().eq("product_id", productId).eq("day_number", dayNumber).select("id"));
 }
 
 // ---------------------------------------------------------------------------
@@ -434,8 +447,7 @@ export async function fetchPhaseDeleteImpact(phaseId: string): Promise<{ days: n
 }
 
 export async function deleteProgramPhase(phaseId: string) {
-  const { error } = await supabase.from("program_phases").delete().eq("id", phaseId);
-  if (error) throw error;
+  await runDelete(supabase.from("program_phases").delete().eq("id", phaseId).select("id"));
 }
 
 /** Moves every day of a product into the phase whose range covers its
@@ -639,16 +651,14 @@ export async function saveStoreCategoryGroup(
 export async function deleteStoreCategoryGroup(groupKey: string) {
   // store_items.category_id -> store_categories.id is ON DELETE CASCADE,
   // so removing every market's category row also removes its items.
-  const { error } = await supabase.from("store_categories").delete().eq("group_key", groupKey);
-  if (error) throw error;
+  await runDelete(supabase.from("store_categories").delete().eq("group_key", groupKey).select("id"));
 }
 
 /** Stops selling one category in ONE market: deletes only that market's
  * row (its items in that market cascade). The other markets' rows stay —
  * the bug this replaces was the UK trash icon wiping VN too. */
 export async function deleteStoreCategoryMarket(groupKey: string, market: AdminMarket) {
-  const { error } = await supabase.from("store_categories").delete().eq("group_key", groupKey).eq("market", market);
-  if (error) throw error;
+  await runDelete(supabase.from("store_categories").delete().eq("group_key", groupKey).eq("market", market).select("id"));
 }
 
 /** Creates/updates the market rows of one item group, linking each
@@ -711,14 +721,12 @@ export async function saveStoreItemGroup(
 }
 
 export async function deleteStoreItemGroup(groupKey: string) {
-  const { error } = await supabase.from("store_items").delete().eq("group_key", groupKey);
-  if (error) throw error;
+  await runDelete(supabase.from("store_items").delete().eq("group_key", groupKey).select("id"));
 }
 
 /** Stops selling one item in ONE market — see deleteStoreCategoryMarket. */
 export async function deleteStoreItemMarket(groupKey: string, market: AdminMarket) {
-  const { error } = await supabase.from("store_items").delete().eq("group_key", groupKey).eq("market", market);
-  if (error) throw error;
+  await runDelete(supabase.from("store_items").delete().eq("group_key", groupKey).eq("market", market).select("id"));
 }
 
 export async function uploadStoreItemImage(itemId: string, file: File) {
@@ -816,8 +824,7 @@ export async function addProductActivationContact(productId: string, contact: st
 }
 
 export async function deleteProductActivationContact(id: string): Promise<void> {
-  const { error } = await supabase.from("product_activation_contacts").delete().eq("id", id);
-  if (error) throw error;
+  await runDelete(supabase.from("product_activation_contacts").delete().eq("id", id).select("id"));
 }
 
 // ---------------------------------------------------------------------------
@@ -875,8 +882,7 @@ export async function saveQuizQuestion(
 }
 
 export async function deleteQuizQuestion(id: string) {
-  const { error } = await supabase.from("quiz_questions").delete().eq("id", id);
-  if (error) throw error;
+  await runDelete(supabase.from("quiz_questions").delete().eq("id", id).select("id"));
 }
 
 /** The translatable text/url fields of a phase promo — everything except
@@ -1363,8 +1369,7 @@ export async function setUserProgramPhase(userProgramId: string, phaseId: string
 // only fires on a *new* products row insert, it never re-scans/reconciles
 // existing products for existing users.
 export async function deleteUserProgram(userProgramId: string) {
-  const { error } = await supabase.from("user_programs").delete().eq("id", userProgramId);
-  if (error) throw error;
+  await runDelete(supabase.from("user_programs").delete().eq("id", userProgramId).select("id"));
 }
 
 // ---------------------------------------------------------------------------
@@ -1465,6 +1470,28 @@ export async function createTheraAccount(input: CreateTheraAccountInput): Promis
 
 export async function resetTheraAccountPassword(userId: string, newPassword: string) {
   await invokeAdminManageAccount({ action: "reset_password", user_id: userId, new_password: newPassword });
+}
+
+/** Really removes the account (2026-09-06). "Xóa" used to call
+ * `updateTheraAccount(id, { locked: true })`, which left the row sitting in
+ * the table marked "Đã khóa" — the owner's "xoá rồi nhưng vẫn hiện". Needs
+ * the service role because deleting an auth.users row is not something RLS
+ * can grant; the Edge Function refuses the root admin, the caller's own
+ * account and ordinary app customers. */
+export async function deleteTheraAccount(userId: string) {
+  await invokeAdminManageAccount({ action: "delete", user_id: userId });
+}
+
+/** Maps the Edge Function's delete refusals to Vietnamese. */
+export function theraAccountDeleteMessage(error: unknown): string {
+  const code = error instanceof Error ? error.message : "";
+  if (code === "cannot_delete_root_admin") return "Không thể xoá tài khoản quản trị gốc.";
+  if (code === "cannot_delete_self") return "Không thể tự xoá tài khoản bạn đang đăng nhập.";
+  if (code === "not_a_thera_account") return "Đây là tài khoản khách, không xoá ở đây được.";
+  if (code === "account_not_found") return "Tài khoản không còn tồn tại — hãy tải lại trang.";
+  if (code.includes("upsell_campaigns")) return "Tài khoản này đã tạo chiến dịch upsell — xoá chiến dịch đó trước.";
+  if (code === "forbidden" || code.includes("Authorization")) return "Phiên đăng nhập đã hết hạn — đăng nhập lại rồi thử lại.";
+  return "Không thể xoá tài khoản. Vui lòng thử lại.";
 }
 
 // ---------------------------------------------------------------------------
@@ -1826,12 +1853,10 @@ export async function uploadPostThumbnail(postId: string, file: File) {
   return supabase.storage.from("community-images").getPublicUrl(path).data.publicUrl;
 }
 export async function deleteCommunityPost(idKey: string) {
-  const { error } = await supabase.from("community_posts").delete().eq("id", idKey);
-  if (error) throw error;
+  await runDelete(supabase.from("community_posts").delete().eq("id", idKey).select("id"));
 }
 export async function deleteCommunityComment(idKey: string) {
-  const { error } = await supabase.from("post_comments").delete().eq("id", idKey);
-  if (error) throw error;
+  await runDelete(supabase.from("post_comments").delete().eq("id", idKey).select("id"));
 }
 export async function hideCommunityComment(idKey: string, hidden: boolean) {
   const { error } = await supabase.from("post_comments").update({ hidden }).eq("id", idKey);
@@ -2316,8 +2341,7 @@ export async function updateAISuggestedReply(id: string, patch: { text?: string;
 }
 
 export async function deleteAISuggestedReply(id: string) {
-  const { error } = await supabase.from("ai_suggested_replies").delete().eq("id", id);
-  if (error) throw error;
+  await runDelete(supabase.from("ai_suggested_replies").delete().eq("id", id).select("id"));
 }
 
 // ---------------------------------------------------------------------------
@@ -2468,8 +2492,7 @@ export async function saveFaqItem(item: FaqItemAdmin) {
 }
 
 export async function deleteFaqItem(id: string) {
-  const { error } = await supabase.from("faq_items").delete().eq("id", id);
-  if (error) throw error;
+  await runDelete(supabase.from("faq_items").delete().eq("id", id).select("id"));
 }
 
 /** Persists a new order after a move up/down. */
@@ -2493,6 +2516,8 @@ export interface SurveyAnswer {
 export interface SurveyAttempt {
   id: string;
   userName: string;
+  /** Market of the customer who answered — null until they confirm one. */
+  country: TheraAccountCountry | null;
   phaseName: string;
   productName: string;
   completedAt: string;
@@ -2507,13 +2532,16 @@ export async function fetchSurveyAttempts(limit = 200): Promise<SurveyAttempt[]>
     supabase.from("user_quiz_attempts").select("id, user_id, phase_id, completed_at, answers").order("completed_at", { ascending: false }).limit(limit),
     supabase.from("program_phases").select("id, name, product_id"),
     supabase.from("products").select("id, name"),
-    supabase.from("profiles").select("id, full_name, username"),
+    // `country` rides along so Thống kê can be split per market — it is the
+    // column that decides which prices and links the customer saw.
+    supabase.from("profiles").select("id, full_name, username, country"),
   ]);
   if (error) throw error;
 
   const phaseById = new Map((phases ?? []).map((p) => [p.id, p]));
   const productById = new Map((products ?? []).map((p) => [p.id, p.name]));
   const profileById = new Map((profs ?? []).map((p) => [p.id, p.full_name || p.username || ""]));
+  const countryById = new Map((profs ?? []).map((p) => [p.id, (p.country as TheraAccountCountry | null) ?? null]));
 
   return (attempts ?? []).map((a) => {
     const phase = phaseById.get(a.phase_id);
@@ -2521,6 +2549,7 @@ export async function fetchSurveyAttempts(limit = 200): Promise<SurveyAttempt[]>
     return {
       id: a.id,
       userName: profileById.get(a.user_id) || "Người dùng",
+      country: countryById.get(a.user_id) ?? null,
       phaseName: phase?.name ?? "",
       productName: phase ? productById.get(phase.product_id) ?? "" : "",
       completedAt: a.completed_at,
@@ -2536,6 +2565,8 @@ export async function fetchSurveyAttempts(limit = 200): Promise<SurveyAttempt[]>
 export interface PurchaseRow {
   id: string;
   userName: string;
+  /** Market of the buyer — null until they confirm one. */
+  country: TheraAccountCountry | null;
   productName: string;
   phaseName: string;
   platform: string;
@@ -2548,19 +2579,23 @@ export async function fetchPhasePurchases(limit = 200): Promise<PurchaseRow[]> {
     supabase.from("phase_purchases").select("id, user_id, phase_id, platform, purchased_at, revoked_at").order("purchased_at", { ascending: false }).limit(limit),
     supabase.from("program_phases").select("id, name, product_id"),
     supabase.from("products").select("id, name"),
-    supabase.from("profiles").select("id, full_name, username"),
+    // `country` rides along so Thống kê can be split per market — it is the
+    // column that decides which prices and links the customer saw.
+    supabase.from("profiles").select("id, full_name, username, country"),
   ]);
   if (error) throw error;
 
   const phaseById = new Map((phases ?? []).map((p) => [p.id, p]));
   const productById = new Map((products ?? []).map((p) => [p.id, p.name]));
   const profileById = new Map((profs ?? []).map((p) => [p.id, p.full_name || p.username || ""]));
+  const countryById = new Map((profs ?? []).map((p) => [p.id, (p.country as TheraAccountCountry | null) ?? null]));
 
   return (rows ?? []).map((r) => {
     const phase = phaseById.get(r.phase_id);
     return {
       id: r.id,
       userName: profileById.get(r.user_id) || "Người dùng",
+      country: countryById.get(r.user_id) ?? null,
       productName: phase ? productById.get(phase.product_id) ?? "" : "",
       phaseName: phase?.name ?? "",
       platform: r.platform,

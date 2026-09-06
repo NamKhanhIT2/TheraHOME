@@ -82,6 +82,9 @@ Deno.serve(async (req: Request) => {
   if (payload.action === "reset_password") {
     return handleResetPassword(adminClient, payload);
   }
+  if (payload.action === "delete") {
+    return handleDelete(adminClient, callerClient, payload);
+  }
   return jsonResponse({ error: "Unknown action" }, 400);
 });
 
@@ -229,6 +232,57 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
   }
 
   return jsonResponse({ user_id: userId });
+}
+
+// Really deletes a TheraHOME-issued account (2026-09-06). The WEB "Xóa"
+// button used to only set profiles.locked, so the row stayed in the list
+// and the owner reported "đã xoá rồi mà vẫn hiện". Deleting the auth user
+// cascades: profiles, user_programs + progress, pain/water logs, chat
+// threads and messages, notifications, push tokens, quiz attempts and
+// access contacts all go with it. community_posts.author_id is SET NULL, so
+// anything the account published in the feed survives without an author.
+// upsell_campaigns.created_by is RESTRICT — an account that scheduled a
+// campaign cannot be deleted until that campaign is gone, and the FK error
+// is returned as-is rather than being swallowed.
+// deno-lint-ignore no-explicit-any
+async function handleDelete(adminClient: any, callerClient: any, payload: Record<string, unknown>) {
+  const userId = String(payload.user_id ?? "");
+  if (!userId) {
+    return jsonResponse({ error: "missing_required_field" }, 400);
+  }
+
+  const { data: callerUser } = await callerClient.auth.getUser();
+  if (callerUser?.user?.id === userId) {
+    return jsonResponse({ error: "cannot_delete_self" }, 400);
+  }
+
+  const { data: target, error: targetError } = await adminClient
+    .from("profiles")
+    .select("account_type")
+    .eq("id", userId)
+    .maybeSingle();
+  if (targetError) {
+    return jsonResponse({ error: targetError.message }, 500);
+  }
+  if (!target) {
+    return jsonResponse({ error: "account_not_found" }, 404);
+  }
+  // The singleton admin is seeded by migration and backed by a partial
+  // unique index; deleting it would lock everyone out of WEB.
+  if (target.account_type === "admin") {
+    return jsonResponse({ error: "cannot_delete_root_admin" }, 400);
+  }
+  // This endpoint manages TheraHOME-issued accounts only. Ordinary
+  // customers delete themselves from the app (profile → xoá tài khoản).
+  if (target.account_type === "normal") {
+    return jsonResponse({ error: "not_a_thera_account" }, 400);
+  }
+
+  const { error } = await adminClient.auth.admin.deleteUser(userId);
+  if (error) {
+    return jsonResponse({ error: error.message }, 500);
+  }
+  return jsonResponse({ ok: true });
 }
 
 // deno-lint-ignore no-explicit-any
