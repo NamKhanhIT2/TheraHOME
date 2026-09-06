@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
@@ -68,7 +68,7 @@ export default function AIChatScreen() {
 
   return (
     <ScreenContainer>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}>
           <Pressable onPress={() => router.back()} hitSlop={8}>
             <Icon name="chevron-left" size={22} color={theme.colors.textPrimary} />

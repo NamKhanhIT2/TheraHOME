@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
@@ -210,7 +210,7 @@ export default function PostDetailScreen() {
       <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{timeAgo(post.createdAt, t)}</Text>
     </View>
   </Pressable>;
-  return <ScreenContainer><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  return <ScreenContainer><KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
     <BackBar onBack={() => router.back()} title={headerAuthor} right={<Pressable onPress={(event) => setPostMenu({ pageX: event.nativeEvent.pageX, pageY: event.nativeEvent.pageY })} hitSlop={10}><Icon name="more-horizontal" size={22} color={theme.colors.textPrimary} /></Pressable>} />
     <ScrollView ref={scrollRef} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" onTouchStart={() => setShowEmoji(false)} onScrollBeginDrag={() => setShowEmoji(false)} refreshControl={<RefreshControl refreshing={manualRefreshing} onRefresh={async () => { setManualRefreshing(true); try { await Promise.all([postQuery.refetch(), commentsQuery.refetch()]); } finally { setManualRefreshing(false); } }} tintColor={theme.colors.primary} />}>
       <View style={styles.post}>

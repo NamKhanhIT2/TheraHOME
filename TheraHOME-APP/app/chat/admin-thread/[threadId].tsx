@@ -4,7 +4,7 @@
 // "own" flips to sender_type: 'specialist' and sending posts as the
 // specialist instead of the patient. See CLAUDE.md.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -189,7 +189,7 @@ export default function AdminChatThreadScreen() {
     : null;
   return (
     <ScreenContainer>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}>
           <Pressable onPress={() => router.back()}><Icon name="chevron-left" size={22} color={theme.colors.textPrimary} /></Pressable>
           <AvatarImg size={36} uri={patientQuery.data?.avatarUrl} />

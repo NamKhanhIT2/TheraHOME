@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Tabs, router, usePathname } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useAppStore } from '@/store/useAppStore';
@@ -57,12 +58,17 @@ function TabBarButton({ item, isFocused, onPress }: { item: (typeof TAB_ITEMS)[n
 
 function CustomTabBar({ state, navigation }: TabBarProps) {
   const theme = useTheme();
+  // Android draws edge-to-edge (SDK 52+), so the system navigation bar sits
+  // ON TOP of this bar unless we reserve its height — the tab labels were
+  // half-hidden behind the three-button nav. Every screen gets this from
+  // ScreenContainer's SafeAreaView; the tab bar renders outside it.
+  const insets = useSafeAreaInsets();
   return (
     <View
       style={[
         styles.bar,
         theme.shadows.nav,
-        { backgroundColor: theme.dark ? theme.colors.bgCard : '#fff', borderTopColor: theme.colors.borderLight },
+        { backgroundColor: theme.dark ? theme.colors.bgCard : '#fff', borderTopColor: theme.colors.borderLight, paddingBottom: insets.bottom },
       ]}
     >
       <View style={styles.barInner}>

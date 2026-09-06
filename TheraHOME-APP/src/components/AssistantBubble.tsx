@@ -9,7 +9,7 @@ import { useI18n } from '@/lib/i18n';
 export interface AssistantBubbleProps {
   onOpenAIChat: () => void;
   onOpenSupportChat: () => void;
-  /** Distance from the bottom of the screen — defaults to clearing the tab bar. */
+  /** Distance above the bottom safe-area inset — defaults to clearing the tab bar. */
   bottomOffset?: number;
   /** Admin/cskh accounts get "Chat" (→ the conversations list) instead of
    * the patient-facing "Chuyên gia TheraHOME" (→ their one specialist
@@ -61,7 +61,11 @@ export function AssistantBubble({ onOpenAIChat, onOpenSupportChat, bottomOffset 
           theme.shadows.fab,
           {
             right: 16,
-            bottom: bottomOffset,
+            // + insets.bottom: the tab bar this is meant to clear reserves the
+            // Android system navigation bar's height (see (tabs)/_layout.tsx),
+            // so a fixed offset from the screen edge lands the bubble on top of
+            // the Community tab instead of above it.
+            bottom: bottomOffset + insets.bottom,
             backgroundColor: theme.colors.primary,
             borderColor: theme.dark ? theme.colors.bgApp : '#fff',
           },
