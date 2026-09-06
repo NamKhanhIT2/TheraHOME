@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
 import { useUpdateProfile } from '@/hooks/useProfile';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -41,6 +42,7 @@ export default function ConsentScreen() {
   const { session } = useSession();
   const updateProfile = useUpdateProfile(session?.user.id);
   const queryClient = useQueryClient();
+  const onboardingAnswers = useAppStore((state) => state.onboardingAnswers);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
 
@@ -58,7 +60,21 @@ export default function ConsentScreen() {
       return;
     }
     try {
-      await updateProfile.mutateAsync({ onboarding_completed: true });
+      // Carry the two single-choice answers that have a home on the profile.
+      // The questionnaire used to live only in the device store, so `Hồ sơ →
+      // Chỉnh sửa` showed an empty training area and goal right after someone
+      // had just answered both, and the answers were gone on the next device.
+      // profile/edit.tsx already reads these two columns and maps them across
+      // languages by option position (localizeSavedAnswer), so store the option
+      // text exactly as that screen writes it. Only send a key we actually have
+      // — an account replaying onboarding must not blank an existing value.
+      const zone = onboardingAnswers.priority_zone;
+      const mainGoal = onboardingAnswers.goal_main;
+      await updateProfile.mutateAsync({
+        onboarding_completed: true,
+        ...(typeof zone === 'string' && zone ? { treatment_area: zone } : {}),
+        ...(typeof mainGoal === 'string' && mainGoal ? { goal: mainGoal } : {}),
+      });
       // Flipping the flag unregisters the whole (onboarding) group, pulling
       // this screen out from under the router. RootNavigator only *actively*
       // navigates when onboarding or the country step is still pending, and
