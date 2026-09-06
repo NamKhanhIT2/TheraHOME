@@ -46,3 +46,8 @@ google-play-service-account.json
 # generated native folders
 /ios
 /android
+
+# Build artefacts for the store — regenerable, and an AAB is ~110MB.
+# The listing copy and screenshots next to it ARE tracked (see play-assets/).
+*.aab
+*.apk

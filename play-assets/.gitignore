@@ -1,0 +1,4 @@
+# The signed bundle is a build artefact: ~110MB, regenerable from any commit
+# with `./gradlew bundleRelease`, and Play only ever wants the newest one.
+*.aab
+*.apk
