@@ -79,7 +79,10 @@ export function OnboardingContentView() {
   async function save(key: string) {
     const draft = drafts[`${key}:${lang}`];
     const original = rowFor(key);
-    if (!draft || !original || savingKey) return;
+    // Was `|| savingKey`: one shared flag meant saving question 2 while
+    // question 1 was in flight silently did nothing at all. Only refuse a
+    // second save of the SAME question.
+    if (!draft || !original || savingKey === key) return;
     if (!draft.title.trim() || draft.options.some((o) => !o.trim())) {
       pushToast("Tiêu đề và tất cả đáp án không được để trống");
       return;

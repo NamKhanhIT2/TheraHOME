@@ -40,7 +40,10 @@ export default function AdminChatThreadScreen() {
   const [actionOrigin, setActionOrigin] = useState<{ x: number; y: number } | null>(null);
   const [reactionOverrides, setReactionOverrides] = useState<Record<string, string | null>>({});
   const [showEmojis, setShowEmojis] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // Guard reads the mutation's own pending flag. A local busy state here
+  // had a setter that was never called, so every check against it passed
+  // and the send button was never disabled — two taps sent two messages
+  // and fired two push notifications.
   const [viewer, setViewer] = useState<{ uri: string; kind: 'image' | 'video' } | null>(null);
   const inputRef = useRef<TextInput>(null);
   const listRef = useRef<FlatList<ChatMessageRow>>(null);
@@ -71,7 +74,7 @@ export default function AdminChatThreadScreen() {
 
   async function submit() {
     const body = text.trim();
-    if ((!body && !attachment) || saving || !threadId || !staffUserId) return;
+    if ((!body && !attachment) || sendMessage.isPending || !threadId || !staffUserId) return;
 
     const replyToMessageId = replyingTo?.id;
     if (!attachment) {
@@ -90,7 +93,7 @@ export default function AdminChatThreadScreen() {
   }
 
   function sendQuickLike() {
-    if (saving || !threadId || !staffUserId) return;
+    if (sendMessage.isPending || !threadId || !staffUserId) return;
     void sendMessage.mutateAsync({ body: '👍' }).catch(() => Alert.alert('Chưa lưu được tin nhắn', 'Vui lòng thử lại.'));
   }
 
@@ -196,7 +199,7 @@ export default function AdminChatThreadScreen() {
         {context ? <View style={[styles.context, { backgroundColor: theme.colors.bgCardAlt, borderLeftColor: theme.colors.primary }]}><View style={styles.flex}><Text style={[styles.contextTitle, { color: theme.colors.primary }]}>Đang trả lời</Text><Text numberOfLines={1} style={{ color: theme.colors.textSecondary }}>{context.body || 'Ảnh'}</Text></View><Pressable onPress={() => setReplyingTo(null)}><Icon name="x" size={18} color={theme.colors.textMuted} /></Pressable></View> : null}
         {showEmojis ? <View style={[styles.emojiBar, { borderTopColor: theme.colors.divider }]}>{COMPOSER_EMOJIS.map((emoji) => <Pressable key={emoji} onPress={() => setText((value) => value + emoji)}><Text style={styles.composerEmoji}>{emoji}</Text></Pressable>)}</View> : null}
         {attachment ? <View style={[styles.attachmentTray, { borderTopColor: theme.colors.divider }]}><View>{attachment.type === 'video' ? <View style={[styles.preview, styles.videoPreview]}><Icon name="film" size={27} color="#fff" /></View> : <Image source={{ uri: attachment.uri }} style={styles.preview} />}<Pressable onPress={() => setAttachment(null)} style={styles.remove}><Icon name="x" size={12} color="#fff" /></Pressable></View></View> : null}
-        <View style={[styles.inputRow, { borderTopColor: theme.colors.divider, backgroundColor: theme.colors.bgApp }]}><Pressable accessibilityRole="button" accessibilityLabel="Chọn ảnh hoặc video" hitSlop={6} onPress={() => void pickMedia()} style={styles.composerTool}><Icon name="image" size={23} color={theme.colors.primary} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Chọn biểu tượng cảm xúc" hitSlop={6} onPress={() => setShowEmojis((value) => !value)} style={styles.composerTool}><Icon name="smile" size={23} color={theme.colors.primary} /></Pressable><TextInput ref={inputRef} value={text} onChangeText={setText} multiline maxLength={2000} placeholder="Aa" accessibilityLabel="Nội dung tin nhắn" placeholderTextColor={theme.colors.textMuted} style={[styles.input, { borderColor: theme.colors.borderInput, color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardAlt }]} /><Pressable accessibilityRole="button" accessibilityLabel={text.trim() || attachment ? 'Gửi tin nhắn' : 'Gửi lượt thích'} disabled={saving} onPress={() => text.trim() || attachment ? void submit() : sendQuickLike()} style={[styles.send, { backgroundColor: theme.colors.primary, opacity: saving ? 0.55 : 1 }]}><Icon name={text.trim() || attachment ? "send" : "thumbs-up"} size={18} color="#fff" /></Pressable></View>
+        <View style={[styles.inputRow, { borderTopColor: theme.colors.divider, backgroundColor: theme.colors.bgApp }]}><Pressable accessibilityRole="button" accessibilityLabel="Chọn ảnh hoặc video" hitSlop={6} onPress={() => void pickMedia()} style={styles.composerTool}><Icon name="image" size={23} color={theme.colors.primary} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Chọn biểu tượng cảm xúc" hitSlop={6} onPress={() => setShowEmojis((value) => !value)} style={styles.composerTool}><Icon name="smile" size={23} color={theme.colors.primary} /></Pressable><TextInput ref={inputRef} value={text} onChangeText={setText} multiline maxLength={2000} placeholder="Aa" accessibilityLabel="Nội dung tin nhắn" placeholderTextColor={theme.colors.textMuted} style={[styles.input, { borderColor: theme.colors.borderInput, color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardAlt }]} /><Pressable accessibilityRole="button" accessibilityLabel={text.trim() || attachment ? 'Gửi tin nhắn' : 'Gửi lượt thích'} disabled={sendMessage.isPending} onPress={() => text.trim() || attachment ? void submit() : sendQuickLike()} style={[styles.send, { backgroundColor: theme.colors.primary, opacity: sendMessage.isPending ? 0.55 : 1 }]}><Icon name={text.trim() || attachment ? "send" : "thumbs-up"} size={18} color="#fff" /></Pressable></View>
         {viewer ? <ChatMediaViewer uri={viewer.uri} kind={viewer.kind} onClose={() => setViewer(null)} /> : null}
         <Modal visible={!!actionMessage} transparent animationType="none" onRequestClose={() => { setActionMessage(null); setActionOrigin(null); }}><Pressable style={styles.backdrop} onPress={() => { setActionMessage(null); setActionOrigin(null); }}><View style={[styles.actionContent, { top: actionTop, ...(actionOwn ? { right: 16 } : { left: 16 }) }]}><View style={[styles.reactionBar, { backgroundColor: theme.colors.bgCard }]}>{REACTIONS.map((emoji) => <Pressable key={emoji} style={[styles.reactionChoice, selectedActionEmoji === emoji ? { backgroundColor: theme.colors.bgCardAlt } : undefined]} onPress={() => actionMessage && void react(actionMessage, emoji)}><ReactionAsset emoji={emoji} size={29} /></Pressable>)}</View><View style={[styles.sheet, { backgroundColor: theme.colors.bgCard }]}><ActionRow icon="message-circle" text="Trả lời" onPress={() => void action('reply')} /><ActionRow icon="copy" text="Sao chép" onPress={() => void action('copy')} /></View></View></Pressable></Modal>
       </KeyboardAvoidingView>

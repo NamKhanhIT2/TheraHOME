@@ -60,7 +60,9 @@ export function ActivationView() {
 
   async function addContact(productId: string) {
     const draft = (drafts[productId] ?? "").trim();
-    if (!draft || addingFor) return;
+    // Was `|| addingFor`: adding a contact to product B while product A's
+    // add was in flight was silently dropped.
+    if (!draft || addingFor === productId) return;
     try {
       setAddingFor(productId);
       setAddErrors((cur) => ({ ...cur, [productId]: "" }));

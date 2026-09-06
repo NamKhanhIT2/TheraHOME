@@ -103,6 +103,7 @@ export function UpsaleNotificationsView() {
   }
 
   async function save() {
+    if (saving) return;
     if (!schedules.length || schedules.some((schedule) => !schedule.title.trim() || !schedule.body.trim())) {
       pushToast("Hãy nhập tiêu đề và nội dung cho từng ngày");
       return;
@@ -204,7 +205,10 @@ export function UpsaleNotificationsView() {
     setSchedules((current) => current.filter((schedule) => schedule.id !== id));
   }
 
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   async function cancel(campaign: UpsellCampaign) {
+    if (cancellingId) return;
+    setCancellingId(campaign.id);
     try {
       await cancelUpsellCampaign(campaign.id);
       setCampaigns((current) => current?.map((item) => item.id === campaign.id ? { ...item, status: "cancelled" } : item) ?? current);
@@ -215,6 +219,8 @@ export function UpsaleNotificationsView() {
           ? "Chiến dịch đã bắt đầu gửi nên không thể hủy nữa"
           : "Không thể hủy lịch gửi",
       );
+    } finally {
+      setCancellingId(null);
     }
   }
 

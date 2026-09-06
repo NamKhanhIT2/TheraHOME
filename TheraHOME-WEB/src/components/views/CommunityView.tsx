@@ -55,15 +55,21 @@ const AUTHOR_TABS: Array<[AuthorTab, string]> = [
   ["users", "Khác"],
 ];
 
-function NewChallengeModal({ onClose, onSave }: { onClose: () => void; onSave: (input: { title: string; description: string; icon: string; targetStreakDays: number }) => void }) {
+function NewChallengeModal({ onClose, onSave }: { onClose: () => void; onSave: (input: { title: string; description: string; icon: string; targetStreakDays: number }) => Promise<void> }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("🔥");
   const [targetStreakDays, setTargetStreakDays] = useState(7);
 
-  function submit() {
-    if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), icon: icon.trim() || "🔥", targetStreakDays });
+  const [submitting, setSubmitting] = useState(false);
+  async function submit() {
+    if (!title.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await onSave({ title: title.trim(), description: description.trim(), icon: icon.trim() || "🔥", targetStreakDays });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -74,7 +80,7 @@ function NewChallengeModal({ onClose, onSave }: { onClose: () => void; onSave: (
       footer={
         <Fragment>
           <GhostBtn onClick={onClose}>Hủy</GhostBtn>
-          <PrimaryBtn onClick={submit}>Tạo thử thách</PrimaryBtn>
+          <PrimaryBtn onClick={submit} disabled={submitting}>{submitting ? "Đang tạo..." : "Tạo thử thách"}</PrimaryBtn>
         </Fragment>
       }
     >
@@ -670,28 +676,37 @@ export function CommunityView() {
       );
     }
   }
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
   async function moderate(it: PinnedPost, status: PostModerationStatus) {
+    if (rowBusy) return;
+    setRowBusy(String(it.id));
     try {
       await setCommunityPostStatus(String(it.id), status);
       pushToast(status === "approved" ? "Đã duyệt bài viết — tác giả sẽ nhận thông báo" : "Đã từ chối bài viết — tác giả sẽ nhận thông báo");
       reload();
     } catch {
       pushToast("Không thể cập nhật trạng thái duyệt");
+    } finally {
+      setRowBusy(null);
     }
   }
   async function toggleHidden(it: PinnedPost) {
+    if (rowBusy) return;
+    setRowBusy(String(it.id));
     try {
       await updateCommunityPost(String(it.id), { hidden: !it.hidden });
       pushToast(it.hidden ? "Đã hiện lại bài viết" : "Đã ẩn bài viết");
       reload();
     } catch {
       pushToast("Không thể cập nhật trạng thái bài viết");
+    } finally {
+      setRowBusy(null);
     }
   }
   const [deletingPost, setDeletingPost] = useState<{ id: string | number; label: string } | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   async function removePost() {
-    if (!deletingPost) return;
+    if (!deletingPost || deleteBusy) return;
     try {
       setDeleteBusy(true);
       await deleteCommunityPost(String(deletingPost.id));
@@ -1190,12 +1205,12 @@ export function CommunityView() {
           <td style={{ padding: "14px 20px" }}>
             <div style={{ display: "flex", gap: 10 }}>
               {!it.official && it.status !== "approved" ? (
-                <button onClick={() => moderate(it, "approved")} title="Duyệt bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                <button onClick={() => moderate(it, "approved")} disabled={rowBusy === String(it.id)} title="Duyệt bài viết" style={{ border: "none", background: "none", cursor: rowBusy === String(it.id) ? "default" : "pointer", opacity: rowBusy === String(it.id) ? 0.5 : 1, display: "flex" }}>
                   <Icon name="check" size={16} color="var(--success, #2BB673)" />
                 </button>
               ) : null}
               {!it.official && it.status === "pending" ? (
-                <button onClick={() => moderate(it, "rejected")} title="Từ chối bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+                <button onClick={() => moderate(it, "rejected")} disabled={rowBusy === String(it.id)} title="Từ chối bài viết" style={{ border: "none", background: "none", cursor: rowBusy === String(it.id) ? "default" : "pointer", opacity: rowBusy === String(it.id) ? 0.5 : 1, display: "flex" }}>
                   <Icon name="x" size={16} color="var(--error)" />
                 </button>
               ) : null}
@@ -1204,7 +1219,7 @@ export function CommunityView() {
               <button onClick={() => openEdit(it)} title="Sửa bài viết" style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                 <Icon name="pencil" size={16} color="var(--color-primary)" />
               </button>
-              <button onClick={() => toggleHidden(it)} title={it.hidden ? "Hiện lại" : "Ẩn bài viết"} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
+              <button onClick={() => toggleHidden(it)} disabled={rowBusy === String(it.id)} title={it.hidden ? "Hiện lại" : "Ẩn bài viết"} style={{ border: "none", background: "none", cursor: rowBusy === String(it.id) ? "default" : "pointer", opacity: rowBusy === String(it.id) ? 0.5 : 1, display: "flex" }}>
                 <Icon name="eye" size={16} color={it.hidden ? "var(--text-muted)" : "var(--text-secondary)"} />
               </button>
               {/* Delete: Admin and CSKH on every post — CSKH publishes the

@@ -3581,6 +3581,64 @@ nên `select count` từ client luôn trả 0. Thêm RPC `product_order_count`
 - Feed refetch mỗi khi BẤT KỲ ai thả cảm xúc ở BẤT KỲ bài nào → nay debounce
   1.5s.
 
+## Quét lớp lỗi "bấm hai lần" (2026-09-06)
+
+Chủ sở hữu chỉ ra rằng ba đợt rà soát trước bỏ sót cả một lớp lỗi. Đúng:
+những đợt đó nhắm vào logic, đồng bộ và trải nghiệm, KHÔNG đợt nào hỏi
+"nút này bấm hai lần thì sao". Đợt này quét đúng lớp đó trên cả hai dự án.
+
+**Bằng chứng từ dữ liệu thật:** thông báo nhắc tập trùng cách nhau 0,00 giây
+(lỗi tranh chấp check-then-act, đã vá ở migration 202609061000 + khoá
+in-flight trong `pushNotifications.ts`), và hai bài chính thức trùng cách
+nhau 1,4 giây (nút Đăng bài không khoá). Đã quét 9 bảng khác: chat trùng là
+do người dùng gõ lại thật (gần nhất cách 29 giây), các bảng còn lại sạch.
+
+**App — nghiêm trọng nhất:** hai màn chat (`chat/human.tsx`,
+`chat/admin-thread/[threadId].tsx`) khai báo state `saving` nhưng KHÔNG BAO
+GIỜ gọi setter, nên `disabled={saving}` luôn false và mọi guard `|| saving`
+đều vô hiệu. Hai lần chạm = hai tin nhắn + hai push. Nay dùng
+`sendMessage.isPending`.
+
+**App — các guard đã thêm:**
+- `useRequestDay.confirmPain` và `day/[dayId].tsx confirmCheckIn`: chặn ghi
+  trùng `pain_logs` (nhật ký đau bị đếm hai lần).
+- `(tabs)/_layout.tsx`: tap thông báo lúc mở app nguội đi qua CẢ listener lẫn
+  `getLastNotificationResponseAsync`, đẩy màn hình hai lần vào stack. Thêm
+  `handledNotificationIds`.
+- `usePhasePurchase.purchase`: `verifying` chỉ bật SAU khi store gọi lại, nên
+  khoảng giữa lúc chạm và lúc StoreKit hiện lên là nút vẫn bấm được — hai lần
+  chạm gửi hai `requestPurchase`. Thêm ref, xoá ở cả hai callback.
+- Báo cáo bài/bình luận ở feed và màn chi tiết.
+- Broadcast của nhân viên: `await` không có try/catch nên lỗi thành unhandled
+  rejection, màn hình đứng im và người gửi bấm lại — đúng cách để gửi trùng.
+
+**Web — các guard đã thêm** (mẫu chung: early return TRÊN handler + `disabled`
+trên nút; chỉ `disabled` là thua vì lần chạm thứ hai có thể tới trước khi
+React kịp render lại):
+- Lộ trình: Thêm sản phẩm, Thêm ngày, Sửa thông tin, Thêm giai đoạn, Xuất
+  bản, Xoá giai đoạn (tách khỏi cờ dùng chung với Lưu), Xoá ngày, Đánh số lại,
+  Gán lại ngày.
+- Cộng đồng: Tạo thử thách (trước còn không `await`), Duyệt/Từ chối bài (mỗi
+  lần đều gửi thông báo cho tác giả), Ẩn/Hiện bài, Xoá bài.
+- Cửa hàng: Thêm nhóm, Thêm sản phẩm (mỗi lần bấm sinh `group_key` mới nên
+  tạo hẳn bản ghi trùng ở cả 3 thị trường), Xoá.
+- Khảo sát & Upsell: Lưu câu hỏi, Xoá câu hỏi, Lưu nội dung upsell, Lên lịch
+  Upsale, Hủy lịch.
+
+**Web — hai lỗi cờ dùng chung:**
+- `LegalContentView`: `reverting` vừa là cờ "modal đang mở" vừa là prop
+  `busy`, nên nút Khôi phục bị khoá NGAY khi mở — tính năng khôi phục bản gốc
+  chưa bao giờ chạy được. Tách thành hai cờ.
+- `OnboardingContentView` và `ActivationView`: một cờ dùng chung khiến thao
+  tác trên dòng KHÁC bị nuốt im lặng (bấm Lưu câu 2 khi câu 1 đang gửi thì
+  không có gì xảy ra). Nay chỉ chặn đúng dòng đang chạy.
+
+**Phát hiện khi chạy thử app:** nút gửi trong hai màn chat hiện hình TRÒN vô
+nghĩa thay vì ngón cái — `'thumbs-up'` là tên biểu tượng DUY NHẤT trong toàn
+bộ codebase thiếu trong bảng `ICONS` của `Icon.tsx`, nên rơi vào placeholder.
+Đã map. (Đã viết script đối chiếu 43 tên đang dùng với 80 tên trong bảng để
+chắc chắn không còn tên nào thiếu.)
+
 ## Hoàn thiện đợt 4 (2026-09-06)
 
 **Cộng đồng (app):**

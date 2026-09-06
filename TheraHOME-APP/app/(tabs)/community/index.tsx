@@ -291,7 +291,7 @@ export default function CommunityScreen() {
   }
 
   function submitReport(reason: ReportReason) {
-    if (!reportTarget) return;
+    if (!reportTarget || reportContent.isPending) return;
     const target = reportTarget;
     setReportTarget(null);
     reportContent.mutate(

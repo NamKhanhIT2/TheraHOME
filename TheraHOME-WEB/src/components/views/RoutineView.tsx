@@ -62,6 +62,14 @@ export function RoutineView() {
   const [publishAction, setPublishAction] = useState<"publish" | "unpublish" | "delete" | null>(null);
   const [deleteOwners, setDeleteOwners] = useState<number | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
+  // One in-flight flag per distinct write. Every handler below early-returns
+  // on its flag AND its button is disabled: the disabled prop alone loses the
+  // race, because a second click can land before React re-renders.
+  const [productBusy, setProductBusy] = useState(false);
+  const [dayBusy, setDayBusy] = useState(false);
+  const [infoBusy, setInfoBusy] = useState(false);
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+  const [deletePhaseBusy, setDeletePhaseBusy] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [newProductName, setNewProductName] = useState("");
@@ -129,6 +137,8 @@ export function RoutineView() {
       pushToast("Vui lòng nhập tên và số ngày từ 1 đến 365");
       return;
     }
+    if (productBusy) return;
+    setProductBusy(true);
     try {
       const { id, translated } = await createRoutineProduct({ name, category: newProductCategory, totalDays });
       setNewProductOpen(false);
@@ -140,6 +150,8 @@ export function RoutineView() {
       reload(id);
     } catch {
       pushToast("Không thể thêm sản phẩm");
+    } finally {
+      setProductBusy(false);
     }
   }
 
@@ -172,7 +184,7 @@ export function RoutineView() {
     setPhaseEnd(String(ph.range[1]));
   }
   async function savePhase() {
-    if (!product || !phaseModal) return;
+    if (!product || !phaseModal || phaseBusy) return;
     const name = phaseName.trim();
     const start = Number.parseInt(phaseStart, 10);
     const end = Number.parseInt(phaseEnd, 10);
@@ -234,8 +246,10 @@ export function RoutineView() {
     fetchPhaseDeleteImpact(ph.id).then(setDeletePhaseImpact).catch(() => setDeletePhaseImpact(null));
   }
   async function confirmDeletePhase() {
-    if (!product || !deletePhaseTarget) return;
-    setPhaseBusy(true);
+    // Its own flag: sharing phaseBusy with savePhase made one action's
+    // spinner disable the other.
+    if (!product || !deletePhaseTarget || deletePhaseBusy) return;
+    setDeletePhaseBusy(true);
     try {
       await deleteProgramPhase(deletePhaseTarget.id);
       setDeletePhaseTarget(null);
@@ -244,28 +258,34 @@ export function RoutineView() {
     } catch {
       pushToast("Không thể xoá giai đoạn");
     } finally {
-      setPhaseBusy(false);
+      setDeletePhaseBusy(false);
     }
   }
   async function runRenumberDays() {
-    if (!product) return;
+    if (!product || maintenanceBusy) return;
+    setMaintenanceBusy(true);
     try {
       const moved = await renumberProgramDays(product.id);
       pushToast(moved ? `Đã đánh số lại ${moved} ngày cho liền mạch` : "Các ngày đã liền mạch, không cần đánh số lại");
       reload(product.id);
     } catch {
       pushToast("Không thể đánh số lại các ngày");
+    } finally {
+      setMaintenanceBusy(false);
     }
   }
 
   async function runReassignDays() {
-    if (!product) return;
+    if (!product || maintenanceBusy) return;
+    setMaintenanceBusy(true);
     try {
       const moved = await reassignDaysToPhases(product.id);
       pushToast(moved ? `Đã gán lại ${moved} ngày theo khoảng giai đoạn` : "Không có ngày nào cần gán lại");
       reload(product.id);
     } catch {
       pushToast("Không thể gán lại ngày tập");
+    } finally {
+      setMaintenanceBusy(false);
     }
   }
   useEffect(() => {
@@ -274,7 +294,7 @@ export function RoutineView() {
   }, [productId, products]);
 
   async function runPublishAction() {
-    if (!product || !publishAction) return;
+    if (!product || !publishAction || publishBusy) return;
     setPublishBusy(true);
     try {
       if (publishAction === "delete") {
@@ -307,12 +327,13 @@ export function RoutineView() {
   }
 
   async function saveInfo() {
-    if (!product) return;
+    if (!product || infoBusy) return;
     const totalDays = Number.parseInt(infoTotalDays, 10);
     if (!Number.isInteger(totalDays) || totalDays < 1 || totalDays > 365) {
       pushToast("Thời lượng lộ trình phải từ 1 đến 365 ngày");
       return;
     }
+    setInfoBusy(true);
     try {
       await updateProductInfo(product.id, { name: infoName, link: infoLink, totalDays });
       // Same auto-draft rule as the phase editor: a blank UK/ML name is
@@ -341,6 +362,8 @@ export function RoutineView() {
       reload(product.id);
     } catch {
       pushToast("Không thể lưu thông tin");
+    } finally {
+      setInfoBusy(false);
     }
   }
   function openNewDay() {
@@ -361,7 +384,8 @@ export function RoutineView() {
     setSupportToolsUrl(d.supportToolsUrl);
   }
   async function saveDay() {
-    if (!product) return;
+    if (!product || dayBusy) return;
+    setDayBusy(true);
     const trimmedVideo: MarketContent = { vn: video.vn.trim(), us: video.us.trim(), malay: video.malay.trim() };
     const trimmedSupportToolsUrl: MarketContent = { vn: supportToolsUrl.vn.trim(), us: supportToolsUrl.us.trim(), malay: supportToolsUrl.malay.trim() };
     // Markets are managed independently (owner rule 2026-09-05) — a day may
@@ -380,10 +404,12 @@ export function RoutineView() {
       reload(product.id);
     } catch {
       pushToast("Không thể lưu ngày tập");
+    } finally {
+      setDayBusy(false);
     }
   }
   async function confirmDeleteDay() {
-    if (!product || deleteDayConfirm === null) return;
+    if (!product || deleteDayConfirm === null || deletingDay) return;
     try {
       setDeletingDay(true);
       await deleteProgramDay(product.id, deleteDayConfirm);
@@ -667,7 +693,7 @@ export function RoutineView() {
           footer={
             <Fragment>
               <GhostBtn onClick={() => setNewProductOpen(false)}>Hủy</GhostBtn>
-              <PrimaryBtn onClick={saveProduct}>Thêm sản phẩm</PrimaryBtn>
+              <PrimaryBtn onClick={saveProduct} disabled={productBusy}>{productBusy ? "Đang thêm..." : "Thêm sản phẩm"}</PrimaryBtn>
             </Fragment>
           }
         >

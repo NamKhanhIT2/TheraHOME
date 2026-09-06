@@ -41,7 +41,10 @@ export default function HumanChatScreen() {
   const [actionOrigin, setActionOrigin] = useState<{ x: number; y: number } | null>(null);
   const [reactionOverrides, setReactionOverrides] = useState<Record<string, string | null>>({});
   const [showEmojis, setShowEmojis] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // Guard reads the mutation's own pending flag. A local busy state here
+  // had a setter that was never called, so every check against it passed
+  // and the send button was never disabled — two taps sent two messages
+  // and fired two push notifications.
   const [viewer, setViewer] = useState<{ uri: string; kind: 'image' | 'video' } | null>(null);
   const inputRef = useRef<TextInput>(null);
   const listRef = useRef<FlatList<ChatMessageRow>>(null);
@@ -72,7 +75,7 @@ export default function HumanChatScreen() {
 
   async function submit() {
     const body = text.trim();
-    if ((!body && !attachment) || saving || !threadId || !userId) return;
+    if ((!body && !attachment) || sendMessage.isPending || !threadId || !userId) return;
 
     const replyToMessageId = replyingTo?.id;
     // Text messages should feel instantaneous: clear the composer and let the
@@ -93,7 +96,7 @@ export default function HumanChatScreen() {
   }
 
   function sendQuickLike() {
-    if (saving || !threadId || !userId) return;
+    if (sendMessage.isPending || !threadId || !userId) return;
     void sendMessage.mutateAsync({ body: '👍' }).catch(() => Alert.alert(t('sendFailTitle'), t('tryAgainBody')));
   }
 
@@ -199,7 +202,7 @@ export default function HumanChatScreen() {
         {context ? <View style={[styles.context, { backgroundColor: theme.colors.bgCardAlt, borderLeftColor: theme.colors.primary }]}><View style={styles.flex}><Text style={[styles.contextTitle, { color: theme.colors.primary }]}>{t('chatReplying')}</Text><Text numberOfLines={1} style={{ color: theme.colors.textSecondary }}>{context.body || t('image')}</Text></View><Pressable onPress={() => setReplyingTo(null)}><Icon name="x" size={18} color={theme.colors.textMuted} /></Pressable></View> : null}
         {showEmojis ? <View style={[styles.emojiBar, { borderTopColor: theme.colors.divider }]}>{COMPOSER_EMOJIS.map((emoji) => <Pressable key={emoji} onPress={() => setText((value) => value + emoji)}><Text style={styles.composerEmoji}>{emoji}</Text></Pressable>)}</View> : null}
         {attachment ? <View style={[styles.attachmentTray, { borderTopColor: theme.colors.divider }]}><View>{attachment.type === 'video' ? <View style={[styles.preview, styles.videoPreview]}><Icon name="film" size={27} color="#fff" /></View> : <Image source={{ uri: attachment.uri }} style={styles.preview} />}<Pressable onPress={() => setAttachment(null)} style={styles.remove}><Icon name="x" size={12} color="#fff" /></Pressable></View></View> : null}
-        <View style={[styles.inputRow, { borderTopColor: theme.colors.divider, backgroundColor: theme.colors.bgApp }]}><Pressable accessibilityRole="button" accessibilityLabel={t('a11yPickMedia')} hitSlop={6} onPress={() => void pickMedia()} style={styles.composerTool}><Icon name="image" size={23} color={theme.colors.primary} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={t('a11yPickEmoji')} hitSlop={6} onPress={() => setShowEmojis((value) => !value)} style={styles.composerTool}><Icon name="smile" size={23} color={theme.colors.primary} /></Pressable><TextInput ref={inputRef} value={text} onChangeText={setText} multiline maxLength={2000} placeholder="Aa" accessibilityLabel={t('a11yMessageInput')} placeholderTextColor={theme.colors.textMuted} style={[styles.input, { borderColor: theme.colors.borderInput, color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardAlt }]} /><Pressable accessibilityRole="button" accessibilityLabel={text.trim() || attachment ? t('a11ySend') : t('a11ySendLike')} disabled={saving} onPress={() => text.trim() || attachment ? void submit() : sendQuickLike()} style={[styles.send, { backgroundColor: theme.colors.primary, opacity: saving ? 0.55 : 1 }]}><Icon name={text.trim() || attachment ? "send" : "thumbs-up"} size={18} color="#fff" /></Pressable></View>
+        <View style={[styles.inputRow, { borderTopColor: theme.colors.divider, backgroundColor: theme.colors.bgApp }]}><Pressable accessibilityRole="button" accessibilityLabel={t('a11yPickMedia')} hitSlop={6} onPress={() => void pickMedia()} style={styles.composerTool}><Icon name="image" size={23} color={theme.colors.primary} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={t('a11yPickEmoji')} hitSlop={6} onPress={() => setShowEmojis((value) => !value)} style={styles.composerTool}><Icon name="smile" size={23} color={theme.colors.primary} /></Pressable><TextInput ref={inputRef} value={text} onChangeText={setText} multiline maxLength={2000} placeholder="Aa" accessibilityLabel={t('a11yMessageInput')} placeholderTextColor={theme.colors.textMuted} style={[styles.input, { borderColor: theme.colors.borderInput, color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardAlt }]} /><Pressable accessibilityRole="button" accessibilityLabel={text.trim() || attachment ? t('a11ySend') : t('a11ySendLike')} disabled={sendMessage.isPending} onPress={() => text.trim() || attachment ? void submit() : sendQuickLike()} style={[styles.send, { backgroundColor: theme.colors.primary, opacity: sendMessage.isPending ? 0.55 : 1 }]}><Icon name={text.trim() || attachment ? "send" : "thumbs-up"} size={18} color="#fff" /></Pressable></View>
         {viewer ? <ChatMediaViewer uri={viewer.uri} kind={viewer.kind} onClose={() => setViewer(null)} /> : null}
         <Modal visible={!!actionMessage} transparent animationType="none" onRequestClose={() => { setActionMessage(null); setActionOrigin(null); }}><Pressable style={styles.backdrop} onPress={() => { setActionMessage(null); setActionOrigin(null); }}><View style={[styles.actionContent, { top: actionTop, ...(actionOwn ? { right: 16 } : { left: 16 }) }]}><View style={[styles.reactionBar, { backgroundColor: theme.colors.bgCard }]}>{REACTIONS.map((emoji) => <Pressable key={emoji} style={[styles.reactionChoice, selectedActionEmoji === emoji ? { backgroundColor: theme.colors.bgCardAlt } : undefined]} onPress={() => actionMessage && void react(actionMessage, emoji)}><ReactionAsset emoji={emoji} size={29} /></Pressable>)}</View><View style={[styles.sheet, { backgroundColor: theme.colors.bgCard }]}><ActionRow icon="message-circle" text={t('reply')} onPress={() => void action('reply')} /><ActionRow icon="copy" text={t('copyText')} onPress={() => void action('copy')} /></View></View></Pressable></Modal>
       </KeyboardAvoidingView>

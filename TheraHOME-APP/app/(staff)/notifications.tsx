@@ -4,7 +4,7 @@
 // staff type one language, and sending that to every market shipped
 // Vietnamese copy to UK and Malaysia customers. See CLAUDE.md.
 import React, { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTheme } from '@/theme';
 import {
   useNotificationCampaigns,
@@ -40,7 +40,15 @@ function ComposeForm({ onSent }: { onSent: () => void }) {
 
   async function submit() {
     if (!title.trim() || !body.trim() || !markets.length || sendBroadcast.isPending) return;
-    await sendBroadcast.mutateAsync({ type, title: title.trim(), body: body.trim(), markets });
+    try {
+      await sendBroadcast.mutateAsync({ type, title: title.trim(), body: body.trim(), markets });
+    } catch {
+      // Without this the rejection was swallowed and the composer just sat
+      // there, so the natural next move was to press Send again — which is
+      // how everyone ends up notified twice.
+      Alert.alert('Không gửi được thông báo', 'Vui lòng kiểm tra kết nối rồi thử lại.');
+      return;
+    }
     setTitle('');
     setBody('');
     onSent();

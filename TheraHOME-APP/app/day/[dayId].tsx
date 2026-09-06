@@ -94,7 +94,7 @@ export default function DayDetailScreen() {
     };
   }, [checkInDone, dayOpenable, userProgramId, programDayId]);
   async function confirmCheckIn(value: number) {
-    if (!userId || !userProgramId || !programDayId) return;
+    if (!userId || !userProgramId || !programDayId || checkInSubmitting) return;
     setCheckInSubmitting(true);
     try {
       const { error } = await supabase.from('pain_logs').insert({

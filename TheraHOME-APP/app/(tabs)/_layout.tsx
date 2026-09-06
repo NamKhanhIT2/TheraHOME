@@ -123,8 +123,18 @@ export default function TabsLayout() {
     });
   }, []);
 
+  // A cold launch from a notification tap delivers the SAME response through
+  // both paths below — the listener and the getLastNotificationResponse
+  // replay — so the destination was pushed onto the stack twice and backing
+  // out landed on it again. Remember what has already been handled.
+  const handledNotificationIds = useRef(new Set<string>());
   useEffect(() => {
     function openNotification(response: Notifications.NotificationResponse) {
+      const responseId = response.notification.request.identifier;
+      if (responseId) {
+        if (handledNotificationIds.current.has(responseId)) return;
+        handledNotificationIds.current.add(responseId);
+      }
       const data = response.notification.request.content.data ?? {};
       if (typeof data.articleId === 'string') {
         router.push({ pathname: '/community/article/[articleId]', params: { articleId: data.articleId } });

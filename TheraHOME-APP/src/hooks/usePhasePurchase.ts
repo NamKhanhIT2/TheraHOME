@@ -49,6 +49,7 @@ export function usePurchasePhase(
   // True between a restore request and either a matching purchase being
   // consumed by the effect below or the empty-result timeout firing.
   const restoreRequestedRef = useRef(false);
+  const purchaseRequestedRef = useRef(false);
 
   const verifyAndFinish = useCallback(
     async (purchase: Purchase, finishTransaction: (args: { purchase: Purchase; isConsumable: boolean }) => Promise<void>) => {
@@ -84,9 +85,11 @@ export function usePurchasePhase(
 
   const { connected, products, fetchProducts, requestPurchase, finishTransaction, availablePurchases, getAvailablePurchases } = useIAP({
     onPurchaseSuccess: (purchase) => {
+      purchaseRequestedRef.current = false;
       void verifyAndFinish(purchase, finishTransaction);
     },
     onPurchaseError: (error) => {
+      purchaseRequestedRef.current = false;
       setPurchaseError(error.message);
       if (__DEV__) console.warn('IAP purchase failed:', error);
     },
@@ -141,7 +144,12 @@ export function usePurchasePhase(
   }, [availablePurchases, sku, verifyAndFinish, finishTransaction]);
 
   const purchase = useCallback(() => {
-    if (!sku) return;
+    // `verifying` only flips true once the store CALLS BACK, so between the
+    // tap and StoreKit's sheet appearing the button was fully enabled and a
+    // second tap issued a second requestPurchase for the same SKU. This ref
+    // closes that window; the store callbacks clear it.
+    if (!sku || purchaseRequestedRef.current) return;
+    purchaseRequestedRef.current = true;
     setPurchaseError(null);
     // Both platform keys are passed; the library reads only the current
     // platform's. `requestPurchase` delivers its result via
@@ -150,6 +158,7 @@ export function usePurchasePhase(
     // connected yet) — without a catch here that becomes an unhandled
     // promise rejection.
     requestPurchase({ request: { apple: { sku }, google: { skus: [sku] } }, type: 'in-app' }).catch((e: unknown) => {
+      purchaseRequestedRef.current = false;
       setPurchaseError(e instanceof Error ? e.message : 'purchase_failed');
       if (__DEV__) console.warn('requestPurchase failed:', e);
     });

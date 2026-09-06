@@ -36,7 +36,11 @@ export function LegalContentView() {
   // and an edit on one tab survives peeking at another.
   const [drafts, setDrafts] = useState<Record<string, { title?: string; body?: string }>>({});
   const [saving, setSaving] = useState(false);
+  // `reverting` is the "confirm dialog is open" flag. It used to double as
+  // ConfirmModal's `busy` prop, which disabled the confirm button from the
+  // moment the dialog appeared — the revert could never actually run.
   const [reverting, setReverting] = useState(false);
+  const [revertBusy, setRevertBusy] = useState(false);
 
   function reload() {
     return fetchLegalOverrides()
@@ -87,6 +91,8 @@ export function LegalContentView() {
   }
 
   async function revert() {
+    if (revertBusy) return;
+    setRevertBusy(true);
     try {
       await deleteLegalOverride(docKey, lang);
       await reload();
@@ -95,6 +101,7 @@ export function LegalContentView() {
     } catch {
       pushToast("Không thể khôi phục");
     } finally {
+      setRevertBusy(false);
       setReverting(false);
     }
   }
@@ -173,7 +180,7 @@ export function LegalContentView() {
 
       {reverting ? (
         <ConfirmModal
-          busy={reverting}
+          busy={revertBusy}
           title="Khôi phục bản gốc"
           message="Xoá bản đã xuất bản của văn bản này? App sẽ quay lại dùng nội dung đóng gói sẵn trong bản build."
           confirmLabel="Khôi phục"

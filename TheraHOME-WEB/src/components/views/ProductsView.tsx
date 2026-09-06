@@ -215,7 +215,7 @@ export function ProductsView() {
   }
 
   async function saveCategory() {
-    if (!categoryModal) return;
+    if (!categoryModal || saving) return;
     if (!MARKET_TABS.some(([code]) => categoryFields[code].title.trim())) {
       setCategoryError("Cần điền tên nhóm cho ít nhất một thị trường.");
       return;
@@ -267,7 +267,10 @@ export function ProductsView() {
     setItemModal({ categoryGroupKey, groupKey: item.groupKey });
   }
   async function saveItem() {
-    if (!itemModal) return;
+    // `disabled={saving}` alone loses the race: saveStoreItemGroup mints
+    // `item-${Date.now()}` for a new group, so two clicks create two
+    // different groups — two duplicate products across all three markets.
+    if (!itemModal || saving) return;
     const filled = (code: AdminMarket) => !!itemFields[code].name.trim() && !!itemFields[code].price.trim();
     const partial = MARKET_TABS.find(([code]) => !filled(code) && (itemFields[code].name.trim() || itemFields[code].price.trim()));
     if (partial) {
@@ -314,6 +317,7 @@ export function ProductsView() {
     setDeleteAllMarkets(false);
   }
   async function confirmDelete() {
+    if (deleting) return;
     if (!deleteConfirm) return;
     const isCategory = deleteConfirm.kind === "category";
     // Default is the market being viewed only; "all markets" needs the

@@ -66,7 +66,10 @@ export function useRequestDay() {
   }
 
   async function confirmPain(value: number) {
-    if (!pending) return;
+    // `submitting` only reaches the modal's Button as a loading prop, which
+    // cannot stop a second tap dispatched before the re-render commits — two
+    // taps wrote two pain_logs rows for the same day.
+    if (!pending || submitting) return;
     const { day, userProgramId, productId } = pending;
     const userId = session?.user.id;
     if (!userId) return;

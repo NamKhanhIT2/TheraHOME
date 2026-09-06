@@ -112,6 +112,7 @@ function QuizTab({ phaseId }: { phaseId: string }) {
   useEffect(reload, [phaseId]);
 
   async function handleSave() {
+    if (saving) return;
     if (!draft) return;
     const vi = draft.vi;
     if (!vi.question.trim() || vi.options.some((o) => !o.trim())) {
@@ -169,6 +170,7 @@ function QuizTab({ phaseId }: { phaseId: string }) {
     }
   }
   async function handleDelete(id: string) {
+    if (saving) return;
     try {
       await deleteQuizQuestion(id);
       reload();
@@ -263,6 +265,7 @@ function PromoTab({ phaseId, productId, phaseRange }: { phaseId: string; product
   }
 
   async function handleSave() {
+    if (saving) return;
     if (!promo) return;
     setSaving(true);
     try {

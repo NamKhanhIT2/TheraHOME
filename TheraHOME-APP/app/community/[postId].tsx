@@ -157,7 +157,7 @@ export default function PostDetailScreen() {
     closeCommentMenu();
     Alert.alert(t('deleteCommentConfirmTitle'), t('deleteCommentConfirmBody'), [{ text: t('cancel'), style: 'cancel' }, { text: t('delete'), style: 'destructive', onPress: () => deleteComment.mutate({ commentId: comment.id, postId: post!.id }) }]);
   }
-  function report(reason: ReportReason) { if (reportTarget) reportContent.mutate({ contentType: reportTarget.type, contentId: reportTarget.id, reason }, { onSuccess: () => setError(t('reportThanks')), onError: (cause) => setError(friendlyCommunityError(cause)) }); setReportTarget(null); }
+  function report(reason: ReportReason) { if (reportContent.isPending) return; if (reportTarget) reportContent.mutate({ contentType: reportTarget.type, contentId: reportTarget.id, reason }, { onSuccess: () => setError(t('reportThanks')), onError: (cause) => setError(friendlyCommunityError(cause)) }); setReportTarget(null); }
   function renderComment(comment: CommentRow, nested = false, index = 0): React.ReactNode {
     const currentReaction = commentReactions.get(comment.id) ?? null;
     const open = expandedThreads.has(comment.id);

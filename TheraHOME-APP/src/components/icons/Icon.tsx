@@ -63,6 +63,7 @@ import {
   RotateCcw,
   Search,
   Send,
+  ThumbsUp,
   ShoppingBag,
   Shield,
   ShieldCheck,
@@ -117,6 +118,9 @@ const ICONS: Record<string, LucideIcon> = {
   'more-horizontal': Ellipsis,
   'user-plus': UserPlus,
   send: Send,
+  // The chat composer's like button asked for this and got the
+  // placeholder circle instead — it was the only name missing from the map.
+  'thumbs-up': ThumbsUp,
   heart: Heart,
   'heart-pulse': HeartPulse,
   keyboard: Keyboard,
