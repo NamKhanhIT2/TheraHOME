@@ -97,23 +97,22 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // circuit straight past the whole patient onboarding/country sequence
   // into the (staff) shell (see the Stack.Protected split below).
   const isStaffAccount = profile?.accountType === 'admin' || profile?.accountType === 'cskh';
-  const isTheraIssuedAccount = !!profile && profile.accountType !== 'normal';
   // Reaching the tabs only needs a session + a loaded profile that's past
   // onboarding/country — activation status plays no part in this anymore.
   const authed = !!session && !!profile;
-  // Admin-issued accounts can be created with onboarding_completed=false so
-  // they walk through the same intake screens a fresh Google/Apple signup
-  // would see — everyone else defaults to true (see
-  // theraccount_columns_and_guard migration), so this never affects
-  // existing users.
-  const onboardingPending = authed && !isStaffAccount && !isTheraIssuedAccount && profile?.onboardingCompleted === false;
-  // Gates the pre-tabs country/region screen (app/(onboarding)/country.tsx)
-  // — shown once, right after onboarding, for every account type (default
-  // false on new rows; existing rows were backfilled true by the
-  // country_confirmed_gate migration so this never affects pre-existing
-  // users). Checked after onboardingPending so admin-issued accounts still
-  // see the intake questions first. Staff accounts never see it.
-  const countryPending = authed && !isStaffAccount && !isTheraIssuedAccount && !onboardingPending && profile?.countryConfirmed === false;
+  // Driven by the stored flag, not by account type. It used to also require
+  // `!isTheraIssuedAccount`, which excluded EVERY admin-issued account and
+  // so made the "Yêu cầu onboarding" switch in Admin do nothing at all —
+  // the opposite of what that switch and this comment promised. Staff
+  // (admin/cskh) are the only accounts that skip regardless: they have no
+  // patient program to set up. Review accounts are created with the flag
+  // already true, so App Review still lands straight in the app.
+  const onboardingPending = authed && !isStaffAccount && profile?.onboardingCompleted === false;
+  // Same shape: the stored flag decides. `admin-manage-account` always writes
+  // country_confirmed = true for the accounts it creates, so they still skip
+  // this; only a real signup that has not picked a region yet sees it.
+  // Checked after onboardingPending so the intake questions come first.
+  const countryPending = authed && !isStaffAccount && !onboardingPending && profile?.countryConfirmed === false;
   const inApp = authed && !onboardingPending && !countryPending && !blockedReason;
 
   // Also doubles as the "last active" heartbeat the win-back notification

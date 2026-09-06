@@ -3639,6 +3639,24 @@ bộ codebase thiếu trong bảng `ICONS` của `Icon.tsx`, nên rơi vào plac
 Đã map. (Đã viết script đối chiếu 43 tên đang dùng với 80 tên trong bảng để
 chắc chắn không còn tên nào thiếu.)
 
+## Ba lỗi hiển thị trên màn onboarding (2026-09-06)
+
+Chủ sở hữu báo màn 8 cỡ chữ không đều. Đúng, và tìm thêm hai lỗi cùng loại
+khi đi hết 8 màn trên simulator.
+
+1. **Màn 8 (thời gian mỗi ngày):** tiêu đề được tách thành BA `<Text>` riêng,
+   mỗi cái mang `adjustsFontSizeToFit` + `numberOfLines={1}`, nên MỖI DÒNG tự
+   co độc lập — dòng dài nhất bị thu nhỏ nhiều nhất, dòng ngắn giữ nguyên cỡ.
+   Gộp thành MỘT `<Text>` với ngắt dòng tường minh để cả khối co cùng nhau.
+2. **Màn 4 (cơ thể thường cảm thấy thế nào):** dòng đầu có `numberOfLines={1}`
+   nhưng KHÔNG có `adjustsFontSizeToFit`, nên bản tiếng Anh bị cắt cụt thành
+   "How does your b…". Gộp thành một `<Text>`, cho phép 3 dòng, chữ tự xuống
+   dòng — không mất chữ, cỡ đồng nhất.
+3. **Màn 2 (vùng ưu tiên):** tiêu đề và mô tả lấy màu từ `theme.colors`, mà
+   các màn onboarding LUÔN nền sáng còn theme của người dùng là TỐI — nên chữ
+   gần như trắng trên nền sáng, gần như vô hình. Đổi sang màu cứng `#102D59`
+   / `#687790` giống hệt các màn hero khác trong cùng file.
+
 ## Tài khoản Google mới KHÔNG hề thấy onboarding (2026-09-06)
 
 Chủ sở hữu đăng nhập Google bằng tài khoản mới và không thấy màn câu hỏi.
@@ -3655,6 +3673,13 @@ Hệ quả: kể từ 18/08, bộ câu hỏi intake CHỈ tài khoản admin c�
 onboarding = Có" mới thấy. Khách thật chưa từng thấy. Lưu ý stack onboarding
 có `initialRouteName: 'login'`, nên câu hỏi nằm SAU đăng nhập chứ không phải
 trước — không có đường nào khác để tới màn đó.
+
+**Lỗi thứ hai cùng họ:** cổng còn có `!isTheraIssuedAccount`, loại trừ MỌI
+tài khoản do TheraHOME cấp — nên công tắc "Yêu cầu onboarding" trong trang
+tạo tài khoản Admin KHÔNG có tác dụng gì, trái hẳn với điều nó hứa và với
+chính comment ở cổng đó. Nay chỉ tài khoản staff (admin/cskh) bỏ qua mặc
+định; còn lại do cờ đã lưu quyết định. Tài khoản `review` vẫn vào thẳng app
+vì trang tạo tài khoản đặt sẵn cờ này là true cho loại đó.
 
 **Sửa (migration 202609061200):** `alter column onboarding_completed set
 default false`. DEFAULT chỉ áp khi INSERT nên dòng cũ giữ nguyên `true`,

@@ -633,25 +633,15 @@ export default function QuestionsScreen() {
               { minHeight: isCompactTension ? 128 : 178 },
             ]}
           >
+            {/* One Text, not one per line. The first line had numberOfLines
+                without adjustsFontSizeToFit, so the English title truncated
+                to "How does your b…"; the second line shrank on its own, so
+                the two lines also rendered at different sizes. */}
             <View style={styles.tensionHeroCopy}>
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.tensionTitle,
-                  {
-                    color: '#102D59',
-                    fontFamily: theme.fontFamily.bold,
-                    fontSize: isCompactTension ? 24 : 29,
-                    lineHeight: isCompactTension ? 30 : 36,
-                  },
-                ]}
-              >
-                {tensionTitle[0]}
-              </Text>
               <Text
                 adjustsFontSizeToFit
                 minimumFontScale={0.68}
-                numberOfLines={1}
+                numberOfLines={3}
                 style={[
                   styles.tensionTitle,
                   {
@@ -662,6 +652,7 @@ export default function QuestionsScreen() {
                   },
                 ]}
               >
+                {tensionTitle[0]}{' '}
                 {tensionTitle[1]}
                 <Text style={{ color: theme.colors.primary }}>{tensionTitle[2]}</Text>
               </Text>
@@ -1124,26 +1115,32 @@ export default function QuestionsScreen() {
               ]}
             >
               {isDailyTime ? (
+                // ONE Text with explicit breaks, not one Text per line: each
+                // line used to carry its own adjustsFontSizeToFit with
+                // numberOfLines={1}, so every line shrank independently and
+                // the longest one ("Bạn có thể dành bao nhiêu") rendered
+                // visibly smaller than the ones under it.
                 <View style={styles.timeTitleBlock}>
-                  {TIME_TITLE_LINES[language].map((line, index) => (
-                    <Text
-                      key={`${line}-${index}`}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.66}
-                      numberOfLines={1}
-                      style={[
-                        styles.timeTitleLine,
-                        {
-                          color: index === 2 ? theme.colors.primary : '#102D59',
-                          fontFamily: theme.fontFamily.bold,
-                          fontSize: isCompactLifestyle ? 19 : 22,
-                          lineHeight: isCompactLifestyle ? 23 : 27,
-                        },
-                      ]}
-                    >
-                      {line}
-                    </Text>
-                  ))}
+                  <Text
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.66}
+                    numberOfLines={3}
+                    style={[
+                      styles.timeTitleLine,
+                      {
+                        color: '#102D59',
+                        fontFamily: theme.fontFamily.bold,
+                        fontSize: isCompactLifestyle ? 19 : 22,
+                        lineHeight: isCompactLifestyle ? 23 : 27,
+                      },
+                    ]}
+                  >
+                    {TIME_TITLE_LINES[language][0]}
+                    {'\n'}
+                    {TIME_TITLE_LINES[language][1]}
+                    {'\n'}
+                    <Text style={{ color: theme.colors.primary }}>{TIME_TITLE_LINES[language][2]}</Text>
+                  </Text>
                 </View>
               ) : (
                 <Text
@@ -1322,10 +1319,14 @@ export default function QuestionsScreen() {
             <>
               <View style={styles.priorityHero}>
                 <View style={styles.priorityHeroCopy}>
-                  <Text style={[styles.priorityTitle, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>
+                  {/* Hardcoded like every other onboarding hero: these screens
+                      are always light, so pulling textPrimary from the theme
+                      painted this title near-white on a light background and
+                      it was effectively invisible in dark mode. */}
+                  <Text style={[styles.priorityTitle, { color: '#102D59', fontFamily: theme.fontFamily.bold }]}>
                     {q.title}
                   </Text>
-                  <Text style={[styles.prioritySubtitle, { color: theme.colors.textSecondary, fontFamily: theme.fontFamily.regular }]}>
+                  <Text style={[styles.prioritySubtitle, { color: '#687790', fontFamily: theme.fontFamily.regular }]}>
                     {q.subtitle}
                   </Text>
                 </View>
