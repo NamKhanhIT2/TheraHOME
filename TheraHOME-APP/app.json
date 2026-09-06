@@ -64,7 +64,16 @@
       ],
       "expo-video",
       "expo-image",
-      "./plugins/withAndroidUploadSigning"
+      "./plugins/withAndroidUploadSigning",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brandmark-blue.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#F3F7FC"
+        }
+      ]
     ],
     "extra": {
       "router": {},
