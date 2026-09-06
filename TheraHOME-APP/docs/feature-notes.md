@@ -3584,8 +3584,10 @@ nên `select count` từ client luôn trả 0. Thêm RPC `product_order_count`
 ## Hoàn thiện đợt 4 (2026-09-06)
 
 **Cộng đồng (app):**
-- Tab "Tất cả" giờ CÓ bài chính thức (trước lọc bỏ hết, chỉ đọc được ở tab
-  TheraHOME hoặc thẻ ghim). Bài đang làm thẻ ghim vẫn bị loại để không trùng.
+- ~~Tab "Tất cả" cho hiện bài chính thức~~ — ĐÃ HOÀN TÁC ngày 2026-09-06 theo
+  ý chủ sở hữu: "Tất cả" là feed của THÀNH VIÊN, bài TheraHOME chỉ xuất hiện
+  ở thẻ ghim đầu trang và trong tab TheraHOME. Trộn vào đọc như thể có bài
+  chưa ghim tự nhiên hiện ra. Đây là thiết kế cố ý, không phải nhãn sai.
 - Chặn người dùng nay chặn cả BÌNH LUẬN của họ, không chỉ bài viết.
 - Báo cáo xong bài tự ẩn khỏi feed của người báo cáo; thêm unique index
   `content_reports_unique_reporter_item` (migration 202609060900) để một người
@@ -3607,6 +3609,12 @@ của đúng số bài đó (trước tải TOÀN BỘ bài + TOÀN BỘ bình l
 tác). Bài chính thức thiếu bản dịch cho thị trường nó nhắm tới có badge
 "Thiếu bản UK / ML". Tab Báo cáo trên app nhân viên mở được nội dung bị báo
 cáo và hai nút không còn quay cùng lúc.
+
+**Bấm đúp tạo bài trùng (2026-09-06):** nút "Đăng bài" trong modal soạn bài
+chính thức KHÔNG có khoá khi đang gửi, nên bấm hai lần là gọi
+`createOfficialPost` hai lần. Đã xảy ra thật: hai bản ghi "relax in 5
+minutes" cách nhau 1,4 giây (13:42:30.7 và 13:42:32.1 ngày 04/09). Thêm cờ
+`savingPost` chặn lần gọi thứ hai và khoá nút với nhãn "Đang lưu...".
 
 **Nhãn trung thực:** ô "Phân quyền tài khoản" ghi rõ app CHƯA đọc trường này
 nên "Hạn chế" không hạn chế gì, muốn chặn thật thì dùng Khóa tài khoản.

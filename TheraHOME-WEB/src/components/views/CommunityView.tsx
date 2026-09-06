@@ -338,6 +338,7 @@ export function CommunityView() {
   const [subTab, setSubTab] = useState<"posts" | "challenges">("posts");
   const [items, setItems] = useState<PinnedPost[] | null>(null);
   const [modal, setModal] = useState<string | number | "new" | null>(null);
+  const [savingPost, setSavingPost] = useState(false);
   // Edit-modal image fields (per explicit request: CSKH can revise a
   // published post's image as well as its text).
   const [editImageUrl, setEditImageUrl] = useState("");
@@ -427,6 +428,11 @@ export function CommunityView() {
     setNotifyBody("");
   }
   async function save() {
+    // Without an in-flight guard a double click fired createOfficialPost
+    // twice and published the post twice — it happened in production
+    // (two identical rows 1.4s apart, 2026-09-04).
+    if (savingPost) return;
+    setSavingPost(true);
     try {
       if (modal === "new") {
         if (!vnTargeted && extraMarkets.length === 0) {
@@ -603,6 +609,8 @@ export function CommunityView() {
         : message === "invalid_image_type" ? "Định dạng ảnh không hợp lệ (JPG, PNG, WebP)"
         : "Không thể lưu bài viết",
       );
+    } finally {
+      setSavingPost(false);
     }
   }
   function togglePin(it: PinnedPost) {
@@ -778,7 +786,7 @@ export function CommunityView() {
       footer={
         <Fragment>
           <GhostBtn onClick={() => setModal(null)}>Hủy</GhostBtn>
-          <PrimaryBtn onClick={save}>{modal === "new" ? "Đăng bài" : "Lưu thay đổi"}</PrimaryBtn>
+          <PrimaryBtn onClick={save} disabled={savingPost}>{savingPost ? "Đang lưu..." : modal === "new" ? "Đăng bài" : "Lưu thay đổi"}</PrimaryBtn>
         </Fragment>
       }
     >

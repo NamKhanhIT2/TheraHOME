@@ -226,11 +226,12 @@ export default function CommunityScreen() {
         !hiddenPostIds.has(p.id) &&
         (!p.authorId || !blockedUserIds.has(p.authorId)) &&
         (
-          // "Tất cả" means all: official posts used to be excluded outright,
-          // so the tab's label promised the opposite of what it did and the
-          // only official post a user could reach was the pinned card. That
-          // one card is still skipped here so it is not shown twice.
-          (filter === 'all' && p.id !== pinnedPost?.id) ||
+          // Owner's design (reaffirmed 2026-09-06): "Tất cả" is the MEMBER
+          // feed. TheraHOME's own writing appears as the single pinned card
+          // at the top and in its own tab — a brief experiment that mixed
+          // every official post into this list read as unpinned posts
+          // suddenly appearing, which is not what the tab is for.
+          (filter === 'all' && !p.isOfficial) ||
           (filter === 'official' && p.isOfficial)
         ),
     );
