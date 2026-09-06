@@ -3929,11 +3929,12 @@ picker trên Android 13+ không cần quyền; thanh tab bệnh nhân đã chừ
    trên ứng dụng khác") dù app không dùng. Chặn bằng
    `android.blockedPermissions` trong `app.json`.
 
-**Chưa làm, cần chủ sở hữu:** upload khoá service-account Firebase lên EAS
-(FCM V1) — không có nó push Android nhận token nhưng không bao giờ được
-giao, xem `docs/manual-setup.md` mục 8. App Links `https://therahomeai.com`
-mở app không được cấu hình (cả hai nền tảng) — cần `assetlinks.json` trên
-domain nếu muốn.
+**Đính chính:** khoá service-account Firebase (FCM V1) ĐÃ được chủ sở hữu
+upload lên EAS ngày 2026-09-05 (kiểm tra lại qua API EAS ngày 06); tôi ghi
+nhầm là còn thiếu. Trên EAS còn thiếu keystore Android và khoá Play
+submit — chỉ cần khi build AAB lên Play, chưa cần lúc này. App Links
+`https://therahomeai.com` mở app không được cấu hình (cả hai nền tảng) —
+cần `assetlinks.json` trên domain nếu muốn.
 
 **Lưu ý môi trường build local:** `expo run:android` thất bại với JDK 25 của
 Android Studio ("A restricted method in java.lang.System has been called" ở
