@@ -79,6 +79,9 @@ interface RawNotification {
   community_posts: { image_url: string | null } | null;
 }
 
+/** Users whose old-notification sweep already ran this session. */
+const retentionSweepDone = new Set<string>();
+
 export function useNotifications(userId: string | undefined) {
   const queryClient = useQueryClient();
   const key = ['notifications', userId] as const;
@@ -105,14 +108,23 @@ export function useNotifications(userId: string | undefined) {
     queryKey: key,
     queryFn: async (): Promise<NotificationRow[]> => {
       const cutoff = retentionCutoff();
-      // The UI expiry is guaranteed by the `gte` filter. This delete is a
-      // best-effort physical cleanup until a scheduled backend cleanup job
-      // is added with the admin service.
-      await supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', userId!)
-        .lt('created_at', cutoff);
+      // The UI expiry is guaranteed by the `gte` filter below. This delete is
+      // best-effort physical cleanup until a scheduled backend job exists.
+      // It used to be awaited inside this query, so it re-ran on every focus
+      // refetch and every realtime invalidation, blocked the read while it
+      // ran, and its error was discarded. Now it runs at most once per app
+      // session, off the critical path.
+      if (!retentionSweepDone.has(userId!)) {
+        retentionSweepDone.add(userId!);
+        void supabase
+          .from('notifications')
+          .delete()
+          .eq('user_id', userId!)
+          .lt('created_at', cutoff)
+          .then(({ error: sweepError }) => {
+            if (sweepError && __DEV__) console.warn('Notification retention sweep failed:', sweepError);
+          });
+      }
       const { data, error } = await supabase
         .from('notifications')
         .select('id, type, title, body, read, created_at, destination, actor_id, actor_name, actor_avatar_url, actor_is_official, reaction_type, group_actor_ids, second_actor_name, related_product_id, related_post_id, related_comment_id, related_parent_comment_id, related_chat_thread_id, program_days(day_number), community_posts(image_url)')
@@ -304,6 +316,8 @@ export function useSendNotificationBroadcast() {
       if (error) throw error;
       void supabase.functions.invoke('dispatch-push', {
         body: { mode: 'broadcast', userIds, title: input.title, body: input.body, data: { type: input.type } },
+      }).then(({ error }) => {
+        if (error && __DEV__) console.warn('dispatch-push failed:', error);
       });
       return userIds.length;
     },

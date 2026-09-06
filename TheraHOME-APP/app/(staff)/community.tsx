@@ -70,6 +70,7 @@ function ReportRow({ report }: { report: ContentReportRow }) {
             variant="secondary"
             style={{ flex: 1 }}
             loading={resolveReport.isPending && resolveReport.variables?.status === 'dismissed'}
+            disabled={resolveReport.isPending}
             onPress={() => resolveReport.mutate({ id: report.id, status: 'dismissed' })}
           >
             Bỏ qua
@@ -77,6 +78,7 @@ function ReportRow({ report }: { report: ContentReportRow }) {
           <Button
             style={{ flex: 1 }}
             loading={resolveReport.isPending && resolveReport.variables?.status === 'resolved'}
+            disabled={resolveReport.isPending}
             onPress={() => resolveReport.mutate({ id: report.id, status: 'resolved' })}
           >
             Đã xử lý

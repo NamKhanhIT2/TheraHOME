@@ -220,6 +220,7 @@ function EditAccountModal({ account, onClose, onSave }: { account: TheraAccount;
   const [submitting, setSubmitting] = useState(false);
 
   async function submit() {
+    if (submitting) return;
     setSubmitting(true);
     try {
       await onSave({

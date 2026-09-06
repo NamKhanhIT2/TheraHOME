@@ -46,7 +46,12 @@ export function ReportsView() {
   }
   useEffect(reload, []);
 
+  // One flag per row: every action here writes, and none was guarded.
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const busyFor = (r: ContentReport) => rowBusy === String(r.id);
   async function hideContent(r: ContentReport) {
+    if (rowBusy) return;
+    setRowBusy(String(r.id));
     try {
       if (r.contentType === "post") await updateCommunityPost(r.contentId, { hidden: true });
       else await hideCommunityComment(r.contentId, true);
@@ -54,11 +59,16 @@ export function ReportsView() {
       reload();
     } catch {
       pushToast("Không thể ẩn nội dung (có thể đã bị xoá)");
+    } finally {
+      setRowBusy(null);
     }
   }
 
   async function deleteContent(r: ContentReport) {
+    // Confirm BEFORE claiming the row, otherwise cancelling leaves it stuck.
+    if (rowBusy) return;
     if (!window.confirm("Xoá vĩnh viễn nội dung này?")) return;
+    setRowBusy(String(r.id));
     try {
       if (r.contentType === "post") await deleteCommunityPost(r.contentId);
       else await deleteCommunityComment(r.contentId);
@@ -66,26 +76,35 @@ export function ReportsView() {
       reload();
     } catch {
       pushToast("Không thể xoá nội dung");
+    } finally {
+      setRowBusy(null);
     }
   }
 
   async function lockAuthor(r: ContentReport) {
-    if (!r.contentAuthorId) return;
+    if (rowBusy || !r.contentAuthorId) return;
     if (!window.confirm("Khoá tài khoản của " + (r.contentAuthorName || "người dùng này") + "?")) return;
+    setRowBusy(String(r.id));
     try {
       await updateAppUser(r.contentAuthorId, { locked: true });
       pushToast("Đã khoá tài khoản " + (r.contentAuthorName || ""));
     } catch {
       pushToast("Không thể khoá tài khoản");
+    } finally {
+      setRowBusy(null);
     }
   }
 
   async function setStatus(r: ContentReport, status: "resolved" | "dismissed") {
+    if (rowBusy) return;
+    setRowBusy(String(r.id));
     try {
       await resolveContentReport(r.id, status);
       reload();
     } catch {
       pushToast("Không thể cập nhật báo cáo");
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -129,13 +148,13 @@ export function ReportsView() {
             </td>
             <td style={{ padding: "14px 20px" }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                <GhostBtn onClick={() => hideContent(r)}>Ẩn</GhostBtn>
-                <GhostBtn color="var(--error)" onClick={() => deleteContent(r)}>Xoá</GhostBtn>
-                {r.contentAuthorId ? <GhostBtn color="var(--error)" onClick={() => lockAuthor(r)}>Khoá tài khoản</GhostBtn> : null}
+                <GhostBtn onClick={() => hideContent(r)} disabled={busyFor(r)}>Ẩn</GhostBtn>
+                <GhostBtn color="var(--error)" onClick={() => deleteContent(r)} disabled={busyFor(r)}>Xoá</GhostBtn>
+                {r.contentAuthorId ? <GhostBtn color="var(--error)" onClick={() => lockAuthor(r)} disabled={busyFor(r)}>Khoá tài khoản</GhostBtn> : null}
                 {r.status === "pending" ? (
                   <>
-                    <GhostBtn onClick={() => setStatus(r, "resolved")}>Đã xử lý</GhostBtn>
-                    <GhostBtn onClick={() => setStatus(r, "dismissed")}>Bỏ qua</GhostBtn>
+                    <GhostBtn onClick={() => setStatus(r, "resolved")} disabled={busyFor(r)}>Đã xử lý</GhostBtn>
+                    <GhostBtn onClick={() => setStatus(r, "dismissed")} disabled={busyFor(r)}>Bỏ qua</GhostBtn>
                   </>
                 ) : null}
               </div>

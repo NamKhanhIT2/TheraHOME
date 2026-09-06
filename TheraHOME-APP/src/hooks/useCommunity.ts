@@ -453,20 +453,6 @@ export function usePost(postId: string | undefined) {
   });
 }
 
-/** Post ids the current user has liked/saved — `post_likes`/`post_saves` RLS
- * already scopes every row to `auth.uid()`, so an unfiltered select returns
- * exactly this user's rows. */
-export function useMyPostLikes(userId: string | undefined) {
-  return useQuery({
-    queryKey: ['post_likes', userId],
-    queryFn: async (): Promise<Set<string>> => {
-      const { data, error } = await supabase.from('post_likes').select('post_id');
-      if (error) throw error;
-      return new Set(data.map((r) => r.post_id));
-    },
-    enabled: !!userId,
-  });
-}
 
 export function useMyPostReactions(userId: string | undefined) {
   return useQuery({
@@ -509,7 +495,9 @@ export function useSetPostReaction(userId: string | undefined) {
       if (!vars.current && vars.reaction) {
         void supabase.functions.invoke('dispatch-push', {
           body: { mode: 'social', event: 'reaction', postId: vars.postId },
-        });
+        }).then(({ error }) => {
+        if (error && __DEV__) console.warn('dispatch-push failed:', error);
+      });
       }
     },
     onMutate: async (vars) => {
@@ -558,48 +546,6 @@ export function useMyPostSaves(userId: string | undefined) {
   });
 }
 
-export function useTogglePostLike(userId: string | undefined) {
-  const queryClient = useQueryClient();
-  const likesKey = ['post_likes', userId] as const;
-
-  return useMutation({
-    mutationFn: async (vars: { postId: string; liked: boolean }) => {
-      if (vars.liked) {
-        const { error } = await supabase
-          .from('post_likes')
-          .delete()
-          .eq('post_id', vars.postId)
-          .eq('user_id', userId!);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('post_likes').insert({ post_id: vars.postId, user_id: userId! });
-        if (error) throw error;
-      }
-    },
-    onMutate: async (vars) => {
-      await queryClient.cancelQueries({ queryKey: likesKey });
-      const previous = queryClient.getQueryData<Set<string>>(likesKey);
-      const next = new Set(previous);
-      if (vars.liked) next.delete(vars.postId);
-      else next.add(vars.postId);
-      queryClient.setQueryData(likesKey, next);
-      // setQueriesData (not setQueryData) so this reaches whatever
-      // [...POSTS_KEY, limit] page is actually mounted — see
-      // useCommunityPosts' DEFAULT_POSTS_PAGE_SIZE comment.
-      queryClient.setQueriesData<CommunityPostRow[]>({ queryKey: POSTS_KEY }, (posts) =>
-        posts?.map((p) => (p.id === vars.postId ? { ...p, likesCount: p.likesCount + (vars.liked ? -1 : 1) } : p)),
-      );
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(likesKey, context.previous);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: likesKey });
-      queryClient.invalidateQueries({ queryKey: POSTS_KEY });
-    },
-  });
-}
 
 export function useTogglePostSave(userId: string | undefined) {
   const queryClient = useQueryClient();
@@ -951,6 +897,8 @@ export function useAddComment(userId: string | undefined) {
           parentCommentId: vars.parentCommentId,
           preview: vars.text,
         },
+      }).then(({ error }) => {
+        if (error && __DEV__) console.warn('dispatch-push failed:', error);
       });
       return data;
     },
@@ -1018,7 +966,9 @@ export function useSetCommentReaction(userId: string | undefined) {
       if (!vars.current && vars.reaction) {
         void supabase.functions.invoke('dispatch-push', {
           body: { mode: 'social', event: 'reaction', targetType: 'comment', postId: vars.postId, commentId: vars.commentId },
-        });
+        }).then(({ error }) => {
+        if (error && __DEV__) console.warn('dispatch-push failed:', error);
+      });
       }
     },
     onMutate: async (vars) => {

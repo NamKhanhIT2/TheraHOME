@@ -44,7 +44,7 @@ export default function ProfileScreen() {
   async function handleSignOut() {
     // Ends the real Supabase session — the root layout's auth gate reacts to
     // this directly now (Phase 3 removed the mock activation bridge).
-    await supabase.auth.signOut();
+    await void supabase.auth.signOut().catch((e: unknown) => { if (__DEV__) console.warn('signOut failed:', e); });
     selectProduct(null);
   }
 

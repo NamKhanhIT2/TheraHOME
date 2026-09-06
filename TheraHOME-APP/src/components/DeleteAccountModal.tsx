@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -31,6 +31,7 @@ export function DeleteAccountModal({ onCancel }: DeleteAccountModalProps) {
       selectProduct(null);
     } catch (e) {
       setSubmitting(false);
+      Alert.alert(t('errGeneric'), t('tryAgainBody'));
       if (__DEV__) console.warn('delete_account failed:', e);
     }
   }

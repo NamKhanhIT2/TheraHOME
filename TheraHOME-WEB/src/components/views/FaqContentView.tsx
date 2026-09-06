@@ -41,6 +41,11 @@ export function FaqContentView() {
   const [lang, setLang] = useState<Lang>("vi");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<FaqItemAdmin | null>(null);
+  // `deleting` is the "dialog is open" flag; these are the real in-flight
+  // flags. Reordering and toggling were completely unguarded, and the delete
+  // confirm never received a `busy` prop so it stayed clickable.
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
 
   function reload() {
     return fetchFaqItems()
@@ -98,7 +103,8 @@ export function FaqContentView() {
   }
 
   async function remove() {
-    if (!deleting) return;
+    if (!deleting || deleteBusy) return;
+    setDeleteBusy(true);
     try {
       await deleteFaqItem(deleting.id);
       await reload();
@@ -106,31 +112,44 @@ export function FaqContentView() {
     } catch {
       pushToast("Không thể xoá");
     } finally {
+      setDeleteBusy(false);
       setDeleting(null);
     }
   }
 
   async function move(index: number, direction: -1 | 1) {
-    if (!items) return;
+    // reorderFaqItems is a sequential per-row update loop; two overlapping
+    // runs interleave over a stale array.
+    if (!items || rowBusy) return;
     const next = items.slice();
     const target = index + direction;
     if (target < 0 || target >= next.length) return;
     [next[index], next[target]] = [next[target], next[index]];
     setItems(next);
+    setRowBusy("reorder");
     try {
       await reorderFaqItems(next.map((i) => i.id));
     } catch {
       pushToast("Không thể đổi thứ tự");
       void reload();
+    } finally {
+      setRowBusy(null);
     }
   }
 
   async function toggleActive(item: FaqItemAdmin) {
+    // Writes the WHOLE row captured at render, so a stale copy would
+    // republish old question/answer text — re-read the current row first.
+    if (rowBusy) return;
+    setRowBusy(item.id);
     try {
-      await saveFaqItem({ ...item, active: !item.active });
+      const current = items?.find((i) => i.id === item.id) ?? item;
+      await saveFaqItem({ ...current, active: !current.active });
       await reload();
     } catch {
       pushToast("Không thể cập nhật trạng thái");
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -184,6 +203,7 @@ export function FaqContentView() {
               title="Xoá câu hỏi"
               message={`Xoá "${deleting.questionVi.slice(0, 80)}" khỏi mục Trợ giúp trong app?`}
               confirmLabel="Xoá"
+              busy={deleteBusy}
               onConfirm={remove}
               onCancel={() => setDeleting(null)}
             />
@@ -195,11 +215,11 @@ export function FaqContentView() {
         <tr key={item.id} style={{ borderTop: "1px solid var(--divider)" }}>
           <td style={{ padding: "14px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <button onClick={() => move(index, -1)} disabled={index === 0} style={arrowStyle(index === 0)}>
+              <button onClick={() => move(index, -1)} disabled={index === 0 || !!rowBusy} style={arrowStyle(index === 0)}>
                 <Icon name="chevron-down" size={14} color="var(--text-secondary)" />
               </button>
               <span style={{ fontSize: 13, color: "var(--text-secondary)", minWidth: 16, textAlign: "center" }}>{index + 1}</span>
-              <button onClick={() => move(index, 1)} disabled={index === items.length - 1} style={arrowStyle(index === items.length - 1)}>
+              <button onClick={() => move(index, 1)} disabled={index === items.length - 1 || !!rowBusy} style={arrowStyle(index === items.length - 1)}>
                 <Icon name="chevron-down" size={14} color="var(--text-secondary)" />
               </button>
             </div>
@@ -230,7 +250,7 @@ export function FaqContentView() {
           <td style={{ padding: "14px 20px" }}>
             <div style={{ display: "flex", gap: 8 }}>
               <GhostBtn onClick={() => { setDraft(item); setLang("vi"); }}>Sửa</GhostBtn>
-              <GhostBtn onClick={() => toggleActive(item)}>{item.active ? "Ẩn" : "Hiện"}</GhostBtn>
+              <GhostBtn onClick={() => toggleActive(item)} disabled={rowBusy === item.id}>{item.active ? "Ẩn" : "Hiện"}</GhostBtn>
               <GhostBtn color="var(--error)" onClick={() => setDeleting(item)}>Xoá</GhostBtn>
             </div>
           </td>

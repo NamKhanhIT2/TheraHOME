@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
@@ -50,11 +50,18 @@ export default function ConsentScreen() {
   }
 
   async function handleContinue() {
+    if (updateProfile.isPending) return;
     if (!session?.user.id) {
       router.push('/login');
       return;
     }
-    await updateProfile.mutateAsync({ onboarding_completed: true });
+    try {
+      await updateProfile.mutateAsync({ onboarding_completed: true });
+    } catch {
+      // Was an unhandled rejection: the screen simply did nothing and the
+      // user had no way to know why.
+      Alert.alert(t('errGeneric'), t('tryAgainBody'));
+    }
   }
 
   if (loading) {

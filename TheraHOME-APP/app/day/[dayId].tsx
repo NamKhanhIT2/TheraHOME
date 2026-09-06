@@ -150,6 +150,7 @@ export default function DayDetailScreen() {
     markWatched.mutate(
       { userProgramId: program.userProgramId, programDayId: d.programDayId },
       {
+        onError: () => Alert.alert(t('errGeneric'), t('tryAgainBody')),
         onSuccess: (newly) => {
           if (!newly || !d || !program) return;
           const totalDays = progress.totalDays || program.product.totalDays;

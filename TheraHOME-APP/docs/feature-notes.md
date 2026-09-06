@@ -3639,6 +3639,52 @@ bộ codebase thiếu trong bảng `ICONS` của `Icon.tsx`, nên rơi vào plac
 Đã map. (Đã viết script đối chiếu 43 tên đang dùng với 80 tên trong bảng để
 chắc chắn không còn tên nào thiếu.)
 
+## Quét lớp lỗi "bấm hai lần" — phần còn lại (2026-09-06)
+
+Hoàn tất ~30 mục hạng thấp trong hai báo cáo quét. Mẫu áp dụng ở mọi nơi:
+early return TRÊN handler + `disabled` trên nút, cờ RIÊNG cho từng hành
+động, và hộp `window.confirm` đặt TRƯỚC khi chiếm cờ (nếu không, bấm Huỷ sẽ
+khoá cứng dòng đó).
+
+**Web:**
+- `ReportsView`: trước KHÔNG có cờ bận nào — Ẩn, Xoá, Khoá tài khoản, Đã xử
+  lý, Bỏ qua đều bấm lại được. Nay một cờ theo dòng.
+- `FaqContentView`: `ConfirmModal` không nhận prop `busy` nên nút xoá không
+  bao giờ bị khoá; đảo thứ tự là vòng lặp update tuần tự chạy chồng nhau;
+  nút Ẩn/Hiện ghi lại TOÀN BỘ dòng chụp lúc render nên có thể xuất bản đè
+  nội dung cũ — nay đọc lại dòng hiện tại trước khi ghi.
+- `UsersView`: `saveContact` không `await` kết quả (toast thành công hiện
+  cùng lúc với toast lỗi); Lưu phân quyền / Lưu thị trường / Khoá tài khoản
+  không có cờ bận nào; Gỡ sản phẩm và Chuyển giai đoạn thiếu early return.
+- `TheraAccountsView`, `NotificationsAdminView`: thêm early return.
+- `AIPromptsView`: hai nút không có prop `disabled`; `saveTranslation` chạy
+  ở mỗi lần blur nên tab qua hai ô là hai lần ghi — nay bỏ qua khi giá trị
+  không đổi.
+- `ChatView`: thả cảm xúc và xoá tin nhắn không có cờ nào (bấm đúp là bật rồi
+  tắt lại ngay).
+
+**App:**
+- `profile/edit.tsx`: `handleSave` thiếu early return nên hai lần chạm gọi
+  `router.back()` HAI LẦN, nhảy quá màn Hồ sơ; `pickAvatar` không có `catch`
+  nên upload lỗi vẫn hiện ảnh vừa chọn như thể đã lưu.
+- `profile/account.tsx`: ba công tắc (ngôn ngữ, quốc gia, chia sẻ dữ liệu)
+  đổi state cục bộ TRƯỚC rồi mới ghi, không có `onError` — ghi lỗi là app
+  hiện một đằng, hồ sơ lưu một nẻo. Nay hoàn tác và báo lỗi.
+- `DeleteAccountModal`: xoá tài khoản thất bại hoàn toàn im lặng trên thao
+  tác nặng nhất của app.
+- `(onboarding)/consent.tsx`: `await` không try/catch → unhandled rejection,
+  người dùng kẹt ở màn đồng ý mà không biết vì sao.
+- Ẩn bài / ẩn bình luận / đánh dấu đã xem video: thêm `onError`.
+- `useNotifications`: một lệnh DELETE nằm TRONG queryFn nên chạy lại mỗi lần
+  refetch và mỗi lần realtime invalidate, chặn cả lượt đọc, lỗi bị vứt. Nay
+  chạy tối đa một lần mỗi phiên, ngoài đường đọc.
+- Xoá hai hook chết `useMyPostLikes` / `useTogglePostLike`: không nơi nào
+  dùng, và rollback của chúng đã hỏng sẵn (chỉ khôi phục set lượt thích,
+  để lại số đếm trên feed sai vĩnh viễn).
+- 5 lệnh `void ...invoke('dispatch-push')` nay log lỗi ở DEV — trước đây
+  push chết là im hoàn toàn, không cách nào chẩn đoán.
+- 3 lệnh `signOut()` trôi nổi không `catch`.
+
 ## Hoàn thiện đợt 4 (2026-09-06)
 
 **Cộng đồng (app):**

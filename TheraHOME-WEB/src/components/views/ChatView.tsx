@@ -125,20 +125,36 @@ export function ChatView() {
     }
   }
 
+  // Reactions and deletes had no guard at all; a double tap toggled the
+  // reaction straight back off and a double delete raced two writes.
+  const [msgBusy, setMsgBusy] = useState<string | null>(null);
   async function react(message: ChatMessage, emoji: string) {
-    if (!message.id) return;
+    if (!message.id || msgBusy) return;
+    setMsgBusy(message.id);
     try {
       await toggleSpecialistReaction(message.id, emoji, message.reactions?.find((reaction) => reaction.userId === currentUserId));
       setActionMessage(null);
       reload();
-    } catch { pushToast("Không thể thả cảm xúc"); }
+    } catch {
+      pushToast("Không thể thả cảm xúc");
+    } finally {
+      setMsgBusy(null);
+    }
   }
 
-  function removeMessage(message: ChatMessage) {
-    if (!message.id) return;
+  async function removeMessage(message: ChatMessage) {
+    if (!message.id || msgBusy) return;
     if (!window.confirm("Xoá tin nhắn này?")) return;
-    deleteSpecialistMessage(message.id).then(reload).catch(() => pushToast("Không thể xoá tin nhắn"));
+    setMsgBusy(message.id);
     setActionMessage(null);
+    try {
+      await deleteSpecialistMessage(message.id);
+      reload();
+    } catch {
+      pushToast("Không thể xoá tin nhắn");
+    } finally {
+      setMsgBusy(null);
+    }
   }
 
   if (!threads) return <div style={{ color: "var(--text-secondary)" }}>Đang tải...</div>;

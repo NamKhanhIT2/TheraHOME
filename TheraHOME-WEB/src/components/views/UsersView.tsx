@@ -107,6 +107,7 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
   }, [user.id]);
 
   async function removeProgram(row: UserProgramRow) {
+    if (removingId) return;
     if (!window.confirm(`Gỡ sản phẩm "${row.productName}" khỏi tài khoản ${user.name}? Toàn bộ tiến độ lộ trình của sản phẩm này sẽ bị xoá.`)) return;
     setRemovingId(row.userProgramId);
     try {
@@ -121,10 +122,13 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
   }
 
   async function saveContact() {
+    if (savingContact) return;
     setSavingContact(true);
     try {
       await updateUserContact(String(user.id), { email: email.trim() || null, phone: phone.trim() || null });
-      onSave({ email: email.trim() || null, phone: phone.trim() || null });
+      // Was fire-and-forget: a rejection here left the success toast showing
+      // alongside updateUser's own failure toast.
+      await onSave({ email: email.trim() || null, phone: phone.trim() || null });
       pushToast("Đã cập nhật thông tin liên hệ");
     } catch {
       pushToast("Không thể lưu thông tin liên hệ");
@@ -135,7 +139,7 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
 
   async function savePhase(row: UserProgramRow) {
     const targetPhaseId = phaseSelections[row.userProgramId];
-    if (!targetPhaseId || targetPhaseId === row.currentPhaseId) return;
+    if (!targetPhaseId || targetPhaseId === row.currentPhaseId || savingPhaseFor) return;
     setSavingPhaseFor(row.userProgramId);
     try {
       await setUserProgramPhase(row.userProgramId, targetPhaseId);
@@ -157,18 +161,37 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
     }
   }
 
+  const [profileBusy, setProfileBusy] = useState(false);
   async function toggleLock() {
+    if (profileBusy) return;
+    setProfileBusy(true);
+    try {
     // Wait for the write — success toast used to fire before (and alongside)
     // the failure toast from updateUser.
-    if (await onSave({ locked: !user.locked })) pushToast(user.locked ? "Đã mở khóa tài khoản " + user.name : "Đã khóa tài khoản " + user.name);
+      if (await onSave({ locked: !user.locked })) pushToast(user.locked ? "Đã mở khóa tài khoản " + user.name : "Đã khóa tài khoản " + user.name);
+    } finally {
+      setProfileBusy(false);
+    }
   }
   async function saveRole() {
-    if (await onSave({ role: permRole })) pushToast("Đã cập nhật phân quyền cho " + user.name + ": " + (ROLE_META[permRole] || ROLE_META.user)[0]);
+    if (profileBusy) return;
+    setProfileBusy(true);
+    try {
+      if (await onSave({ role: permRole })) pushToast("Đã cập nhật phân quyền cho " + user.name + ": " + (ROLE_META[permRole] || ROLE_META.user)[0]);
+    } finally {
+      setProfileBusy(false);
+    }
   }
 
   async function saveCountry() {
-    if (await onSave({ country: permCountry })) {
-      pushToast("Đã đổi thị trường của " + user.name + " sang " + COUNTRY_META[permCountry] + " — app cập nhật trong ít phút");
+    if (profileBusy) return;
+    setProfileBusy(true);
+    try {
+      if (await onSave({ country: permCountry })) {
+        pushToast("Đã đổi thị trường của " + user.name + " sang " + COUNTRY_META[permCountry] + " — app cập nhật trong ít phút");
+      }
+    } finally {
+      setProfileBusy(false);
     }
   }
 
@@ -353,7 +376,7 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
                 </select>
                 <button
                   onClick={saveRole}
-                  disabled={!roleDirty}
+                  disabled={!roleDirty || profileBusy}
                   style={{
                     width: "100%",
                     border: "none",
@@ -382,7 +405,7 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
                 </select>
                 <button
                   onClick={saveCountry}
-                  disabled={!countryDirty}
+                  disabled={!countryDirty || profileBusy}
                   style={{
                     width: "100%",
                     border: "none",
@@ -402,6 +425,7 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
               <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
                 <button
                   onClick={toggleLock}
+                  disabled={profileBusy}
                   style={{ flex: 1, border: "1px solid var(--border-input)", background: "none", color: "var(--error)", borderRadius: 10, padding: "11px 0", fontFamily: "var(--font-family)", fontWeight: 600, fontSize: 13.5, cursor: "pointer" }}
                 >
                   {user.locked ? "Mở khóa tài khoản" : "Khóa tài khoản"}

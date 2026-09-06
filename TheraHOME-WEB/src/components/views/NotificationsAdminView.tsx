@@ -81,7 +81,7 @@ export function NotificationsAdminView() {
   }
 
   async function save() {
-    if (!editing || !title.trim() || !body.trim()) return;
+    if (!editing || !title.trim() || !body.trim() || saving) return;
     setSaving(true);
     try {
       await saveSystemNotificationTemplate({ templateKey: editing, language: languageTab, title: title.trim(), body: body.trim() });

@@ -59,6 +59,10 @@ export function AIPromptsView() {
   }
 
   async function saveTranslation(id: string, field: "textEn" | "textMs", value: string) {
+    // Fires on every blur, so tabbing across both language fields issued two
+    // writes even when nothing changed. Skip when the value already matches.
+    const current = replies?.find((r) => r.id === id);
+    if (current && (current[field] ?? "") === value) return;
     try {
       await updateAISuggestedReply(id, { [field]: value });
     } catch {
@@ -82,7 +86,7 @@ export function AIPromptsView() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard title="System prompt — Trợ lý AI" action={<PrimaryBtn onClick={savePrompt}>{savingPrompt ? "Đang lưu..." : "Lưu thay đổi"}</PrimaryBtn>}>
+      <SectionCard title="System prompt — Trợ lý AI" action={<PrimaryBtn onClick={savePrompt} disabled={savingPrompt}>{savingPrompt ? "Đang lưu..." : "Lưu thay đổi"}</PrimaryBtn>}>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -103,7 +107,7 @@ export function AIPromptsView() {
               placeholder="Câu gợi ý mới..."
               style={{ border: "1px solid var(--border-input)", borderRadius: 8, padding: "7px 10px", fontFamily: "var(--font-family)", fontSize: 13 }}
             />
-            <PrimaryBtn icon="plus" onClick={addReply}>{addingReply ? "Đang thêm..." : "Thêm mẫu"}</PrimaryBtn>
+            <PrimaryBtn icon="plus" onClick={addReply} disabled={addingReply}>{addingReply ? "Đang thêm..." : "Thêm mẫu"}</PrimaryBtn>
           </div>
         }
       >

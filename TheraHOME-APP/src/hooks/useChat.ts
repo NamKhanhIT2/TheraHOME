@@ -219,7 +219,9 @@ export function useSendChatMessage(threadId: string | undefined, userId: string 
       } else {
         void supabase.functions.invoke('dispatch-push', {
           body: { mode: 'chat', threadId, senderType, preview: message.body || undefined, attachment: !message.body },
-        });
+        }).then(({ error }) => {
+        if (error && __DEV__) console.warn('dispatch-push failed:', error);
+      });
       }
     },
     onError: (_error, _input, context) => {

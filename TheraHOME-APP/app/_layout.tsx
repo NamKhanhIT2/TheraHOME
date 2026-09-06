@@ -239,7 +239,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     const expired = !!profile.expiresAt && new Date(profile.expiresAt) < new Date();
     if (profile.locked || expired) {
       setBlockedReason(profile.locked ? 'locked' : 'expired');
-      supabase.auth.signOut();
+      void supabase.auth.signOut().catch((e: unknown) => { if (__DEV__) console.warn('signOut failed:', e); });
     }
   }, [profile, blockedReason]);
 

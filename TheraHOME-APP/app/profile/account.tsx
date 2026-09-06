@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
@@ -82,8 +82,12 @@ export default function AccountSettingsScreen() {
                     // Language only. It used to overwrite the market too,
                     // which is how a VN customer reading in English ended
                     // up with US prices — market lives in the block below.
+                    const previous = language;
                     setLanguage(code as AppLanguage);
-                    updateProfile.mutate({ language: code, language_explicit: true });
+                    updateProfile.mutate(
+                      { language: code, language_explicit: true },
+                      { onError: () => { setLanguage(previous); Alert.alert(t('errGeneric'), t('tryAgainBody')); } },
+                    );
                   }}
                   style={[
                     styles.langBtn,
@@ -116,8 +120,12 @@ export default function AccountSettingsScreen() {
                   <Pressable
                     key={option}
                     onPress={() => {
+                      const previous = market;
                       setMarket(localFromMarket(code));
-                      updateProfile.mutate({ country: code });
+                      updateProfile.mutate(
+                        { country: code },
+                        { onError: () => { setMarket(localFromMarket(previous)); Alert.alert(t('errGeneric'), t('tryAgainBody')); } },
+                      );
                     }}
                     style={[
                       styles.langBtn,
@@ -144,7 +152,7 @@ export default function AccountSettingsScreen() {
             title={t('shareData')}
             sub={t('anonymousData')}
             value={shareData}
-            onChange={(v) => updateProfile.mutate({ data_sharing_enabled: v })}
+            onChange={(v) => updateProfile.mutate({ data_sharing_enabled: v }, { onError: () => Alert.alert(t('errGeneric'), t('tryAgainBody')) })}
           />
         </View>
 

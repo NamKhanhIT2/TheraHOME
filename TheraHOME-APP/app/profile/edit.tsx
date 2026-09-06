@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/theme';
@@ -107,20 +107,29 @@ export default function EditProfileScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, allowsEditing: true });
     if (result.canceled || !result.assets[0]) return;
 
+    const previousAvatar = avatarUri;
     setAvatarUri(result.assets[0].uri);
     setUploadingAvatar(true);
     try {
       const url = await uploadAvatarImage(userId, result.assets[0].uri);
       await updateProfile.mutateAsync({ avatar_url: url });
+    } catch {
+      // There was no catch at all: an upload failure left the picked image on
+      // screen, so it looked saved when nothing had been written.
+      setAvatarUri(previousAvatar);
+      Alert.alert(t('errGeneric'), t('tryAgainBody'));
     } finally {
       setUploadingAvatar(false);
     }
   }
 
   function handleSave() {
+    // Without the pending check two taps ran two mutations AND two
+    // router.back() calls, popping past the profile screen.
+    if (updateProfile.isPending) return;
     updateProfile.mutate(
       { full_name: name.trim() || null, phone: phone.trim() || null, treatment_area: area || null, goal: goal || null },
-      { onSuccess: () => router.back() },
+      { onSuccess: () => router.back(), onError: () => Alert.alert(t('errGeneric'), t('tryAgainBody')) },
     );
   }
 

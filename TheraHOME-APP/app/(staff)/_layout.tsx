@@ -34,7 +34,7 @@ function StaffHeader() {
           {roleLabel ? <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 1 }]}>{roleLabel}</Text> : null}
         </View>
         <Pressable
-          onPress={() => supabase.auth.signOut()}
+          onPress={() => void supabase.auth.signOut().catch((e: unknown) => { if (__DEV__) console.warn('signOut failed:', e); })}
           style={[styles.logoutBtn, { backgroundColor: theme.colors.bgCardAlt }]}
           hitSlop={8}
         >
