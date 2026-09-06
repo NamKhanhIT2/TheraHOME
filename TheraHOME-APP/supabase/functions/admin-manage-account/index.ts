@@ -24,6 +24,7 @@ const ACCESS_LEVELS = ["free", "premium", "admin_granted"];
 // country screen, so Admin picks it at creation (2026-09-05); older callers
 // that send nothing keep the previous behaviour of defaulting to VN.
 const COUNTRIES = ["VN", "US", "MALAY"];
+const MARKET_LANGUAGE: Record<string, string> = { VN: "vi", US: "en", MALAY: "ms" };
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 
 // TheraHOME-issued accounts log in with a plain username, not a real email
@@ -150,6 +151,13 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
       // the app guessing the market from the UI language.
       country_confirmed: true,
       country,
+      // The market Admin picks IS the deliberate language choice for these
+      // accounts: they never see country.tsx (which is where a normal user
+      // sets language + language_explicit), so without this they inherited
+      // whatever language the phone happened to be on -- a UK-market account
+      // read the whole app, onboarding questionnaire included, in Vietnamese.
+      language: MARKET_LANGUAGE[country] ?? "vi",
+      language_explicit: true,
       notes,
       created_by: createdBy,
       locked: false,

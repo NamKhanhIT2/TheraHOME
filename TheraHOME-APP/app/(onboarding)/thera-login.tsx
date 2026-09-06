@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/icons/Icon';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useI18n } from '@/lib/i18n';
+import { useAppStore } from '@/store/useAppStore';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -108,6 +109,7 @@ function FallingLeaf({ source, startX, size, duration, delay, drift, rotateAmoun
 export default function TheraAccountLoginScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const resetOnboardingAnswers = useAppStore((state) => state.resetOnboardingAnswers);
   const reduceMotion = useReduceMotion();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -198,6 +200,12 @@ export default function TheraAccountLoginScreen() {
       });
       if (signInError) throw signInError;
       if (data.session) {
+        // Wipe whatever onboarding progress this device still holds before
+        // handing over to RootNavigator. login.tsx already does this for a
+        // new OAuth user; without it a TheraHOME account whose onboarding is
+        // pending resumes at the question the previous person on this device
+        // stopped at — reported as "it opens straight at question 8".
+        resetOnboardingAnswers();
         router.replace('/');
       }
     } catch (e) {

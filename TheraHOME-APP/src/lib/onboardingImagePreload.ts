@@ -22,7 +22,7 @@ const REMAINING_QUESTION_IMAGES: ImageSourcePropType[] = [
   require('../../assets/onboarding/time-medium.png'),
   require('../../assets/onboarding/time-long.png'),
   require('../../assets/onboarding/tension-hero.png'),
-  require('../../assets/onboarding/tension-poses-clean.png'),
+  require('../../assets/onboarding/tension-poses.png'),
   require('../../assets/onboarding/age-hero.png'),
   require('../../assets/onboarding/home-reason-sprite.png'),
   require('../../assets/onboarding/tension-timing-sprite.png'),

@@ -263,11 +263,24 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // Vietnamese for any account (including every pre-existing one) that has
   // never actually picked a language.
   useEffect(() => {
-    if (!profile?.languageExplicit) return;
-    if (profile.language === 'vi' || profile.language === 'en' || profile.language === 'ms') {
-      setLanguage(profile.language as AppLanguage, { auto: false });
+    if (profile?.languageExplicit) {
+      if (profile.language === 'vi' || profile.language === 'en' || profile.language === 'ms') {
+        setLanguage(profile.language as AppLanguage, { auto: false });
+      }
+      return;
     }
-  }, [profile?.language, profile?.languageExplicit, setLanguage]);
+    // Admin-issued accounts never see country.tsx (RootNavigator treats them
+    // as inApp), so they never get `language_explicit` set and used to sit on
+    // whatever this device had — a UK-market account read the app, and its
+    // onboarding questionnaire, in Vietnamese. The market an Admin picked for
+    // the account IS the deliberate choice here, so derive from it. Normal
+    // accounts keep the device-locale default until the user picks for real.
+    if (profile && profile.accountType !== 'normal' && profile.country) {
+      const fromMarket: AppLanguage | null =
+        profile.country === 'VN' ? 'vi' : profile.country === 'US' ? 'en' : profile.country === 'MALAY' ? 'ms' : null;
+      if (fromMarket) setLanguage(fromMarket, { auto: false });
+    }
+  }, [profile?.language, profile?.languageExplicit, profile?.accountType, profile?.country, setLanguage]);
 
   if (!fontsReady || sessionLoading || profileLoading || !minimumSplashElapsed) {
     return <AppSplashScreen />;

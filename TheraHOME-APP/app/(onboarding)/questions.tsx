@@ -61,7 +61,9 @@ const LIFESTYLE_HERO_IMAGES = {
 };
 
 const TENSION_HERO_IMAGE = require('../../assets/onboarding/tension-hero.png');
-const TENSION_POSES_IMAGE = require('../../assets/onboarding/tension-poses-clean.png');
+// This source has a real alpha channel. The former `-clean` asset had an
+// opaque white canvas which became visible around the character in dark mode.
+const TENSION_POSES_IMAGE = require('../../assets/onboarding/tension-poses.png');
 const AGE_HERO_IMAGE = require('../../assets/onboarding/age-hero.png');
 const HOME_REASON_SPRITE = require('../../assets/onboarding/home-reason-sprite.png');
 const TENSION_TIMING_SPRITE = require('../../assets/onboarding/tension-timing-sprite.png');
@@ -821,7 +823,7 @@ export default function QuestionsScreen() {
                 <Text style={{ color: theme.colors.primary }}>{editorialTitle[1]}</Text>
               </Text>
               <Text
-                numberOfLines={language === 'ms' ? 3 : 2}
+                numberOfLines={3}
                 style={[
                   styles.editorialSubtitle,
                   {
@@ -982,7 +984,7 @@ export default function QuestionsScreen() {
               <Text
                 adjustsFontSizeToFit
                 minimumFontScale={0.78}
-                numberOfLines={language === 'ms' ? 3 : 2}
+                numberOfLines={3}
                 style={[
                   styles.ageHeroTitle,
                   {
@@ -1353,7 +1355,10 @@ export default function QuestionsScreen() {
                         styles.priorityCard,
                         theme.shadows.card,
                         {
-                          backgroundColor: theme.colors.bgCard,
+                          // The priority artwork is exported on white. Keep a
+                          // single intentional art surface in every app theme
+                          // so no differently coloured image rectangle leaks.
+                          backgroundColor: '#FFFFFF',
                           borderColor: active ? theme.colors.primary : 'rgba(0,127,217,0.08)',
                           opacity: pressed ? 0.9 : 1,
                           transform: [{ scale: pressed ? 0.985 : 1 }],
@@ -1368,7 +1373,7 @@ export default function QuestionsScreen() {
                         style={[
                           styles.priorityCardLabel,
                           {
-                            color: theme.colors.textPrimary,
+                            color: '#112E5A',
                             fontFamily: theme.fontFamily.semiBold,
                             maxWidth: Math.max(112, width - priorityCardImageWidth - 142),
                           },
@@ -1523,6 +1528,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     marginBottom: 6,
     overflow: 'hidden',
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
   },
   goalHeroCopy: {
     zIndex: 2,
@@ -1896,6 +1903,8 @@ const styles = StyleSheet.create({
     minHeight: 218,
     marginBottom: 10,
     overflow: 'hidden',
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
   },
   priorityHeroCopy: {
     zIndex: 2,

@@ -55,7 +55,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/android-icon-monochrome.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#007FD9",
           "sounds": [
             "./assets/sounds/ting.wav"
