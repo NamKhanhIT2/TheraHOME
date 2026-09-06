@@ -66,6 +66,13 @@ export function CommunityMediaViewer({ uris, initialIndex, onClose }: CommunityM
         initialScrollIndex={initialIndex}
         getItemLayout={(_data, index) => ({ length: width, offset: width * index, index })}
         onMomentumScrollEnd={handleMomentumEnd}
+        // Each video page builds its own expo-video player, so an unbounded
+        // window meant a five-video post spun up five players at once. Keep
+        // only the current page and its neighbours mounted.
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={3}
+        removeClippedSubviews
         renderItem={({ item, index }) =>
           isVideoUri(item) ? (
             <View style={{ width }}>

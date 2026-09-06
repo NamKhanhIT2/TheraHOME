@@ -211,22 +211,44 @@ export default function CommunityScreen() {
   // alongside every other official post, same as before.
   const pinnedPost = posts.find((p) => p.isOfficial && isPinnedForMarket(p, market) && !hiddenPostIds.has(p.id)) ?? null;
   const pinnedPostDisplay = pinnedPost ? pinnedDisplay(pinnedPost) : null;
+  // Latest reaction/save sets for the ranker, read through refs so changing
+  // them does not itself trigger a re-rank (see the memo below).
+  const reactionsRef = useRef(myReactions);
+  const savesRef = useRef(savedSet);
+  useEffect(() => {
+    reactionsRef.current = myReactions;
+    savesRef.current = savedSet;
+  }, [myReactions, savedSet]);
+
   const filteredPosts = useMemo(() => {
     const eligible = posts.filter(
       (p) =>
         !hiddenPostIds.has(p.id) &&
         (!p.authorId || !blockedUserIds.has(p.authorId)) &&
         (
-          (filter === 'all' && !p.isOfficial) ||
+          // "Tất cả" means all: official posts used to be excluded outright,
+          // so the tab's label promised the opposite of what it did and the
+          // only official post a user could reach was the pinned card. That
+          // one card is still skipped here so it is not shown twice.
+          (filter === 'all' && p.id !== pinnedPost?.id) ||
           (filter === 'official' && p.isOfficial)
         ),
     );
-    return rankCommunityPosts(eligible, myReactions, savedSet);
-  }, [blockedUserIds, filter, hiddenPostIds, myReactions, posts, savedSet]);
+    // Ranking is deliberately NOT recomputed when the viewer reacts or saves:
+    // per-author affinity is derived from those very sets, so a tap used to
+    // re-sort the feed under the user's finger. The order is refreshed when
+    // the post list itself changes (refetch, new post, load more).
+    return rankCommunityPosts(eligible, reactionsRef.current, savesRef.current);
+  }, [blockedUserIds, filter, hiddenPostIds, posts, pinnedPost?.id]);
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
   function showToast(msg: string) {
     setToast(msg);
-    setTimeout(() => setToast(null), 2000);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2000);
   }
 
   function congratulate(post: CommunityPostRow) {
@@ -274,7 +296,10 @@ export default function CommunityScreen() {
     reportContent.mutate(
       { contentType: 'post', contentId: target.id, reason },
       {
-        onSuccess: () => showToast(t('reportThanks')),
+        onSuccess: () => {
+          hidePost.mutate(target.id);
+          showToast(t('reportThanks'));
+        },
         onError: (e) => showToast(friendlyCommunityError(e)),
       },
     );
@@ -453,7 +478,13 @@ export default function CommunityScreen() {
           saved={savedByMe}
           onQuickReact={() => { hapticConfirm(); setPostReaction.mutate({ postId: p.id, current: currentReaction, reaction: currentReaction ? null : 'heart' }, { onError: () => showToast(t('cannotUpdateReaction')) }); }}
           onReactionLongPress={({ pageX, pageY }) => setReactionPicker({ post: p, pageX, pageY, hovered: null })}
-          onReactionLongPressMove={(point) => setReactionPicker((active) => active?.post.id === p.id ? { ...active, hovered: pickerReactionAt(point, getReactionTrayFrame(active, WINDOW_WIDTH)) } : active)}
+          onReactionLongPressMove={(point) =>
+            setReactionPicker((active) => {
+              if (active?.post.id !== p.id) return active;
+              const hovered = pickerReactionAt(point, getReactionTrayFrame(active, WINDOW_WIDTH));
+              return hovered === active.hovered ? active : { ...active, hovered };
+            })
+          }
           onReactionLongPressRelease={() => {
             const active = reactionPicker;
             if (active?.post.id !== p.id || !active.hovered) return;

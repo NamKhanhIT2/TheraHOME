@@ -58,7 +58,9 @@ export function CommunityPostImage({
           }}
         />
       </Pressable>
-      {localViewerOpen ? <CommunityMediaViewer uris={[uri]} initialIndex={0} onClose={() => setLocalViewerOpen(false)} /> : null}
+      {/* Full screen must show the ORIGINAL, not the downsized feed copy —
+          `uri` is the feed-resolution image. */}
+      {localViewerOpen ? <CommunityMediaViewer uris={[originalUri]} initialIndex={0} onClose={() => setLocalViewerOpen(false)} /> : null}
     </>
   );
 }

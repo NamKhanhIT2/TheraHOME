@@ -2,7 +2,8 @@
 // only; hide/delete post/comment and locking a user are admin-only RLS, not
 // offered here). See CLAUDE.md and useCommunity.ts's useContentReports.
 import React, { useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useContentReports, useResolveContentReport, type ContentReportRow } from '@/hooks/useCommunity';
 import { Button } from '@/components/ui/Button';
@@ -46,19 +47,36 @@ function ReportRow({ report }: { report: ContentReportRow }) {
       {report.note ? (
         <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 4 }]}>Ghi chú: {report.note}</Text>
       ) : null}
+      {report.postId ? (
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: '/community/[postId]',
+              params: report.contentType === 'comment'
+                ? { postId: report.postId!, commentId: report.contentId }
+                : { postId: report.postId! },
+            })
+          }
+          style={{ marginTop: 8 }}
+        >
+          <Text style={[theme.type.caption, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>
+            Xem nội dung bị báo cáo →
+          </Text>
+        </Pressable>
+      ) : null}
       {report.status === 'pending' ? (
         <View style={styles.actionsRow}>
           <Button
             variant="secondary"
             style={{ flex: 1 }}
-            loading={resolveReport.isPending}
+            loading={resolveReport.isPending && resolveReport.variables?.status === 'dismissed'}
             onPress={() => resolveReport.mutate({ id: report.id, status: 'dismissed' })}
           >
             Bỏ qua
           </Button>
           <Button
             style={{ flex: 1 }}
-            loading={resolveReport.isPending}
+            loading={resolveReport.isPending && resolveReport.variables?.status === 'resolved'}
             onPress={() => resolveReport.mutate({ id: report.id, status: 'resolved' })}
           >
             Đã xử lý

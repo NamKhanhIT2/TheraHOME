@@ -7,7 +7,7 @@ import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
-import { useAddComment, useDeleteComment, useDeletePost, useHideCommunityComment, useHideCommunityPost, useHiddenCommunityComments, useMyCommentReactions, useMyPostReactions, useMyPostSaves, usePost, usePostComments, useReportContent, useSetCommentReaction, useSetPostReaction, useTogglePostSave, useUpdateComment, useUpdatePost, friendlyCommunityError, DEFAULT_COMMENTS_PAGE_SIZE, type CommentRow, type PostReaction, type ReportReason } from '@/hooks/useCommunity';
+import { useAddComment, useDeleteComment, useDeletePost, useHideCommunityComment, useHideCommunityPost, useHiddenCommunityComments, useBlockedCommunityUsers, useMyCommentReactions, useMyPostReactions, useMyPostSaves, usePost, usePostComments, useReportContent, useSetCommentReaction, useSetPostReaction, useTogglePostSave, useUpdateComment, useUpdatePost, friendlyCommunityError, DEFAULT_COMMENTS_PAGE_SIZE, type CommentRow, type PostReaction, type ReportReason } from '@/hooks/useCommunity';
 import { timeAgo } from '@/lib/timeAgo';
 import { CommunityAvatar } from '@/components/CommunityAvatar';
 import { CommunityPostImage } from '@/components/CommunityPostImage';
@@ -61,6 +61,10 @@ export default function PostDetailScreen() {
   const updatePost = useUpdatePost(userId);
   const hidePost = useHideCommunityPost(userId);
   const hiddenCommentIds = useHiddenCommunityComments(userId).data ?? new Set<string>();
+  // Blocking used to hide a person's POSTS from the feed but leave every
+  // comment and reply they wrote fully visible here, avatar and profile link
+  // included — which defeats the point of blocking them.
+  const blockedUserIds = useBlockedCommunityUsers(userId).data ?? new Set<string>();
   const hideComment = useHideCommunityComment(userId);
   const reportContent = useReportContent(userId);
   const scrollRef = useRef<ScrollView>(null);
@@ -92,9 +96,10 @@ export default function PostDetailScreen() {
   const comments = useMemo(() => {
     const withoutHidden = (items: CommentRow[]): CommentRow[] => items
       .filter((item) => !hiddenCommentIds.has(item.id))
+      .filter((item) => !item.authorId || !blockedUserIds.has(item.authorId))
       .map((item) => ({ ...item, replies: withoutHidden(item.replies) }));
     return withoutHidden(commentsQuery.data?.comments ?? []);
-  }, [commentsQuery.data, hiddenCommentIds]);
+  }, [commentsQuery.data, hiddenCommentIds, blockedUserIds]);
   const targetId = commentId ?? parentCommentId;
 
   // Runs ONCE per deep-linked comment. `comments` gets a new array identity on

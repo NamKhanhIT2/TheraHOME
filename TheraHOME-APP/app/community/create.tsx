@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { useActivatedPrograms, useProgramDays, usePainLogs, usePrimaryProducts } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useProgramDays, usePainLogs } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useAppStore } from '@/store/useAppStore';
 import { useCreatePost, friendlyCommunityError, type PostMediaItem, type PostType, type ProgressSnapshot } from '@/hooks/useCommunity';
@@ -54,9 +54,8 @@ export default function CreatePostScreen() {
   // source as Home's hero and the Profile header. The device name follows
   // the viewer's market's store name (same as the Home/Roadmap dropdowns).
   const progress = useAccessibleProgress(userId, activeProgram);
-  const primaryQuery = usePrimaryProducts();
   const snapshotProductName = activeProgram
-    ? primaryQuery.data?.nameById[activeProgram.productId] ?? activeProgram.product.name
+    ? activeProgram.product.name
     : '';
   const currentPhase = daysQuery.data?.find((d) => d.id === activeProgram?.currentDay)?.phase;
 
@@ -113,6 +112,18 @@ export default function CreatePostScreen() {
   }
 
   const canSubmit = postType === 'progress' || postType === 'exercise' ? !!snapshot : !!text.trim() || media.length > 0;
+  // Closing used to drop a half-written post (and any picked photos) without
+  // a word.
+  function closeComposer() {
+    if (!text.trim() && media.length === 0) {
+      router.back();
+      return;
+    }
+    Alert.alert(t('discardPostTitle'), t('discardPostBody'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('discardPostAction'), style: 'destructive', onPress: () => router.back() },
+    ]);
+  }
 
   function handleSubmit() {
     if (!canSubmit || createPost.isPending) return;
@@ -142,7 +153,7 @@ export default function CreatePostScreen() {
       <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}>
         <View style={{ width: 32 }} />
         <Text style={[theme.type.h2, { color: theme.colors.textPrimary }]}>{t('createPost')}</Text>
-        <Pressable onPress={() => router.back()} style={[styles.closeBtn, { backgroundColor: theme.colors.bgCardAlt }]}>
+        <Pressable onPress={closeComposer} style={[styles.closeBtn, { backgroundColor: theme.colors.bgCardAlt }]}>
           <Icon name="x" size={16} color={theme.colors.textPrimary} />
         </Pressable>
       </View>
@@ -241,7 +252,7 @@ export default function CreatePostScreen() {
           </View>
         </View>
         <Button style={{ width: '100%' }} disabled={!canSubmit} loading={createPost.isPending} onPress={handleSubmit}>
-          {t('next')}
+          {t('share')}
         </Button>
         <Pressable onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'community' } })} style={{ marginTop: 10, alignItems: 'center' }}>
           <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, textDecorationLine: 'underline' }]}>{t('viewCommunityGuidelines')}</Text>

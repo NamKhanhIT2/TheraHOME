@@ -249,7 +249,10 @@ export function friendlyCommunityError(e: unknown): string {
   // Read the store directly: this runs from mutation handlers, not render.
   const language = useAppStore.getState().language;
   const key: TranslationKey =
-    message.includes('rate_limited') ? 'errRateLimited'
+    // Unique violation on content_reports_unique_reporter_item — one report
+    // per person per item (migration 202609060900).
+    message.includes('content_reports_unique_reporter_item') || message.includes('duplicate key') ? 'errAlreadyReported'
+    : message.includes('rate_limited') ? 'errRateLimited'
     : message.includes('unsafe_community_content') ? 'errUnsafeContent'
     : message.includes('authentication_required') || message.includes('JWT') ? 'errSessionExpired'
     : message.includes('comment_text_required') ? 'errCommentTextRequired'
