@@ -26,12 +26,30 @@ function addErrorMessage(error: unknown): string {
   return "Không thể thêm. Vui lòng thử lại.";
 }
 
+/**
+ * Dialling codes for the markets this store serves. The market cannot supply
+ * one on its own — 'US' here covers "UK · Anh / EU / Mỹ", spanning +44, +1 and
+ * the EU codes — so whoever types the number picks it.
+ */
+const DIALLING_CODES = ["84", "44", "60", "1"] as const;
+
+/** What the database stores: E.164, no separators. The leading trunk zero of a
+ * domestic number is dropped — it is not part of the international form, and a
+ * contact saved as "+840912…" would match no customer. Emails pass through. */
+function toStoredContact(diallingCode: string, typed: string): string {
+  const value = typed.trim();
+  if (value.includes("@")) return value;
+  const digits = value.replace(/[^0-9]/g, "").replace(/^0+/, "");
+  return digits ? `+${diallingCode}${digits}` : "";
+}
+
 export function ActivationView() {
   const [products, setProducts] = useState<ActivationProduct[] | null>(null);
   const [contacts, setContacts] = useState<ActivationContact[] | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [addErrors, setAddErrors] = useState<Record<string, string>>({});
+  const [codes, setCodes] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ActivationContact | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -66,7 +84,7 @@ export function ActivationView() {
     try {
       setAddingFor(productId);
       setAddErrors((cur) => ({ ...cur, [productId]: "" }));
-      await addProductActivationContact(productId, draft);
+      await addProductActivationContact(productId, toStoredContact(codes[productId] ?? "84", draft));
       setDrafts((cur) => ({ ...cur, [productId]: "" }));
       pushToast("Đã thêm vào danh sách kích hoạt");
       reload();
@@ -131,6 +149,18 @@ export function ActivationView() {
             }
           >
             <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+              {!(drafts[product.id] ?? "").includes("@") ? (
+                <select
+                  value={codes[product.id] ?? "84"}
+                  onChange={(e) => setCodes((cur) => ({ ...cur, [product.id]: e.target.value }))}
+                  aria-label="Mã quốc gia"
+                  style={{ ...inputStyle, width: 92, flex: "none" }}
+                >
+                  {DIALLING_CODES.map((code) => (
+                    <option key={code} value={code}>+{code}</option>
+                  ))}
+                </select>
+              ) : null}
               <input
                 value={drafts[product.id] ?? ""}
                 onChange={(e) => {

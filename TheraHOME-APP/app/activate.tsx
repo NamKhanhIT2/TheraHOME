@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
+import { useProfile } from '@/hooks/useProfile';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Card } from '@/components/ui/Card';
@@ -28,6 +29,27 @@ const BENEFIT_KEYS = ['benefitFullRoadmap', 'benefitDailySync'] as const;
 //    that product's own CSKH activation list (activate_product_by_contact),
 //    so a second device registered under a different phone/email can be
 //    redeemed without touching the account's main contact.
+/**
+ * Dialling codes for the markets this app serves. The market itself cannot
+ * supply one — 'US' covers "UK · Anh / EU / Mỹ", which spans +44, +1 and the
+ * EU codes — so the person entering the number picks it, and the market only
+ * decides which entry starts selected.
+ */
+const DIALLING_CODES: { code: string; label: string }[] = [
+  { code: '84', label: 'Việt Nam' },
+  { code: '44', label: 'United Kingdom' },
+  { code: '60', label: 'Malaysia' },
+  { code: '1', label: 'US / Canada' },
+];
+
+/** Compose what the database stores: E.164, no separators. A domestic number's
+ * leading trunk zero is dropped — it is not part of the international form, and
+ * sending "+84 0912…" would store a number that matches no order. */
+function toE164(diallingCode: string, typed: string): string {
+  const digits = typed.replace(/[^0-9]/g, '').replace(/^0+/, '');
+  return digits ? `+${diallingCode}${digits}` : '';
+}
+
 export default function ActivationScreen() {
   const theme = useTheme();
   const { t } = useI18n();
@@ -39,6 +61,16 @@ export default function ActivationScreen() {
   const [contactError, setContactError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const isEmail = contact.includes('@');
+  const profile = useProfile(session?.user.id).data;
+  // The market only preselects; 'US' spans several codes so the user decides.
+  const defaultCode = profile?.country === 'MALAY' ? '60' : profile?.country === 'US' ? '44' : '84';
+  const [diallingCode, setDiallingCode] = useState<string | null>(null);
+  const activeCode = diallingCode ?? defaultCode;
+  const [codePickerOpen, setCodePickerOpen] = useState(false);
+  const submittedContact = useMemo(
+    () => (isEmail ? contact.trim() : toE164(activeCode, contact)),
+    [isEmail, contact, activeCode],
+  );
 
   function handleClose() {
     if (submitting) return;
@@ -53,12 +85,12 @@ export default function ActivationScreen() {
       if (productId) {
         const { error } = await supabase.rpc('activate_product_by_contact', {
           p_product_id: productId,
-          p_contact: contact.trim(),
+          p_contact: submittedContact,
         });
         if (error) throw error;
       } else {
         const { data, error } = await supabase.rpc('claim_user_access_contact', {
-          p_contact: contact.trim(),
+          p_contact: submittedContact,
         });
         if (error) throw error;
         if (!data || data.length === 0) {
@@ -142,6 +174,12 @@ export default function ActivationScreen() {
             ]}
           >
             <Icon name={isEmail ? 'mail' : 'smartphone'} size={19} color={theme.colors.textMuted} />
+            {!isEmail ? (
+              <Pressable onPress={() => setCodePickerOpen(true)} style={styles.codeBtn} hitSlop={6}>
+                <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>+{activeCode}</Text>
+                <Icon name="chevron-down" size={14} color={theme.colors.textMuted} />
+              </Pressable>
+            ) : null}
             <TextInput
               value={contact}
               onChangeText={(v) => {
@@ -161,13 +199,34 @@ export default function ActivationScreen() {
           ) : null}
           <Button
             style={{ width: '100%', marginTop: 16 }}
-            disabled={!contact.trim()}
+            disabled={!submittedContact}
             loading={submitting}
             onPress={confirmContact}
           >
             {t('confirmAndUnlock')}
           </Button>
         </Card>
+
+        <Modal visible={codePickerOpen} transparent animationType="fade" onRequestClose={() => setCodePickerOpen(false)}>
+          <Pressable style={styles.codeOverlay} onPress={() => setCodePickerOpen(false)}>
+            <Pressable onPress={() => undefined} style={[styles.codeSheet, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+              {DIALLING_CODES.map((entry) => {
+                const selected = entry.code === activeCode;
+                return (
+                  <Pressable
+                    key={entry.code}
+                    onPress={() => { setDiallingCode(entry.code); setCodePickerOpen(false); }}
+                    style={[styles.codeRow, { borderBottomColor: theme.colors.divider }]}
+                  >
+                    <Text style={[theme.type.bodyStrong, { color: selected ? theme.colors.primary : theme.colors.textPrimary, width: 56 }]}>+{entry.code}</Text>
+                    <Text style={[theme.type.body, { color: selected ? theme.colors.primary : theme.colors.textSecondary, flex: 1 }]}>{entry.label}</Text>
+                    {selected ? <Icon name="check" size={17} color={theme.colors.primary} /> : null}
+                  </Pressable>
+                );
+              })}
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         <View style={styles.footerNote}>
           <Icon name="lock" size={13} color={theme.colors.textMuted} />
@@ -182,6 +241,30 @@ export default function ActivationScreen() {
 }
 
 const styles = StyleSheet.create({
+  codeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  codeOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(9,17,28,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  codeSheet: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+  },
   flex: { flex: 1 },
   body: {
     flexGrow: 1,
