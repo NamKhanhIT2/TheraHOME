@@ -3,10 +3,10 @@
 // (scaffolding only — see CLAUDE.md for what still needs a Customer Care
 // client to actually reply). Replaces the Phase 1 mock canned-reply logic
 // in app/chat/ai.tsx and app/chat/human.tsx.
-import { useEffect, useRef } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 
 export type ChatKind = 'ai' | 'human';
@@ -65,27 +65,26 @@ type ChatMessagesData = InfiniteData<ChatMessagesPage, number>;
 export function useChatMessages(threadId: string | undefined) {
   const queryClient = useQueryClient();
   const key = ['chat_messages', threadId] as const;
-  const channelId = useRef(`chat_messages_${Math.random().toString(36).slice(2)}`);
 
-  useEffect(() => {
-    if (!threadId) return;
-    const channel = supabase
-      .channel(`${channelId.current}_${threadId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_messages', filter: `thread_id=eq.${threadId}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: key });
-        },
-      )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_message_reactions' }, () => {
-        queryClient.invalidateQueries({ queryKey: key });
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [threadId, queryClient]);
+  // Through useRealtimeSync rather than a bare .subscribe(): a socket the OS
+  // suspended while the app was backgrounded used to stay dead, and nothing
+  // refetched to cover what was written meanwhile, so the thread only caught
+  // up when the user left the screen and came back (owner, 2026-09-07).
+  useRealtimeSync({
+    enabled: !!threadId,
+    channelName: `chat_messages_${threadId}`,
+    bind: (channel) =>
+      channel
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'chat_messages', filter: `thread_id=eq.${threadId}` },
+          () => queryClient.invalidateQueries({ queryKey: key }),
+        )
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_message_reactions' }, () =>
+          queryClient.invalidateQueries({ queryKey: key }),
+        ),
+    onSync: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
 
   return useInfiniteQuery({
     queryKey: key,
@@ -354,20 +353,16 @@ export interface AdminChatThreadRow {
  * nothing useful to show for them yet. */
 export function useAdminChatThreads() {
   const queryClient = useQueryClient();
-  const channelId = useRef(`admin_chat_threads_${Math.random().toString(36).slice(2)}`);
   const key = ['admin_chat_threads'] as const;
 
-  useEffect(() => {
-    const channel = supabase
-      .channel(channelId.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => {
-        queryClient.invalidateQueries({ queryKey: key });
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
+  useRealtimeSync({
+    channelName: 'admin_chat_threads',
+    bind: (channel) =>
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () =>
+        queryClient.invalidateQueries({ queryKey: key }),
+      ),
+    onSync: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
 
   return useQuery({
     queryKey: key,

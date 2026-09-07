@@ -237,6 +237,8 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 10,
     flexGrow: 1,
+    // 'flex-end' on an inverted list is the visual TOP — see human.tsx.
+    justifyContent: 'flex-end',
   },
   bubble: {
     maxWidth: '78%',

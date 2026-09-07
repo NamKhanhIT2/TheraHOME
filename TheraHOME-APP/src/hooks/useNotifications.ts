@@ -5,9 +5,9 @@
 // the Community-expansion triggers `notify_post_comment_event`/
 // `notify_post_like_event` (`comment`/`reply`/`like`) — see
 // community_moderation_and_notifications migration. See CLAUDE.md.
-import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { marketForLanguage, type StoreMarket } from '@/hooks/useMarket';
 import type { AppLanguage } from '@/store/useAppStore';
 
@@ -85,24 +85,20 @@ const retentionSweepDone = new Set<string>();
 export function useNotifications(userId: string | undefined) {
   const queryClient = useQueryClient();
   const key = ['notifications', userId] as const;
-  const channelId = useRef(`notifications_${Math.random().toString(36).slice(2)}`);
-
-  useEffect(() => {
-    if (!userId) return;
-    const channel = supabase
-      .channel(`${channelId.current}_${userId}`)
-      .on(
+  // Same treatment as the chat threads: a new specialist message writes a
+  // notification row too, and the inbox and its badge were stale for exactly
+  // the same reason — a suspended socket that nothing rebuilt or refetched.
+  useRealtimeSync({
+    enabled: !!userId,
+    channelName: `notifications_${userId}`,
+    bind: (channel) =>
+      channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: key });
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, queryClient]);
+        () => queryClient.invalidateQueries({ queryKey: key }),
+      ),
+    onSync: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
 
   return useQuery({
     queryKey: key,

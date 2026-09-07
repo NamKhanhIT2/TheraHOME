@@ -4118,3 +4118,56 @@ trong app để xem đúng số ngày của sản phẩm mình.
 hiệu lực ngay — không cần build lại app hay deploy lại Edge Function. Phần
 còn lại của prompt giữ nguyên từng chữ (sửa bằng `replace()` có kiểm tra
 trước/sau, không gõ lại toàn bộ).
+
+## 2026-09-07 — Chat: tin nhắn mới hiện ngay, và bỏ khoảng trống phía trên
+
+### Phải thoát ra vào lại mới thấy tin nhắn mới
+
+**Đã loại trừ trước:** `chat_messages` CÓ trong publication `supabase_realtime`,
+và một channel `postgres_changes` trên bảng đó subscribe thành công bằng
+chính khoá anon của dự án (thử bằng script Node ngày 07/09). Hạ tầng realtime
+không có vấn đề gì — lỗi nằm ở vòng đời kết nối phía app.
+
+Ba thiếu sót trong các lệnh `supabase.channel(...).on(...).subscribe()` trần,
+cả ba đều dẫn tới cùng một kết quả là màn hình đứng yên cho tới khi người
+dùng rời đi rồi quay lại (lúc đó `focusManager` mới refetch):
+
+1. **Trạng thái subscribe bị vứt đi.** `CHANNEL_ERROR`, `TIMED_OUT`, `CLOSED`
+   trông y hệt thành công, nên channel không join được — hoặc chết giữa
+   chừng — chẳng ai biết, càng không thử lại.
+2. **Không phản ứng gì khi app bị đưa xuống nền.** iOS/Android treo websocket;
+   những gì ghi vào DB trong lúc đó không bao giờ được gửi tới, vì
+   postgres_changes không có replay.
+3. **Ngay cả khi rejoin thành công thì lỗ hổng vẫn còn.** Kết nối lại chỉ cho
+   biết thay đổi TIẾP THEO, không bao giờ bù những cái đã lỡ — nên bắt buộc
+   phải refetch ở MỖI lần join, không chỉ lần đầu.
+
+Kiểm chứng bằng script chạy thật với server: sau khi gọi
+`realtime.disconnect()`, callback trạng thái báo về `CHANNEL_ERROR` và channel
+chuyển sang `errored`; kết nối lại thì có `SUBSCRIBED` lần nữa. Đáng chú ý:
+supabase-js TỰ rejoin channel cũ khi socket trở lại — nghĩa là điểm 3 mới là
+lỗi cốt lõi, vì code cũ không hề refetch ở lần rejoin đó.
+
+**Sửa:** hook dùng chung `src/hooks/useRealtimeSync.ts` — báo trạng thái, thử
+lại có backoff (1s, 2s, 4s, 8s, rồi 15s), dựng lại channel khi app trở lại
+foreground nếu nó không còn ở trạng thái `joined`, và **gọi `onSync` ở mỗi lần
+join thành công** để bù đúng lỗ hổng nói trên. Áp dụng cho `useChatMessages`,
+`useAdminChatThreads` và `useNotifications` (tin nhắn mới của chuyên gia cũng
+sinh một dòng `notifications`, hộp thư và badge cũ y hệt).
+
+**Chưa đổi:** ba subscription trong `useCommunity.ts` vẫn là bản trần. Chúng
+có debounce riêng và nhiều listener nên chuyển đổi nặng hơn; bảng tin lại có
+sẵn kéo-để-làm-mới. Cùng lớp lỗi, để lần sau.
+
+### Khoảng trống thừa phía trên đoạn hội thoại ngắn
+
+Cả ba màn chat dùng `FlatList inverted` với `contentContainerStyle` chỉ có
+`flexGrow: 1`. Trên danh sách đảo ngược, `justifyContent` mặc định
+(`flex-start`) là ĐÁY màn hình, nên một đoạn hội thoại 4 tin nhắn bị ghim
+xuống dưới cùng và chừa cả màn hình trống phía trên.
+
+Messages, Telegram, WhatsApp đều đổ nội dung từ trên xuống và chỉ bắt đầu
+cuộn khi hội thoại dài hơn màn hình. Thêm `justifyContent: 'flex-end'` (trên
+danh sách đảo ngược, đó chính là ĐỈNH màn hình) cho cả ba màn. Hội thoại dài
+không đổi gì: khi nội dung cao hơn khung nhìn thì `flexGrow`/`justifyContent`
+không còn tác dụng, danh sách vẫn ghim ở tin mới nhất như cũ.
