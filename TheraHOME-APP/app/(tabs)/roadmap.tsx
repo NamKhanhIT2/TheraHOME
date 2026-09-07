@@ -158,33 +158,38 @@ export default function RoadmapScreen() {
     }
     return map;
   }, [days]);
-  // The phase that should default expanded: normally the one containing the
-  // user's actual current day — but once a phase's days AND its survey are
-  // both finished there is nothing left to act on inside it, so it
-  // collapses by default (per explicit request: when the two promo cards
-  // appear after survey 2, phases 1/2 fold up and the cards stand apart —
-  // PhaseFooter renders them regardless of collapse). While days are done
-  // but the survey isn't, the last visible phase stays open so its
-  // take-survey prompt is on screen.
+  // The phase that opens by default: the one holding today. Owner rule
+  // (2026-09-07): opening the roadmap must always land on today's phase
+  // expanded, never on a wall of collapsed phases.
+  //
+  // It used to fold that phase back up once its days AND its survey were
+  // both finished ("nothing left to act on"), which is precisely the state a
+  // completed roadmap sits in — so the account that had finished all 14 days
+  // opened the tab with every phase shut. Other phases still collapse, so
+  // the two promo cards at the bottom keep the room around them they were
+  // given when survey 2 is submitted.
   const currentPhaseId = useMemo(() => {
-    const resolved = (phaseId: string) => quizResolvedQuery.data?.get(phaseId) ?? false;
-    // Today's day by the calendar — once it's watched its status flips to
-    // 'done' and nothing is 'current' anymore, so fall back to the day
-    // number the program says is today.
-    const currentDay =
-      days.find((d) => d.status === 'current') ?? (program ? days.find((d) => d.id === program.currentDay) : undefined);
-    if (
-      currentDay &&
-      !lockedPhaseIds.has(currentDay.phaseId) &&
-      !((phaseAllDone.get(currentDay.phaseId) ?? false) && resolved(currentDay.phaseId))
-    ) {
-      return currentDay.phaseId;
-    }
+    // Locked (unpurchased) phases can never be the default — their days are
+    // not shown at all, so filter first and let every lookup below inherit it.
     const visibleDays = days.filter((d) => !lockedPhaseIds.has(d.phaseId));
+    // Today's day by the calendar. Once watched, its status flips to 'done'
+    // and nothing is 'current' any more, so fall back to the day number the
+    // program reports. That number can also run PAST the last day of a
+    // finished roadmap (current_day 15 of 14 today, for the same reason
+    // Admin's "Ngày N/X" had to be capped), which matched no day at all and
+    // was the other half of why nothing expanded — hence the final clamp to
+    // the last day that exists at or before it.
+    const todayDay =
+      visibleDays.find((d) => d.status === 'current') ??
+      (program ? visibleDays.find((d) => d.id === program.currentDay) : undefined) ??
+      (program ? visibleDays.filter((d) => d.id <= program.currentDay).pop() : undefined);
+    if (todayDay) return todayDay.phaseId;
+    // No program (a roadmap being previewed before activation): keep the old
+    // behaviour of opening the last phase whose survey is still outstanding.
     const lastVisiblePhaseId = visibleDays[visibleDays.length - 1]?.phaseId ?? null;
     if (lastVisiblePhaseId && quizResolvedQuery.data?.get(lastVisiblePhaseId) === false) return lastVisiblePhaseId;
     return null;
-  }, [days, program, lockedPhaseIds, phaseAllDone, quizResolvedQuery.data]);
+  }, [days, program, lockedPhaseIds, quizResolvedQuery.data]);
 
   // The promo pair for the bottom-of-list cards: the LAST reachable
   // (non-IAP-locked) phase must have all days run their course AND its

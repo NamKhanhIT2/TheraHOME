@@ -4019,3 +4019,41 @@ báo cáo và màn onboarding — không có gì chừa sẵn chỗ cho chúng n
 phải giữ inset thật trên cả hai nền tảng. Phần padding của bottom sheet
 trong `AssistantBubble` vì thế vẫn dùng `insets.bottom`, cố ý khác với FAB
 ngay phía trên nó.
+
+## 2026-09-07 — Lộ trình: giai đoạn chứa ngày hôm nay luôn mở sẵn
+
+Yêu cầu: mở tab Lộ trình lần đầu thì giai đoạn chứa ngày hôm nay phải bung
+ra, không phải đóng lại. Tài khoản của chủ sở hữu mở lên thấy TẤT CẢ giai
+đoạn đều đóng. Hai nguyên nhân độc lập, cả hai đều nằm trong memo
+`currentPhaseId` của `app/(tabs)/roadmap.tsx`:
+
+1. **`current_day` chạy quá số ngày của lộ trình.** Tài khoản đó có
+   `current_day = 15` trong khi lộ trình chỉ có 14 ngày. Ngày "hôm nay" được
+   dò bằng `days.find(d => d.id === program.currentDay)` nên không khớp ngày
+   nào. `deriveDayStatus` cũng không đánh dấu ngày nào là `'current'` vì điều
+   kiện là `dayNumber === todayDay` mà todayDay = 15. Kết quả: không xác định
+   được ngày hôm nay. (Cùng gốc với lỗi Admin hiện "Ngày 15 / 14" đã cap hôm
+   2026-09-05, nhưng chỗ này chưa được cap.)
+2. **Quy tắc tự đóng khi giai đoạn đã xong.** Giai đoạn nào có đủ ngày
+   done/missed VÀ đã nộp khảo sát thì bị đóng mặc định vì "không còn gì để
+   làm bên trong". Lộ trình hoàn thành thì đúng vào trạng thái đó, nên ngay
+   cả khi dò được ngày hôm nay thì giai đoạn vẫn đóng.
+
+**Sửa:** ngày hôm nay dò theo ba bước — ngày đang `'current'`, rồi đúng số
+`current_day`, cuối cùng là ngày lớn nhất còn tồn tại mà nhỏ hơn hoặc bằng
+`current_day` (chính là cái cap còn thiếu). Tìm ra là mở, không còn điều kiện
+done/survey nào chặn nữa. Lọc bỏ giai đoạn bị khoá IAP trước khi dò nên ngày
+hôm nay không bao giờ rơi vào giai đoạn chưa mua.
+
+**Giữ nguyên:** các giai đoạn KHÁC vẫn đóng mặc định, nên hai thẻ khuyến mãi
+ở cuối danh sách vẫn có khoảng trống như yêu cầu 2026-09-03 — chỉ khác là
+giai đoạn 2 (chứa ngày hôm nay) nay mở thay vì đóng. Bấm tay để đóng/mở vẫn
+được giữ trong phiên và vẫn reset khi đổi thiết bị. Lộ trình xem trước (chưa
+kích hoạt) không có `program` nên vẫn theo nhánh cũ: mở giai đoạn cuối nếu
+khảo sát của nó chưa nộp.
+
+**Kiểm chứng:** mô phỏng lại đúng logic trên dữ liệu thật của 8 tình huống
+(hoàn thành 14/14 với current_day 15, giữa giai đoạn 1, ngày 1, ngày cuối
+giai đoạn 1, ngày đầu giai đoạn 2, ngày hôm nay đã xem xong, giai đoạn 2 bị
+khoá IAP, và lộ trình xem trước). Trước khi sửa, tình huống của chủ sở hữu
+trả về `null` (đóng hết); sau khi sửa trả về đúng giai đoạn 2.
