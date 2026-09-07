@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
+import { errorMessage } from '@/lib/errorMessage';
 
 const BENEFIT_KEYS = ['benefitFullRoadmap', 'benefitDailySync'] as const;
 
@@ -121,7 +122,7 @@ export default function ActivationScreen() {
       ]);
       router.back();
     } catch (e) {
-      const message = e instanceof Error ? e.message : '';
+      const message = errorMessage(e);
       if (message.includes('contact_already_claimed')) {
         setContactError(t('errContactClaimed'));
       } else if (message.includes('account_already_has_contact')) {

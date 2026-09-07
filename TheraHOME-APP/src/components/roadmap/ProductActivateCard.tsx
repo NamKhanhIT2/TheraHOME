@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
 import { useI18n } from '@/lib/i18n';
+import { errorMessage } from '@/lib/errorMessage';
 
 /** Locked-device card on the Roadmap with the activation input INLINE (per
  * explicit request — no detour through /activate): enter the phone/email
@@ -45,7 +46,7 @@ export function ProductActivateCard({ productId }: { productId: string }) {
         queryClient.invalidateQueries({ queryKey: ['user_access_contact', userId] }),
       ]);
     } catch (e) {
-      const message = e instanceof Error ? e.message : '';
+      const message = errorMessage(e);
       if (message.includes('contact_already_claimed')) {
         setError(t('errContactClaimed'));
       } else if (message.includes('activation_contact_not_found')) {

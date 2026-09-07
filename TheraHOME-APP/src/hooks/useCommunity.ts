@@ -17,6 +17,7 @@ import { isVideoUri } from '@/lib/mediaKind';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 import { useMarket, type StoreMarket } from '@/hooks/useMarket';
 import { translate, type TranslationKey } from '@/lib/i18n';
+import { errorMessage } from '@/lib/errorMessage';
 
 export type PostType = 'text' | 'image' | 'progress' | 'exercise';
 export type PostReaction = 'heart' | 'like' | 'haha' | 'celebrate' | 'support';
@@ -245,7 +246,7 @@ const POST_COLUMNS =
  * enforce_content_rate_limit in the community_moderation_and_notifications
  * migration) — both post and comment mutations map to this. */
 export function friendlyCommunityError(e: unknown): string {
-  const message = e instanceof Error ? e.message : String(e ?? '');
+  const message = errorMessage(e);
   // Read the store directly: this runs from mutation handlers, not render.
   const language = useAppStore.getState().language;
   const key: TranslationKey =
