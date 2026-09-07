@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/theme';
@@ -96,6 +96,13 @@ export default function ActivationScreen() {
   return (
     <ScreenContainer>
       <BackBar onBack={handleClose} />
+      {/* The form is vertically centred (`body` is flexGrow + center), so
+          without this the keyboard simply covered the contact field and the
+          "Xác nhận" button — the content had no reason to move. Shrinking the
+          scroll viewport re-centres it in what is left and makes the rest
+          reachable by scrolling. Same behavior="padding" the chat composers
+          and the post composer use. */}
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <View style={[styles.heroIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
           <Icon name="shield-check" size={30} color={theme.colors.primary} />
@@ -169,11 +176,13 @@ export default function ActivationScreen() {
           </Text>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   body: {
     flexGrow: 1,
     paddingHorizontal: 20,

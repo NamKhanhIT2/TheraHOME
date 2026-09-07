@@ -4057,3 +4057,53 @@ khảo sát của nó chưa nộp.
 giai đoạn 1, ngày đầu giai đoạn 2, ngày hôm nay đã xem xong, giai đoạn 2 bị
 khoá IAP, và lộ trình xem trước). Trước khi sửa, tình huống của chủ sở hữu
 trả về `null` (đóng hết); sau khi sửa trả về đúng giai đoạn 2.
+
+## 2026-09-07 — Ngôn ngữ không đồng bộ, và bàn phím che ô nhập mã kích hoạt
+
+### Giao diện tiếng Anh nhưng trợ lý trả lời tiếng Việt
+
+Ảnh chụp: toàn bộ khung chat là tiếng Anh ("TheraHOME AI Assistant",
+"Type your question...") nhưng câu trả lời của AI là tiếng Việt.
+
+**Nguyên nhân:** hai nguồn ngôn ngữ chỉ đồng bộ MỘT chiều.
+`useAppStore.language` (giao diện) khởi tạo từ locale của máy, còn
+`profiles.language` giữ nguyên giá trị lúc tạo tài khoản. `_layout.tsx` chỉ
+sao chép profile → store khi `language_explicit = true`; chiều ngược lại
+không hề có. Mà MỌI thứ sinh ra ở phía server đều đọc cột đó chứ không đọc
+store: LANGUAGE RULE của `chat-ai-reply`, `dispatch-push`,
+`dispatch-system-notifications`, mẫu `system_notification_templates`. Nên
+khách đọc app bằng tiếng Anh nhận câu trả lời và cả thông báo bằng tiếng
+Việt. Kiểm tra DB: 2 tài khoản khách đang ở đúng trạng thái này
+(`language = 'vi'`, `language_explicit = false`).
+
+**Sửa:** thêm chiều còn lại vào cùng effect đó. Ngôn ngữ app đang thực sự
+dùng (locale máy, hoặc thị trường với tài khoản do Admin cấp) được ghi vào
+`profiles.language` khi hai bên lệch nhau. **Chỉ ghi `language`, không bao
+giờ ghi `language_explicit`** — đây vẫn là giá trị mặc định chứ không phải
+lựa chọn, nên màn Cài đặt và `country.tsx` vẫn là nơi duy nhất đặt cờ đó, và
+nhánh này ngừng chạy ngay khi cờ được đặt. Sau khi ghi, profile refetch làm
+hai bên bằng nhau nên chỉ ghi một lần, không lặp mỗi lần mở app.
+
+**Gộp luôn trường hợp thứ hai** phát hiện khi kiểm tra DB: tài khoản do Admin
+cấp cho thị trường UK (`user3`) vẫn mang `language = 'vi'`. Nhánh thị trường
+trước đây `return` sớm nên không ghi ngược lại profile. Nay nhánh thị trường
+và nhánh locale dùng chung một lần ghi. Đã sửa luôn dòng dữ liệu đó về `en`
+cho khớp ngay, không phải chờ tài khoản mở app.
+
+### Bàn phím che ô nhập mã kích hoạt
+
+`app/activate.tsx` không có `KeyboardAvoidingView` — chỉ một `ScrollView` với
+`body` là `flexGrow: 1` + `justifyContent: center`. Nội dung căn giữa nên khi
+bàn phím hiện lên không có gì đẩy nó lên, ô nhập liên hệ và nút "Xác nhận" bị
+che. Nay bọc trong `KeyboardAvoidingView behavior="padding"` giống các màn
+chat và màn soạn bài: vùng cuộn co lại, nội dung căn giữa lại trong phần còn
+trống, phần thừa cuộn tới được (`keyboardShouldPersistTaps="handled"` đã có
+sẵn).
+
+### Ghi nhận, chưa sửa: system prompt còn ghi "lộ trình 28 ngày"
+
+`ai_prompts.system_prompt` (sửa ở tab Prompt AI trên WEB) vẫn mô tả "lộ trình
+tập luyện 28 ngày", nên AI nói với khách đúng con số đó — thấy rõ trong ảnh
+chụp. Lộ trình thật hiện là 14 ngày (`products.total_days`). Đây là nội dung
+do chủ sở hữu quản lý nên tôi không tự đổi; sửa một dòng trong tab Prompt AI
+là xong.

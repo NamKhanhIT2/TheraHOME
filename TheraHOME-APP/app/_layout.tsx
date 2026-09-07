@@ -15,7 +15,7 @@ import { ThemeProvider, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
-import { useProfile } from '@/hooks/useProfile';
+import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 import { translate } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -60,6 +60,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const profileQuery = useProfile(userId);
   const profile = profileQuery.data;
   const profileLoading = !!userId && profileQuery.isPending;
+  const updateProfile = useUpdateProfile(userId);
   const language = useAppStore((state) => state.language);
   const setLanguage = useAppStore((state) => state.setLanguage);
   const [blockedReason, setBlockedReason] = useState<BlockedReason>(null);
@@ -282,12 +283,42 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     // onboarding questionnaire, in Vietnamese. The market an Admin picked for
     // the account IS the deliberate choice here, so derive from it. Normal
     // accounts keep the device-locale default until the user picks for real.
-    if (profileAccountType && profileAccountType !== 'normal' && profileCountry) {
-      const fromMarket: AppLanguage | null =
-        profileCountry === 'VN' ? 'vi' : profileCountry === 'US' ? 'en' : profileCountry === 'MALAY' ? 'ms' : null;
-      if (fromMarket) setLanguage(fromMarket, { auto: false });
+    const fromMarket: AppLanguage | null =
+      profileAccountType && profileAccountType !== 'normal' && profileCountry
+        ? profileCountry === 'VN' ? 'vi' : profileCountry === 'US' ? 'en' : profileCountry === 'MALAY' ? 'ms' : null
+        : null;
+    if (fromMarket) setLanguage(fromMarket, { auto: false });
+
+    // Then the sync in the other direction, which was missing entirely (owner
+    // report, 2026-09-07: "ngôn ngữ ko đồng bộ" — an English UI getting
+    // Vietnamese answers from the assistant).
+    //
+    // Until someone picks a language for real, the app reads what it decided
+    // — the device locale, or the market above — off the store, while
+    // `profiles.language` keeps whatever the row was created with. Everything
+    // written on the SERVER reads that column and never the store:
+    // chat-ai-reply's LANGUAGE RULE, the push dispatchers, the
+    // system-notification templates. So a customer reading the app in English
+    // was answered in Vietnamese, and their notifications arrived in
+    // Vietnamese too. Two rows are in exactly that state today, plus one
+    // admin-issued UK account still carrying language 'vi'.
+    //
+    // Writing `language` alone (never `language_explicit`) keeps this a
+    // default, not a choice: the settings screen and country.tsx still own
+    // the explicit flag, and this branch stops running the moment either sets
+    // it. The profile refetch that follows makes the two equal, so it writes
+    // once, not on every launch.
+    const effective = fromMarket ?? language;
+    if (profileLanguage && profileLanguage !== effective) {
+      updateProfile.mutate(
+        { language: effective },
+        { onError: (e: unknown) => { if (__DEV__) console.warn('language sync failed:', e); } },
+      );
     }
-  }, [profileLanguage, profileLanguageExplicit, profileAccountType, profileCountry, setLanguage]);
+    // `updateProfile` is a stable mutation object; listing it re-runs this on
+    // every render of the provider.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileLanguage, profileLanguageExplicit, profileAccountType, profileCountry, language, setLanguage]);
 
   if (!fontsReady || sessionLoading || profileLoading || !minimumSplashElapsed) {
     return <AppSplashScreen />;
