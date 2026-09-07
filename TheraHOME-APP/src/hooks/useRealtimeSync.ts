@@ -34,6 +34,7 @@ export function useRealtimeSync({
   channelName,
   bind,
   onSync,
+  onConnectionChange,
   enabled = true,
 }: {
   /** Stable prefix; a random suffix is added so two screens never collide. */
@@ -42,10 +43,16 @@ export function useRealtimeSync({
   bind: (channel: RealtimeChannel) => RealtimeChannel;
   /** Refetch whatever this channel feeds. Called on change and on every join. */
   onSync: () => void;
+  /** Joined or not, on every status change. Lets a screen tell the user the
+   * thread has gone quiet because the socket dropped, not because nobody
+   * replied. Read through a ref, same as `onSync`. */
+  onConnectionChange?: (joined: boolean) => void;
   enabled?: boolean;
 }) {
   const onSyncRef = useRef(onSync);
   onSyncRef.current = onSync;
+  const onConnectionChangeRef = useRef(onConnectionChange);
+  onConnectionChangeRef.current = onConnectionChange;
   const bindRef = useRef(bind);
   bindRef.current = bind;
 
@@ -77,11 +84,13 @@ export function useRealtimeSync({
         if (cancelled) return;
         if (status === 'SUBSCRIBED') {
           attempt = 0;
+          onConnectionChangeRef.current?.(true);
           // Covers anything written while this channel was down.
           onSyncRef.current();
           return;
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          onConnectionChangeRef.current?.(false);
           // Backoff so a server that is genuinely unavailable is not hammered:
           // 1s, 2s, 4s, 8s, then every 15s.
           const delay = Math.min(1000 * 2 ** attempt, 15000);

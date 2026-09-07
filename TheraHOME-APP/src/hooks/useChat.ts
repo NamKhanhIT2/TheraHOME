@@ -8,6 +8,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
+import { reportChatChannelStatus } from '@/lib/chatConnection';
 
 export type ChatKind = 'ai' | 'human';
 
@@ -56,6 +57,11 @@ export interface ChatMessageRow {
   deletedAt: string | null;
   replyToMessageId: string | null;
   reactions: { id: string; userId: string; emoji: string }[];
+  /** Set only on rows the outbox is still holding — a send in flight or one
+   * that failed and is waiting for the user to retry. Server rows never
+   * carry these, so `sendStatus` is also how a bubble knows it is local. */
+  outboxId?: string;
+  sendStatus?: 'sending' | 'failed';
 }
 
 const CHAT_PAGE_SIZE = 30;
@@ -84,6 +90,7 @@ export function useChatMessages(threadId: string | undefined) {
           queryClient.invalidateQueries({ queryKey: key }),
         ),
     onSync: () => queryClient.invalidateQueries({ queryKey: key }),
+    onConnectionChange: reportChatChannelStatus,
   });
 
   return useInfiniteQuery({
@@ -154,6 +161,69 @@ export interface SendChatMessageInput {
   replyToMessageId?: string | null;
 }
 
+/**
+ * Uploads any attachment, writes the row, and kicks off whatever the thread
+ * kind needs afterwards. Deliberately a plain function, not a hook: both the
+ * staff mutation below and the customer screens' outbox
+ * (`src/hooks/useChatOutbox.ts`) have to perform exactly this work, and the
+ * outbox has to be able to run it again on demand for a retry.
+ *
+ * Throws on anything that failed, so the caller can keep the message and
+ * offer to send it again rather than losing what the user typed.
+ */
+export async function sendChatMessageRequest({
+  threadId,
+  userId,
+  kind,
+  senderType,
+  input,
+}: {
+  threadId: string;
+  userId: string;
+  kind: ChatKind;
+  senderType: 'user' | 'specialist';
+  input: string | SendChatMessageInput;
+}): Promise<void> {
+  const message: SendChatMessageInput = typeof input === 'string' ? { body: input } : input;
+  const attachmentPath = message.attachmentPath ?? (message.attachmentLocalUri
+    ? await uploadChatAttachment(userId, threadId, message.attachmentLocalUri, message.attachmentMimeType ?? undefined, message.attachmentWidth, message.attachmentHeight)
+    : null);
+  const { error } = await supabase
+    .from('chat_messages')
+    .insert({
+      thread_id: threadId,
+      sender_type: senderType,
+      sender_id: userId,
+      body: message.body,
+      attachment_path: attachmentPath,
+      reply_to_message_id: message.replyToMessageId ?? null,
+    });
+  if (error) throw error;
+
+  if (kind !== 'ai') {
+    void supabase.functions.invoke('dispatch-push', {
+      body: { mode: 'chat', threadId, senderType, preview: message.body || undefined, attachment: !message.body },
+    }).then(({ error: pushError }) => {
+      if (pushError && __DEV__) console.warn('dispatch-push failed:', pushError);
+    });
+  }
+}
+
+/**
+ * Asks the assistant to answer what is already in the thread.
+ *
+ * Separate from the send above on purpose. The user's message is written to
+ * the database first and is safely there before Claude is even asked, so the
+ * two have to be able to fail — and be retried — independently. Folded
+ * together, a bubble read "sending…" for the whole time the model was
+ * thinking, and retrying a failed answer would have posted the question
+ * twice.
+ */
+export async function requestAIReply(threadId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('chat-ai-reply', { body: { thread_id: threadId } });
+  if (error) throw error;
+}
+
 /** `senderType` defaults to 'user' for the existing AI/patient-side callers;
  * the admin conversations thread passes 'specialist' so CSKH staff replies
  * post as the specialist instead of impersonating the patient. */
@@ -194,34 +264,8 @@ export function useSendChatMessage(threadId: string | undefined, userId: string 
       return { previous };
     },
     mutationFn: async (input: string | SendChatMessageInput) => {
-      const message: SendChatMessageInput = typeof input === 'string' ? { body: input } : input;
-      const attachmentPath = message.attachmentPath ?? (message.attachmentLocalUri
-        ? await uploadChatAttachment(userId!, threadId!, message.attachmentLocalUri, message.attachmentMimeType ?? undefined, message.attachmentWidth, message.attachmentHeight)
-        : null);
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId!,
-          sender_type: senderType,
-          sender_id: userId!,
-          body: message.body,
-          attachment_path: attachmentPath,
-          reply_to_message_id: message.replyToMessageId ?? null,
-        });
-      if (error) throw error;
-
-      if (kind === 'ai') {
-        const { error: fnError } = await supabase.functions.invoke('chat-ai-reply', {
-          body: { thread_id: threadId },
-        });
-        if (fnError) throw fnError;
-      } else {
-        void supabase.functions.invoke('dispatch-push', {
-          body: { mode: 'chat', threadId, senderType, preview: message.body || undefined, attachment: !message.body },
-        }).then(({ error }) => {
-        if (error && __DEV__) console.warn('dispatch-push failed:', error);
-      });
-      }
+      await sendChatMessageRequest({ threadId: threadId!, userId: userId!, kind, senderType, input });
+      if (kind === 'ai') await requestAIReply(threadId!);
     },
     onError: (_error, _input, context) => {
       if (context?.previous) queryClient.setQueryData(key, context.previous);

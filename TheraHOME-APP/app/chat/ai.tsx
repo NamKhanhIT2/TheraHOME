@@ -1,12 +1,17 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
-import { useChatThread, useChatMessages, useSendChatMessage, useAISuggestedReplies, type ChatMessageRow } from '@/hooks/useChat';
+import { useChatThread, useChatMessages, useAISuggestedReplies, type ChatMessageRow } from '@/hooks/useChat';
+import { useChatOutbox } from '@/hooks/useChatOutbox';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
+import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
+import { ChatComposer, type ChatComposerHandle } from '@/components/chat/ChatComposer';
+import { ChatOfflineBanner } from '@/components/chat/ChatOfflineBanner';
+import { resetChatChannelStatus } from '@/lib/chatConnection';
 import { useAppStore } from '@/store/useAppStore';
 import { useI18n } from '@/lib/i18n';
 import { CHAT_FOLLOW_NEW_MESSAGES } from '@/lib/chatListProps';
@@ -29,43 +34,50 @@ export default function AIChatScreen() {
   const threadId = threadQuery.data;
   const messagesQuery = useChatMessages(threadId);
   const messages = useMemo(() => messagesQuery.data?.pages.flatMap((page) => page.messages) ?? [], [messagesQuery.data]);
-  const sendMessage = useSendChatMessage(threadId, userId, 'ai');
+  const outbox = useChatOutbox(threadId, userId, 'ai');
+  const items = useMemo(() => [...outbox.rows, ...messages], [outbox.rows, messages]);
   const suggestions = useAISuggestedReplies().data ?? [];
 
   const [text, setText] = useState('');
+  const composerRef = useRef<ChatComposerHandle>(null);
+  const listRef = useRef<FlatList<ChatMessageRow>>(null);
+  const latestOwnId = messages.find((message) => message.senderType === 'user' && !message.deletedAt)?.id;
 
+  useEffect(() => resetChatChannelStatus, []);
+
+  /** Queues and returns. The assistant may still be composing an answer to
+   * the previous question — that is no reason to refuse this one. */
   function send(value?: string) {
-    const v = (value ?? text).trim();
-    if (!v || sendMessage.isPending) return;
-    setText('');
-    // Same failure path as chat/human.tsx — without it a failed send
-    // rolled the optimistic bubble back and silently lost the typed text.
-    void sendMessage.mutateAsync(v).catch(() => {
-      setText(v);
-      Alert.alert(t('sendFailTitle'), t('tryAgainBody'));
-    });
+    const body = (value ?? text).trim();
+    if (!body || !threadId || !userId) return;
+    if (value === undefined) setText('');
+    composerRef.current?.closeEmojis();
+    requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }));
+    outbox.send({ body });
   }
 
   const loading = threadQuery.isPending || messagesQuery.isPending;
 
-  function renderMessage({ item: m }: { item: ChatMessageRow }) {
-    const own = m.senderType === 'user';
+  function renderMessage({ item: message, index }: { item: ChatMessageRow; index: number }) {
+    const newerMessage = index > 0 ? items[index - 1] : null;
+    const olderMessage = index < items.length - 1 ? items[index + 1] : null;
     return (
-      <View
-        style={[
-          styles.bubble,
-          theme.shadows.card,
-          {
-            alignSelf: own ? 'flex-end' : 'flex-start',
-            backgroundColor: own ? theme.colors.primary : theme.colors.bgCard,
-            borderRadius: theme.radius.md,
-          },
-        ]}
-      >
-        <Text style={[theme.type.body, { color: own ? '#fff' : theme.colors.textPrimary }]}>{m.body}</Text>
-      </View>
+      <ChatMessageBubble
+        message={message}
+        own={message.senderType === 'user'}
+        showStatus={message.id === latestOwnId}
+        joinsNewer={newerMessage?.senderType === message.senderType}
+        joinsOlder={olderMessage?.senderType === message.senderType}
+        onRetry={outbox.retry}
+      />
     );
   }
+
+  const greeting = (
+    <View style={[styles.greeting, { backgroundColor: theme.colors.bgCardAlt }]}>
+      <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{t('aiGreeting')}</Text>
+    </View>
+  );
 
   return (
     <ScreenContainer>
@@ -79,9 +91,13 @@ export default function AIChatScreen() {
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>
               {t('aiAssistant')}
             </Text>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('aiInstantNoDoctor')}</Text>
+            <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>
+              {outbox.aiReplying ? t('aiTyping') : t('aiInstantNoDoctor')}
+            </Text>
           </View>
         </View>
+
+        {aiConsentAccepted ? <ChatOfflineBanner /> : null}
 
         {!aiConsentAccepted ? (
           <View style={styles.consentBox}>
@@ -109,51 +125,47 @@ export default function AIChatScreen() {
           </View>
         ) : (
           <FlatList
+            ref={listRef}
             inverted
-            data={messages}
+            data={items}
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
             contentContainerStyle={styles.body}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
             maintainVisibleContentPosition={CHAT_FOLLOW_NEW_MESSAGES}
+            onTouchStart={() => composerRef.current?.closeEmojis()}
+            onScrollBeginDrag={() => composerRef.current?.closeEmojis()}
             onEndReached={() => {
               if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) void messagesQuery.fetchNextPage();
             }}
             onEndReachedThreshold={0.2}
             ListHeaderComponent={
-              sendMessage.isPending ? (
-                <View style={[styles.bubble, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md, flexDirection: 'row', gap: 4, alignSelf: 'flex-start' }]}>
+              outbox.aiReplying ? (
+                <View style={[styles.typing, { backgroundColor: theme.colors.bgCardAlt }]}>
                   {[0, 1, 2].map((i) => (
                     <View key={i} style={[styles.typingDot, { backgroundColor: theme.colors.textMuted }]} />
                   ))}
+                  <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('aiTyping')}</Text>
                 </View>
+              ) : outbox.aiFailed ? (
+                <Pressable onPress={() => void outbox.retryAIReply()} style={[styles.typing, { backgroundColor: theme.colors.errorTint }]}>
+                  <Text style={[theme.type.captionSm, { color: theme.colors.error }]}>{t('aiReplyFailed')}</Text>
+                  <Icon name="refresh-cw" size={12} color={theme.colors.error} />
+                  <Text style={[theme.type.captionSm, { color: theme.colors.error, fontFamily: theme.fontFamily.semiBold }]}>{t('retry')}</Text>
+                </Pressable>
               ) : null
             }
             ListFooterComponent={
               messagesQuery.isFetchingNextPage ? (
                 <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 8 }} />
-              ) : !messagesQuery.hasNextPage && messages.length > 0 ? (
-                <View
-                  style={[
-                    styles.bubble,
-                    theme.shadows.card,
-                    { alignSelf: 'flex-start', backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md },
-                  ]}
-                >
-                  <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{t('aiGreeting')}</Text>
-                </View>
+              ) : !messagesQuery.hasNextPage && items.length > 0 ? (
+                greeting
               ) : null
             }
             ListEmptyComponent={
               <View style={{ gap: 10 }}>
-                <View
-                  style={[
-                    styles.bubble,
-                    theme.shadows.card,
-                    { alignSelf: 'flex-start', backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md },
-                  ]}
-                >
-                  <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{t('aiGreeting')}</Text>
-                </View>
+                {greeting}
                 <View style={styles.suggestions}>
                   {suggestions.map((s) => (
                     <Pressable
@@ -171,27 +183,20 @@ export default function AIChatScreen() {
         )}
 
         {aiConsentAccepted ? (
-        <>
-        <Pressable onPress={() => router.push('/chat/human')} style={styles.escalateBtn}>
-          <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, textDecorationLine: 'underline' }]}>
-            {t('aiNeedHuman')}
-          </Text>
-        </Pressable>
-
-        <View style={[styles.inputRow, { borderTopColor: theme.colors.divider }]}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            onSubmitEditing={() => send()}
-            placeholder={t('aiInputPlaceholder')}
-            placeholderTextColor={theme.colors.textMuted}
-            style={[styles.input, { borderColor: theme.colors.borderInput, borderRadius: theme.radius.full, color: theme.colors.textPrimary }]}
-          />
-          <Pressable onPress={() => send()} style={[styles.sendBtn, { backgroundColor: theme.colors.primary }]}>
-            <Icon name="send" size={16} color="#fff" />
-          </Pressable>
-        </View>
-        </>
+          <>
+            <Pressable onPress={() => router.push('/chat/human')} style={styles.escalateBtn}>
+              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, textDecorationLine: 'underline' }]}>
+                {t('aiNeedHuman')}
+              </Text>
+            </Pressable>
+            <ChatComposer
+              ref={composerRef}
+              value={text}
+              onChangeValue={setText}
+              onSend={() => send()}
+              placeholder={t('aiInputPlaceholder')}
+            />
+          </>
         ) : null}
       </KeyboardAvoidingView>
     </ScreenContainer>
@@ -236,16 +241,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   body: {
-    padding: 20,
-    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    gap: 2,
     flexGrow: 1,
     // 'flex-end' on an inverted list is the visual TOP — see human.tsx.
     justifyContent: 'flex-end',
   },
-  bubble: {
-    maxWidth: '78%',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+  greeting: {
+    alignSelf: 'flex-start',
+    maxWidth: '82%',
+    borderRadius: 18,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    marginTop: 6,
+  },
+  typing: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 18,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    marginBottom: 6,
   },
   typingDot: {
     width: 6,
@@ -267,28 +286,5 @@ const styles = StyleSheet.create({
   escalateBtn: {
     alignSelf: 'center',
     paddingVertical: 8,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    fontSize: 14,
-  },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
   },
 });
