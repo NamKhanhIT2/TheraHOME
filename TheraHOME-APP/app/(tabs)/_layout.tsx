@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Tabs, router, usePathname } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
-import { useTabBarInset } from '@/hooks/useTabBarInset';
+import { TAB_BAR_BODY_HEIGHT, TAB_BAR_BODY_PADDING_BOTTOM, useTabBarInset } from '@/hooks/useTabBarInset';
 import { useTheme } from '@/theme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useAppStore } from '@/store/useAppStore';
@@ -215,8 +215,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 32,
   },
   barInner: {
-    height: 84,
-    paddingBottom: 8,
+    height: TAB_BAR_BODY_HEIGHT,
+    paddingBottom: TAB_BAR_BODY_PADDING_BOTTOM,
     flexDirection: 'row',
     alignItems: 'center',
   },

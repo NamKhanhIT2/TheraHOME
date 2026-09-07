@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useWebRoles } from '@/hooks/useWebRoles';
-import { useTabBarInset } from '@/hooks/useTabBarInset';
+import { TAB_BAR_BODY_HEIGHT, TAB_BAR_BODY_PADDING_BOTTOM, useTabBarInset } from '@/hooks/useTabBarInset';
 import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/icons/Icon';
 
@@ -61,8 +61,8 @@ function StaffTabBar({ state, navigation }: Parameters<NonNullable<React.Compone
         {
           backgroundColor: theme.dark ? theme.colors.bgCard : '#fff',
           borderTopColor: theme.colors.borderLight,
-          height: 84 + tabBarInset,
-          paddingBottom: 8 + tabBarInset,
+          height: TAB_BAR_BODY_HEIGHT + tabBarInset,
+          paddingBottom: TAB_BAR_BODY_PADDING_BOTTOM + tabBarInset,
         },
       ]}
     >

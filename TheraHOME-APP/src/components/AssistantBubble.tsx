@@ -3,7 +3,7 @@ import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, View } fro
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useSpecialistPresence } from '@/hooks/useChat';
-import { useTabBarInset } from '@/hooks/useTabBarInset';
+import { TAB_BAR_BODY_HEIGHT, useTabBarInset } from '@/hooks/useTabBarInset';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
 
@@ -24,7 +24,7 @@ const AI_ASSISTANT_IMAGE = require('../../assets/ai-assistant.png');
 const SPECIALIST_IMAGE = require('../../assets/therahome-specialist.png');
 
 /** Floating action button + bottom-sheet chat picker — mirrors `AssistantBubble`. */
-export function AssistantBubble({ onOpenAIChat, onOpenSupportChat, bottomOffset = 96, isStaff = false }: AssistantBubbleProps) {
+export function AssistantBubble({ onOpenAIChat, onOpenSupportChat, bottomOffset = TAB_BAR_BODY_HEIGHT + 12, isStaff = false }: AssistantBubbleProps) {
   const theme = useTheme();
   const { t } = useI18n();
   // Two different measurements on purpose: the FAB rides on top of the tab
