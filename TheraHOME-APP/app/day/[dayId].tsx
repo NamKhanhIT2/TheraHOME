@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { useTheme } from '@/theme';
@@ -34,6 +34,24 @@ export default function DayDetailScreen() {
   // black rectangle with no sign that anything is loading.
   const [videoReady, setVideoReady] = useState(false);
   const [videoWidth, setVideoWidth] = useState(0);
+  // Mounting the player's WebView is the single most expensive thing this
+  // screen does, and it used to happen on the first onLayout — i.e. while the
+  // push animation was still running, which cost a ~150ms frame and made
+  // opening a day feel like it hitched. Measured with `dumpsys gfxinfo`
+  // before and after. Waiting for the transition costs nothing visually: the
+  // "loading video" overlay already covers this window either way.
+  const navigation = useNavigation();
+  const [transitionDone, setTransitionDone] = useState(false);
+  useEffect(() => {
+    const stop = navigation.addListener('transitionEnd' as never, () => setTransitionDone(true));
+    // Belt and braces: a screen shown without a transition (deep link, reduced
+    // motion) would otherwise never mount the player at all.
+    const timer = setTimeout(() => setTransitionDone(true), 500);
+    return () => {
+      stop();
+      clearTimeout(timer);
+    };
+  }, [navigation]);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
 
   const programsQuery = useActivatedPrograms(userId);
@@ -214,7 +232,7 @@ export default function DayDetailScreen() {
             { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight, borderRadius: theme.radius.lg },
           ]}
         >
-          {videoId && !videoError && videoWidth > 0 ? (
+          {videoId && !videoError && videoWidth > 0 && transitionDone ? (
             <>
             <YoutubePlayer
               key={videoId}
