@@ -35,19 +35,22 @@ const BENEFIT_KEYS = ['benefitFullRoadmap', 'benefitDailySync'] as const;
  * EU codes — so the person entering the number picks it, and the market only
  * decides which entry starts selected.
  */
-/** Onboarding's three country options, in the dialling code each maps to.
- * 'US/EU' is the UK market (docs/feature-notes.md): UK numbers, +44. */
+/** The dialling code each of onboarding's three country options maps to. */
 const DIALLING_CODE_BY_MARKET: Record<StoreMarket, string> = {
+  US: '1',
   VN: '84',
-  US: '44',
   MALAY: '60',
 };
 
-const DIALLING_CODES: { code: string; label: string }[] = [
-  { code: '84', label: 'Việt Nam' },
-  { code: '44', label: 'United Kingdom' },
-  { code: '60', label: 'Malaysia' },
-  { code: '1', label: 'US / Canada' },
+/** Listed in the order the country question lists its options — the three
+ * markets the app serves — then +44 for the EU half of the 'US/EU' option.
+ * Names come from the dictionary so the list is written in the language the
+ * rest of the screen is in, not a fixed mix of Vietnamese and English. */
+const DIALLING_CODES: { code: string; labelKey: 'countryNameUS' | 'countryNameVN' | 'countryNameMY' | 'countryNameUK' }[] = [
+  { code: '1', labelKey: 'countryNameUS' },
+  { code: '84', labelKey: 'countryNameVN' },
+  { code: '60', labelKey: 'countryNameMY' },
+  { code: '44', labelKey: 'countryNameUK' },
 ];
 
 /** Compose what the database stores: E.164, no separators. A domestic number's
@@ -232,7 +235,7 @@ export default function ActivationScreen() {
                     style={[styles.codeRow, { borderBottomColor: theme.colors.divider }]}
                   >
                     <Text style={[theme.type.bodyStrong, { color: selected ? theme.colors.primary : theme.colors.textPrimary, width: 56 }]}>+{entry.code}</Text>
-                    <Text style={[theme.type.body, { color: selected ? theme.colors.primary : theme.colors.textSecondary, flex: 1 }]}>{entry.label}</Text>
+                    <Text style={[theme.type.body, { color: selected ? theme.colors.primary : theme.colors.textSecondary, flex: 1 }]}>{t(entry.labelKey)}</Text>
                     {selected ? <Icon name="check" size={17} color={theme.colors.primary} /> : null}
                   </Pressable>
                 );
