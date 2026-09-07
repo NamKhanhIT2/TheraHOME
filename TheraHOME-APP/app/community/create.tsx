@@ -191,7 +191,12 @@ export default function CreatePostScreen() {
 
         <View style={styles.userRow}>
           <AvatarImg size={40} uri={profile?.avatarUrl} />
-          <View>
+          {/* flex: 1 bounds this column to the row. Without it the column grew
+              to fit the untruncated phase label, which pushed the pill past the
+              right edge of the screen — visible in Malay, whose phase names run
+              longer than the English ones ("Kurangkan ketidakselesaan &
+              penyesuaian" against "Reduce discomfort & adapt"). */}
+          <View style={styles.userRowText}>
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>
               {displayName}
             </Text>
@@ -200,7 +205,10 @@ export default function CreatePostScreen() {
                 onPress={() => setTagPhase((t) => !t)}
                 style={[styles.pill, { backgroundColor: tagPhase ? theme.colors.primaryTint10 : theme.colors.bgCardAlt, marginTop: 4 }]}
               >
-                <Text style={[theme.type.captionSm, { color: tagPhase ? theme.colors.primaryDark : theme.colors.textSecondary }]}>
+                <Text
+                  numberOfLines={1}
+                  style={[theme.type.captionSm, styles.pillLabel, { color: tagPhase ? theme.colors.primaryDark : theme.colors.textSecondary }]}
+                >
                   {tagPhase ? t('tagPhase', { phase: currentPhase }) : t('noTagPhase')}
                 </Text>
                 <Icon name="chevron-down" size={12} color={tagPhase ? theme.colors.primaryDark : theme.colors.textSecondary} />
@@ -315,7 +323,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  userRowText: {
+    flex: 1,
+  },
+  pillLabel: {
+    // Shrink before the chevron does, so a long label ellipsises instead of
+    // shouldering the arrow out of the pill.
+    flexShrink: 1,
+  },
   pill: {
+    // maxWidth stops the pill outgrowing its column even though it hugs its
+    // content when the label is short.
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
