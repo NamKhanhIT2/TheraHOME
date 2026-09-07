@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, LogBox, Platform, Text, View } from 'react-native';
+import { NavigationBar } from 'expo-navigation-bar';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -328,6 +329,11 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.bgApp, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 20 }}>
         <StatusBar style={theme.dark ? 'light' : 'dark'} />
+        {/* Same idea at the bottom of the screen: Android draws the navigation
+            buttons light by default, assuming a dark bar behind them. The tab bar
+            paints that strip itself and in light mode it is pale, which left the
+            buttons barely legible. No-op on iOS. */}
+        <NavigationBar style={theme.dark ? 'light' : 'dark'} />
         <Text style={{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 24 }}>
           {translate(language, blockedReason === 'locked' ? 'accountLocked' : 'accountExpired')}
         </Text>
@@ -346,6 +352,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bgApp }}>
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
+      <NavigationBar style={theme.dark ? 'light' : 'dark'} />
       {/* Android's native-stack default is a fade-and-scale, so tapping a
           roadmap day made the next screen bloom in place while the same tap
           on iOS pushed it in from the right. Matched to iOS on request.

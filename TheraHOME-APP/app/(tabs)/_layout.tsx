@@ -69,10 +69,16 @@ function CustomTabBar({ state, navigation }: TabBarProps) {
       style={[
         styles.bar,
         theme.shadows.nav,
-        { backgroundColor: theme.dark ? theme.colors.bgCard : '#fff', borderTopColor: theme.colors.borderLight, paddingBottom: tabBarInset },
+        // The strip behind the system navigation buttons is painted here, not
+        // by the OS: with edge-to-edge the app owns those pixels, and a white
+        // bar left the buttons floating on the same white as the tab labels.
+        // Colouring android:navigationBarColor instead would work on this
+        // device and be ignored from Android 15 on, where a transparent
+        // navigation bar is enforced — so the app paints it.
+        { backgroundColor: theme.colors.bgApp, borderTopColor: theme.colors.borderLight, paddingBottom: tabBarInset },
       ]}
     >
-      <View style={styles.barInner}>
+      <View style={[styles.barInner, { backgroundColor: theme.dark ? theme.colors.bgCard : '#fff' }]}>
         {state.routes.map((route, index) => {
           const item = tabItemForRoute(route.name);
           if (!item) return null;
