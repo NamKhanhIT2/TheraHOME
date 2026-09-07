@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
-import { useProfile } from '@/hooks/useProfile';
+import { useMarket, type StoreMarket } from '@/hooks/useMarket';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Card } from '@/components/ui/Card';
@@ -35,6 +35,14 @@ const BENEFIT_KEYS = ['benefitFullRoadmap', 'benefitDailySync'] as const;
  * EU codes — so the person entering the number picks it, and the market only
  * decides which entry starts selected.
  */
+/** Onboarding's three country options, in the dialling code each maps to.
+ * 'US/EU' is the UK market (docs/feature-notes.md): UK numbers, +44. */
+const DIALLING_CODE_BY_MARKET: Record<StoreMarket, string> = {
+  VN: '84',
+  US: '44',
+  MALAY: '60',
+};
+
 const DIALLING_CODES: { code: string; label: string }[] = [
   { code: '84', label: 'Việt Nam' },
   { code: '44', label: 'United Kingdom' },
@@ -61,9 +69,14 @@ export default function ActivationScreen() {
   const [contactError, setContactError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const isEmail = contact.includes('@');
-  const profile = useProfile(session?.user.id).data;
-  // The market only preselects; 'US' spans several codes so the user decides.
-  const defaultCode = profile?.country === 'MALAY' ? '60' : profile?.country === 'US' ? '44' : '84';
+  // Preselect the code for the country answered on the onboarding country
+  // screen. useMarket() rather than profile.country directly: it also reads
+  // the market saved locally at country-confirm, so the code is already right
+  // while the profile write is still in flight, and falls back to the UI
+  // language for TheraHOME-issued accounts that never saw that screen —
+  // reading the profile row alone showed every one of them +84.
+  // Only a preselection: 'US/EU' spans several codes, so the user can change it.
+  const defaultCode = DIALLING_CODE_BY_MARKET[useMarket()];
   const [diallingCode, setDiallingCode] = useState<string | null>(null);
   const activeCode = diallingCode ?? defaultCode;
   const [codePickerOpen, setCodePickerOpen] = useState(false);
