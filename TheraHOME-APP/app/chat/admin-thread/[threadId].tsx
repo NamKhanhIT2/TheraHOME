@@ -18,6 +18,7 @@ import { AvatarImg } from '@/components/AvatarImg';
 import { ChatMediaViewer } from '@/components/ChatMediaViewer';
 import { ReactionAsset } from '@/components/ReactionAsset';
 import { hapticConfirm, hapticPressHold } from '@/lib/haptics';
+import { CHAT_FOLLOW_NEW_MESSAGES } from '@/lib/chatListProps';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const COMPOSER_EMOJIS = ['😀', '😂', '🥰', '👍', '🙏', '❤️', '🎉', '💪'];
@@ -94,6 +95,8 @@ export default function AdminChatThreadScreen() {
 
   function sendQuickLike() {
     if (sendMessage.isPending || !threadId || !staffUserId) return;
+    // Scrolls like submit() does — see human.tsx.
+    requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }));
     void sendMessage.mutateAsync({ body: '👍' }).catch(() => Alert.alert('Chưa lưu được tin nhắn', 'Vui lòng thử lại.'));
   }
 
@@ -195,7 +198,7 @@ export default function AdminChatThreadScreen() {
           <AvatarImg size={36} uri={patientQuery.data?.avatarUrl} />
           <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{patientQuery.data?.fullName ?? '...'}</Text>
         </View>
-        {messagesQuery.isPending ? <View style={styles.loading}><ActivityIndicator color={theme.colors.primary} /></View> : <FlatList ref={listRef} inverted data={messages} keyExtractor={(item) => item.id} renderItem={renderMessage} contentContainerStyle={styles.body} keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" maintainVisibleContentPosition={{ minIndexForVisible: 0 }} onTouchStart={() => setShowEmojis(false)} onScrollBeginDrag={() => setShowEmojis(false)} onEndReached={() => { if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) void messagesQuery.fetchNextPage(); }} onEndReachedThreshold={0.2} ListHeaderComponent={<View style={styles.listBottomSpacer} />} ListFooterComponent={messagesQuery.isFetchingNextPage ? <ActivityIndicator color={theme.colors.primary} /> : null} ListEmptyComponent={<Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>Chưa có tin nhắn nào.</Text>} />}
+        {messagesQuery.isPending ? <View style={styles.loading}><ActivityIndicator color={theme.colors.primary} /></View> : <FlatList ref={listRef} inverted data={messages} keyExtractor={(item) => item.id} renderItem={renderMessage} contentContainerStyle={styles.body} keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" maintainVisibleContentPosition={CHAT_FOLLOW_NEW_MESSAGES} onTouchStart={() => setShowEmojis(false)} onScrollBeginDrag={() => setShowEmojis(false)} onEndReached={() => { if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) void messagesQuery.fetchNextPage(); }} onEndReachedThreshold={0.2} ListHeaderComponent={<View style={styles.listBottomSpacer} />} ListFooterComponent={messagesQuery.isFetchingNextPage ? <ActivityIndicator color={theme.colors.primary} /> : null} ListEmptyComponent={<Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>Chưa có tin nhắn nào.</Text>} />}
         {context ? <View style={[styles.context, { backgroundColor: theme.colors.bgCardAlt, borderLeftColor: theme.colors.primary }]}><View style={styles.flex}><Text style={[styles.contextTitle, { color: theme.colors.primary }]}>Đang trả lời</Text><Text numberOfLines={1} style={{ color: theme.colors.textSecondary }}>{context.body || 'Ảnh'}</Text></View><Pressable onPress={() => setReplyingTo(null)}><Icon name="x" size={18} color={theme.colors.textMuted} /></Pressable></View> : null}
         {showEmojis ? <View style={[styles.emojiBar, { borderTopColor: theme.colors.divider }]}>{COMPOSER_EMOJIS.map((emoji) => <Pressable key={emoji} onPress={() => setText((value) => value + emoji)}><Text style={styles.composerEmoji}>{emoji}</Text></Pressable>)}</View> : null}
         {attachment ? <View style={[styles.attachmentTray, { borderTopColor: theme.colors.divider }]}><View>{attachment.type === 'video' ? <View style={[styles.preview, styles.videoPreview]}><Icon name="film" size={27} color="#fff" /></View> : <Image source={{ uri: attachment.uri }} style={styles.preview} />}<Pressable onPress={() => setAttachment(null)} style={styles.remove}><Icon name="x" size={12} color="#fff" /></Pressable></View></View> : null}

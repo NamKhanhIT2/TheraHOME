@@ -4171,3 +4171,33 @@ cuộn khi hội thoại dài hơn màn hình. Thêm `justifyContent: 'flex-end'
 danh sách đảo ngược, đó chính là ĐỈNH màn hình) cho cả ba màn. Hội thoại dài
 không đổi gì: khi nội dung cao hơn khung nhìn thì `flexGrow`/`justifyContent`
 không còn tác dụng, danh sách vẫn ghim ở tin mới nhất như cũ.
+
+### Cùng ngày — tin nhắn tới nằm dưới mép ô nhập, phải tự cuộn mới thấy hết
+
+Bên GỬI thì đúng: `submit()` gọi `scrollToOffset({ offset: 0 })` ngay sau khi
+xoá ô nhập, nên bong bóng của mình luôn hiện đủ. Bên NHẬN không có gì tương
+đương, và tệ hơn là danh sách được cấu hình để CỐ Ý không cuộn:
+`maintainVisibleContentPosition={{ minIndexForVisible: 0 }}` bảo danh sách giữ
+nguyên vị trí khi có dòng thêm vào index 0 — mà trên danh sách đảo ngược,
+index 0 chính là tin mới nhất. Nên tin vừa tới rơi xuống dưới mép nhìn thấy,
+phần dưới nằm sau ô nhập. `app/chat/ai.tsx` còn không khai báo prop này.
+
+`autoscrollToTopThreshold` là nửa còn thiếu. "Top" ở đây là theo trục của
+danh sách đảo ngược, tức đầu MỚI NHẤT: khi người đọc còn trong khoảng đó tính
+từ tin mới nhất thì danh sách bám theo tin mới; khi họ đã cuộn lên đọc lịch
+sử thì để yên. Đúng cách Messages/Telegram/WhatsApp hành xử — dính đáy trừ
+khi bạn chủ động cuộn đi, và không bao giờ giật màn hình giữa lúc đang đọc.
+
+Đặt trong `src/lib/chatListProps.ts` để cả ba màn dùng chung một giá trị
+(120pt, hơn hai dòng bong bóng một chút) thay vì ba object rời dễ lệch nhau.
+Đã đối chiếu mã nguồn RN 0.86: cả `MaintainVisibleScrollPositionHelper.kt`
+(Android) và `RCTScrollView.m` (iOS) đều đọc `autoscrollToTopThreshold`, prop
+này không bị bỏ qua thầm lặng ở nền tảng nào.
+
+Sửa kèm: nút 👍 gửi nhanh ở cả hai màn không hề cuộn như `submit()`, nên bong
+bóng của chính mình cũng rơi xuống dưới mép.
+
+**Đã kiểm tra và KHÔNG phải sửa:** đường gửi vốn đã optimistic —
+`useSendChatMessage.onMutate` chèn bong bóng vào cache ngay lập tức,
+`onError` hoàn tác, `onSettled` invalidate. Cảm giác gửi tức thì đã đúng
+chuẩn từ trước; chỉ nửa nhận là hỏng.

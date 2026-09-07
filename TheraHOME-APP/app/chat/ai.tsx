@@ -9,6 +9,7 @@ import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
 import { useAppStore } from '@/store/useAppStore';
 import { useI18n } from '@/lib/i18n';
+import { CHAT_FOLLOW_NEW_MESSAGES } from '@/lib/chatListProps';
 
 // Localized at render — see t('aiGreeting').
 const AI_ASSISTANT_IMAGE = require('../../assets/ai-assistant.png');
@@ -113,6 +114,7 @@ export default function AIChatScreen() {
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
             contentContainerStyle={styles.body}
+            maintainVisibleContentPosition={CHAT_FOLLOW_NEW_MESSAGES}
             onEndReached={() => {
               if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) void messagesQuery.fetchNextPage();
             }}
