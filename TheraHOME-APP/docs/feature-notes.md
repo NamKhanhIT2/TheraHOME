@@ -4100,10 +4100,21 @@ chat và màn soạn bài: vùng cuộn co lại, nội dung căn giữa lại t
 trống, phần thừa cuộn tới được (`keyboardShouldPersistTaps="handled"` đã có
 sẵn).
 
-### Ghi nhận, chưa sửa: system prompt còn ghi "lộ trình 28 ngày"
+### System prompt còn ghi "lộ trình 28 ngày" — đã sửa cùng ngày
 
 `ai_prompts.system_prompt` (sửa ở tab Prompt AI trên WEB) vẫn mô tả "lộ trình
 tập luyện 28 ngày", nên AI nói với khách đúng con số đó — thấy rõ trong ảnh
-chụp. Lộ trình thật hiện là 14 ngày (`products.total_days`). Đây là nội dung
-do chủ sở hữu quản lý nên tôi không tự đổi; sửa một dòng trong tab Prompt AI
-là xong.
+chụp. Lộ trình thật hiện là 14 ngày (`products.total_days`).
+
+Sửa theo hướng KHÔNG ghi con số nào nữa, vì chính việc ghi cứng "28" là thứ
+đã lỗi thời khi rút xuống 14 và sẽ lỗi lại nếu sau này có sản phẩm dài ngắn
+khác nhau. `chat-ai-reply` không gửi kèm bất kỳ ngữ cảnh nào về chương trình
+của người dùng (không có số ngày, không có sản phẩm), nên AI vốn không có cơ
+sở để nói con số đó. Nay câu mô tả là "lộ trình tập luyện theo từng ngày", và
+thêm một quy tắc: không tự nêu tổng số ngày, ai hỏi thì mời mở tab Lộ trình
+trong app để xem đúng số ngày của sản phẩm mình.
+
+Đây là nội dung sống trong DB, `getSystemPrompt` đọc lại mỗi lần gọi, nên có
+hiệu lực ngay — không cần build lại app hay deploy lại Edge Function. Phần
+còn lại của prompt giữ nguyên từng chữ (sửa bằng `replace()` có kiểm tra
+trước/sau, không gõ lại toàn bộ).
