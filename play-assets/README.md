@@ -16,8 +16,10 @@ the build.
 | `store-listing-en-US.txt` | App name, short description, full description |
 | `TheraHOME-1.0.0-versionCode1.aab` | Production → Create release → App bundle |
 
-The bundle is gitignored (110 MB, and Play only wants the newest). Rebuild it
-any time with, from `TheraHOME-APP/android`:
+The bundle is gitignored (110 MB, and Play only wants the newest) and lands
+here on its own: `plugins/withPlayAssetsBundleCopy.js` makes `bundleRelease`
+copy it in and delete the previous one, so this folder always holds exactly
+one bundle and it is always the newest. Rebuild from `TheraHOME-APP/android`:
 
     JAVA_HOME=$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home \
     ANDROID_HOME=$HOME/Library/Android/sdk ./gradlew bundleRelease
