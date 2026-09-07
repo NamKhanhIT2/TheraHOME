@@ -3982,3 +3982,40 @@ chỉ-đọc). Thị trường vẫn được chọn một lần ở onboarding,
 `app/profile/account.tsx` chỉ còn Google account, Ngôn ngữ, Chia sẻ dữ liệu
 và mục Pháp lý. Khoá i18n `countryRegion`/`countryRegionLocked` giữ lại vì
 Admin/onboarding còn dùng nhãn tương tự.
+
+## 2026-09-07 — Thanh tab dưới trên iOS bị nhô cao: inset đếm hai lần
+
+Chủ sở hữu báo thanh Home/Lộ trình/Cửa hàng/Cộng đồng trên iOS nhô lên cao
+hơn trước. Đúng, và do commit `c9ee2c6` ("Android: give the tab bar, the
+keyboard and the FAB the insets they need", 2026-09-06) gây ra — commit đó
+sửa một lỗi Android thật nhưng áp dụng cho cả hai nền tảng.
+
+**Vì sao sai:** 84pt CHÍNH LÀ chiều cao thanh tab chuẩn của iOS — 49pt phần
+điều khiển cộng 34pt dải home indicator. Vùng an toàn đã nằm sẵn trong con
+số 84 mà thiết kế dùng. Thêm `paddingBottom: insets.bottom` là đếm dải đó
+lần thứ hai, đẩy toàn bộ thanh lên 34pt trên iPhone có home indicator. Nút
+trợ lý nổi cũng đi theo vì nó được đặt `bottom: 96 + insets.bottom`.
+
+Trên Android thì ngược lại: không có gì được tính sẵn, app vẽ tràn viền từ
+SDK 52 nên thanh điều hướng hệ thống che mất nhãn tab nếu không chừa chỗ.
+Lỗi Android đó là có thật và phải giữ nguyên cách sửa.
+
+**Cách sửa:** một quy tắc chung trong `src/hooks/useTabBarInset.ts` — trả về
+`insets.bottom` trên Android, trả về 0 trên iOS. Dùng ở ba chỗ: thanh tab
+bệnh nhân, nút trợ lý nổi, và thanh tab tài khoản nhân viên. Chỗ thứ ba là
+lỗi của chính tôi hôm 2026-09-06 (`060b80d` đổi thành
+`height: 76 + insets.bottom`), mắc y hệt và cũng làm thanh nhân viên cao
+thêm 26pt trên iPhone; nay quay lại `84 + tabBarInset`.
+
+Đối chiếu số liệu để chắc chắn iOS trở về đúng như trước `c9ee2c6`:
+
+| Thành phần | Trước c9ee2c6 | Sau c9ee2c6 | Hiện tại (iOS) |
+| --- | --- | --- | --- |
+| Chiều cao thanh tab | 84 | 118 | 84 |
+| Đáy nút trợ lý | 96 | 130 | 96 |
+
+**Không đụng tới:** mọi chỗ khác dùng `insets.bottom` đều là modal, sheet
+báo cáo và màn onboarding — không có gì chừa sẵn chỗ cho chúng nên chúng
+phải giữ inset thật trên cả hai nền tảng. Phần padding của bottom sheet
+trong `AssistantBubble` vì thế vẫn dùng `insets.bottom`, cố ý khác với FAB
+ngay phía trên nó.

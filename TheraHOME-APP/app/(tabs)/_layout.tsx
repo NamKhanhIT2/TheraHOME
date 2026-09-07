@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Tabs, router, usePathname } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarInset } from '@/hooks/useTabBarInset';
 import { useTheme } from '@/theme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useAppStore } from '@/store/useAppStore';
@@ -58,17 +58,18 @@ function TabBarButton({ item, isFocused, onPress }: { item: (typeof TAB_ITEMS)[n
 
 function CustomTabBar({ state, navigation }: TabBarProps) {
   const theme = useTheme();
-  // Android draws edge-to-edge (SDK 52+), so the system navigation bar sits
-  // ON TOP of this bar unless we reserve its height — the tab labels were
-  // half-hidden behind the three-button nav. Every screen gets this from
-  // ScreenContainer's SafeAreaView; the tab bar renders outside it.
-  const insets = useSafeAreaInsets();
+  // Android only — see useTabBarInset. There the system navigation bar sits
+  // ON TOP of this bar unless its height is reserved (the tab labels were
+  // half-hidden behind the three-button nav). On iOS the 84pt barInner below
+  // already includes the home-indicator strip, so adding an inset here lifted
+  // the whole bar off the bottom of the screen.
+  const tabBarInset = useTabBarInset();
   return (
     <View
       style={[
         styles.bar,
         theme.shadows.nav,
-        { backgroundColor: theme.dark ? theme.colors.bgCard : '#fff', borderTopColor: theme.colors.borderLight, paddingBottom: insets.bottom },
+        { backgroundColor: theme.dark ? theme.colors.bgCard : '#fff', borderTopColor: theme.colors.borderLight, paddingBottom: tabBarInset },
       ]}
     >
       <View style={styles.barInner}>

@@ -6,10 +6,11 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useWebRoles } from '@/hooks/useWebRoles';
+import { useTabBarInset } from '@/hooks/useTabBarInset';
 import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/icons/Icon';
 
@@ -47,10 +48,12 @@ function StaffHeader() {
 
 function StaffTabBar({ state, navigation }: Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0]) {
   const theme = useTheme();
-  // Same hazard the patient tab bar in (tabs)/_layout.tsx already handles:
-  // Android draws edge-to-edge, so without the bottom inset the 3-button
-  // navigation bar (or the gesture pill) sits on top of the tab labels.
-  const insets = useSafeAreaInsets();
+  // Same rule as the patient tab bar in (tabs)/_layout.tsx: grow only on
+  // Android, where the edge-to-edge system navigation bar would otherwise sit
+  // on top of the tab labels. On iOS this stays the original 84pt, which
+  // already contains the home-indicator strip — my first version added the
+  // inset on both platforms and pushed the bar 34pt up on iPhone.
+  const tabBarInset = useTabBarInset();
   return (
     <View
       style={[
@@ -58,8 +61,8 @@ function StaffTabBar({ state, navigation }: Parameters<NonNullable<React.Compone
         {
           backgroundColor: theme.dark ? theme.colors.bgCard : '#fff',
           borderTopColor: theme.colors.borderLight,
-          height: 76 + insets.bottom,
-          paddingBottom: Math.max(insets.bottom, 8),
+          height: 84 + tabBarInset,
+          paddingBottom: 8 + tabBarInset,
         },
       ]}
     >

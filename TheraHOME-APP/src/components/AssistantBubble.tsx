@@ -3,6 +3,7 @@ import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Text, View } fro
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useSpecialistPresence } from '@/hooks/useChat';
+import { useTabBarInset } from '@/hooks/useTabBarInset';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
 
@@ -26,6 +27,10 @@ const SPECIALIST_IMAGE = require('../../assets/therahome-specialist.png');
 export function AssistantBubble({ onOpenAIChat, onOpenSupportChat, bottomOffset = 96, isStaff = false }: AssistantBubbleProps) {
   const theme = useTheme();
   const { t } = useI18n();
+  // Two different measurements on purpose: the FAB rides on top of the tab
+  // bar and follows its Android-only growth, while the sheet below keeps the
+  // raw inset because nothing has reserved that space for it.
+  const tabBarInset = useTabBarInset();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const specialistOnline = useSpecialistPresence();
@@ -61,11 +66,13 @@ export function AssistantBubble({ onOpenAIChat, onOpenSupportChat, bottomOffset 
           theme.shadows.fab,
           {
             right: 16,
-            // + insets.bottom: the tab bar this is meant to clear reserves the
-            // Android system navigation bar's height (see (tabs)/_layout.tsx),
-            // so a fixed offset from the screen edge lands the bubble on top of
-            // the Community tab instead of above it.
-            bottom: bottomOffset + insets.bottom,
+            // + tabBarInset: on Android the tab bar this is meant to clear
+            // reserves the system navigation bar's height (see
+            // (tabs)/_layout.tsx), so a fixed offset from the screen edge
+            // lands the bubble on top of the Community tab instead of above
+            // it. On iOS that inset is zero — the bar does not grow there, and
+            // adding it lifted the bubble 34pt too high.
+            bottom: bottomOffset + tabBarInset,
             backgroundColor: theme.colors.primary,
             borderColor: theme.dark ? theme.colors.bgApp : '#fff',
           },
