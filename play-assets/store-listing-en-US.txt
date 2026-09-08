@@ -1,19 +1,16 @@
 TheraHOME — Google Play store listing (en-US)
 ==============================================
 
-APP NAME (max 30)
+APP NAME 
 -----------------
-TheraHOME: Neck & Back Care
-(27 characters)
+TheraHOME
 
 
-SHORT DESCRIPTION (max 80)
+SHORT DESCRIPTION 
 --------------------------
 Guided daily neck & back care at home — 14-day plan with video sessions.
-(71 characters)
 
-
-FULL DESCRIPTION (max 4000)
+FULL DESCRIPTION 
 ---------------------------
 TheraHOME turns your neck and back care into a simple daily habit. Instead of
 guessing what to do, you open the app and follow one short guided session a

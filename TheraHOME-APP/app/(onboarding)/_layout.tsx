@@ -14,6 +14,10 @@ export default function OnboardingLayout() {
   return (
     <Stack screenOptions={{ headerShown: false, animation: Platform.OS === 'android' ? 'slide_from_right' : 'default' }}>
       <Stack.Screen name="login" />
+      <Stack.Screen name="create-account" />
+      <Stack.Screen name="verify-code" />
+      <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="reset-password" />
       <Stack.Screen name="questions" />
       <Stack.Screen name="consent" />
       <Stack.Screen name="thera-login" />

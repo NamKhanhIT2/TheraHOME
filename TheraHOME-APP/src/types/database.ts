@@ -2094,6 +2094,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      is_username_available: { Args: { p_username: string }; Returns: boolean }
       lookup_order: {
         Args: { p_email?: string; p_phone?: string }
         Returns: {
@@ -2120,6 +2121,10 @@ export type Database = {
         Args: { p_program_day_id: string; p_user_program_id: string }
         Returns: boolean
       }
+      normalize_phone_e164: {
+        Args: { p_default_cc?: string; p_phone: string }
+        Returns: string
+      }
       normalize_phone_vn: { Args: { p_phone: string }; Returns: string }
       notification_copy: {
         Args: { p_key: string; p_language: string; p_n?: number }
@@ -2128,6 +2133,7 @@ export type Database = {
           title: string
         }[]
       }
+      product_order_count: { Args: { p_product_id: string }; Returns: number }
       profile_language: { Args: { p_user_id: string }; Returns: string }
       provision_product_for_user: {
         Args: { p_product_id: string; p_user_id: string }
@@ -2180,6 +2186,7 @@ export type Database = {
         Args: { p_max: number; p_text: string }
         Returns: string
       }
+      username_is_wellformed: { Args: { p_username: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

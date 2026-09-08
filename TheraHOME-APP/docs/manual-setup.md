@@ -162,3 +162,41 @@ flow into `orders`:
    (Supabase CLI) or dashboard → Edge Functions → `shopify-order-webhook` →
    Secrets.
 
+
+## Resend SMTP for auth emails (2026-09-08) — REQUIRED before sign-up works
+
+Registration and password recovery both send a **six-digit code**, not a
+link. The code the app expects is the one Supabase puts in `{{ .Token }}`, so
+two things have to be set in the Supabase dashboard. Until they are, accounts
+can be created but no one receives a code: Supabase's built-in SMTP is capped
+at a couple of messages an hour and only delivers to project members.
+
+**1. Auth → SMTP Settings** — switch on custom SMTP and enter Resend's:
+
+| Field | Value |
+|---|---|
+| Host | `smtp.resend.com` |
+| Port | `465` |
+| Username | `resend` |
+| Password | a Resend API key — create it at resend.com/api-keys |
+| Sender email | an address on a domain verified in Resend |
+| Sender name | TheraHOME |
+
+The domain must be verified in Resend first (DNS records), or every message
+is rejected. This step needs the API key, so it is yours to do — the key must
+not pass through the repo or this chat.
+
+**2. Auth → Email Templates** — the default templates send a link, which this
+app has no way to receive. Both of these must contain `{{ .Token }}`:
+
+- **Confirm signup** — replace the `{{ .ConfirmationURL }}` anchor with the
+  code, e.g. `Your TheraHOME code is <strong>{{ .Token }}</strong>`.
+- **Reset password** — same change.
+
+Leaving a template on the link form is the one failure that looks like a bug
+in the app rather than a setting: the email arrives, and the code the screen
+asks for is nowhere in it.
+
+Nothing else needs configuring. Sign-in by username, the account/profile
+link, and the code verification itself are all in the app and the
+`auth-sign-in` Edge Function, and were verified end to end on 2026-09-08.
