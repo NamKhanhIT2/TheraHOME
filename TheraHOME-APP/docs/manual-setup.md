@@ -184,9 +184,22 @@ Settings — direct link `/dashboard/project/nyjvtvmllwbyfokldgtj/auth/smtp`)
 | Sender email | an address on a domain verified in Resend |
 | Sender name | TheraHOME |
 
-The domain must be verified in Resend first (DNS records), or every message
-is rejected. This step needs the API key, so it is yours to do — the key must
-not pass through the repo or this chat.
+The domain must be verified in Resend first, by adding the DNS records Resend
+gives you at resend.com/domains. Until it is, **registration fails outright** —
+not silently, and not "account created but no email": Supabase rolls the whole
+signup back and returns
+
+    500 unexpected_failure — "Error sending confirmation email"
+
+with the real reason only in Logs → auth_logs:
+
+    550 "The therahomeai.com domain is not verified."
+
+Observed exactly this on 2026-09-08 with SMTP configured and the domain not
+yet verified. Nobody can create an account in that state.
+
+This step needs the API key, so it is yours to do — the key must not pass
+through the repo or this chat.
 
 **2. Authentication → Emails → Templates** (same page, below SMTP) — the
 default templates send a link, which this
