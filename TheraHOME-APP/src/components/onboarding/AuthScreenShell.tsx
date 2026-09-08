@@ -4,6 +4,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icons/Icon';
+import { RunnerDoor } from '@/components/onboarding/RunnerDoor';
 import { AppleLogo } from '@/components/AppleLogo';
 import { GoogleGLogo } from '@/components/GoogleGLogo';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
@@ -111,28 +112,13 @@ export function AuthInput({ icon, ...props }: React.ComponentProps<typeof TextIn
 export function PrimaryAuthButton({ disabled, busy, label, onPress }: { disabled: boolean; busy?: boolean; label: string; onPress?: () => void }) {
   const scale = React.useRef(new Animated.Value(1)).current;
   const sheen = React.useRef(new Animated.Value(0)).current;
-  const iconTravel = React.useRef(new Animated.Value(0)).current;
-  const glow = React.useRef(new Animated.Value(0.42)).current;
   const animateTo = (value: number) => Animated.spring(scale, { toValue: value, useNativeDriver: true, speed: 30, bounciness: 5 }).start();
   const play = () => {
     sheen.setValue(0);
-    iconTravel.setValue(0);
-    Animated.parallel([
-      Animated.timing(sheen, { toValue: 1, duration: 520, useNativeDriver: true }),
-      Animated.sequence([
-        Animated.spring(iconTravel, { toValue: 1, speed: 22, bounciness: 8, useNativeDriver: true }),
-        Animated.spring(iconTravel, { toValue: 0, speed: 18, bounciness: 7, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 180, useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0.42, duration: 480, useNativeDriver: true }),
-      ]),
-    ]).start();
+    Animated.timing(sheen, { toValue: 1, duration: 520, useNativeDriver: true }).start();
     onPress?.();
   };
   const sheenX = sheen.interpolate({ inputRange: [0, 1], outputRange: [-110, 430] });
-  const iconX = iconTravel.interpolate({ inputRange: [0, 1], outputRange: [0, 7] });
-  const iconScale = iconTravel.interpolate({ inputRange: [0, 0.55, 1], outputRange: [1, 0.9, 1.08] });
   return (
     <Animated.View style={[styles.primaryWrap, { transform: [{ scale }] }, disabled && styles.primaryDisabled]}>
       <Pressable accessibilityRole="button" accessibilityState={{ disabled, busy }} disabled={disabled} onPress={play} onPressIn={() => animateTo(0.965)} onPressOut={() => animateTo(1)} style={styles.primary}>
@@ -142,8 +128,7 @@ export function PrimaryAuthButton({ disabled, busy, label, onPress }: { disabled
         </Svg>
         <Animated.View pointerEvents="none" style={[styles.primarySheen, { transform: [{ translateX: sheenX }, { rotate: '-18deg' }] }]} />
         <Text style={styles.primaryText}>{label}</Text>
-        <Animated.View pointerEvents="none" style={[styles.primaryIconGlow, { opacity: glow }]} />
-        <Animated.View style={[styles.primaryIcon, { transform: [{ translateX: iconX }, { scale: iconScale }] }]}><Icon name="chevron-right" size={21} color="#FFFFFF" strokeWidth={2.4} /></Animated.View>
+        <View style={styles.primaryStage}><RunnerDoor running={!!busy} size={50} /></View>
       </Pressable>
     </Animated.View>
   );
@@ -157,7 +142,7 @@ const styles = StyleSheet.create({
   title: { textAlign: 'center', color: '#10244B', fontSize: 27, lineHeight: 33, fontWeight: '800', letterSpacing: -0.5, marginBottom: 17 }, subtitle: { textAlign: 'center', color: '#4A6182', fontSize: 14, lineHeight: 20, marginTop: -9, marginBottom: 17 }, fields: { gap: 10 },
   inputRow: { minHeight: 55, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 17, borderRadius: 16, borderWidth: 1, borderTopColor: 'rgba(255,255,255,0.98)', borderLeftColor: 'rgba(255,255,255,0.98)', borderRightColor: '#D9E2EA', borderBottomColor: '#D4DEE7', backgroundColor: '#EEF3F7', shadowColor: '#8292A5', shadowOpacity: 0.24, shadowRadius: 7, shadowOffset: { width: 5, height: 6 }, elevation: 5 }, inputRowFocused: { borderColor: '#72BDF0', backgroundColor: '#F2F8FC', shadowColor: '#078BE4', shadowOpacity: 0.25, elevation: 7 }, input: { flex: 1, minWidth: 0, paddingVertical: 14, color: '#13284D', fontSize: 15 },
   forgot: { alignSelf: 'flex-end', paddingVertical: 9 }, link: { color: '#078BE4', fontWeight: '600' }, error: { color: '#D84545', textAlign: 'center', fontSize: 12, marginTop: 7 },
-  primaryWrap: { minHeight: 57, marginTop: 4, borderRadius: 29, shadowColor: '#10CFC8', shadowOpacity: 0.46, shadowRadius: 13, shadowOffset: { width: 0, height: 7 }, elevation: 8 }, primary: { flex: 1, minHeight: 57, borderRadius: 29, paddingLeft: 24, paddingRight: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' }, primaryGradient: { ...StyleSheet.absoluteFill }, primarySheen: { position: 'absolute', top: -24, bottom: -24, width: 54, backgroundColor: 'rgba(255,255,255,0.36)' }, primaryDisabled: { opacity: 0.48, shadowOpacity: 0.12, elevation: 2 }, primaryText: { color: '#103859', fontSize: 17, fontWeight: '800' }, primaryIconGlow: { position: 'absolute', right: 3, width: 54, height: 54, borderRadius: 27, backgroundColor: '#7D72FF' }, primaryIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(18,71,159,0.84)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.34)', shadowColor: '#514BFF', shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 5 },
+  primaryWrap: { alignSelf: 'stretch', minHeight: 57, marginTop: 4, borderRadius: 18, shadowColor: '#10CFC8', shadowOpacity: 0.46, shadowRadius: 13, shadowOffset: { width: 0, height: 7 }, elevation: 8 }, primary: { alignSelf: 'stretch', width: '100%', minHeight: 57, borderRadius: 18, paddingLeft: 24, paddingRight: 16, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }, primaryGradient: { ...StyleSheet.absoluteFill }, primarySheen: { position: 'absolute', top: -24, bottom: -24, width: 54, backgroundColor: 'rgba(255,255,255,0.36)' }, primaryDisabled: { opacity: 0.48, shadowOpacity: 0.12, elevation: 2 }, primaryText: { color: '#103859', fontSize: 17, fontWeight: '800' }, primaryStage: { position: 'absolute', right: 40, top: 3, bottom: 3, width: 50, alignItems: 'center', justifyContent: 'center' }, primaryIconGlow: { position: 'absolute', right: 3, width: 54, height: 54, borderRadius: 27, backgroundColor: '#7D72FF' }, primaryIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(18,71,159,0.84)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.34)', shadowColor: '#514BFF', shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 5 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 15 }, line: { flex: 1, height: 1, backgroundColor: '#D6E0EC' }, or: { color: '#7F8EA4', fontSize: 12 }, socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 18, marginTop: 12 }, socialButton: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E3E9F1', shadowColor: '#17395E', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   switchRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 13 }, switchText: { color: '#75859C' }, legal: { color: '#7D8DA3', textAlign: 'center', fontSize: 10.5, lineHeight: 15, marginTop: 13 },
 });
