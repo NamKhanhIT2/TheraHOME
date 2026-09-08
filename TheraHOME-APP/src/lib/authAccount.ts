@@ -78,6 +78,17 @@ export function isUsernameWellFormed(username: string): boolean {
   return USERNAME_SHAPE.test(username.trim());
 }
 
+/** Minimum password length, enforced in the app on both the sign-up and the
+ * password-change paths. Supabase's own server-side minimum (Auth settings)
+ * is a dashboard toggle this code cannot reach; enforcing it here is what
+ * actually stops a short password being chosen through the app, and every
+ * password in the app is set through one of the two functions below. */
+const PASSWORD_MIN_LENGTH = 8;
+
+export function isPasswordStrongEnough(password: string): boolean {
+  return password.length >= PASSWORD_MIN_LENGTH;
+}
+
 export async function isUsernameAvailable(username: string): Promise<boolean> {
   const { data, error } = await supabase.rpc('is_username_available', { p_username: username });
   if (error) throw new AuthError(classify(error));
@@ -104,6 +115,7 @@ export async function signUpAccount({
   // Both checked up front so the person is told while the form is still on
   // screen, and told which of the two is actually wrong.
   if (!isUsernameWellFormed(trimmedUsername)) throw new AuthError('username_invalid');
+  if (!isPasswordStrongEnough(password)) throw new AuthError('weak_password');
   if (!(await isUsernameAvailable(trimmedUsername))) throw new AuthError('username_taken');
 
   const { error } = await supabase.auth.signUp({
@@ -187,6 +199,7 @@ export async function verifyRecoveryCode(email: string, token: string): Promise<
 }
 
 export async function updatePassword(password: string): Promise<void> {
+  if (!isPasswordStrongEnough(password)) throw new AuthError('weak_password');
   const { error } = await supabase.auth.updateUser({ password });
   if (error) throw new AuthError(classify(error));
 }
