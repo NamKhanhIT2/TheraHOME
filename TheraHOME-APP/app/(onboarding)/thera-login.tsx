@@ -3,10 +3,10 @@ import { ActivityIndicator, Dimensions, Image, ImageBackground, Keyboard, Platfo
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/icons/Icon';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useI18n } from '@/lib/i18n';
+import { AuthError, authErrorKey, signInWithIdentifier } from '@/lib/authAccount';
 import { useAppStore } from '@/store/useAppStore';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -189,17 +189,11 @@ export default function TheraAccountLoginScreen() {
     setSubmitting(true);
     setError('');
     try {
-      const { data: email, error: resolveError } = await supabase.rpc('resolve_thera_login_email', {
-        p_username: username.trim(),
-      });
-      if (resolveError) throw resolveError;
-      if (!email) throw new Error('Invalid login credentials');
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) throw signInError;
-      if (data.session) {
+      // Was: resolve_thera_login_email + signInWithPassword. That RPC handed
+      // any anonymous caller the email behind a username; the lookup now
+      // happens inside the auth-sign-in Edge Function and the RPC is revoked.
+      await signInWithIdentifier({ identifier: username.trim(), password });
+      {
         // Wipe whatever onboarding progress this device still holds before
         // handing over to RootNavigator. login.tsx already does this for a
         // new OAuth user; without it a TheraHOME account whose onboarding is
@@ -209,12 +203,7 @@ export default function TheraAccountLoginScreen() {
         router.replace('/');
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message : '';
-      if (message.toLowerCase().includes('invalid login credentials')) {
-        setError(t('invalidCredentials'));
-      } else {
-        setError(t('connectionError'));
-      }
+      setError(t(e instanceof AuthError ? authErrorKey(e.code) : 'connectionError'));
       if (__DEV__) console.warn('TheraHOME account sign-in failed:', e);
     } finally {
       setSubmitting(false);
