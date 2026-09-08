@@ -113,6 +113,15 @@ export async function signUpAccount({
   });
   if (error) throw new AuthError(classify(error));
 
+  // With email-enumeration protection on, Supabase does NOT error on a
+  // duplicate email — it returns a decoy user with an empty `identities`
+  // array and no session, to avoid revealing which addresses are registered.
+  // Treat that as "already taken" too, so a repeat email is always caught
+  // whether the project errors (protection off) or decoys (protection on).
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    throw new AuthError('email_taken');
+  }
+
   // Whether a code has to be entered follows the project's "Confirm email"
   // setting, read straight off the result rather than hard-coded: with
   // confirmation OFF, signUp returns a live session and the user is already
