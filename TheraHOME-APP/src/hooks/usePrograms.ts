@@ -15,11 +15,12 @@ import { useMarket, type StoreMarket } from '@/hooks/useMarket';
  * since they read the same 6 market columns. */
 function resolveMarketDayContent(
   market: StoreMarket,
-  day: { video_url_vn: string | null; video_url_us: string | null; video_url_malay: string | null; support_tools_url_vn: string | null; support_tools_url_us: string | null; support_tools_url_malay: string | null },
-): { video: string; supportToolsUrl: string } {
+  day: { video_url_vn: string | null; video_url_us: string | null; video_url_malay: string | null; support_tools_url_vn: string | null; support_tools_url_us: string | null; support_tools_url_malay: string | null; support_tools_label_vn?: string | null; support_tools_label_us?: string | null; support_tools_label_malay?: string | null },
+): { video: string; supportToolsUrl: string; supportToolsLabel: string } {
   const video = market === 'US' ? day.video_url_us : market === 'MALAY' ? day.video_url_malay : day.video_url_vn;
   const supportToolsUrl = market === 'US' ? day.support_tools_url_us : market === 'MALAY' ? day.support_tools_url_malay : day.support_tools_url_vn;
-  return { video: video ?? day.video_url_vn ?? '', supportToolsUrl: supportToolsUrl ?? day.support_tools_url_vn ?? '' };
+  const supportToolsLabel = market === 'US' ? day.support_tools_label_us : market === 'MALAY' ? day.support_tools_label_malay : day.support_tools_label_vn;
+  return { video: video ?? day.video_url_vn ?? '', supportToolsUrl: supportToolsUrl ?? day.support_tools_url_vn ?? '', supportToolsLabel: (supportToolsLabel ?? day.support_tools_label_vn ?? '').trim() };
 }
 
 export interface ProductInfo {
@@ -228,6 +229,7 @@ export interface DayRow {
   video: string;
   /** Optional admin-managed link opened by "Dụng cụ hỗ trợ tập luyện". */
   supportToolsUrl: string;
+  supportToolsLabel: string;
   type: DayType;
 }
 
@@ -243,6 +245,9 @@ interface RawUserProgramDay {
     support_tools_url_vn: string | null;
     support_tools_url_us: string | null;
     support_tools_url_malay: string | null;
+    support_tools_label_vn: string | null;
+    support_tools_label_us: string | null;
+    support_tools_label_malay: string | null;
     phase_id: string;
   } | null;
 }
@@ -274,7 +279,7 @@ export function useProgramDays(userProgramId: string | undefined, productId: str
     queryFn: async (): Promise<DayRow[]> => {
       const { data, error } = await supabase
         .from('user_program_days')
-        .select('status, program_days(id, day_number, day_type, video_url_vn, video_url_us, video_url_malay, support_tools_url_vn, support_tools_url_us, support_tools_url_malay, phase_id)')
+        .select('status, program_days(id, day_number, day_type, video_url_vn, video_url_us, video_url_malay, support_tools_url_vn, support_tools_url_us, support_tools_url_malay, support_tools_label_vn, support_tools_label_us, support_tools_label_malay, phase_id)')
         .eq('user_program_id', userProgramId!);
       if (error) throw error;
       const phases = phasesQuery.data ?? [];
@@ -314,7 +319,7 @@ export function useCatalogProgramDays(productId: string | undefined, userProgram
           .order('sort_order'),
         supabase
           .from('program_days')
-          .select('id, day_number, day_type, video_url_vn, video_url_us, video_url_malay, support_tools_url_vn, support_tools_url_us, support_tools_url_malay, phase_id')
+          .select('id, day_number, day_type, video_url_vn, video_url_us, video_url_malay, support_tools_url_vn, support_tools_url_us, support_tools_url_malay, support_tools_label_vn, support_tools_label_us, support_tools_label_malay, phase_id')
           .eq('product_id', productId!)
           .order('day_number'),
         userProgramId

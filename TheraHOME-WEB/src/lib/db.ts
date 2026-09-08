@@ -126,7 +126,7 @@ export async function fetchRoutineProducts(): Promise<Product[]> {
     supabase.from("program_phases").select("id, product_id, name, name_en, name_ms, day_start, day_end, sort_order").order("sort_order"),
     supabase
       .from("program_days")
-      .select("id, product_id, phase_id, day_number, day_type, video_url_vn, video_url_us, video_url_malay, support_tools_url_vn, support_tools_url_us, support_tools_url_malay")
+      .select("id, product_id, phase_id, day_number, day_type, video_url_vn, video_url_us, video_url_malay, support_tools_url_vn, support_tools_url_us, support_tools_url_malay, support_tools_label_vn, support_tools_label_us, support_tools_label_malay")
       .order("day_number"),
   ]);
   if (pErr) throw pErr;
@@ -147,6 +147,7 @@ export async function fetchRoutineProducts(): Promise<Product[]> {
           status: "locked",
           video: { vn: d.video_url_vn ?? "", us: d.video_url_us ?? "", malay: d.video_url_malay ?? "" },
           supportToolsUrl: { vn: d.support_tools_url_vn ?? "", us: d.support_tools_url_us ?? "", malay: d.support_tools_url_malay ?? "" },
+          supportToolsLabel: { vn: d.support_tools_label_vn ?? "", us: d.support_tools_label_us ?? "", malay: d.support_tools_label_malay ?? "" },
           type: (d.day_type as "train" | "rest") ?? "train",
         })
       );
@@ -328,18 +329,19 @@ export async function updateProductInfo(productId: string, patch: { name?: strin
   }
 }
 
-export async function createProgramDay(productId: string, phaseName: string, dayNumber: number, type: "train" | "rest", video: MarketContent, supportToolsUrl: MarketContent) {
+export async function createProgramDay(productId: string, phaseName: string, dayNumber: number, type: "train" | "rest", video: MarketContent, supportToolsUrl: MarketContent, supportToolsLabel: MarketContent) {
   const { data: phase, error: phaseErr } = await supabase.from("program_phases").select("id").eq("product_id", productId).eq("name", phaseName).single();
   if (phaseErr) throw phaseErr;
   const { error } = await supabase.from("program_days").insert({
     product_id: productId, phase_id: phase.id, day_number: dayNumber, day_type: type,
     video_url_vn: video.vn || null, video_url_us: video.us || null, video_url_malay: video.malay || null,
     support_tools_url_vn: supportToolsUrl.vn || null, support_tools_url_us: supportToolsUrl.us || null, support_tools_url_malay: supportToolsUrl.malay || null,
+    support_tools_label_vn: supportToolsLabel.vn || null, support_tools_label_us: supportToolsLabel.us || null, support_tools_label_malay: supportToolsLabel.malay || null,
   });
   if (error) throw error;
 }
 
-export async function updateProgramDay(productId: string, dayNumber: number, phaseName: string, type: "train" | "rest", video: MarketContent, supportToolsUrl: MarketContent) {
+export async function updateProgramDay(productId: string, dayNumber: number, phaseName: string, type: "train" | "rest", video: MarketContent, supportToolsUrl: MarketContent, supportToolsLabel: MarketContent) {
   const { data: phase, error: phaseErr } = await supabase.from("program_phases").select("id").eq("product_id", productId).eq("name", phaseName).single();
   if (phaseErr) throw phaseErr;
   const { error } = await supabase
@@ -348,6 +350,7 @@ export async function updateProgramDay(productId: string, dayNumber: number, pha
       phase_id: phase.id, day_type: type,
       video_url_vn: video.vn || null, video_url_us: video.us || null, video_url_malay: video.malay || null,
       support_tools_url_vn: supportToolsUrl.vn || null, support_tools_url_us: supportToolsUrl.us || null, support_tools_url_malay: supportToolsUrl.malay || null,
+      support_tools_label_vn: supportToolsLabel.vn || null, support_tools_label_us: supportToolsLabel.us || null, support_tools_label_malay: supportToolsLabel.malay || null,
     })
     .eq("product_id", productId)
     .eq("day_number", dayNumber);

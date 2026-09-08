@@ -162,6 +162,8 @@ export default function DayDetailScreen() {
   const canRecordWatch = !!program && (d.status === 'current' || d.status === 'missed');
   const videoUrl = normalizeVideoUrl(d.video);
   const supportToolsUrl = normalizeVideoUrl(d.supportToolsUrl);
+  // Admin can name this per day/market; fall back to the translated default.
+  const supportToolsLabel = d.supportToolsLabel || t('supportTools');
   const videoId = youtubeVideoId(videoUrl);
 
   // Marks the day watched the first time the user actually starts the video
@@ -339,7 +341,7 @@ export default function DayDetailScreen() {
             ]}
           >
             <Icon name="external-link" size={18} color={theme.colors.primary} />
-            <Text style={[theme.type.button, { color: theme.colors.primary }]}>{t('supportTools')}</Text>
+            <Text numberOfLines={1} style={[theme.type.button, { color: theme.colors.primary }]}>{supportToolsLabel}</Text>
           </Pressable>
         </View>
       </ScrollView>

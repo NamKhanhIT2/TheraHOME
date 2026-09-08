@@ -105,6 +105,7 @@ export function RoutineView() {
   const [type, setType] = useState<"train" | "rest">("train");
   const [video, setVideo] = useState<MarketContent>(EMPTY_MARKET_CONTENT);
   const [supportToolsUrl, setSupportToolsUrl] = useState<MarketContent>(EMPTY_MARKET_CONTENT);
+  const [supportToolsLabel, setSupportToolsLabel] = useState<MarketContent>(EMPTY_MARKET_CONTENT);
   const [deleteDayConfirm, setDeleteDayConfirm] = useState<number | null>(null);
   const [deletingDay, setDeletingDay] = useState(false);
 
@@ -396,22 +397,24 @@ export function RoutineView() {
     setType(d.type);
     setVideo(d.video);
     setSupportToolsUrl(d.supportToolsUrl);
+    setSupportToolsLabel(d.supportToolsLabel);
   }
   async function saveDay() {
     if (!product || dayBusy) return;
     setDayBusy(true);
     const trimmedVideo: MarketContent = { vn: video.vn.trim(), us: video.us.trim(), malay: video.malay.trim() };
     const trimmedSupportToolsUrl: MarketContent = { vn: supportToolsUrl.vn.trim(), us: supportToolsUrl.us.trim(), malay: supportToolsUrl.malay.trim() };
+    const trimmedSupportToolsLabel: MarketContent = { vn: supportToolsLabel.vn.trim(), us: supportToolsLabel.us.trim(), malay: supportToolsLabel.malay.trim() };
     // Markets are managed independently (owner rule 2026-09-05) — a day may
     // be filled for VN only. The per-market readiness panel and the publish
     // confirm are what flag a market that is still short of videos.
     try {
       if (dayModal === "new") {
         const nextDayNumber = product.days.length ? Math.max(...product.days.map((d) => d.id)) + 1 : 1;
-        await createProgramDay(product.id, phase, nextDayNumber, type, trimmedVideo, trimmedSupportToolsUrl);
+        await createProgramDay(product.id, phase, nextDayNumber, type, trimmedVideo, trimmedSupportToolsUrl, trimmedSupportToolsLabel);
         pushToast("Đã thêm ngày mới");
       } else if (dayModal !== null) {
-        await updateProgramDay(product.id, dayModal, phase, type, trimmedVideo, trimmedSupportToolsUrl);
+        await updateProgramDay(product.id, dayModal, phase, type, trimmedVideo, trimmedSupportToolsUrl, trimmedSupportToolsLabel);
         pushToast("Đã lưu Ngày " + dayModal);
       }
       setDayModal(null);
@@ -837,7 +840,19 @@ export function RoutineView() {
               Dùng link này cho cả 3 thị trường
             </GhostBtn>
           </div>
-          <FieldLabel>Link Dụng cụ hỗ trợ tập luyện ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
+          <FieldLabel>Tên dụng cụ hỗ trợ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
+          <input
+            value={supportToolsLabel[dayMarketTab]}
+            onChange={(e) => setSupportToolsLabel((v) => ({ ...v, [dayMarketTab]: e.target.value }))}
+            placeholder="Dụng cụ hỗ trợ tập luyện"
+            style={{ ...inputStyle, marginBottom: 6 }}
+          />
+          <div style={{ marginBottom: 14 }}>
+            <GhostBtn onClick={() => setSupportToolsLabel({ vn: supportToolsLabel[dayMarketTab], us: supportToolsLabel[dayMarketTab], malay: supportToolsLabel[dayMarketTab] })}>
+              Dùng tên này cho cả 3 thị trường
+            </GhostBtn>
+          </div>
+          <FieldLabel>Link dụng cụ hỗ trợ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
           <input
             value={supportToolsUrl[dayMarketTab]}
             onChange={(e) => setSupportToolsUrl((v) => ({ ...v, [dayMarketTab]: e.target.value }))}

@@ -1384,6 +1384,9 @@ export type Database = {
           id: string
           phase_id: string
           product_id: string
+          support_tools_label_malay: string | null
+          support_tools_label_us: string | null
+          support_tools_label_vn: string | null
           support_tools_url_malay: string | null
           support_tools_url_us: string | null
           support_tools_url_vn: string | null
@@ -1397,6 +1400,9 @@ export type Database = {
           id?: string
           phase_id: string
           product_id: string
+          support_tools_label_malay?: string | null
+          support_tools_label_us?: string | null
+          support_tools_label_vn?: string | null
           support_tools_url_malay?: string | null
           support_tools_url_us?: string | null
           support_tools_url_vn?: string | null
@@ -1410,6 +1416,9 @@ export type Database = {
           id?: string
           phase_id?: string
           product_id?: string
+          support_tools_label_malay?: string | null
+          support_tools_label_us?: string | null
+          support_tools_label_vn?: string | null
           support_tools_url_malay?: string | null
           support_tools_url_us?: string | null
           support_tools_url_vn?: string | null

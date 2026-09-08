@@ -27,6 +27,7 @@ export interface ProgramDay {
   status: "done" | "current" | "locked";
   video: MarketContent;
   supportToolsUrl: MarketContent;
+  supportToolsLabel: MarketContent;
   type: "train" | "rest";
 }
 
