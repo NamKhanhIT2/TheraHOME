@@ -38,7 +38,7 @@ export function RunnerDoor({ running, size = 50 }: { running: boolean; size?: nu
         ]),
       );
       strideLoop.current.start();
-      Animated.timing(run, { toValue: 1, duration: 1150, easing: Easing.inOut(Easing.quad), useNativeDriver: true }).start();
+      Animated.timing(run, { toValue: 1, duration: 1350, easing: Easing.inOut(Easing.quad), useNativeDriver: true }).start();
     } else {
       strideLoop.current?.stop();
       stride.setValue(0);
@@ -49,14 +49,14 @@ export function RunnerDoor({ running, size = 50 }: { running: boolean; size?: nu
 
   // Order (owner, 2026-09-08): the door opens the instant the button is
   // pressed, THEN the figure runs across and through, THEN the door shuts.
-  // So the leaf opens first (0→0.15), holds while the figure crosses, and
-  // shuts last (0.72→0.9); the figure only starts running once it is open.
-  const leafScale = run.interpolate({ inputRange: [0, 0.15, 0.72, 0.9], outputRange: [1, 0.14, 0.14, 1], extrapolate: 'clamp' });
-  const glowOpacity = run.interpolate({ inputRange: [0, 0.15, 0.72, 0.9], outputRange: [0, 0.42, 0.42, 0], extrapolate: 'clamp' });
+  // The leaf opens first (0→0.15) and holds; the figure waits a beat, then
+  // runs across (0.3→0.66) and through, and the leaf shuts last (0.8→0.94).
+  const leafScale = run.interpolate({ inputRange: [0, 0.15, 0.8, 0.94], outputRange: [1, 0.14, 0.14, 1], extrapolate: 'clamp' });
+  const glowOpacity = run.interpolate({ inputRange: [0, 0.15, 0.8, 0.94], outputRange: [0, 0.42, 0.42, 0], extrapolate: 'clamp' });
 
-  // Figure waits for the door, runs to the threshold, then fades as it crosses.
-  const runnerX = run.interpolate({ inputRange: [0, 0.16, 0.56, 0.68], outputRange: [0, 0, 17, 21], extrapolate: 'clamp' });
-  const runnerOpacity = run.interpolate({ inputRange: [0, 0.16, 0.58, 0.68], outputRange: [1, 1, 1, 0], extrapolate: 'clamp' });
+  // Figure holds a beat after the door opens, then runs and fades through.
+  const runnerX = run.interpolate({ inputRange: [0, 0.3, 0.64, 0.74], outputRange: [0, 0, 17, 21], extrapolate: 'clamp' });
+  const runnerOpacity = run.interpolate({ inputRange: [0, 0.64, 0.74], outputRange: [1, 1, 0], extrapolate: 'clamp' });
   const bob = stride.interpolate({ inputRange: [0, 1], outputRange: [0, -1.3] });
 
   const leafW = 14;
