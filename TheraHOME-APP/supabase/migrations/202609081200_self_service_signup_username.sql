@@ -16,6 +16,7 @@ create or replace function public.username_is_wellformed(p_username text)
 returns boolean
 language sql
 immutable
+set search_path to ''
 as $function$
   select btrim(coalesce(p_username, '')) ~ '^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$';
 $function$;
