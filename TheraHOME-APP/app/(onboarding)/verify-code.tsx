@@ -87,12 +87,12 @@ export default function VerifyCodeScreen() {
         <AuthInput
           icon="shield-check"
           value={code}
-          onChangeText={(value: string) => setCode(value.replace(/[^0-9]/g, '').slice(0, 8))}
+          onChangeText={(value: string) => setCode(value.replace(/[^0-9]/g, '').slice(0, 6))}
           placeholder={t('authCodePlaceholder')}
           keyboardType="number-pad"
           textContentType="oneTimeCode"
           autoComplete="one-time-code"
-          maxLength={8}
+          maxLength={6}
         />
       </View>
       {error ? <Text style={s.error}>{error}</Text> : null}

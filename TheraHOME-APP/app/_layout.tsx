@@ -67,6 +67,14 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const recoveringPassword = useAppStore((state) => state.recoveringPassword);
   const [blockedReason, setBlockedReason] = useState<BlockedReason>(null);
   const [minimumSplashElapsed, setMinimumSplashElapsed] = useState(() => Date.now() - APP_BOOT_TIME >= MIN_SPLASH_MS);
+  // The brand splash is a COLD-LAUNCH cover, not a general "profile is
+  // loading" spinner. Once the first boot has fully settled we latch this,
+  // and never raise the full-screen splash again — so an in-app action that
+  // mints a fresh session (finishing a sign-up, verifying a recovery code,
+  // re-logging in) doesn't flash the splash over the auth screens on its way
+  // to the next one. The onboarding/reset stacks render straight through the
+  // brief profile-load instead (owner report 2026-09-08: "bỏ màn splash").
+  const [initialSplashDone, setInitialSplashDone] = useState(false);
   const lastLoginTouchRef = useRef(0);
 
   useEffect(() => {
@@ -75,6 +83,15 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     const timeout = setTimeout(() => setMinimumSplashElapsed(true), Math.max(remaining, 0));
     return () => clearTimeout(timeout);
   }, [minimumSplashElapsed]);
+
+  // True while the very first boot is still assembling (fonts, the restored
+  // session, that session's profile, and the branded minimum). The gate below
+  // raises the splash only until this settles once; `initialSplashDone` then
+  // stays latched so later profile-loads never re-raise it.
+  const bootLoading = !fontsReady || sessionLoading || profileLoading || !minimumSplashElapsed;
+  useEffect(() => {
+    if (!bootLoading) setInitialSplashDone(true);
+  }, [bootLoading]);
   // Latest reminder settings, read by the AppState 'active' handler below to
   // backfill today's local reminder(s) into the notification center on every
   // foreground — not just when settings/day/language actually change (see
@@ -322,7 +339,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileLanguage, profileLanguageExplicit, profileAccountType, profileCountry, language, setLanguage]);
 
-  if (!fontsReady || sessionLoading || profileLoading || !minimumSplashElapsed) {
+  if (bootLoading && !initialSplashDone) {
     return <AppSplashScreen />;
   }
 
