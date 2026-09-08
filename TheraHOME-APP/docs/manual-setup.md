@@ -171,7 +171,9 @@ two things have to be set in the Supabase dashboard. Until they are, accounts
 can be created but no one receives a code: Supabase's built-in SMTP is capped
 at a couple of messages an hour and only delivers to project members.
 
-**1. Auth → SMTP Settings** — switch on custom SMTP and enter Resend's:
+**1. Authentication → Emails → SMTP Settings** (left sidebar, NOT Project
+Settings — direct link `/dashboard/project/nyjvtvmllwbyfokldgtj/auth/smtp`)
+— switch on custom SMTP and enter Resend's:
 
 | Field | Value |
 |---|---|
@@ -186,7 +188,8 @@ The domain must be verified in Resend first (DNS records), or every message
 is rejected. This step needs the API key, so it is yours to do — the key must
 not pass through the repo or this chat.
 
-**2. Auth → Email Templates** — the default templates send a link, which this
+**2. Authentication → Emails → Templates** (same page, below SMTP) — the
+default templates send a link, which this
 app has no way to receive. Both of these must contain `{{ .Token }}`:
 
 - **Confirm signup** — replace the `{{ .ConfirmationURL }}` anchor with the
