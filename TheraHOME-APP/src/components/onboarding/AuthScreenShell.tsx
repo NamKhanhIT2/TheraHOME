@@ -46,7 +46,7 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
       <>
               <Text style={styles.title}>{creating ? copy.createTitle : copy.signInTitle}</Text>
               <View style={styles.fields}>
-                <AuthInput icon="user" value={username} onChangeText={setUsername} placeholder={creating ? copy.username : copy.identity} textContentType="username" />
+                <AuthInput icon={creating ? 'user' : 'mail'} value={username} onChangeText={setUsername} placeholder={creating ? copy.username : copy.email} keyboardType={creating ? 'default' : 'email-address'} textContentType={creating ? 'username' : 'emailAddress'} />
                 {creating ? <AuthInput icon="mail" value={email} onChangeText={setEmail} placeholder={copy.email} keyboardType="email-address" textContentType="emailAddress" /> : null}
                 <View style={[styles.inputRow, passwordFocused && styles.inputRowFocused]}>
                   <Icon name="lock" size={20} color="#6E84A2" />

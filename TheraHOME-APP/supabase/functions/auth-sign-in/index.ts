@@ -2,13 +2,18 @@
 // registry may reject anonymous manifest fetches during CLI bundling.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-// The sign-in form accepts "email or username", but Supabase Auth only ever
-// authenticates by email. Resolving that here rather than in the app is a
-// deliberate privacy choice: an RPC that answered "which email belongs to
-// this username?" would let anyone walk the user list and harvest addresses.
-// Nothing in the response distinguishes an unknown name from a wrong
-// password, so this endpoint cannot be used to discover who has an account
-// either — both come back as `invalid_credentials`.
+// Resolves a sign-in identifier to an email server-side, so the app never
+// learns which email belongs to a username — an endpoint that answered that
+// would be a list of every customer's address to anyone who asked. A wrong
+// password and an unknown identifier return the identical response, so it
+// cannot be used to discover who has an account either.
+//
+// Username sign-in is for STAFF accounts only (admin, cskh, review, tester,
+// admin_issued) — the web console and the app's TheraHOME-account screen.
+// Customer usernames are display names that may repeat, so they are excluded
+// from the lookup: a customer sharing a staff member's name can never
+// intercept that name's sign-in, and two customers sharing a name never make
+// the lookup ambiguous. Customers sign in by email.
 //
 // The password itself is verified by Supabase Auth, which owns the hashing
 // and its own rate limits. This function never stores or logs it.
@@ -47,19 +52,23 @@ Deno.serve(async (req: Request) => {
   let email = identifier;
 
   if (!identifier.includes('@')) {
+    // Username path: staff only. A customer's (account_type 'normal') username
+    // is a repeatable display name and is deliberately not resolvable here.
     const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
     const { data, error } = await admin
       .from('profiles')
-      .select('email')
+      .select('email, account_type')
       .ilike('username', identifier)
-      .maybeSingle();
+      .neq('account_type', 'normal')
+      .limit(2);
     if (error) {
       console.error('auth-sign-in: username lookup failed', error.message);
       return json({ error: 'server_error' }, 500);
     }
-    // Deliberately the same answer as a wrong password.
-    if (!data?.email) return json({ error: 'invalid_credentials' }, 401);
-    email = data.email;
+    // Zero matches, or the impossible case of two staff sharing a name (the
+    // partial unique index forbids it) — both answer like a wrong password.
+    if (!data || data.length !== 1 || !data[0].email) return json({ error: 'invalid_credentials' }, 401);
+    email = data[0].email;
   }
 
   // A plain anon client, so Supabase Auth applies exactly the same checks and

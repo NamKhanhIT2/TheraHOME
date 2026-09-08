@@ -2094,7 +2094,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      is_username_available: { Args: { p_username: string }; Returns: boolean }
       lookup_order: {
         Args: { p_email?: string; p_phone?: string }
         Returns: {

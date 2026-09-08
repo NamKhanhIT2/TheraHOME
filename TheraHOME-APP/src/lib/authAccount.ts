@@ -57,13 +57,6 @@ function classify(raw: unknown): AuthErrorCode {
   if (message.includes('token has expired') || message.includes('invalid') && message.includes('otp')) return 'otp_invalid';
   if (message.includes('rate limit') || message.includes('too many')) return 'rate_limited';
   if (message.includes('invalid login credentials')) return 'invalid_credentials';
-  // GoTrue swallows the detail of anything the handle_new_user trigger
-  // raises and reports a flat "Database error saving new user", so the
-  // trigger's own `username_taken` never reaches us. The checks in
-  // signUpAccount catch every ordinary case before we get here; what is left
-  // is two people claiming the same name in the same instant, which the
-  // unique index rejects — so name it rather than blaming the network.
-  if (message.includes('database error saving new user')) return 'username_taken';
   return 'unknown';
 }
 
@@ -89,16 +82,11 @@ export function isPasswordStrongEnough(password: string): boolean {
   return password.length >= PASSWORD_MIN_LENGTH;
 }
 
-export async function isUsernameAvailable(username: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('is_username_available', { p_username: username });
-  if (error) throw new AuthError(classify(error));
-  return data === true;
-}
-
 /**
- * Creates the account and asks Supabase to email a confirmation code. The
- * username rides along in user metadata; `handle_new_user` copies it onto the
- * profile and rejects a duplicate with `username_taken`.
+ * Creates the account and, when email confirmation is on, asks Supabase to
+ * email a code. The username rides along in user metadata; `handle_new_user`
+ * copies it onto the profile. It is a customer display name and may repeat,
+ * so nothing here rejects a duplicate.
  */
 export async function signUpAccount({
   username,
@@ -112,11 +100,11 @@ export async function signUpAccount({
   const trimmedEmail = email.trim();
   const trimmedUsername = username.trim();
 
-  // Both checked up front so the person is told while the form is still on
-  // screen, and told which of the two is actually wrong.
+  // A customer's username is a repeatable display name (owner, 2026-09-08),
+  // so only its shape is checked, not whether it is free. Staff-name
+  // uniqueness lives in a partial index, not on this path.
   if (!isUsernameWellFormed(trimmedUsername)) throw new AuthError('username_invalid');
   if (!isPasswordStrongEnough(password)) throw new AuthError('weak_password');
-  if (!(await isUsernameAvailable(trimmedUsername))) throw new AuthError('username_taken');
 
   const { data, error } = await supabase.auth.signUp({
     email: trimmedEmail,
