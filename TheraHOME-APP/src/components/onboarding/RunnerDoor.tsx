@@ -5,9 +5,9 @@ import Svg, { Path, Rect, Line } from 'react-native-svg';
 /**
  * The figure-and-door on the sign-in button (owner reference video,
  * 2026-09-08). At rest a stick figure stands beside a shut single door.
- * While the request is in flight it plays once: the figure runs to the door,
- * the door swings open on its hinge, the figure steps through and fades, and
- * the door swings shut behind them.
+ * While the request is in flight it plays once: the door swings open the
+ * instant the button is pressed, the figure runs across and steps through,
+ * and the door swings shut behind them.
  *
  * Plain react-native `Animated`, the same driver the button's sheen and
  * press-scale use, so the whole thing stays on the native driver.
@@ -47,17 +47,17 @@ export function RunnerDoor({ running, size = 50 }: { running: boolean; size?: nu
     return () => strideLoop.current?.stop();
   }, [running, run, stride]);
 
-  // Figure runs left→right to the threshold, then fades as it crosses.
-  const runnerX = run.interpolate({ inputRange: [0, 0.34, 0.52], outputRange: [0, 17, 21], extrapolate: 'clamp' });
-  const runnerOpacity = run.interpolate({ inputRange: [0, 0.4, 0.52], outputRange: [1, 1, 0], extrapolate: 'clamp' });
-  const bob = stride.interpolate({ inputRange: [0, 1], outputRange: [0, -1.3] });
+  // Order (owner, 2026-09-08): the door opens the instant the button is
+  // pressed, THEN the figure runs across and through, THEN the door shuts.
+  // So the leaf opens first (0→0.15), holds while the figure crosses, and
+  // shuts last (0.72→0.9); the figure only starts running once it is open.
+  const leafScale = run.interpolate({ inputRange: [0, 0.15, 0.72, 0.9], outputRange: [1, 0.14, 0.14, 1], extrapolate: 'clamp' });
+  const glowOpacity = run.interpolate({ inputRange: [0, 0.15, 0.72, 0.9], outputRange: [0, 0.42, 0.42, 0], extrapolate: 'clamp' });
 
-  // Openness: shut → open while crossing → shut again, from one value.
-  // Read straight off `run` in one interpolation each — chaining a second
-  // interpolation off an intermediate value breaks under the native driver,
-  // which is why the leaf never moved before.
-  const leafScale = run.interpolate({ inputRange: [0, 0.3, 0.42, 0.6, 0.86], outputRange: [1, 1, 0.14, 0.14, 1], extrapolate: 'clamp' });
-  const glowOpacity = run.interpolate({ inputRange: [0, 0.3, 0.5, 0.7, 0.86], outputRange: [0, 0, 0.42, 0.42, 0], extrapolate: 'clamp' });
+  // Figure waits for the door, runs to the threshold, then fades as it crosses.
+  const runnerX = run.interpolate({ inputRange: [0, 0.16, 0.56, 0.68], outputRange: [0, 0, 17, 21], extrapolate: 'clamp' });
+  const runnerOpacity = run.interpolate({ inputRange: [0, 0.16, 0.58, 0.68], outputRange: [1, 1, 1, 0], extrapolate: 'clamp' });
+  const bob = stride.interpolate({ inputRange: [0, 1], outputRange: [0, -1.3] });
 
   const leafW = 14;
 
