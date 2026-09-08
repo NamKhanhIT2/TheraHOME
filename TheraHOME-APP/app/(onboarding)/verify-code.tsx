@@ -11,6 +11,7 @@ import {
   verifySignUpCode,
 } from '@/lib/authAccount';
 import { useI18n } from '@/lib/i18n';
+import { useAppStore } from '@/store/useAppStore';
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -25,6 +26,7 @@ const RESEND_COOLDOWN_SECONDS = 30;
 export default function VerifyCodeScreen() {
   const { t } = useI18n();
   const { email = '', purpose = 'signup' } = useLocalSearchParams<{ email?: string; purpose?: 'signup' | 'recovery' }>();
+  const setRecoveringPassword = useAppStore((state) => state.setRecoveringPassword);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,14 +44,20 @@ export default function VerifyCodeScreen() {
     setBusy(true); setError(null); setNotice(null);
     try {
       if (purpose === 'recovery') {
+        // Set BEFORE verifyOtp: it creates a session, and this flag is what
+        // keeps RootNavigator on the reset screen instead of the app shell.
+        setRecoveringPassword(true);
         await verifyRecoveryCode(email, code);
-        router.replace({ pathname: '/reset-password' });
+        router.replace('/reset-password');
       } else {
         await verifySignUpCode(email, code);
         // The session now exists; RootNavigator's guard swaps the stack.
         router.replace('/');
       }
     } catch (reason) {
+      // The flag was set before verifyOtp; a failed code must clear it, or a
+      // later normal sign-in would be pushed onto the reset screen.
+      if (purpose === 'recovery') setRecoveringPassword(false);
       setError(t(reason instanceof AuthError ? authErrorKey(reason.code) : 'connectionError'));
     } finally {
       setBusy(false);

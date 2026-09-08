@@ -64,6 +64,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const updateProfile = useUpdateProfile(userId);
   const language = useAppStore((state) => state.language);
   const setLanguage = useAppStore((state) => state.setLanguage);
+  const recoveringPassword = useAppStore((state) => state.recoveringPassword);
   const [blockedReason, setBlockedReason] = useState<BlockedReason>(null);
   const [minimumSplashElapsed, setMinimumSplashElapsed] = useState(() => Date.now() - APP_BOOT_TIME >= MIN_SPLASH_MS);
   const lastLoginTouchRef = useRef(0);
@@ -362,7 +363,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         {/* Stable cold-launch/deep-link entry. Kept outside every protected
             group so `/` always exists while auth/profile guards switch. */}
         <Stack.Screen name="index" />
-        <Stack.Protected guard={inApp && !isStaffAccount}>
+        <Stack.Protected guard={inApp && !isStaffAccount && !recoveringPassword}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="activate" />
           <Stack.Screen name="day/[dayId]" />
@@ -392,8 +393,15 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         {/* Purely-staff TheraHOME accounts (admin/cskh, no patient program)
             — a dedicated 3-tab shell (Chat/Cộng đồng/Thông báo), not the
             patient (tabs). See CLAUDE.md's CSKH-vs-dual-role-admin note. */}
-        <Stack.Protected guard={inApp && isStaffAccount}>
+        <Stack.Protected guard={inApp && isStaffAccount && !recoveringPassword}>
           <Stack.Screen name="(staff)" />
+        </Stack.Protected>
+        {/* Password reset: verifyOtp('recovery') makes a session, so the guards
+            above would drop the user into the app before they set a new
+            password. This flag holds the reset screen in front until they do,
+            over whatever shell the session would otherwise show. */}
+        <Stack.Protected guard={recoveringPassword}>
+          <Stack.Screen name="reset-password" />
         </Stack.Protected>
         <Stack.Protected guard={!inApp}>
           <Stack.Screen name="(onboarding)" />

@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { AuthLayout, AuthInput, PrimaryAuthButton, authStyles as s } from '@/components/onboarding/AuthScreenShell';
 import { AuthError, authErrorKey, updatePassword } from '@/lib/authAccount';
 import { useI18n } from '@/lib/i18n';
+import { useAppStore } from '@/store/useAppStore';
 
 /**
  * Reached only from a verified recovery code, which is what put a session in
@@ -12,6 +13,7 @@ import { useI18n } from '@/lib/i18n';
  */
 export default function ResetPasswordScreen() {
   const { t } = useI18n();
+  const setRecoveringPassword = useAppStore((state) => state.setRecoveringPassword);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,6 +25,9 @@ export default function ResetPasswordScreen() {
     setBusy(true); setError(null);
     try {
       await updatePassword(password);
+      // Done recovering: clearing this lets RootNavigator show the app shell,
+      // and the user is already signed in from the recovery session.
+      setRecoveringPassword(false);
       // Already signed in as this account, so hand back to the root navigator.
       router.replace('/');
     } catch (reason) {

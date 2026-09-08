@@ -58,6 +58,13 @@ interface AppState {
   // agree before first use). Persisted so it's asked exactly once.
   aiConsentAccepted: boolean;
   acceptAiConsent: () => void;
+  // True from confirming a password-reset code until the new password is
+  // saved. verifyOtp('recovery') creates a live session, which would
+  // otherwise drop the user straight into the app — this keeps the
+  // set-new-password screen in front of them until they finish. Not
+  // persisted: a fresh launch should never resume mid-reset.
+  recoveringPassword: boolean;
+  setRecoveringPassword: (value: boolean) => void;
 }
 
 // Best-effort device-locale detection for the language a brand-new install
@@ -109,6 +116,8 @@ export const useAppStore = create<AppState>()(
 
       aiConsentAccepted: false,
       acceptAiConsent: () => set({ aiConsentAccepted: true }),
+      recoveringPassword: false,
+      setRecoveringPassword: (value) => set({ recoveringPassword: value }),
     }),
     {
       name: 'therahome-app-state',
