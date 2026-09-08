@@ -14,8 +14,13 @@ export default function CreateAccountScreen() {
     if (busy) return;
     setBusy(true); setError(null);
     try {
-      const { email: address } = await signUpAccount({ username, email, password });
-      router.push({ pathname: '/verify-code', params: { email: address, purpose: 'signup' } });
+      const { email: address, needsConfirmation } = await signUpAccount({ username, email, password });
+      // With "Confirm email" off the account already has a live session and
+      // RootNavigator takes it into the app on its own — nothing to do here.
+      // With it on, a code was emailed and has to be entered first.
+      if (needsConfirmation) {
+        router.push({ pathname: '/verify-code', params: { email: address, purpose: 'signup' } });
+      }
     } catch (reason) {
       setError(t(reason instanceof AuthError ? authErrorKey(reason.code) : 'connectionError'));
     } finally {

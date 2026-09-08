@@ -108,7 +108,7 @@ export async function signUpAccount({
   username: string;
   email: string;
   password: string;
-}): Promise<{ email: string }> {
+}): Promise<{ email: string; needsConfirmation: boolean }> {
   const trimmedEmail = email.trim();
   const trimmedUsername = username.trim();
 
@@ -118,13 +118,19 @@ export async function signUpAccount({
   if (!isPasswordStrongEnough(password)) throw new AuthError('weak_password');
   if (!(await isUsernameAvailable(trimmedUsername))) throw new AuthError('username_taken');
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: trimmedEmail,
     password,
     options: { data: { username: trimmedUsername } },
   });
   if (error) throw new AuthError(classify(error));
-  return { email: trimmedEmail };
+
+  // Whether a code has to be entered follows the project's "Confirm email"
+  // setting, read straight off the result rather than hard-coded: with
+  // confirmation OFF, signUp returns a live session and the user is already
+  // in; with it ON, session is null and a code was emailed. The screen
+  // branches on this, so flipping the dashboard toggle needs no app change.
+  return { email: trimmedEmail, needsConfirmation: !data.session };
 }
 
 /** Signs in with either a username or an email. Resolves to `needsOtp` when
