@@ -19,50 +19,55 @@ import Svg, { Path, Rect, Line } from 'react-native-svg';
  * would not render reliably at this size either. The lit interior sits behind
  * it and is revealed as the leaf scales away.
  *
- * `run` is one 0→1 timeline. The door is open only in the middle of it, so a
- * single value both opens and closes it: openness peaks while the figure
- * crosses and is back to zero by the end. Turning `running` off before it
- * finishes (a failed sign-in) rewinds to the figure standing at a shut door.
+ * `run` is one 0→1 timeline played once per press (`playToken`). The door is
+ * open only in the middle of it, so a single value both opens and closes it;
+ * it snaps back to 0 at the end so the next press starts from the resting
+ * frame. Playing on the press, not on a `busy` flag, is what lets it finish
+ * even when the request returns in a few hundred milliseconds.
  */
 const RUN_MS = 1350;
 
-export function RunnerDoor({ running, size = 50 }: { running: boolean; size?: number }) {
+export function RunnerDoor({ playToken, size = 50 }: { playToken: number; size?: number }) {
   const run = useRef(new Animated.Value(0)).current;
   const stride = useRef(new Animated.Value(0)).current;
   const strideLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    if (!running) {
-      strideLoop.current?.stop();
-      stride.setValue(0);
-      Animated.timing(run, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-      return;
-    }
-    Animated.timing(run, { toValue: 1, duration: RUN_MS, easing: Easing.inOut(Easing.quad), useNativeDriver: true }).start();
-    // The legs only pump while the figure is actually running. Gating the
-    // stride with a second animated value chained onto `run` would silently
-    // break under the native driver, so the stride loop is instead started
-    // and stopped by the clock: it stays still through the opening beat, runs
-    // during the crossing, and freezes again as the figure steps through.
+    // playToken starts at 0 (never pressed) — sit still at the door.
+    if (playToken === 0) return;
+    // One full run-through, then snap back to the resting frame so the next
+    // press starts clean. It always runs the whole RUN_MS, so the legs get
+    // their whole stride window regardless of how fast the request returns.
+    run.setValue(0);
+    const anim = Animated.sequence([
+      Animated.timing(run, { toValue: 1, duration: RUN_MS, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(run, { toValue: 0, duration: 1, useNativeDriver: true }),
+    ]);
+    anim.start();
+    // Legs pump only during the crossing (0.3→0.72 of the timeline): still
+    // through the opening beat, running as the figure crosses, still again as
+    // it steps through. Driven by the clock because a second interpolation
+    // chained onto `run` breaks silently under the native driver.
     const startStride = setTimeout(() => {
       strideLoop.current = Animated.loop(
         Animated.sequence([
-          Animated.timing(stride, { toValue: 1, duration: 120, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-          Animated.timing(stride, { toValue: 0, duration: 120, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(stride, { toValue: 1, duration: 115, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(stride, { toValue: 0, duration: 115, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
         ]),
       );
       strideLoop.current.start();
     }, RUN_MS * 0.3);
     const stopStride = setTimeout(() => {
       strideLoop.current?.stop();
-      Animated.timing(stride, { toValue: 0, duration: 90, useNativeDriver: true }).start();
+      stride.setValue(0);
     }, RUN_MS * 0.72);
     return () => {
       clearTimeout(startStride);
       clearTimeout(stopStride);
       strideLoop.current?.stop();
+      anim.stop();
     };
-  }, [running, run, stride]);
+  }, [playToken, run, stride]);
 
   // Order (owner, 2026-09-08): the door opens the instant the button is
   // pressed, THEN the figure runs across and through, THEN the door shuts.

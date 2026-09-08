@@ -112,10 +112,16 @@ export function AuthInput({ icon, ...props }: React.ComponentProps<typeof TextIn
 export function PrimaryAuthButton({ disabled, busy, label, onPress }: { disabled: boolean; busy?: boolean; label: string; onPress?: () => void }) {
   const scale = React.useRef(new Animated.Value(1)).current;
   const sheen = React.useRef(new Animated.Value(0)).current;
+  // Each press bumps this, and RunnerDoor plays one full run-through on the
+  // change. Tying the animation to a press rather than to `busy` means it
+  // always completes — a fast sign-in used to cut it off before the legs
+  // even pumped, so the figure only appeared to slide.
+  const [playToken, setPlayToken] = React.useState(0);
   const animateTo = (value: number) => Animated.spring(scale, { toValue: value, useNativeDriver: true, speed: 30, bounciness: 5 }).start();
   const play = () => {
     sheen.setValue(0);
     Animated.timing(sheen, { toValue: 1, duration: 520, useNativeDriver: true }).start();
+    setPlayToken((token) => token + 1);
     onPress?.();
   };
   const sheenX = sheen.interpolate({ inputRange: [0, 1], outputRange: [-110, 430] });
@@ -128,7 +134,7 @@ export function PrimaryAuthButton({ disabled, busy, label, onPress }: { disabled
         </Svg>
         <Animated.View pointerEvents="none" style={[styles.primarySheen, { transform: [{ translateX: sheenX }, { rotate: '-18deg' }] }]} />
         <Text style={styles.primaryText}>{label}</Text>
-        <View style={styles.primaryStage}><RunnerDoor running={!!busy} size={50} /></View>
+        <View style={styles.primaryStage}><RunnerDoor playToken={playToken} size={50} /></View>
       </Pressable>
     </Animated.View>
   );
