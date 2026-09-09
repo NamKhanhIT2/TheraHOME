@@ -513,13 +513,16 @@ export default function QuestionsScreen() {
           <View style={[styles.goalHero, { minHeight: isCompactGoal ? 116 : 158 }]}>
             <View style={styles.goalHeroCopy}>
               <Text
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+                numberOfLines={3}
                 style={[
                   styles.goalTitle,
                   {
                     color: '#0B2D5E',
                     fontFamily: theme.fontFamily.bold,
-                    fontSize: isCompactGoal ? 26 : 31,
-                    lineHeight: isCompactGoal ? 31 : 37,
+                    fontSize: isCompactGoal ? 24 : 28,
+                    lineHeight: isCompactGoal ? 29 : 34,
                   },
                 ]}
               >
@@ -669,8 +672,8 @@ export default function QuestionsScreen() {
                   {
                     color: '#102D59',
                     fontFamily: theme.fontFamily.bold,
-                    fontSize: isCompactTension ? 24 : 29,
-                    lineHeight: isCompactTension ? 30 : 36,
+                    fontSize: isCompactTension ? 22 : 26,
+                    lineHeight: isCompactTension ? 28 : 32,
                   },
                 ]}
               >
@@ -834,8 +837,8 @@ export default function QuestionsScreen() {
                   {
                     color: '#102D59',
                     fontFamily: theme.fontFamily.bold,
-                    fontSize: isCompactEditorial ? 24 : 29,
-                    lineHeight: isCompactEditorial ? 30 : 36,
+                    fontSize: isCompactEditorial ? 22 : 26,
+                    lineHeight: isCompactEditorial ? 28 : 32,
                   },
                 ]}
               >
@@ -1010,8 +1013,8 @@ export default function QuestionsScreen() {
                   {
                     color: '#102D59',
                     fontFamily: theme.fontFamily.bold,
-                    fontSize: isCompactAge ? 27 : 32,
-                    lineHeight: isCompactAge ? 33 : 39,
+                    fontSize: isCompactAge ? 25 : 28,
+                    lineHeight: isCompactAge ? 31 : 34,
                   },
                 ]}
               >
@@ -1152,8 +1155,8 @@ export default function QuestionsScreen() {
                       {
                         color: '#102D59',
                         fontFamily: theme.fontFamily.bold,
-                        fontSize: isCompactLifestyle ? 19 : 22,
-                        lineHeight: isCompactLifestyle ? 23 : 27,
+                        fontSize: isCompactLifestyle ? 18 : 20,
+                        lineHeight: isCompactLifestyle ? 22 : 24,
                       },
                     ]}
                   >
@@ -1174,8 +1177,8 @@ export default function QuestionsScreen() {
                     {
                       color: '#102D59',
                       fontFamily: theme.fontFamily.bold,
-                      fontSize: isCompactLifestyle ? 23 : 29,
-                      lineHeight: isCompactLifestyle ? 28 : 35,
+                      fontSize: isCompactLifestyle ? 22 : 26,
+                      lineHeight: isCompactLifestyle ? 27 : 32,
                     },
                   ]}
                 >
