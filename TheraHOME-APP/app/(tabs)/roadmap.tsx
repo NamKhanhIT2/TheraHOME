@@ -23,6 +23,7 @@ import { PathNode } from '@/components/PathNode';
 import { PhaseFooter } from '@/components/roadmap/PhaseFooter';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
+import { IAP_ENABLED } from '@/lib/features';
 import { useI18n } from '@/lib/i18n';
 import { useAppStore } from '@/store/useAppStore';
 import { useTabFocusFade } from '@/hooks/useTabFocusFade';
@@ -138,6 +139,9 @@ export default function RoadmapScreen() {
   const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
   const purchasesQuery = usePhasePurchases(userId);
   const lockedPhaseIds = useMemo(() => {
+    // IAP is off for now — never lock a phase, so the paywall/purchase card is
+    // unreachable and StoreKit is never opened (see IAP_ENABLED).
+    if (!IAP_ENABLED) return new Set<string>();
     const requirements = lockRequirementsQuery.data;
     const purchased = purchasesQuery.data;
     if (!requirements) return new Set<string>();

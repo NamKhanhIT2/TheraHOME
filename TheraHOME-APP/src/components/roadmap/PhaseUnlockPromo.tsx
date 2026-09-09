@@ -7,6 +7,7 @@ import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { ExternalLinkModal } from '@/components/ExternalLinkModal';
 import { usePhasePromo } from '@/hooks/usePhasePromo';
+import { IAP_ENABLED } from '@/lib/features';
 import { useI18n } from '@/lib/i18n';
 
 export interface PhaseUnlockPromoProps {
@@ -52,7 +53,9 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
   // store product exists — an apple-only phase must not dangle a dead
   // paywall on Android (and vice versa).
   const platformProductId = Platform.OS === 'android' ? promo.googleProductId : promo.appleProductId;
-  const hasUnlock = !unlocked && !!platformProductId;
+  // IAP off (see IAP_ENABLED): never surface the unlock/purchase card, so the
+  // StoreKit-backed button below never mounts. Cross-sell (non-IAP) still shows.
+  const hasUnlock = IAP_ENABLED && !unlocked && !!platformProductId;
   if (!hasCrossSell && !hasUnlock) return null;
 
   return (
