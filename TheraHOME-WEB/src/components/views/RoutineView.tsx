@@ -841,9 +841,16 @@ export function RoutineView() {
             </GhostBtn>
           </div>
           <div style={{ borderTop: "1px solid var(--divider)", marginTop: 6, paddingTop: 14 }} />
-          <FieldLabel>Dụng cụ hỗ trợ (tuỳ chọn)</FieldLabel>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <FieldLabel>Dụng cụ hỗ trợ (tuỳ chọn)</FieldLabel>
+            {supportToolsUrl[dayMarketTab].trim() || supportToolsLabel[dayMarketTab].trim() ? (
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1E9E5E" }}>● Đang bật ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</span>
+            ) : (
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-muted)" }}>○ Đang ẩn ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</span>
+            )}
+          </div>
           <div style={{ marginBottom: 10, fontSize: 12, color: "var(--text-muted)" }}>
-            Để trống <b>Link dụng cụ hỗ trợ</b> là app tự <b>ẩn</b> nút này ở màn ngày tập (theo từng thị trường). Dùng nút &quot;Xoá&quot; bên dưới để xoá nhanh.
+            Nhập <b>Tên + Link</b> rồi bấm <b>Lưu thay đổi</b> để thêm/sửa. Để trống <b>Link</b> (hoặc bấm <b>Xoá</b>) là app tự <b>ẩn</b> nút này ở màn ngày tập — theo từng thị trường.
           </div>
           <FieldLabel>Tên dụng cụ hỗ trợ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
           <input
@@ -879,18 +886,22 @@ export function RoutineView() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <GhostBtn
               color="var(--error)"
+              disabled={!(supportToolsUrl[dayMarketTab].trim() || supportToolsLabel[dayMarketTab].trim())}
               onClick={() => {
                 setSupportToolsLabel((v) => ({ ...v, [dayMarketTab]: "" }));
                 setSupportToolsUrl((v) => ({ ...v, [dayMarketTab]: "" }));
+                pushToast('Đã xoá dụng cụ — bấm "Lưu thay đổi" để áp dụng');
               }}
             >
               Xoá dụng cụ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})
             </GhostBtn>
             <GhostBtn
               color="var(--error)"
+              disabled={![supportToolsUrl.vn, supportToolsUrl.us, supportToolsUrl.malay, supportToolsLabel.vn, supportToolsLabel.us, supportToolsLabel.malay].some((s) => s.trim())}
               onClick={() => {
                 setSupportToolsLabel(EMPTY_MARKET_CONTENT);
                 setSupportToolsUrl(EMPTY_MARKET_CONTENT);
+                pushToast('Đã xoá dụng cụ ở cả 3 thị trường — bấm "Lưu thay đổi" để áp dụng');
               }}
             >
               Xoá ở cả 3 thị trường
