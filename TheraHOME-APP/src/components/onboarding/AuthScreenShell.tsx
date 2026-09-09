@@ -53,7 +53,12 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
                     report 2026-09-09). Turn autofill off here. sign-in keeps
                     emailAddress so the OS can still offer the saved email. */}
                 <AuthInput icon={creating ? 'user' : 'mail'} value={username} onChangeText={setUsername} placeholder={creating ? copy.username : copy.email} keyboardType={creating ? 'default' : 'email-address'} textContentType={creating ? 'none' : 'emailAddress'} autoComplete={creating ? 'off' : 'email'} importantForAutofill="no" />
-                {creating ? <AuthInput icon="mail" value={email} onChangeText={setEmail} placeholder={copy.email} keyboardType="email-address" textContentType="emailAddress" /> : null}
+                {/* Autofill off on create too: with a username/email field
+                    advertising an account name, iOS paired it against the
+                    password field and popped the "suggested username" strip
+                    over the form (owner report 2026-09-09). The keyboard stays
+                    email-address; only the autofill semantic is dropped. */}
+                {creating ? <AuthInput icon="mail" value={email} onChangeText={setEmail} placeholder={copy.email} keyboardType="email-address" textContentType="none" autoComplete="off" importantForAutofill="no" /> : null}
                 <View style={[styles.inputRow, passwordFocused && styles.inputRowFocused]}>
                   <Icon name="lock" size={20} color="#6E84A2" />
                   <TextInput value={password} onChangeText={setPassword} onFocus={() => setPasswordFocused(true)} onBlur={() => setPasswordFocused(false)} placeholder={copy.password} placeholderTextColor="#8292AA" secureTextEntry={!showPassword} textContentType={creating ? 'newPassword' : 'password'} autoCapitalize="none" style={styles.input} />
