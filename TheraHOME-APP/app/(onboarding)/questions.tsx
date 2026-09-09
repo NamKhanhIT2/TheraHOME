@@ -12,7 +12,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useOnboardingContent } from '@/hooks/useOnboardingContent';
 import { useAppStore, type AnswerValue } from '@/store/useAppStore';
@@ -332,6 +332,26 @@ export default function QuestionsScreen() {
     ambientLoop.start();
     return () => ambientLoop.stop();
   }, [ambientAnim, assetsReady, reduceMotion]);
+
+  // The last question pushes /consent after fading the content out
+  // (contentAnim → 0) and setting isTransitioning. Pressing back from there
+  // returns focus here with qIndex unchanged, so the per-question entrance
+  // effect below never re-runs and the screen was left blank with a dead
+  // Continue button (owner report 2026-09-09). Restore the resting state on
+  // any focus AFTER the first — the first focus is the normal mount, where the
+  // entrance animation should play instead.
+  const firstFocusRef = useRef(true);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (firstFocusRef.current) {
+        firstFocusRef.current = false;
+        return;
+      }
+      contentAnim.setValue(1);
+      optionAnims.forEach((animation) => animation.setValue(1));
+      setIsTransitioning(false);
+    }, [contentAnim, optionAnims]),
+  );
 
   useEffect(() => {
     if (!assetsReady) return;
