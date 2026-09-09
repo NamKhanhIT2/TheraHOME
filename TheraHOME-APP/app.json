@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ai.therahome",
-      "buildNumber": "17",
+      "buildNumber": "18",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "ai.therahome",
-      "versionCode": 1,
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0169ED",
