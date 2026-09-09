@@ -837,8 +837,8 @@ export default function QuestionsScreen() {
                   {
                     color: '#102D59',
                     fontFamily: theme.fontFamily.bold,
-                    fontSize: isCompactEditorial ? 22 : 26,
-                    lineHeight: isCompactEditorial ? 28 : 32,
+                    fontSize: isCompactEditorial ? 20 : 23,
+                    lineHeight: isCompactEditorial ? 26 : 29,
                   },
                 ]}
               >
@@ -954,7 +954,7 @@ export default function QuestionsScreen() {
                         fontFamily: theme.fontFamily.semiBold,
                         fontSize: isCompactEditorial ? 13.5 : 15.5,
                         lineHeight: isCompactEditorial ? 17.5 : 20,
-                        paddingRight: artSize - 14,
+                        paddingRight: artSize + 4,
                       },
                     ]}
                   >
