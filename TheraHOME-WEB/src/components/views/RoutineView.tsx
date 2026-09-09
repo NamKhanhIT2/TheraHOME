@@ -21,7 +21,7 @@ import { fetchRoutineProducts, fetchStoreCategories, createRoutineProduct, updat
   renumberProgramDays,
   type RoadmapReadiness,
 } from "@/lib/db";
-import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, PillTabs, MarketSelect } from "@/components/ui/primitives";
+import { SectionCard, GhostBtn, PrimaryBtn, Badge, FieldLabel, inputStyle, MarketSelect } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { HeaderAccessory } from "@/components/shell/HeaderAccessory";
@@ -824,9 +824,8 @@ export function RoutineView() {
             ))}
           </div>
           <FieldLabel>Nội dung theo thị trường</FieldLabel>
-          <PillTabs options={MARKET_TABS} value={dayMarketTab} onChange={setDayMarketTab} />
-          <div style={{ marginBottom: 8, fontSize: 12, color: "var(--text-muted)" }}>
-            Mỗi thị trường lưu riêng — có thể chỉ điền VN. Thị trường bỏ trống sẽ hiện trong bảng &quot;Thiếu video&quot;.
+          <div style={{ marginBottom: 10, fontSize: 12, color: "var(--text-muted)" }}>
+            Đang sửa cho thị trường <b>{MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]}</b> — đổi ở ô <b>Thị trường</b> phía trên. Mỗi thị trường lưu riêng (có thể chỉ điền VN); dùng nút &quot;Dùng cho cả 3 thị trường&quot; để áp cho tất cả. Thị trường bỏ trống sẽ hiện trong bảng &quot;Thiếu video&quot;.
           </div>
           <FieldLabel>Link video ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
           <input
@@ -910,7 +909,7 @@ export function RoutineView() {
         </Modal>
       ) : null}
       {phaseContentTarget ? (
-        <PhaseContentModal phase={phaseContentTarget} productId={product.id} onClose={() => setPhaseContentTarget(null)} />
+        <PhaseContentModal phase={phaseContentTarget} productId={product.id} market={viewMarket} onClose={() => setPhaseContentTarget(null)} />
       ) : null}
       {publishAction ? (
         <ConfirmModal

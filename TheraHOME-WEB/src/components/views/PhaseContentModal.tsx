@@ -30,6 +30,12 @@ import { translateDrafts } from "@/lib/translate";
 
 type ContentTab = "quiz" | "promo" | "suggest";
 type QuizLangKey = "vi" | "en" | "ms";
+
+// The whole modal follows the outer "Thị trường" selector (RoutineView) — no
+// second per-tab language filter. A market maps 1:1 to the content language.
+type Market = "vn" | "us" | "malay";
+const MARKET_TO_LANG: Record<Market, QuizLangKey> = { vn: "vi", us: "en", malay: "ms" };
+const MARKET_LABEL: Record<Market, string> = { vn: "VN", us: "UK", malay: "ML" };
 const QUIZ_LANG_TABS: Array<[QuizLangKey, string]> = [["vi", "VN"], ["en", "EN"], ["ms", "MS"]];
 const EMPTY_QUIZ_LANGUAGE: QuizLanguageContent = { question: "", options: ["", "", "", ""], correctIndex: 0 };
 
@@ -37,9 +43,9 @@ function emptyDraft(sortOrder: number): QuizQuestionAdmin {
   return { id: "", sortOrder, vi: { ...EMPTY_QUIZ_LANGUAGE, options: [...EMPTY_QUIZ_LANGUAGE.options] }, en: { ...EMPTY_QUIZ_LANGUAGE, options: [...EMPTY_QUIZ_LANGUAGE.options] }, ms: { ...EMPTY_QUIZ_LANGUAGE, options: [...EMPTY_QUIZ_LANGUAGE.options] } };
 }
 
-function QuestionEditor({ draft, onChange, onCancel, onSave, saving }: { draft: QuizQuestionAdmin; onChange: (d: QuizQuestionAdmin) => void; onCancel: () => void; onSave: () => void; saving: boolean }) {
-  const [lang, setLang] = useState<QuizLangKey>("vi");
+function QuestionEditor({ draft, lang, onChange, onCancel, onSave, saving }: { draft: QuizQuestionAdmin; lang: QuizLangKey; onChange: (d: QuizQuestionAdmin) => void; onCancel: () => void; onSave: () => void; saving: boolean }) {
   const content = draft[lang];
+  const langLabel = QUIZ_LANG_TABS.find(([k]) => k === lang)?.[1] ?? "VN";
 
   function updateContent(patch: Partial<QuizLanguageContent>) {
     onChange({ ...draft, [lang]: { ...content, ...patch } });
@@ -75,9 +81,13 @@ function QuestionEditor({ draft, onChange, onCancel, onSave, saving }: { draft: 
 
   return (
     <div style={{ background: "var(--bg-card-alt)", borderRadius: 12, padding: 16, marginBottom: 12 }}>
-      <PillTabs options={QUIZ_LANG_TABS} value={lang} onChange={setLang} />
-      <div style={{ marginTop: 10 }}>
-        <FieldLabel>Câu hỏi</FieldLabel>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+        {lang === "vi"
+          ? "Soạn câu hỏi bằng bản VN (gốc) — bản EN/MS sẽ tự dịch khi lưu."
+          : `Đang sửa bản ${langLabel} (chỉnh lại bản dịch tự động). Để trống = dùng bản VN.`}
+      </div>
+      <div>
+        <FieldLabel>Câu hỏi ({langLabel})</FieldLabel>
         <input value={content.question} onChange={(e) => updateContent({ question: e.target.value })} style={{ ...inputStyle, marginBottom: 12 }} placeholder="Nhập nội dung câu hỏi..." />
         <FieldLabel>Các lựa chọn trả lời (khảo sát/đánh giá — không có đáp án đúng/sai)</FieldLabel>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
@@ -104,7 +114,7 @@ function QuestionEditor({ draft, onChange, onCancel, onSave, saving }: { draft: 
   );
 }
 
-function QuizTab({ phaseId }: { phaseId: string }) {
+function QuizTab({ phaseId, lang }: { phaseId: string; lang: QuizLangKey }) {
   const [questions, setQuestions] = useState<QuizQuestionAdmin[] | null>(null);
   const [draft, setDraft] = useState<QuizQuestionAdmin | null>(null);
   const [saving, setSaving] = useState(false);
@@ -189,7 +199,7 @@ function QuizTab({ phaseId }: { phaseId: string }) {
       {questions.map((q, i) => (
         <Fragment key={q.id}>
           {draft?.id === q.id ? (
-            <QuestionEditor draft={draft} onChange={setDraft} onCancel={() => setDraft(null)} onSave={handleSave} saving={saving} />
+            <QuestionEditor draft={draft} lang={lang} onChange={setDraft} onCancel={() => setDraft(null)} onSave={handleSave} saving={saving} />
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, background: "#fff", boxShadow: "var(--shadow-card)", marginBottom: 8 }}>
               <div style={{ flex: 1, fontSize: 13.5, color: "var(--text-primary)" }}>
@@ -206,7 +216,9 @@ function QuizTab({ phaseId }: { phaseId: string }) {
         </Fragment>
       ))}
       {draft && !draft.id ? (
-        <QuestionEditor draft={draft} onChange={setDraft} onCancel={() => setDraft(null)} onSave={handleSave} saving={saving} />
+        // A new question is authored in VN (the required base); EN/MS are
+        // auto-drafted on save regardless of the market being viewed.
+        <QuestionEditor draft={draft} lang="vi" onChange={setDraft} onCancel={() => setDraft(null)} onSave={handleSave} saving={saving} />
       ) : (
         <GhostBtn onClick={() => setDraft(emptyDraft(questions.length))}>+ Thêm câu hỏi</GhostBtn>
       )}
@@ -215,14 +227,12 @@ function QuizTab({ phaseId }: { phaseId: string }) {
 }
 
 type PromoLangTab = "vi" | "en" | "ms";
-const PROMO_LANG_TABS: Array<[PromoLangTab, string]> = [["vi", "VN"], ["en", "EN"], ["ms", "MS"]];
 /** Fields editable per language (text/urls). Images + Apple/Google Product
  * IDs are shared across languages and only shown on the VN tab. */
 type PromoTextKey = keyof PhasePromoTranslation;
 
-function PromoTab({ phaseId, productId, phaseRange }: { phaseId: string; productId: string; phaseRange: [number, number] }) {
+function PromoTab({ phaseId, productId, phaseRange, lang }: { phaseId: string; productId: string; phaseRange: [number, number]; lang: PromoLangTab }) {
   const [promo, setPromo] = useState<PhasePromoAdmin | null>(null);
-  const [langTab, setLangTab] = useState<PromoLangTab>("vi");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"cross-sell" | "unlock" | null>(null);
 
@@ -238,18 +248,18 @@ function PromoTab({ phaseId, productId, phaseRange }: { phaseId: string; product
   // the translations overrides (empty override = mobile falls back to VN).
   function getText(key: PromoTextKey): string {
     if (!promo) return "";
-    return langTab === "vi" ? promo[key] : promo.translations[langTab][key];
+    return lang === "vi" ? promo[key] : promo.translations[lang][key];
   }
   function setText(key: PromoTextKey, value: string) {
     setPromo((p) => {
       if (!p) return p;
-      if (langTab === "vi") return { ...p, [key]: value };
-      return { ...p, translations: { ...p.translations, [langTab]: { ...p.translations[langTab], [key]: value } } };
+      if (lang === "vi") return { ...p, [key]: value };
+      return { ...p, translations: { ...p.translations, [lang]: { ...p.translations[lang], [key]: value } } };
     });
   }
   function hint(key: PromoTextKey, viPlaceholder?: string): string | undefined {
     if (!promo) return viPlaceholder;
-    if (langTab === "vi") return viPlaceholder;
+    if (lang === "vi") return viPlaceholder;
     const viValue = promo[key].trim();
     return viValue ? `VN: ${viValue.split("\n")[0]}` : "Để trống = dùng bản VN";
   }
@@ -326,14 +336,13 @@ function PromoTab({ phaseId, productId, phaseRange }: { phaseId: string; product
 
   if (!promo) return <div style={{ color: "var(--text-secondary)", padding: 10 }}>Đang tải...</div>;
 
-  const isVi = langTab === "vi";
+  const isVi = lang === "vi";
 
   return (
     <div>
-      <PillTabs options={PROMO_LANG_TABS} value={langTab} onChange={setLangTab} />
       {!isVi ? (
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12, marginTop: -6 }}>
-          Tab {langTab === "en" ? "EN" : "MS"} phục vụ hai việc: chữ hiển thị cho người dùng đặt ngôn ngữ {langTab === "en" ? "tiếng Anh" : "tiếng Malay"}, VÀ giá + link mua cho khách thuộc thị trường {langTab === "en" ? "UK" : "ML"} (giá/link đi theo QUỐC GIA của khách, không theo ngôn ngữ app). Trường nào để trống, app sẽ dùng bản VN. Ảnh và Apple/Google Product ID dùng chung — chỉnh ở tab VN.
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+          Đang sửa cho thị trường {lang === "en" ? "UK" : "ML"}: chữ hiển thị cho người dùng đặt ngôn ngữ {lang === "en" ? "tiếng Anh" : "tiếng Malay"}, VÀ giá + link mua cho khách thuộc thị trường {lang === "en" ? "UK" : "ML"} (giá/link đi theo QUỐC GIA của khách). Trường nào để trống, app dùng bản VN. Ảnh và Apple/Google Product ID dùng chung — chỉnh ở thị trường VN.
         </div>
       ) : null}
       {isVi ? (
@@ -448,10 +457,9 @@ const emptyConfigRow = (key: string): AppConfigRow => ({ key, valueVi: "", value
  * Content is GLOBAL (app_config, shared by every phase) — the note says so —
  * with two parts: a title and a body. Kept here (not in "Nội dung ứng dụng")
  * because this is where staff manage the survey, so it's where they look. */
-function SuggestTab() {
+function SuggestTab({ lang }: { lang: SuggestLang }) {
   const [title, setTitle] = useState<AppConfigRow | null>(null);
   const [body, setBody] = useState<AppConfigRow | null>(null);
-  const [lang, setLang] = useState<SuggestLang>("vi");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -491,10 +499,9 @@ function SuggestTab() {
         Màn <b>&quot;Gợi ý từ TheraHOME&quot;</b> hiện ra sau khi người dùng gửi khảo sát (và khi mở lại khảo sát đã trả lời).{" "}
         <b>Dùng chung cho mọi giai đoạn</b> — sửa ở đây áp dụng cho tất cả khảo sát.
       </div>
-      <PillTabs options={SUGGEST_LANG_TABS} value={lang} onChange={setLang} />
       {lang !== "vi" ? (
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12, marginTop: -6 }}>
-          Để trống = dùng bản VN.
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+          Đang sửa bản {langLabel}. Để trống = dùng bản VN.
         </div>
       ) : null}
       <div style={{ marginTop: 10 }}>
@@ -518,12 +525,13 @@ function SuggestTab() {
   );
 }
 
-export function PhaseContentModal({ phase, productId, onClose }: { phase: ProgramPhase; productId: string; onClose: () => void }) {
+export function PhaseContentModal({ phase, productId, market, onClose }: { phase: ProgramPhase; productId: string; market: Market; onClose: () => void }) {
   const [tab, setTab] = useState<ContentTab>("quiz");
+  const lang = MARKET_TO_LANG[market];
 
   return (
     <Modal title={"Khảo sát & Upsell · " + phase.name} onClose={onClose} width={520} footer={<GhostBtn onClick={onClose}>Đóng</GhostBtn>}>
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 12 }}>
         <PillTabs
           options={[
             ["quiz", "Câu hỏi khảo sát"],
@@ -534,12 +542,15 @@ export function PhaseContentModal({ phase, productId, onClose }: { phase: Progra
           onChange={setTab}
         />
       </div>
+      <div style={{ marginBottom: 14, fontSize: 12, color: "var(--text-secondary)", background: "var(--bg-card-alt)", borderRadius: 8, padding: "8px 10px" }}>
+        Đang sửa nội dung cho thị trường <b>{MARKET_LABEL[market]}</b> — đổi ở ô <b>Thị trường</b> trên trang Lộ trình.
+      </div>
       {tab === "quiz" ? (
-        <QuizTab phaseId={phase.id} />
+        <QuizTab phaseId={phase.id} lang={lang} />
       ) : tab === "suggest" ? (
-        <SuggestTab />
+        <SuggestTab lang={lang} />
       ) : (
-        <PromoTab phaseId={phase.id} productId={productId} phaseRange={phase.range} />
+        <PromoTab phaseId={phase.id} productId={productId} phaseRange={phase.range} lang={lang} />
       )}
     </Modal>
   );
