@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
@@ -91,24 +91,26 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, enabled, lo
 
   if (collapsed) return null;
 
+  // Already answered: the survey is done once, so tapping this row re-opens
+  // the "Gợi ý từ TheraHOME" screen (the quiz screen shows the suggestion,
+  // not the questions, once an attempt exists) — per explicit request.
   return (
-    <Fragment>
-      {(
-        <View style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, marginBottom: 0 }]}>
-          <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-            <Icon name="clipboard-check" size={19} color={theme.colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('quizTitle')}</Text>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>{phaseName}</Text>
-          </View>
-          <View style={[styles.doneBadge, { backgroundColor: theme.colors.successTint }]}>
-            <Icon name="check" size={13} color={theme.colors.success} />
-            <Text style={[theme.type.captionSm, { color: theme.colors.success, fontFamily: theme.fontFamily.semiBold }]}>{t('quizCompleted')}</Text>
-          </View>
-        </View>
-      )}
-    </Fragment>
+    <Pressable
+      onPress={() => router.push({ pathname: '/quiz/[phaseId]', params: { phaseId, productId, phaseName } })}
+      style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, marginBottom: 0 }]}
+    >
+      <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
+        <Icon name="clipboard-check" size={19} color={theme.colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('quizTitle')}</Text>
+        <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>{phaseName}</Text>
+      </View>
+      <View style={[styles.doneBadge, { backgroundColor: theme.colors.successTint }]}>
+        <Icon name="check" size={13} color={theme.colors.success} />
+        <Text style={[theme.type.captionSm, { color: theme.colors.success, fontFamily: theme.fontFamily.semiBold }]}>{t('quizCompleted')}</Text>
+      </View>
+    </Pressable>
   );
 }
 

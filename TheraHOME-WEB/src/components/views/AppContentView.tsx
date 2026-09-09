@@ -5,7 +5,7 @@
 // video meant a code change plus a store release. Saving here takes effect on
 // every install within a few minutes (mobile caches for 5 minutes; see
 // TheraHOME-APP/src/hooks/useAppConfig.ts), no new build required.
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { SectionCard, PrimaryBtn, FieldLabel, inputStyle } from "@/components/ui/primitives";
 import { pushToast } from "@/components/ui/Toast";
 import { fetchAppConfig, saveAppConfig, type AppConfigRow } from "@/lib/db";
@@ -13,7 +13,7 @@ import { fetchAppConfig, saveAppConfig, type AppConfigRow } from "@/lib/db";
 /** Human labels + help text per key. A key present in the DB but missing
  * here still renders (raw key as the label), so adding a row server-side
  * never leaves it uneditable. */
-const FIELD_META: Record<string, { label: string; help: string; localized: boolean; placeholder?: string }> = {
+const FIELD_META: Record<string, { label: string; help: string; localized: boolean; placeholder?: string; multiline?: boolean }> = {
   support_hotline: {
     label: "Số hotline (để trống = ẨN mục hotline trong app)",
     help:
@@ -39,6 +39,20 @@ const FIELD_META: Record<string, { label: string; help: string; localized: boole
     help: "Nút nằm cạnh 'Bắt đầu hôm nay' trên Trang chủ. Có thể đặt link riêng cho từng thị trường.",
     localized: true,
     placeholder: "https://www.youtube.com/watch?v=...",
+  },
+  survey_suggestion_title: {
+    label: 'Gợi ý sau khảo sát — Tiêu đề',
+    help:
+      "Màn 'Gợi ý từ TheraHOME' hiện ra sau khi người dùng gửi bài khảo sát giai đoạn (và khi họ mở lại một khảo sát đã trả lời). Đây là dòng tiêu đề.",
+    localized: true,
+    placeholder: "Gợi ý từ TheraHOME",
+  },
+  survey_suggestion_body: {
+    label: 'Gợi ý sau khảo sát — Nội dung',
+    help: "Đoạn nội dung hiển thị dưới tiêu đề ở màn gợi ý. Có thể viết nhiều dòng.",
+    localized: true,
+    multiline: true,
+    placeholder: "Lời khuyên / gợi ý cho người dùng sau khi hoàn thành khảo sát...",
   },
 };
 
@@ -86,37 +100,40 @@ export function AppContentView() {
       </div>
       {rows.map((row) => {
         const meta = FIELD_META[row.key];
+        const multiline = meta?.multiline === true;
+        const textareaStyle = { ...inputStyle, minHeight: 108, lineHeight: 1.5, resize: "vertical" as const, fontFamily: "inherit", paddingTop: 10, paddingBottom: 10 };
+        const renderField = (
+          value: string,
+          onChange: (v: string) => void,
+          placeholder: string | undefined,
+          extraStyle?: CSSProperties,
+        ) =>
+          multiline ? (
+            <textarea
+              value={value}
+              placeholder={placeholder}
+              onChange={(e) => onChange(e.target.value)}
+              style={{ ...textareaStyle, ...extraStyle }}
+            />
+          ) : (
+            <input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, ...extraStyle }} />
+          );
         return (
           <div key={row.key} style={{ paddingBottom: 18, marginBottom: 18, borderBottom: "1px solid var(--divider)" }}>
             <FieldLabel>{meta?.label ?? row.key}</FieldLabel>
             {meta?.help ? (
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>{meta.help}</div>
             ) : null}
-            <input
-              value={row.valueVi}
-              placeholder={meta?.placeholder}
-              onChange={(e) => update(row.key, { valueVi: e.target.value })}
-              style={{ ...inputStyle, marginBottom: meta?.localized ? 10 : 0 }}
-            />
+            {renderField(row.valueVi, (v) => update(row.key, { valueVi: v }), meta?.placeholder, { marginBottom: meta?.localized ? 10 : 0 })}
             {meta?.localized !== false ? (
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{ flex: 1 }}>
                   <FieldLabel>Bản UK (để trống = dùng bản VN)</FieldLabel>
-                  <input
-                    value={row.valueEn}
-                    placeholder={row.valueVi}
-                    onChange={(e) => update(row.key, { valueEn: e.target.value })}
-                    style={inputStyle}
-                  />
+                  {renderField(row.valueEn, (v) => update(row.key, { valueEn: v }), row.valueVi)}
                 </div>
                 <div style={{ flex: 1 }}>
                   <FieldLabel>Bản ML (để trống = dùng bản VN)</FieldLabel>
-                  <input
-                    value={row.valueMs}
-                    placeholder={row.valueVi}
-                    onChange={(e) => update(row.key, { valueMs: e.target.value })}
-                    style={inputStyle}
-                  />
+                  {renderField(row.valueMs, (v) => update(row.key, { valueMs: v }), row.valueVi)}
                 </div>
               </div>
             ) : null}

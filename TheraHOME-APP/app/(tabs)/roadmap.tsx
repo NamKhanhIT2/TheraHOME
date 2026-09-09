@@ -1,6 +1,6 @@
-import React, { Fragment, useEffect, useMemo, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
@@ -21,6 +21,7 @@ import { ProductActivateCard } from '@/components/roadmap/ProductActivateCard';
 import { PhaseUnlockPromo } from '@/components/roadmap/PhaseUnlockPromo';
 import { PathNode } from '@/components/PathNode';
 import { PhaseFooter } from '@/components/roadmap/PhaseFooter';
+import { SurveyPromptModal } from '@/components/roadmap/SurveyPromptModal';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
 import { IAP_ENABLED } from '@/lib/features';
@@ -216,6 +217,39 @@ export default function RoadmapScreen() {
     return nextPhase;
   }, [days, lockedPhaseIds, phaseAllDone, quizResolvedQuery.data, isReviewAccount]);
 
+  // The phase whose survey is now DUE: its last day has unlocked on the
+  // calendar (e.g. day 7 for phase 1), it isn't behind the IAP paywall, and
+  // this user has a survey for it they haven't answered yet. Picks the
+  // earliest such phase. Review accounts are never nagged — they get no
+  // day/survey gating at all (see isReviewAccount).
+  const dueSurveyPhase = useMemo(() => {
+    if (isReviewAccount || !program) return null;
+    const phaseLastDay = new Map<string, { name: string; lastDay: number }>();
+    for (const d of days) {
+      if (lockedPhaseIds.has(d.phaseId)) continue;
+      const cur = phaseLastDay.get(d.phaseId);
+      if (!cur || d.id > cur.lastDay) phaseLastDay.set(d.phaseId, { name: d.phase, lastDay: d.id });
+    }
+    for (const [phaseId, info] of phaseLastDay) {
+      // quizResolvedQuery === false means "has a survey AND not yet answered".
+      if (program.currentDay >= info.lastDay && quizResolvedQuery.data?.get(phaseId) === false) {
+        return { id: phaseId, name: info.name };
+      }
+    }
+    return null;
+  }, [days, program, lockedPhaseIds, quizResolvedQuery.data, isReviewAccount]);
+
+  // The prompt is dismissible ("Để sau") but comes back the next time the
+  // roadmap tab is focused while the survey is still due — reset the
+  // per-focus dismissal on focus. It also stops on its own once the survey
+  // is answered (dueSurveyPhase becomes null).
+  const [surveyPromptDismissed, setSurveyPromptDismissed] = useState(false);
+  useFocusEffect(useCallback(() => { setSurveyPromptDismissed(false); }, []));
+  // Only over the real day list — never on the skeleton, an error, a
+  // coming-soon roadmap, or a not-yet-activated device.
+  const showSurveyPrompt =
+    !!dueSurveyPhase && !surveyPromptDismissed && !showSkeleton && !loadError && !!selectedProduct?.roadmapPublished;
+
   let lastPhase: string | null = null;
 
   return (
@@ -400,7 +434,12 @@ export default function RoadmapScreen() {
                         productId={selectedProduct.id}
                         phaseId={d.phaseId}
                         phaseName={d.phase}
-                        enabled={isReviewAccount || (phaseAllDone.get(d.phaseId) ?? false)}
+                        // The survey opens as soon as the phase's LAST day
+                        // UNLOCKS on the calendar (e.g. day 7 for phase 1) —
+                        // not only once every day of the phase is watched/past
+                        // (per explicit request 2026-09-09). `d.id` here is the
+                        // phase's last day number (this branch is isLastOfPhase).
+                        enabled={isReviewAccount || (program ? program.currentDay >= d.id : false)}
                         lockedDayNumber={d.id}
                         collapsed={collapsed}
                       />
@@ -433,6 +472,16 @@ export default function RoadmapScreen() {
           onCancel={requestDayGate.cancelPain}
           onConfirm={(value) => void requestDayGate.confirmPain(value)}
           submitting={requestDayGate.isSubmitting}
+        />
+      ) : null}
+      {showSurveyPrompt && dueSurveyPhase ? (
+        <SurveyPromptModal
+          phaseName={dueSurveyPhase.name}
+          onTake={() => {
+            setSurveyPromptDismissed(true);
+            router.push({ pathname: '/quiz/[phaseId]', params: { phaseId: dueSurveyPhase.id, productId: selectedProduct?.id, phaseName: dueSurveyPhase.name } });
+          }}
+          onLater={() => setSurveyPromptDismissed(true)}
         />
       ) : null}
     </ScreenContainer>

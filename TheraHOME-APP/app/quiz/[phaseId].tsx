@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
-import { usePhaseQuiz, useSubmitQuizAttempt } from '@/hooks/useQuiz';
+import { usePhaseQuiz, useQuizAttempt, useSubmitQuizAttempt } from '@/hooks/useQuiz';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Card } from '@/components/ui/Card';
@@ -22,7 +23,9 @@ export default function QuizScreen() {
   const programsQuery = useActivatedPrograms(userId);
   const program = (programsQuery.data ?? []).find((p) => p.productId === productId);
   const questionsQuery = usePhaseQuiz(phaseId);
+  const attemptQuery = useQuizAttempt(userId, phaseId);
   const submitAttempt = useSubmitQuizAttempt();
+  const { get } = useAppConfig();
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -62,7 +65,48 @@ export default function QuizScreen() {
     }
   }
 
-  const isLoading = programsQuery.isPending || questionsQuery.isPending;
+  // The survey is answered ONCE (the attempt row is upserted on
+  // user_id+phase_id). After submitting — and on every later open of an
+  // already-answered survey — we show the admin-editable "Gợi ý từ TheraHOME"
+  // screen instead of the questions (per explicit request 2026-09-09).
+  const alreadyAnswered = !!attemptQuery.data;
+  const showSuggestion = submitted || alreadyAnswered;
+
+  // Wait on the attempt lookup too, so an already-answered survey never flashes
+  // its questions for a frame before switching to the suggestion screen.
+  const isLoading = programsQuery.isPending || questionsQuery.isPending || attemptQuery.isPending;
+
+  if (showSuggestion) {
+    const suggestionTitle = get('survey_suggestion_title', t('surveySuggestTitle'));
+    const suggestionBody = get('survey_suggestion_body', t('surveySuggestBody'));
+    return (
+      <ScreenContainer edges={['top']}>
+        <View style={styles.suggestHeader}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('close')}
+            style={[styles.closeBtn, { backgroundColor: theme.colors.bgCardAlt }]}
+          >
+            <Icon name="x" size={20} color={theme.colors.textSecondary} />
+          </Pressable>
+        </View>
+        <Reanimated.View entering={FadeIn.duration(240)} style={styles.suggestBody}>
+          <View style={[styles.suggestIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
+            <Icon name="sparkles" size={30} color={theme.colors.primary} />
+          </View>
+          <Text style={[theme.type.h1, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{suggestionTitle}</Text>
+          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 12, lineHeight: 24 }]}>
+            {suggestionBody}
+          </Text>
+          <Button style={{ width: '100%', marginTop: 28 }} onPress={() => router.back()}>
+            {t('quizContinue')}
+          </Button>
+        </Reanimated.View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
@@ -71,19 +115,6 @@ export default function QuizScreen() {
         <View style={styles.loadingBox}>
           <ActivityIndicator color={theme.colors.primary} />
         </View>
-      ) : submitted ? (
-        <Reanimated.View entering={FadeIn.duration(220)} style={styles.resultBody}>
-          <View style={[styles.resultIcon, { backgroundColor: theme.colors.successTint }]}>
-            <Icon name="clipboard-check" size={30} color={theme.colors.success} />
-          </View>
-          <Text style={[theme.type.h1, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('quizResultTitle')}</Text>
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }]}>
-            {t('quizSurveyThanks')}
-          </Text>
-          <Button style={{ width: '100%', marginTop: 24 }} onPress={() => router.back()}>
-            {t('quizContinue')}
-          </Button>
-        </Reanimated.View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
           {questions.map((q, index) => (
@@ -150,13 +181,28 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 14,
   },
-  resultBody: {
+  suggestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestBody: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingBottom: 40,
   },
-  resultIcon: {
+  suggestIcon: {
     width: 64,
     height: 64,
     borderRadius: 32,
