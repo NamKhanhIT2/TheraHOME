@@ -1938,6 +1938,12 @@ const styles = StyleSheet.create({
     zIndex: 2,
     width: '61%',
     paddingTop: 26,
+    // Keep the last subtitle line clear of the card's bottom-left rounded
+    // corner (borderRadius 24 + overflow:hidden), which was clipping "suit"
+    // on Android (owner report 2026-09-09). paddingBottom guarantees the last
+    // line sits at least this far above the card bottom regardless of how the
+    // copy wraps, so it never lands in the corner curve.
+    paddingBottom: 28,
   },
   priorityTitle: {
     fontSize: 32,
