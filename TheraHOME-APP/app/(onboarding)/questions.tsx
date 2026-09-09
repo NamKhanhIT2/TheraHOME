@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Image,
   Pressable,
@@ -13,6 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 import { useOnboardingContent } from '@/hooks/useOnboardingContent';
 import { useAppStore, type AnswerValue } from '@/store/useAppStore';
@@ -431,7 +433,21 @@ export default function QuestionsScreen() {
         if (finished) setQIndex((current) => current - 1);
       });
     } else {
-      router.back();
+      // Q1 is the onboarding root and the account already exists (it's created
+      // at sign-up, before the questionnaire), so "back" here means leaving
+      // setup: sign out and return to login, from which they can sign back in
+      // and resume (owner, 2026-09-09). Confirm first so a stray back tap
+      // doesn't drop the session.
+      Alert.alert(t('exitSetupTitle'), t('exitSetupBody'), [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('signOut'),
+          style: 'destructive',
+          onPress: () => {
+            void supabase.auth.signOut().finally(() => router.replace('/login'));
+          },
+        },
+      ]);
     }
   }
 
@@ -473,7 +489,9 @@ export default function QuestionsScreen() {
           onboarding gate, consent's back), so router.back() there has nowhere
           valid to go and reads as a dead button (owner report 2026-09-09).
           Keep the row's height so stepping Q1↔Q2 doesn't jump. */}
-      {qIndex > 0 ? <BackBar onBack={onBack} /> : <View style={{ height: 50 }} />}
+      {/* Back on Q1 leaves setup (sign out -> login), since the account is
+          already created; Q2+ step to the previous question. See onBack. */}
+      <BackBar onBack={onBack} />
       <View style={styles.progressHeader}>
         <Text
           style={[
