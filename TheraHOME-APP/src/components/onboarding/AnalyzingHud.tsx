@@ -62,18 +62,36 @@ export function AnalyzingHud({ size = 400, preparingLabel, completedLabel, onCom
   // 91→99, a visible pause at 99, then the final tick to 100.
   const progress = useSharedValue(0);
   const entrance = useSharedValue(0);
+  // Hold the number at 0 until the particle canvas is actually up, so it
+  // doesn't count against a blank ring during the WebView's load (owner report
+  // 2026-09-09: "số chạy 1 tí rồi mới thấy hiệu ứng vòng"). onLoadEnd flips it;
+  // a fallback timer covers the rare case that event is missed, and Reduce
+  // Motion (no WebView) is ready immediately.
+  const [particlesReady, setParticlesReady] = useState(reduceMotion);
 
   useEffect(() => {
-    entrance.value = withTiming(1, { duration: reduceMotion ? 120 : 620, easing: Easing.out(Easing.cubic) });
-    progress.value = withSequence(
-      withTiming(45, { duration: 1_050, easing: Easing.out(Easing.cubic) }),
-      withTiming(70, { duration: 1_800, easing: Easing.inOut(Easing.sin) }),
-      withTiming(91, { duration: 820, easing: Easing.in(Easing.cubic) }),
-      withTiming(99, { duration: 1_420, easing: Easing.out(Easing.cubic) }),
-      withDelay(560, withTiming(99, { duration: 0 })),
-      withTiming(100, { duration: 300, easing: Easing.out(Easing.cubic) }, (finished) => {
-        if (finished) runOnJS(setCompleted)(true);
-      }),
+    if (reduceMotion) return;
+    const fallback = setTimeout(() => setParticlesReady(true), 1_100);
+    return () => clearTimeout(fallback);
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    if (!particlesReady) return;
+    entrance.value = withTiming(1, { duration: reduceMotion ? 120 : 420, easing: Easing.out(Easing.cubic) });
+    // Small lead-in so a few particles have formed the arc before the count
+    // starts moving, then the same easing shape as before.
+    progress.value = withDelay(
+      reduceMotion ? 0 : 240,
+      withSequence(
+        withTiming(45, { duration: 1_050, easing: Easing.out(Easing.cubic) }),
+        withTiming(70, { duration: 1_800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(91, { duration: 820, easing: Easing.in(Easing.cubic) }),
+        withTiming(99, { duration: 1_420, easing: Easing.out(Easing.cubic) }),
+        withDelay(560, withTiming(99, { duration: 0 })),
+        withTiming(100, { duration: 300, easing: Easing.out(Easing.cubic) }, (finished) => {
+          if (finished) runOnJS(setCompleted)(true);
+        }),
+      ),
     );
     return () => {
       cancelAnimation(progress);
@@ -81,7 +99,7 @@ export function AnalyzingHud({ size = 400, preparingLabel, completedLabel, onCom
     };
     // Reanimated shared values are stable for this mounted HUD.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reduceMotion]);
+  }, [particlesReady, reduceMotion]);
 
   useEffect(() => {
     if (!completed) return;
@@ -108,72 +126,75 @@ export function AnalyzingHud({ size = 400, preparingLabel, completedLabel, onCom
   const subtitle = completed ? completedLabel : preparingLabel;
 
   return (
-    <View style={[styles.container, { width: size, height: size }]}>
-      {/* Particle field behind everything. Skipped under Reduce Motion — the
-          number still counts, which is what actually drives the flow forward. */}
-      {!reduceMotion ? (
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <WebView
-            source={{ html: PARTICLE_HTML }}
-            style={styles.web}
-            containerStyle={styles.web}
-            originWhitelist={['*']}
-            scrollEnabled={false}
-            overScrollMode="never"
-            opaque={false}
-            androidLayerType="hardware"
-            pointerEvents="none"
-            javaScriptEnabled
-            domStorageEnabled={false}
-            showsVerticalScrollIndicator={false}
-            showsHorizontalScrollIndicator={false}
+    <View style={styles.container}>
+      {/* The ring: particle field with the count in its centre. */}
+      <View style={{ width: size, height: size }}>
+        {/* Particle field. Skipped under Reduce Motion — the number still
+            counts, which is what actually drives the flow forward. */}
+        {!reduceMotion ? (
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <WebView
+              source={{ html: PARTICLE_HTML }}
+              style={styles.web}
+              containerStyle={styles.web}
+              originWhitelist={['*']}
+              scrollEnabled={false}
+              overScrollMode="never"
+              opaque={false}
+              androidLayerType="hardware"
+              pointerEvents="none"
+              javaScriptEnabled
+              domStorageEnabled={false}
+              showsVerticalScrollIndicator={false}
+              showsHorizontalScrollIndicator={false}
+              onLoadEnd={() => setParticlesReady(true)}
+            />
+          </View>
+        ) : null}
+
+        <View style={styles.center} pointerEvents="none">
+          <AnimatedTextInput
+            defaultValue="0%"
+            editable={false}
+            caretHidden
+            underlineColorAndroid="transparent"
+            animatedProps={percentProps}
+            style={[
+              styles.percent,
+              { width: 220 * scale, fontSize: 46 * scale, lineHeight: 58 * scale, fontFamily: theme.fontFamily.bold },
+              numberStyle,
+            ]}
+            accessibilityLabel={subtitle}
           />
         </View>
-      ) : null}
-
-      {/* Soft dark disc so the number stays legible over the bright trails. */}
-      <View pointerEvents="none" style={[styles.centerScrim, { width: 176 * scale, height: 176 * scale, borderRadius: 88 * scale }]} />
-
-      <View style={styles.center} pointerEvents="none">
-        <AnimatedTextInput
-          defaultValue="0%"
-          editable={false}
-          caretHidden
-          underlineColorAndroid="transparent"
-          animatedProps={percentProps}
-          style={[
-            styles.percent,
-            { width: 240 * scale, fontSize: 66 * scale, lineHeight: 80 * scale, fontFamily: theme.fontFamily.bold },
-            numberStyle,
-          ]}
-          accessibilityLabel={subtitle}
-        />
-        <Animated.Text
-          key={subtitle}
-          numberOfLines={1}
-          style={[
-            styles.subtitle,
-            {
-              fontSize: 15 * scale,
-              letterSpacing: 1.4 * scale,
-              fontFamily: theme.fontFamily.semiBold,
-              color: completed ? WHITE_BLUE : '#7FD4FF',
-            },
-            captionStyle,
-          ]}
-        >
-          {subtitle}
-        </Animated.Text>
       </View>
+
+      {/* Label sits BELOW the ring, in the clear space, not inside it. */}
+      <Animated.Text
+        key={subtitle}
+        numberOfLines={1}
+        style={[
+          styles.subtitle,
+          {
+            marginTop: -size * 0.08,
+            fontSize: 15 * scale,
+            letterSpacing: 1.4 * scale,
+            fontFamily: theme.fontFamily.semiBold,
+            color: completed ? WHITE_BLUE : '#7FD4FF',
+          },
+          captionStyle,
+        ]}
+      >
+        {subtitle}
+      </Animated.Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  container: { alignItems: 'center' },
   web: { flex: 1, width: '100%', height: '100%', backgroundColor: 'transparent' },
   center: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  centerScrim: { position: 'absolute', backgroundColor: 'rgba(2,8,19,0.42)' },
   percent: {
     color: '#EAFBFF',
     textAlign: 'center',
@@ -184,7 +205,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     textAlign: 'center',
-    marginTop: 8,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowRadius: 8,
   },

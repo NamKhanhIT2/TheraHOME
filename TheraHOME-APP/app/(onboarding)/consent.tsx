@@ -94,7 +94,6 @@ export default function ConsentScreen() {
   if (loading) {
     return (
       <View style={[styles.analyzingRoot, { backgroundColor: ANALYZING_BG, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <View style={styles.analyzingAmbientGlow} pointerEvents="none" />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('backLabel')}
@@ -189,13 +188,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-  },
-  analyzingAmbientGlow: {
-    position: 'absolute',
-    width: 420,
-    height: 420,
-    borderRadius: 210,
-    backgroundColor: 'rgba(0,127,217,0.055)',
   },
   analyzingBack: {
     position: 'absolute',
