@@ -1928,7 +1928,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   priorityHero: {
-    minHeight: 218,
+    minHeight: 188,
     marginBottom: 10,
     overflow: 'hidden',
     borderRadius: 24,
@@ -1937,21 +1937,21 @@ const styles = StyleSheet.create({
   priorityHeroCopy: {
     zIndex: 2,
     width: '61%',
-    paddingTop: 26,
+    paddingTop: 18,
     // Keep the last subtitle line clear of the card's bottom-left rounded
     // corner (borderRadius 24 + overflow:hidden), which was clipping "suit"
     // on Android (owner report 2026-09-09). paddingBottom guarantees the last
     // line sits at least this far above the card bottom regardless of how the
     // copy wraps, so it never lands in the corner curve.
-    paddingBottom: 28,
+    paddingBottom: 26,
   },
   priorityTitle: {
-    fontSize: 32,
-    lineHeight: 38,
-    letterSpacing: -0.8,
+    fontSize: 26,
+    lineHeight: 31,
+    letterSpacing: -0.6,
   },
   prioritySubtitle: {
-    marginTop: 14,
+    marginTop: 10,
     fontSize: 14,
     lineHeight: 21,
   },
