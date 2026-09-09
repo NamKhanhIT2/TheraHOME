@@ -40,21 +40,12 @@ const FIELD_META: Record<string, { label: string; help: string; localized: boole
     localized: true,
     placeholder: "https://www.youtube.com/watch?v=...",
   },
-  survey_suggestion_title: {
-    label: 'Gợi ý sau khảo sát — Tiêu đề',
-    help:
-      "Màn 'Gợi ý từ TheraHOME' hiện ra sau khi người dùng gửi bài khảo sát giai đoạn (và khi họ mở lại một khảo sát đã trả lời). Đây là dòng tiêu đề.",
-    localized: true,
-    placeholder: "Gợi ý từ TheraHOME",
-  },
-  survey_suggestion_body: {
-    label: 'Gợi ý sau khảo sát — Nội dung',
-    help: "Đoạn nội dung hiển thị dưới tiêu đề ở màn gợi ý. Có thể viết nhiều dòng.",
-    localized: true,
-    multiline: true,
-    placeholder: "Lời khuyên / gợi ý cho người dùng sau khi hoàn thành khảo sát...",
-  },
 };
+
+// Managed in a dedicated editor elsewhere, so hidden from this generic list:
+// the survey "Gợi ý từ TheraHOME" title/body live in the Lộ trình → "Quản lý
+// Khảo sát & Upsell" modal (PhaseContentModal's "Gợi ý sau khảo sát" tab).
+const MANAGED_ELSEWHERE = new Set(["survey_suggestion_title", "survey_suggestion_body"]);
 
 export function AppContentView() {
   const [rows, setRows] = useState<AppConfigRow[] | null>(null);
@@ -62,7 +53,7 @@ export function AppContentView() {
 
   useEffect(() => {
     fetchAppConfig()
-      .then(setRows)
+      .then((rows) => setRows(rows.filter((r) => !MANAGED_ELSEWHERE.has(r.key))))
       .catch(() => pushToast("Không thể tải nội dung ứng dụng"));
   }, []);
 

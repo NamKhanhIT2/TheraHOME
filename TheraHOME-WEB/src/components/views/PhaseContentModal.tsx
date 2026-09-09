@@ -18,6 +18,9 @@ import {
   type PhasePromoAdmin,
   type PhasePromoTranslation,
   fetchRoadmapReadiness,
+  fetchAppConfig,
+  saveAppConfig,
+  type AppConfigRow,
 } from "@/lib/db";
 import { GhostBtn, PrimaryBtn, FieldLabel, inputStyle, PillTabs } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
@@ -25,7 +28,7 @@ import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 import { translateDrafts } from "@/lib/translate";
 
-type ContentTab = "quiz" | "promo";
+type ContentTab = "quiz" | "promo" | "suggest";
 type QuizLangKey = "vi" | "en" | "ms";
 const QUIZ_LANG_TABS: Array<[QuizLangKey, string]> = [["vi", "VN"], ["en", "EN"], ["ms", "MS"]];
 const EMPTY_QUIZ_LANGUAGE: QuizLanguageContent = { question: "", options: ["", "", "", ""], correctIndex: 0 };
@@ -435,6 +438,86 @@ function PromoTab({ phaseId, productId, phaseRange }: { phaseId: string; product
   );
 }
 
+type SuggestLang = "vi" | "en" | "ms";
+const SUGGEST_LANG_TABS: Array<[SuggestLang, string]> = [["vi", "VN"], ["en", "EN"], ["ms", "MS"]];
+const SUGGEST_TITLE_KEY = "survey_suggestion_title";
+const SUGGEST_BODY_KEY = "survey_suggestion_body";
+const emptyConfigRow = (key: string): AppConfigRow => ({ key, valueVi: "", valueEn: "", valueMs: "" });
+
+/** The "Gợi ý từ TheraHOME" screen shown after any phase survey is submitted.
+ * Content is GLOBAL (app_config, shared by every phase) — the note says so —
+ * with two parts: a title and a body. Kept here (not in "Nội dung ứng dụng")
+ * because this is where staff manage the survey, so it's where they look. */
+function SuggestTab() {
+  const [title, setTitle] = useState<AppConfigRow | null>(null);
+  const [body, setBody] = useState<AppConfigRow | null>(null);
+  const [lang, setLang] = useState<SuggestLang>("vi");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchAppConfig()
+      .then((rows) => {
+        setTitle(rows.find((r) => r.key === SUGGEST_TITLE_KEY) ?? emptyConfigRow(SUGGEST_TITLE_KEY));
+        setBody(rows.find((r) => r.key === SUGGEST_BODY_KEY) ?? emptyConfigRow(SUGGEST_BODY_KEY));
+      })
+      .catch(() => pushToast("Không thể tải nội dung gợi ý"));
+  }, []);
+
+  const col: keyof AppConfigRow = lang === "vi" ? "valueVi" : lang === "en" ? "valueEn" : "valueMs";
+  const langLabel = SUGGEST_LANG_TABS.find(([k]) => k === lang)?.[1] ?? "VN";
+
+  async function handleSave() {
+    if (saving || !title || !body) return;
+    if (!title.valueVi.trim() || !body.valueVi.trim()) {
+      pushToast("Vui lòng điền Tiêu đề và Nội dung (ít nhất bản VN)");
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveAppConfig([title, body]);
+      pushToast("Đã lưu nội dung gợi ý — app cập nhật trong vài phút, không cần bản build mới");
+    } catch {
+      pushToast("Không thể lưu nội dung gợi ý");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!title || !body) return <div style={{ color: "var(--text-secondary)", padding: 10 }}>Đang tải...</div>;
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+        Màn <b>&quot;Gợi ý từ TheraHOME&quot;</b> hiện ra sau khi người dùng gửi khảo sát (và khi mở lại khảo sát đã trả lời).{" "}
+        <b>Dùng chung cho mọi giai đoạn</b> — sửa ở đây áp dụng cho tất cả khảo sát.
+      </div>
+      <PillTabs options={SUGGEST_LANG_TABS} value={lang} onChange={setLang} />
+      {lang !== "vi" ? (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12, marginTop: -6 }}>
+          Để trống = dùng bản VN.
+        </div>
+      ) : null}
+      <div style={{ marginTop: 10 }}>
+        <FieldLabel>Phần 1 · Tiêu đề ({langLabel})</FieldLabel>
+        <input
+          value={title[col]}
+          onChange={(e) => setTitle({ ...title, [col]: e.target.value })}
+          style={{ ...inputStyle, marginBottom: 16 }}
+          placeholder={lang === "vi" ? "Gợi ý từ TheraHOME" : title.valueVi || "Gợi ý từ TheraHOME"}
+        />
+        <FieldLabel>Phần 2 · Nội dung ({langLabel})</FieldLabel>
+        <textarea
+          value={body[col]}
+          onChange={(e) => setBody({ ...body, [col]: e.target.value })}
+          style={{ ...inputStyle, minHeight: 150, lineHeight: 1.5, marginBottom: 16 }}
+          placeholder={lang === "vi" ? "Lời khuyên / gợi ý cho người dùng sau khi hoàn thành khảo sát..." : body.valueVi || "..."}
+        />
+      </div>
+      <PrimaryBtn onClick={handleSave} disabled={saving}>{saving ? "Đang lưu..." : "Lưu nội dung gợi ý"}</PrimaryBtn>
+    </div>
+  );
+}
+
 export function PhaseContentModal({ phase, productId, onClose }: { phase: ProgramPhase; productId: string; onClose: () => void }) {
   const [tab, setTab] = useState<ContentTab>("quiz");
 
@@ -444,13 +527,20 @@ export function PhaseContentModal({ phase, productId, onClose }: { phase: Progra
         <PillTabs
           options={[
             ["quiz", "Câu hỏi khảo sát"],
+            ["suggest", "Gợi ý sau khảo sát"],
             ["promo", "Nội dung Upsell"],
           ]}
           value={tab}
           onChange={setTab}
         />
       </div>
-      {tab === "quiz" ? <QuizTab phaseId={phase.id} /> : <PromoTab phaseId={phase.id} productId={productId} phaseRange={phase.range} />}
+      {tab === "quiz" ? (
+        <QuizTab phaseId={phase.id} />
+      ) : tab === "suggest" ? (
+        <SuggestTab />
+      ) : (
+        <PromoTab phaseId={phase.id} productId={productId} phaseRange={phase.range} />
+      )}
     </Modal>
   );
 }
