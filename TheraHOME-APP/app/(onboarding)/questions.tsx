@@ -468,7 +468,12 @@ export default function QuestionsScreen() {
           <View pointerEvents="none" style={styles.decorLine} />
         </>
       ) : null}
-      <BackBar onBack={onBack} />
+      {/* No back button on Q1: the questionnaire is always the onboarding
+          ROOT (reached only by replace/redirect — app/index.tsx, _layout's
+          onboarding gate, consent's back), so router.back() there has nowhere
+          valid to go and reads as a dead button (owner report 2026-09-09).
+          Keep the row's height so stepping Q1↔Q2 doesn't jump. */}
+      {qIndex > 0 ? <BackBar onBack={onBack} /> : <View style={{ height: 50 }} />}
       <View style={styles.progressHeader}>
         <Text
           style={[
