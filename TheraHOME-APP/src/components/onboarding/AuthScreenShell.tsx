@@ -43,11 +43,16 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
   const [passwordFocused, setPasswordFocused] = useState(false);
   const canContinue = creating ? !!username.trim() && !!email.trim() && !!password : !!username.trim() && !!password;
   return (
-    <AuthLayout>
+    <AuthLayout brandGap={creating ? 26 : 38}>
       <>
               <Text style={styles.title}>{creating ? copy.createTitle : copy.signInTitle}</Text>
               <View style={styles.fields}>
-                <AuthInput icon={creating ? 'user' : 'mail'} value={username} onChangeText={setUsername} placeholder={creating ? copy.username : copy.email} keyboardType={creating ? 'default' : 'email-address'} textContentType={creating ? 'username' : 'emailAddress'} />
+                {/* create: this is a chosen display name, not a saved login, so
+                    `textContentType="username"`/autoComplete drove iOS to pop a
+                    "suggested username" strip over the form every time (owner
+                    report 2026-09-09). Turn autofill off here. sign-in keeps
+                    emailAddress so the OS can still offer the saved email. */}
+                <AuthInput icon={creating ? 'user' : 'mail'} value={username} onChangeText={setUsername} placeholder={creating ? copy.username : copy.email} keyboardType={creating ? 'default' : 'email-address'} textContentType={creating ? 'none' : 'emailAddress'} autoComplete={creating ? 'off' : 'email'} importantForAutofill="no" />
                 {creating ? <AuthInput icon="mail" value={email} onChangeText={setEmail} placeholder={copy.email} keyboardType="email-address" textContentType="emailAddress" /> : null}
                 <View style={[styles.inputRow, passwordFocused && styles.inputRowFocused]}>
                   <Icon name="lock" size={20} color="#6E84A2" />
@@ -57,6 +62,10 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
               </View>
               {!creating ? <Pressable accessibilityRole="button" onPress={onForgot} style={styles.forgot}><Text style={styles.link}>{copy.forgot}</Text></Pressable> : null}
               {error ? <Text style={styles.error}>{error}</Text> : null}
+              {/* Sign-in gets its breathing room from the "Forgot password?" row
+                  above; create-account has no such row, so the button sat right
+                  under the password field — add the gap here (owner, 2026-09-09). */}
+              {creating ? <View style={{ height: 10 }} /> : null}
               <PrimaryAuthButton
                 disabled={!canContinue || !!busy}
                 busy={!!busy}
@@ -84,7 +93,7 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
  * code-entry, forgot-password and new-password screens reuse it so the flow
  * reads as one thing rather than a designed front door followed by three
  * plain forms. */
-export function AuthLayout({ children }: { children: React.ReactNode }) {
+export function AuthLayout({ children, brandGap = 38 }: { children: React.ReactNode; brandGap?: number }) {
   const insets = useSafeAreaInsets();
   return (
     <ImageBackground source={BACKGROUND} resizeMode="cover" style={styles.screen}>
@@ -96,7 +105,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
               <Image source={BRANDMARK} resizeMode="contain" style={styles.brandmark} />
               <Text style={styles.brand}>Thera<Text style={styles.brandAccent}>HOME</Text></Text>
             </View>
-            <View style={styles.card}>{children}</View>
+            <View style={[styles.card, { marginTop: brandGap }]}>{children}</View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -125,20 +134,23 @@ export function PrimaryAuthButton({ disabled, busy, label, onPress }: { disabled
     onPress?.();
   };
   const sheenX = sheen.interpolate({ inputRange: [0, 1], outputRange: [-110, 430] });
-  // Disabled reads as a flat grey button, not a dimmed live one: the teal is
-  // bright enough that lowering opacity alone still looked tappable, so the
-  // gradient itself goes grey and the label/figure mute. Only the sheen (which
-  // implies liveness) is dropped while disabled.
-  const stops = disabled ? ['#CBD4DE', '#BDC7D2', '#AFBAC7'] : ['#55E4D5', '#16CFC5', '#079FE4'];
+  // "Muted" — the flat grey, clearly-not-tappable look — is for a form that
+  // isn't ready to submit yet, NOT for a submit in progress. `disabled` is true
+  // in both cases (the caller passes `!canContinue || busy`), so keying the
+  // grey off it alone turned the button grey the instant it was pressed, mid
+  // run-through. Press should play the figure on the SAME teal button, so the
+  // grey is gated on `disabled && !busy`.
+  const muted = disabled && !busy;
+  const stops = muted ? ['#CBD4DE', '#BDC7D2', '#AFBAC7'] : ['#55E4D5', '#16CFC5', '#079FE4'];
   return (
-    <Animated.View style={[styles.primaryWrap, { transform: [{ scale }] }, disabled && styles.primaryDisabled]}>
+    <Animated.View style={[styles.primaryWrap, { transform: [{ scale }] }, muted && styles.primaryDisabled]}>
       <Pressable accessibilityRole="button" accessibilityState={{ disabled, busy }} disabled={disabled} onPress={play} onPressIn={() => animateTo(0.965)} onPressOut={() => animateTo(1)} style={styles.primary}>
         <Svg pointerEvents="none" width="100%" height="100%" style={styles.primaryGradient}>
           <Defs><LinearGradient id="authButtonGradient" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor={stops[0]} /><Stop offset="0.54" stopColor={stops[1]} /><Stop offset="1" stopColor={stops[2]} /></LinearGradient></Defs>
           <Rect width="100%" height="100%" rx="28" fill="url(#authButtonGradient)" />
         </Svg>
-        {!disabled ? <Animated.View pointerEvents="none" style={[styles.primarySheen, { transform: [{ translateX: sheenX }, { rotate: '-18deg' }] }]} /> : null}
-        <Text style={[styles.primaryText, disabled && styles.primaryTextDisabled]}>{label}</Text>
+        {!muted ? <Animated.View pointerEvents="none" style={[styles.primarySheen, { transform: [{ translateX: sheenX }, { rotate: '-18deg' }] }]} /> : null}
+        <Text style={[styles.primaryText, muted && styles.primaryTextDisabled]}>{label}</Text>
         <View style={styles.primaryStage}><RunnerDoor playToken={playToken} size={50} /></View>
       </Pressable>
     </Animated.View>
