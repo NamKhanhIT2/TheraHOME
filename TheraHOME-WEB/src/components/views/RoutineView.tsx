@@ -840,6 +840,11 @@ export function RoutineView() {
               Dùng link này cho cả 3 thị trường
             </GhostBtn>
           </div>
+          <div style={{ borderTop: "1px solid var(--divider)", marginTop: 6, paddingTop: 14 }} />
+          <FieldLabel>Dụng cụ hỗ trợ (tuỳ chọn)</FieldLabel>
+          <div style={{ marginBottom: 10, fontSize: 12, color: "var(--text-muted)" }}>
+            Để trống <b>Link dụng cụ hỗ trợ</b> là app tự <b>ẩn</b> nút này ở màn ngày tập (theo từng thị trường). Dùng nút &quot;Xoá&quot; bên dưới để xoá nhanh.
+          </div>
           <FieldLabel>Tên dụng cụ hỗ trợ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
           <input
             value={supportToolsLabel[dayMarketTab]}
@@ -859,13 +864,38 @@ export function RoutineView() {
             placeholder="https://..."
             style={{ ...inputStyle, marginBottom: 6 }}
           />
-          <GhostBtn
-            onClick={() =>
-              setSupportToolsUrl({ vn: supportToolsUrl[dayMarketTab], us: supportToolsUrl[dayMarketTab], malay: supportToolsUrl[dayMarketTab] })
-            }
-          >
-            Dùng link này cho cả 3 thị trường
-          </GhostBtn>
+          <div style={{ marginBottom: 12 }}>
+            <GhostBtn
+              onClick={() =>
+                setSupportToolsUrl({ vn: supportToolsUrl[dayMarketTab], us: supportToolsUrl[dayMarketTab], malay: supportToolsUrl[dayMarketTab] })
+              }
+            >
+              Dùng link này cho cả 3 thị trường
+            </GhostBtn>
+          </div>
+          {/* Clear = hide: empties the tool name + link so the app hides the
+              button. Two scopes — this market only, or all three. Only takes
+              effect after "Lưu thay đổi". */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <GhostBtn
+              color="var(--error)"
+              onClick={() => {
+                setSupportToolsLabel((v) => ({ ...v, [dayMarketTab]: "" }));
+                setSupportToolsUrl((v) => ({ ...v, [dayMarketTab]: "" }));
+              }}
+            >
+              Xoá dụng cụ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})
+            </GhostBtn>
+            <GhostBtn
+              color="var(--error)"
+              onClick={() => {
+                setSupportToolsLabel(EMPTY_MARKET_CONTENT);
+                setSupportToolsUrl(EMPTY_MARKET_CONTENT);
+              }}
+            >
+              Xoá ở cả 3 thị trường
+            </GhostBtn>
+          </div>
         </Modal>
       ) : null}
       {phaseContentTarget ? (

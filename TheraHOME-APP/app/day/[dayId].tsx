@@ -322,27 +322,27 @@ export default function DayDetailScreen() {
               <Text style={[theme.type.bodyStrong, { color: theme.colors.success }]}>{t('completed')}</Text>
             </View>
           ) : null}
-          <Pressable
-            onPress={() => {
-              if (!supportToolsUrl) {
-                Alert.alert(t('noToolsTitle'), t('noToolsBody'));
-                return;
-              }
-              setPendingUrl(supportToolsUrl);
-            }}
-            style={[
-              styles.actionBtn,
-              {
-                backgroundColor: theme.colors.bgCard,
-                borderWidth: 1,
-                borderColor: theme.colors.borderInput,
-                borderRadius: theme.radius.md,
-              },
-            ]}
-          >
-            <Icon name="external-link" size={18} color={theme.colors.primary} />
-            <Text numberOfLines={1} style={[theme.type.button, { color: theme.colors.primary }]}>{supportToolsLabel}</Text>
-          </Pressable>
+          {/* Support-tools link is optional: when Admin leaves the day's
+              support-tools URL empty (for this market), the button is hidden
+              entirely rather than showing a dead button that alerts "no link"
+              — per explicit request 2026-09-09. */}
+          {supportToolsUrl ? (
+            <Pressable
+              onPress={() => setPendingUrl(supportToolsUrl)}
+              style={[
+                styles.actionBtn,
+                {
+                  backgroundColor: theme.colors.bgCard,
+                  borderWidth: 1,
+                  borderColor: theme.colors.borderInput,
+                  borderRadius: theme.radius.md,
+                },
+              ]}
+            >
+              <Icon name="external-link" size={18} color={theme.colors.primary} />
+              <Text numberOfLines={1} style={[theme.type.button, { color: theme.colors.primary }]}>{supportToolsLabel}</Text>
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
       {pendingUrl ? <ExternalLinkModal url={pendingUrl} onClose={() => setPendingUrl(null)} /> : null}
