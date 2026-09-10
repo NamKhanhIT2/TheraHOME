@@ -506,11 +506,16 @@ function SuggestTab({ lang }: { lang: SuggestLang }) {
       ) : null}
       <div style={{ marginTop: 10 }}>
         <FieldLabel>Phần 1 · Tiêu đề ({langLabel})</FieldLabel>
-        <input
+        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 6, lineHeight: 1.5 }}>
+          Xuống dòng để tách đoạn. <b>Phần 1</b>: dòng đầu to + căn giữa, các dòng sau căn giữa.{" "}
+          <b>Phần 2</b>: dòng cuối căn giữa, các dòng trên căn trái.<br />
+          Đánh dấu: <b>*chữ*</b> = làm nổi bật (màu thương hiệu), <b>~chữ~</b> = làm mờ.
+        </div>
+        <textarea
           value={title[col]}
           onChange={(e) => setTitle({ ...title, [col]: e.target.value })}
-          style={{ ...inputStyle, marginBottom: 16 }}
-          placeholder={lang === "vi" ? "Gợi ý từ TheraHOME" : title.valueVi || "Gợi ý từ TheraHOME"}
+          style={{ ...inputStyle, minHeight: 72, lineHeight: 1.5, marginBottom: 16 }}
+          placeholder={lang === "vi" ? "Chúng tôi đã hiểu bạn hơn\n(xuống dòng)..." : title.valueVi || "Gợi ý từ TheraHOME"}
         />
         <FieldLabel>Phần 2 · Nội dung ({langLabel})</FieldLabel>
         <textarea

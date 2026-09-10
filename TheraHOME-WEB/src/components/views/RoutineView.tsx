@@ -653,7 +653,7 @@ export function RoutineView() {
               <th style={{ padding: "0 8px 10px" }}>Giai đoạn</th>
               <th style={{ padding: "0 8px 10px" }}>Loại</th>
               <th style={{ padding: "0 8px 10px" }}>Video</th>
-              <th style={{ padding: "0 8px 10px" }}>Dụng cụ hỗ trợ</th>
+              <th style={{ padding: "0 8px 10px" }}>Nội dung thêm</th>
               <th></th>
             </tr>
           </thead>
@@ -841,7 +841,7 @@ export function RoutineView() {
           </div>
           <div style={{ borderTop: "1px solid var(--divider)", marginTop: 6, paddingTop: 14 }} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <FieldLabel>Dụng cụ hỗ trợ (tuỳ chọn)</FieldLabel>
+            <FieldLabel>Nội dung thêm (tuỳ chọn)</FieldLabel>
             {supportToolsUrl[dayMarketTab].trim() || supportToolsLabel[dayMarketTab].trim() ? (
               <span style={{ fontSize: 11.5, fontWeight: 700, color: "#1E9E5E" }}>● Đang bật ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</span>
             ) : (
@@ -849,13 +849,13 @@ export function RoutineView() {
             )}
           </div>
           <div style={{ marginBottom: 10, fontSize: 12, color: "var(--text-muted)" }}>
-            Nhập <b>Tên + Link</b> rồi bấm <b>Lưu thay đổi</b> để thêm/sửa. Để trống <b>Link</b> (hoặc bấm <b>Xoá</b>) là app tự <b>ẩn</b> nút này ở màn ngày tập — theo từng thị trường.
+            Nhập <b>Tiêu đề + Link</b> rồi bấm <b>Lưu thay đổi</b> để thêm/sửa. Để trống <b>Link</b> (hoặc bấm <b>Xoá</b>) là app tự <b>ẩn</b> mục này ở màn ngày tập — theo từng thị trường.
           </div>
-          <FieldLabel>Tên dụng cụ hỗ trợ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
+          <FieldLabel>Tiêu đề ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
           <input
             value={supportToolsLabel[dayMarketTab]}
             onChange={(e) => setSupportToolsLabel((v) => ({ ...v, [dayMarketTab]: e.target.value }))}
-            placeholder="Dụng cụ hỗ trợ tập luyện"
+            placeholder="Ví dụ: Tài liệu bổ sung, bài đọc thêm…"
             style={{ ...inputStyle, marginBottom: 6 }}
           />
           <div style={{ marginBottom: 14 }}>
@@ -863,7 +863,7 @@ export function RoutineView() {
               Dùng tên này cho cả 3 thị trường
             </GhostBtn>
           </div>
-          <FieldLabel>Link dụng cụ hỗ trợ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
+          <FieldLabel>Link ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
           <input
             value={supportToolsUrl[dayMarketTab]}
             onChange={(e) => setSupportToolsUrl((v) => ({ ...v, [dayMarketTab]: e.target.value }))}
@@ -889,10 +889,10 @@ export function RoutineView() {
               onClick={() => {
                 setSupportToolsLabel((v) => ({ ...v, [dayMarketTab]: "" }));
                 setSupportToolsUrl((v) => ({ ...v, [dayMarketTab]: "" }));
-                pushToast('Đã xoá dụng cụ — bấm "Lưu thay đổi" để áp dụng');
+                pushToast('Đã xoá nội dung thêm — bấm "Lưu thay đổi" để áp dụng');
               }}
             >
-              Xoá dụng cụ ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})
+              Xoá nội dung ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})
             </GhostBtn>
             <GhostBtn
               color="var(--error)"
@@ -900,7 +900,7 @@ export function RoutineView() {
               onClick={() => {
                 setSupportToolsLabel(EMPTY_MARKET_CONTENT);
                 setSupportToolsUrl(EMPTY_MARKET_CONTENT);
-                pushToast('Đã xoá dụng cụ ở cả 3 thị trường — bấm "Lưu thay đổi" để áp dụng');
+                pushToast('Đã xoá nội dung thêm ở cả 3 thị trường — bấm "Lưu thay đổi" để áp dụng');
               }}
             >
               Xoá ở cả 3 thị trường
