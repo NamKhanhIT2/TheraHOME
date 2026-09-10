@@ -52,7 +52,12 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
                     "suggested username" strip over the form every time (owner
                     report 2026-09-09). Turn autofill off here. sign-in keeps
                     emailAddress so the OS can still offer the saved email. */}
-                <AuthInput icon={creating ? 'user' : 'mail'} value={username} onChangeText={setUsername} placeholder={creating ? copy.username : copy.email} keyboardType={creating ? 'default' : 'email-address'} textContentType={creating ? 'none' : 'emailAddress'} autoComplete={creating ? 'off' : 'email'} importantForAutofill="no" />
+                {/* Sign-in accepts an email OR a username (auth-sign-in resolves
+                    either), and TheraHOME-issued accounts often log in by
+                    username — so the field is labelled "Email hoặc tên đăng
+                    nhập", not "Email", and uses a default keyboard so a username
+                    is natural to type. */}
+                <AuthInput icon={creating ? 'user' : 'mail'} value={username} onChangeText={setUsername} placeholder={creating ? copy.username : copy.identity} keyboardType="default" textContentType={creating ? 'none' : 'username'} autoComplete={creating ? 'off' : 'username'} importantForAutofill="no" />
                 {/* Autofill off on create too: with a username/email field
                     advertising an account name, iOS paired it against the
                     password field and popped the "suggested username" strip
