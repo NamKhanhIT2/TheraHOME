@@ -1768,17 +1768,25 @@ export async function updateCommunityPost(
     targetMarkets?: AdminMarket[] | null;
   },
 ) {
-  // A pin can never outlive the post's own reach: if target markets shrink,
-  // drop the pin from markets no longer targeted (or unpin entirely).
+  // Keep the pin in step with the post's reach. A pin can never outlive the
+  // targeting (markets removed from `target_markets` lose their pin), and — so
+  // that "edit a pinned post to also target VN" actually pins it in VN, which
+  // is what staff expect — a market NEWLY added to `target_markets` inherits
+  // the pin too. (Un-pinning a single market is still done in the pin editor.)
   let pinPatch: { pinned?: boolean; pinned_markets?: AdminMarket[] | null } = {};
   if (patch.targetMarkets !== undefined) {
     const { data: pinRow } = await supabase.from("community_posts").select("pinned, pinned_markets, target_markets").eq("id", idKey).maybeSingle();
     if (pinRow?.pinned) {
-      const currentPin = (pinRow.pinned_markets as AdminMarket[] | null) ?? (pinRow.target_markets as AdminMarket[] | null);
-      if (patch.targetMarkets === null) pinPatch = { pinned_markets: currentPin };
-      else {
-        const kept = (currentPin ?? patch.targetMarkets).filter((m) => patch.targetMarkets!.includes(m));
-        pinPatch = kept.length ? { pinned_markets: kept } : { pinned: false, pinned_markets: null };
+      const oldTargets = (pinRow.target_markets as AdminMarket[] | null) ?? [];
+      const currentPin = (pinRow.pinned_markets as AdminMarket[] | null) ?? oldTargets;
+      if (patch.targetMarkets === null) {
+        // Now targeting every market → pin everywhere (null = all markets).
+        pinPatch = { pinned_markets: null };
+      } else {
+        const kept = currentPin.filter((m) => patch.targetMarkets!.includes(m));
+        const added = patch.targetMarkets.filter((m) => !oldTargets.includes(m));
+        const next = Array.from(new Set([...kept, ...added]));
+        pinPatch = next.length ? { pinned_markets: next } : { pinned: false, pinned_markets: null };
       }
     }
   }
