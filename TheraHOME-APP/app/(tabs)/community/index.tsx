@@ -230,11 +230,10 @@ export default function CommunityScreen() {
         !hiddenPostIds.has(p.id) &&
         (!p.authorId || !blockedUserIds.has(p.authorId)) &&
         (
-          // Owner's design (reaffirmed 2026-09-06): "Tất cả" is the MEMBER
-          // feed. TheraHOME's own writing appears as the single pinned card
-          // at the top and in its own tab — a brief experiment that mixed
-          // every official post into this list read as unpinned posts
-          // suddenly appearing, which is not what the tab is for.
+          // "Tất cả" = the MEMBER feed plus the single pinned TheraHOME card
+          // at the top (rendered separately); every other official post lives
+          // only under the "Từ TheraHOME" tab. (Confirmed 2026-09-10 after a
+          // brief experiment that listed all targeted official posts here.)
           (filter === 'all' && !p.isOfficial) ||
           (filter === 'official' && p.isOfficial)
         ),
