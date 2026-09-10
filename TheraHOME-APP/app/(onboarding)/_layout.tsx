@@ -19,7 +19,6 @@ export default function OnboardingLayout() {
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="questions" />
       <Stack.Screen name="consent" />
-      <Stack.Screen name="thera-login" />
       <Stack.Screen name="country" />
       <Stack.Screen name="welcome" />
     </Stack>

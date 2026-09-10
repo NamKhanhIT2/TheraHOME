@@ -117,8 +117,8 @@ export function useStoreCategories() {
  * every product image decode start cold the first time Store is tapped,
  * which is what made it feel slow right after launch. Called from Home's
  * mount effect (see `app/(tabs)/home.tsx`), the same "prefetch from the
- * previous screen" pattern already used for `thera-login.tsx`'s background
- * image — just applied to remote/admin-managed data instead of a bundled
+ * previous screen" pattern used for auth screens' background image — just
+ * applied to remote/admin-managed data instead of a bundled
  * asset. Safe to call even if Store's own query is already warm/in-flight;
  * `prefetchQuery` is a no-op for fresh data and react-query dedupes
  * concurrent fetches for the same key. */
