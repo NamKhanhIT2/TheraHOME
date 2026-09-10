@@ -92,6 +92,11 @@ Deno.serve(async (req: Request) => {
 async function handleCreate(adminClient: any, callerClient: any, payload: Record<string, unknown>) {
   const username = String(payload.username ?? "").trim().toLowerCase();
   const password = String(payload.password ?? "");
+  // Real, deliverable email (optional). When given, the account signs in and
+  // resets its password by this address, exactly like a self-service customer.
+  // When omitted, we fall back to the synthetic <username>@thera.local below —
+  // login by username only, no email password reset.
+  const providedEmail = String(payload.email ?? "").trim().toLowerCase();
   const fullName = String(payload.full_name ?? "").trim();
   const accountType = String(payload.account_type ?? "");
   const accessLevel = String(payload.access_level ?? "");
@@ -118,16 +123,25 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
   if (password.length < 8) {
     return jsonResponse({ error: "password_too_short" }, 400);
   }
+  // A provided email must be a real, deliverable address — never one on the
+  // synthetic domain (that would defeat the point and collide with a
+  // username's fallback address).
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (providedEmail && (!EMAIL_RE.test(providedEmail) || providedEmail.endsWith(`@${SYNTHETIC_EMAIL_DOMAIN}`))) {
+    return jsonResponse({ error: "invalid_email" }, 400);
+  }
 
-  const email = `${username}@${SYNTHETIC_EMAIL_DOMAIN}`;
+  const email = providedEmail || `${username}@${SYNTHETIC_EMAIL_DOMAIN}`;
   const { data: created, error: createError } = await adminClient.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
   });
   if (createError || !created?.user) {
-    const message = createError?.message?.includes("already been registered")
-      ? "username_already_registered"
+    // A duplicate collides on whichever identifier was actually used.
+    const alreadyRegistered = createError?.message?.includes("already been registered");
+    const message = alreadyRegistered
+      ? (providedEmail ? "email_already_registered" : "username_already_registered")
       : createError?.message ?? "create_failed";
     return jsonResponse({ error: message }, 400);
   }
@@ -142,6 +156,9 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
     .from("profiles")
     .update({
       username,
+      // Real email onto the profile too (so it shows in Admin and the app);
+      // null for synthetic-only accounts rather than storing the fake address.
+      email: providedEmail || null,
       full_name: fullName,
       account_type: accountType,
       access_level: accessLevel,

@@ -64,11 +64,12 @@ function toDateInputValue(iso: string | null) {
   return iso.slice(0, 10);
 }
 
-// Not a real inbox — TheraHOME-issued accounts log in with a plain
-// username (see thera-login page); Supabase Auth still needs an
-// email-shaped identifier under the hood, so the edge function derives
-// `<username>@thera.local` itself. Validated here just enough to keep it a
-// valid email local-part once that suffix is appended.
+// Every issued account has a username (login by username always works). A
+// real email is now optional: when omitted, the edge function derives a
+// synthetic `<username>@thera.local` under the hood (Supabase Auth needs an
+// email-shaped identifier); when given, the account also logs in and resets
+// its password by that real address. This regex validates the username enough
+// to stay a valid email local-part once the `.local` suffix is appended.
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 
 function PasswordField({ label, value, onChange, placeholder, style }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; style?: React.CSSProperties }) {
@@ -104,6 +105,7 @@ function PasswordField({ label, value, onChange, placeholder, style }: { label: 
 function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCreate: (input: CreateTheraAccountInput) => Promise<void> }) {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [accountType, setAccountType] = useState<TheraAccountType>("admin_issued");
@@ -114,18 +116,26 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Apple App Review accounts must always see everything and never be locked
+  // out mid-review (App Store Guideline 2.1). Selecting "App Review" locks the
+  // access/onboarding/expiry choices to the safe preset so they can't be set
+  // to anything that would gate a reviewer.
+  const isReview = accountType === "review";
+
   function handleAccountTypeChange(next: TheraAccountType) {
     setAccountType(next);
     if (next === "review") {
-      // Preset for Apple App Review: highest access, straight into Home.
-      setAccessLevel("admin_granted");
-      setOnboardingRequired(false);
+      setAccessLevel("admin_granted"); // full access
+      setOnboardingRequired(false); // straight into Home
+      setExpiresAt(""); // never expires
     }
   }
 
   const usernameValid = USERNAME_RE.test(username.trim());
+  // Email is optional; when given it must be a real, deliverable address.
+  const emailValid = email.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const passwordsMatch = password.length >= 8 && password === confirmPassword;
-  const canSubmit = !!fullName.trim() && usernameValid && passwordsMatch && !submitting;
+  const canSubmit = !!fullName.trim() && usernameValid && emailValid && passwordsMatch && !submitting;
 
   async function submit() {
     if (!canSubmit) return;
@@ -133,13 +143,15 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
     try {
       await onCreate({
         username: username.trim(),
+        email: email.trim() || null,
         password,
         full_name: fullName.trim(),
         account_type: accountType,
-        access_level: accessLevel,
+        access_level: isReview ? "admin_granted" : accessLevel,
         country,
-        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-        onboarding_required: onboardingRequired,
+        // App Review never expires, regardless of any stale value in the field.
+        expires_at: isReview ? null : expiresAt ? new Date(expiresAt).toISOString() : null,
+        onboarding_required: isReview ? false : onboardingRequired,
         notes: notes.trim() || null,
       });
     } finally {
@@ -165,19 +177,51 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ví dụ: App Review iOS" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Username</FieldLabel>
       <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 14 }} />
+      <FieldLabel>Email (tùy chọn)</FieldLabel>
+      <input
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        type="email"
+        autoCapitalize="none"
+        autoComplete="off"
+        name="thera-new-account-email"
+        placeholder="Ví dụ: review@therahomeai.com"
+        style={{ ...inputStyle, marginBottom: email.trim() && !emailValid ? 6 : 6 }}
+      />
+      {email.trim() && !emailValid ? (
+        <div style={{ fontSize: 12.5, color: "var(--error)", marginBottom: 14 }}>Email không hợp lệ.</div>
+      ) : (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+          Có email thật → đăng nhập bằng email và đặt lại mật khẩu qua email. Bỏ trống → hệ thống tự dùng{" "}
+          <code>username@thera.local</code> (chỉ đăng nhập bằng username, không đặt lại mật khẩu qua email được).
+        </div>
+      )}
       <PasswordField label="Password" value={password} onChange={setPassword} placeholder="Tối thiểu 8 ký tự" style={{ marginBottom: 14 }} />
       <PasswordField label="Nhập lại Password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Nhập lại để xác nhận" style={{ marginBottom: 14 }} />
       {confirmPassword && !passwordsMatch ? (
         <div style={{ fontSize: 12.5, color: "var(--error)", marginTop: -10, marginBottom: 14 }}>Mật khẩu nhập lại không khớp.</div>
       ) : null}
       <FieldLabel>Loại tài khoản</FieldLabel>
-      <select value={accountType} onChange={(e) => handleAccountTypeChange(e.target.value as TheraAccountType)} style={{ ...inputStyle, marginBottom: 14 }}>
+      <select value={accountType} onChange={(e) => handleAccountTypeChange(e.target.value as TheraAccountType)} style={{ ...inputStyle, marginBottom: isReview ? 10 : 14 }}>
         {ACCOUNT_TYPE_OPTIONS.map((k) => (
           <option key={k} value={k}>{ACCOUNT_TYPE_META[k]}</option>
         ))}
       </select>
+      {isReview ? (
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "rgba(30,158,94,0.10)", border: "1px solid rgba(30,158,94,0.35)" }}>
+          <Icon name="shield" size={16} color="#1E9E5E" />
+          <div style={{ fontSize: 12.5, color: "var(--text-primary)", lineHeight: 1.5 }}>
+            <b>App Review (Apple)</b> — tài khoản này <b>toàn quyền</b>, thấy mọi tính năng và <b>không bao giờ bị khoá / hết hạn</b> (yêu cầu Apple 2.1). Quyền truy cập, Onboarding và Ngày hết hạn đã được đặt sẵn và khoá lại để không cấu hình nhầm.
+          </div>
+        </div>
+      ) : null}
       <FieldLabel>Quyền truy cập</FieldLabel>
-      <select value={accessLevel} onChange={(e) => setAccessLevel(e.target.value as TheraAccessLevel)} style={{ ...inputStyle, marginBottom: 14 }}>
+      <select
+        value={isReview ? "admin_granted" : accessLevel}
+        onChange={(e) => setAccessLevel(e.target.value as TheraAccessLevel)}
+        disabled={isReview}
+        style={{ ...inputStyle, marginBottom: 14, opacity: isReview ? 0.6 : 1, cursor: isReview ? "not-allowed" : "pointer" }}
+      >
         {ACCESS_LEVEL_OPTIONS.map((k) => (
           <option key={k} value={k}>{ACCESS_LEVEL_META[k]}</option>
         ))}
@@ -193,13 +237,21 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
         Ngôn ngữ hiển thị vẫn theo máy của người dùng, không theo ô này.
       </div>
       <FieldLabel>Ngày hết hạn (tùy chọn)</FieldLabel>
-      <input value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} type="date" style={{ ...inputStyle, marginBottom: 14 }} />
+      <input
+        value={isReview ? "" : expiresAt}
+        onChange={(e) => setExpiresAt(e.target.value)}
+        type="date"
+        disabled={isReview}
+        placeholder={isReview ? "Không hết hạn" : undefined}
+        style={{ ...inputStyle, marginBottom: 14, opacity: isReview ? 0.6 : 1, cursor: isReview ? "not-allowed" : "auto" }}
+      />
       <FieldLabel>Yêu cầu onboarding</FieldLabel>
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {([[true, "Có"], [false, "Không"]] as const).map(([v, l]) => (
           <button
             key={l}
-            onClick={() => setOnboardingRequired(v)}
+            onClick={() => !isReview && setOnboardingRequired(v)}
+            disabled={isReview}
             style={{
               flex: 1,
               border: onboardingRequired === v ? "none" : "1px solid var(--border-input)",
@@ -210,7 +262,8 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
               fontFamily: "var(--font-family)",
               fontWeight: 600,
               fontSize: 13,
-              cursor: "pointer",
+              cursor: isReview ? "not-allowed" : "pointer",
+              opacity: isReview && onboardingRequired !== v ? 0.5 : 1,
             }}
           >
             {l}
@@ -369,7 +422,12 @@ export function TheraAccountsView() {
       void signOut();
       return;
     }
-    pushToast(message === "username_already_registered" ? "Tên đăng nhập này đã được sử dụng." : genericMessage);
+    const known: Record<string, string> = {
+      username_already_registered: "Tên đăng nhập này đã được sử dụng.",
+      email_already_registered: "Email này đã được dùng cho một tài khoản khác.",
+      invalid_email: "Email không hợp lệ.",
+    };
+    pushToast(known[message] ?? genericMessage);
   }
 
   async function handleCreate(input: CreateTheraAccountInput) {

@@ -1432,6 +1432,10 @@ export async function updateTheraAccount(
  * decides content, language decides wording). Added 2026-09-05. */
 export interface CreateTheraAccountInput {
   username: string;
+  // Optional real, deliverable email. When set, the account signs in and
+  // resets its password by this address; when empty the Edge Function falls
+  // back to a synthetic <username>@thera.local (username-only login).
+  email: string | null;
   password: string;
   full_name: string;
   account_type: TheraAccountType;
