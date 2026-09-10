@@ -851,38 +851,37 @@ export function RoutineView() {
           <div style={{ marginBottom: 10, fontSize: 12, color: "var(--text-muted)" }}>
             Nhập <b>Tiêu đề + Link</b> rồi bấm <b>Lưu thay đổi</b> để thêm/sửa. Để trống <b>Link</b> (hoặc bấm <b>Xoá</b>) là app tự <b>ẩn</b> mục này ở màn ngày tập — theo từng thị trường.
           </div>
-          <FieldLabel>Tiêu đề ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
+          <FieldLabel>Tiêu đề</FieldLabel>
           <input
             value={supportToolsLabel[dayMarketTab]}
             onChange={(e) => setSupportToolsLabel((v) => ({ ...v, [dayMarketTab]: e.target.value }))}
             placeholder="Ví dụ: Tài liệu bổ sung, bài đọc thêm…"
-            style={{ ...inputStyle, marginBottom: 6 }}
+            style={{ ...inputStyle, marginBottom: 10 }}
           />
-          <div style={{ marginBottom: 14 }}>
-            <GhostBtn onClick={() => setSupportToolsLabel({ vn: supportToolsLabel[dayMarketTab], us: supportToolsLabel[dayMarketTab], malay: supportToolsLabel[dayMarketTab] })}>
-              Dùng tên này cho cả 3 thị trường
-            </GhostBtn>
-          </div>
-          <FieldLabel>Link ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})</FieldLabel>
+          <FieldLabel>Link</FieldLabel>
           <input
             value={supportToolsUrl[dayMarketTab]}
             onChange={(e) => setSupportToolsUrl((v) => ({ ...v, [dayMarketTab]: e.target.value }))}
             placeholder="https://..."
-            style={{ ...inputStyle, marginBottom: 6 }}
+            style={{ ...inputStyle, marginBottom: 12 }}
           />
-          <div style={{ marginBottom: 12 }}>
-            <GhostBtn
-              onClick={() =>
-                setSupportToolsUrl({ vn: supportToolsUrl[dayMarketTab], us: supportToolsUrl[dayMarketTab], malay: supportToolsUrl[dayMarketTab] })
-              }
-            >
-              Dùng link này cho cả 3 thị trường
-            </GhostBtn>
-          </div>
-          {/* Clear = hide: empties the tool name + link so the app hides the
-              button. Two scopes — this market only, or all three. Only takes
+          {/* This editor always acts on the ONE market picked in the outer
+              "Thị trường" selector — markets are managed independently, so there
+              is exactly one per-market Clear and no cross-market delete. "Dùng
+              cho cả 3 thị trường" stays as an optional convenience: it copies
+              this market's title + link into all three at once. Both only take
               effect after "Lưu thay đổi". */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <GhostBtn
+              disabled={!(supportToolsUrl[dayMarketTab].trim() || supportToolsLabel[dayMarketTab].trim())}
+              onClick={() => {
+                setSupportToolsLabel({ vn: supportToolsLabel[dayMarketTab], us: supportToolsLabel[dayMarketTab], malay: supportToolsLabel[dayMarketTab] });
+                setSupportToolsUrl({ vn: supportToolsUrl[dayMarketTab], us: supportToolsUrl[dayMarketTab], malay: supportToolsUrl[dayMarketTab] });
+                pushToast('Đã áp nội dung thêm cho cả 3 thị trường — bấm "Lưu thay đổi" để áp dụng');
+              }}
+            >
+              Dùng cho cả 3 thị trường
+            </GhostBtn>
             <GhostBtn
               color="var(--error)"
               disabled={!(supportToolsUrl[dayMarketTab].trim() || supportToolsLabel[dayMarketTab].trim())}
@@ -892,18 +891,7 @@ export function RoutineView() {
                 pushToast('Đã xoá nội dung thêm — bấm "Lưu thay đổi" để áp dụng');
               }}
             >
-              Xoá nội dung ({MARKET_TABS.find(([k]) => k === dayMarketTab)?.[1]})
-            </GhostBtn>
-            <GhostBtn
-              color="var(--error)"
-              disabled={![supportToolsUrl.vn, supportToolsUrl.us, supportToolsUrl.malay, supportToolsLabel.vn, supportToolsLabel.us, supportToolsLabel.malay].some((s) => s.trim())}
-              onClick={() => {
-                setSupportToolsLabel(EMPTY_MARKET_CONTENT);
-                setSupportToolsUrl(EMPTY_MARKET_CONTENT);
-                pushToast('Đã xoá nội dung thêm ở cả 3 thị trường — bấm "Lưu thay đổi" để áp dụng');
-              }}
-            >
-              Xoá ở cả 3 thị trường
+              Xoá nội dung
             </GhostBtn>
           </div>
         </Modal>
