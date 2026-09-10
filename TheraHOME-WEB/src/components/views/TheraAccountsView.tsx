@@ -167,8 +167,9 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
   }
 
   const usernameValid = USERNAME_RE.test(username.trim());
-  // Email is optional; when given it must be a real, deliverable address.
-  const emailValid = email.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  // Login is by email only now (owner, 2026-09-10), so every issued account
+  // must have a real, deliverable email — it's required, not optional.
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const passwordsMatch = password.length >= 8 && password === confirmPassword;
   const canSubmit = !!fullName.trim() && usernameValid && emailValid && passwordsMatch && !submitting;
 
@@ -252,8 +253,11 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       <FieldLabel>Tên hiển thị</FieldLabel>
       <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ví dụ: App Review iOS" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Username</FieldLabel>
-      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 14 }} />
-      <FieldLabel>Email (tùy chọn)</FieldLabel>
+      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 6 }} />
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+        Tên hiển thị trong app / cộng đồng. <b>Không</b> dùng để đăng nhập — đăng nhập bằng email bên dưới.
+      </div>
+      <FieldLabel>Email</FieldLabel>
       <input
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -268,8 +272,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
         <div style={{ fontSize: 12.5, color: "var(--error)", marginBottom: 14 }}>Email không hợp lệ.</div>
       ) : (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
-          Có email thật → đăng nhập bằng email và đặt lại mật khẩu qua email. Bỏ trống → hệ thống tự dùng{" "}
-          <code>username@thera.local</code> (chỉ đăng nhập bằng username, không đặt lại mật khẩu qua email được).
+          Bắt buộc — tài khoản <b>đăng nhập vào app bằng email này</b> (và đặt lại mật khẩu qua email).
         </div>
       )}
       <PasswordField label="Password" value={password} onChange={setPassword} placeholder="Tối thiểu 8 ký tự" style={{ marginBottom: 14 }} />
@@ -554,7 +557,7 @@ export function TheraAccountsView() {
 
   return (
     <TableShell
-      subtitle="Tài khoản đặc biệt do Admin cấp — App Review / QA toàn quyền không khoá, nhân viên (CSKH), tester. Khách hàng thường tự đăng ký trong app; tab này chỉ dành cho những quyền self-service không có. Đăng nhập bằng Username hoặc Email + mật khẩu."
+      subtitle="Tài khoản đặc biệt do Admin cấp — App Review / QA toàn quyền không khoá, nhân viên (CSKH), tester. Khách hàng thường tự đăng ký trong app; tab này chỉ dành cho những quyền self-service không có. Đăng nhập vào app bằng Email + mật khẩu."
       action={
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <MarketSelect options={MARKET_FILTER_TABS} value={marketFilter} onChange={setMarketFilter} />
