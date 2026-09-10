@@ -37,9 +37,38 @@ import { useWebAccess } from "@/components/AccessGate";
 
 // 'admin' excluded — there is exactly one admin account (seeded directly by
 // a migration, see current_web_roles()'s account_type fallback), not
-// creatable here.
-const ACCOUNT_TYPE_OPTIONS: TheraAccountType[] = ["admin_issued", "review", "staff", "partner", "tester", "cskh"];
+// creatable here. Ordered by how this tab is actually used: full-access /
+// no-lock accounts first (its main purpose — customers self-register in the
+// app, so this tab exists for the privileged accounts self-service can't
+// make), then staff, then the "behaves like a real customer" types.
+const ACCOUNT_TYPE_OPTIONS: TheraAccountType[] = ["review", "cskh", "tester", "partner", "staff", "admin_issued"];
 const ACCESS_LEVEL_OPTIONS: TheraAccessLevel[] = ["free", "premium", "admin_granted"];
+
+// What each type actually DOES in the app, so the person creating one sees the
+// consequence rather than a bare enum. Only `review` bypasses the customer
+// gates (see the app's `accountType === 'review'` checks: day-locks, block/
+// expiry, full catalog); every other type walks the real activation flow.
+const CAPABILITY_META: Record<TheraAccountType, { tag: string; locked: boolean; desc: string }> = {
+  review: {
+    tag: "Toàn quyền · không khoá",
+    locked: false,
+    desc: "Thấy mọi tính năng ngay, KHÔNG cần mua/kích hoạt, KHÔNG bao giờ bị khoá hay hết hạn, vào thẳng Home. Dùng cho Apple/Google App Review và QA/test nội bộ toàn diện.",
+  },
+  cskh: {
+    tag: "Nhân viên hỗ trợ",
+    locked: false,
+    desc: "Vào console CSKH + kiểm duyệt cộng đồng. Là nhân viên, không có lộ trình bệnh nhân.",
+  },
+  tester: {
+    tag: "Như khách thật",
+    locked: false,
+    desc: "Đi qua đúng luồng khách: phải kích hoạt sản phẩm mới mở lộ trình, có khoá ngày — để test trải nghiệm thực tế.",
+  },
+  partner: { tag: "Như khách thật", locked: false, desc: "Đối tác. Trải nghiệm như khách: phải kích hoạt sản phẩm." },
+  staff: { tag: "Như khách thật", locked: false, desc: "Nhân viên (không phải CSKH). Trải nghiệm như khách: phải kích hoạt." },
+  admin_issued: { tag: "Như khách thật", locked: false, desc: "Người dùng được cấp thủ công. Trải nghiệm như khách: phải kích hoạt." },
+  admin: { tag: "", locked: false, desc: "" },
+};
 
 // Market filter. The DB code for the UK/EU/US market is "US" while the label
 // everywhere in the UI is "UK" — same mapping RoutineView/ProductsView use.
@@ -108,11 +137,12 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [accountType, setAccountType] = useState<TheraAccountType>("admin_issued");
-  const [accessLevel, setAccessLevel] = useState<TheraAccessLevel>("free");
+  // Defaults to the tab's main purpose: a full-access, never-locked account.
+  const [accountType, setAccountType] = useState<TheraAccountType>("review");
+  const [accessLevel, setAccessLevel] = useState<TheraAccessLevel>("admin_granted");
   const [country, setCountry] = useState<TheraAccountCountry>("VN");
   const [expiresAt, setExpiresAt] = useState("");
-  const [onboardingRequired, setOnboardingRequired] = useState(true);
+  const [onboardingRequired, setOnboardingRequired] = useState(false);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -123,11 +153,16 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
   const isReview = accountType === "review";
 
   function handleAccountTypeChange(next: TheraAccountType) {
+    const wasReview = accountType === "review";
     setAccountType(next);
     if (next === "review") {
       setAccessLevel("admin_granted"); // full access
       setOnboardingRequired(false); // straight into Home
       setExpiresAt(""); // never expires
+    } else if (wasReview) {
+      // Leaving the full-access preset: back to customer-like defaults.
+      setAccessLevel("free");
+      setOnboardingRequired(true);
     }
   }
 
@@ -173,6 +208,47 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
         </Fragment>
       }
     >
+      {/* Customers self-register in the app now, so this tab is purpose-first:
+          it exists for the privileged accounts self-service can't make. */}
+      <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.5 }}>
+        Khách hàng tự đăng ký trong app. Tab này chỉ để tạo <b>tài khoản đặc biệt</b>: App Review / QA
+        toàn quyền không khoá, nhân viên, và tester — những quyền self-service không có.
+      </div>
+
+      <FieldLabel>Mục đích / Loại tài khoản</FieldLabel>
+      <select value={accountType} onChange={(e) => handleAccountTypeChange(e.target.value as TheraAccountType)} style={{ ...inputStyle, marginBottom: 10 }}>
+        {ACCOUNT_TYPE_OPTIONS.map((k) => (
+          <option key={k} value={k}>
+            {ACCOUNT_TYPE_META[k]}{CAPABILITY_META[k].tag ? ` — ${CAPABILITY_META[k].tag}` : ""}
+          </option>
+        ))}
+      </select>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 18,
+          padding: "10px 12px",
+          borderRadius: 10,
+          background: isReview ? "rgba(30,158,94,0.10)" : "rgba(0,0,0,0.03)",
+          border: isReview ? "1px solid rgba(30,158,94,0.35)" : "1px solid var(--border-input)",
+        }}
+      >
+        {isReview ? (
+          <Icon name="shield" size={16} color="#1E9E5E" />
+        ) : (
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: "var(--text-muted)", marginTop: 5, flexShrink: 0 }} />
+        )}
+        <div style={{ fontSize: 12.5, color: "var(--text-primary)", lineHeight: 1.5 }}>
+          <b>{CAPABILITY_META[accountType].tag}</b> — {CAPABILITY_META[accountType].desc}
+          {isReview ? (
+            <div style={{ marginTop: 4, color: "var(--text-muted)" }}>
+              Quyền truy cập, Onboarding và Ngày hết hạn đã được đặt sẵn &amp; ẩn để không cấu hình nhầm (Apple 2.1).
+            </div>
+          ) : null}
+        </div>
+      </div>
+
       <FieldLabel>Tên hiển thị</FieldLabel>
       <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ví dụ: App Review iOS" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Username</FieldLabel>
@@ -186,7 +262,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
         autoComplete="off"
         name="thera-new-account-email"
         placeholder="Ví dụ: review@therahomeai.com"
-        style={{ ...inputStyle, marginBottom: email.trim() && !emailValid ? 6 : 6 }}
+        style={{ ...inputStyle, marginBottom: 6 }}
       />
       {email.trim() && !emailValid ? (
         <div style={{ fontSize: 12.5, color: "var(--error)", marginBottom: 14 }}>Email không hợp lệ.</div>
@@ -201,31 +277,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       {confirmPassword && !passwordsMatch ? (
         <div style={{ fontSize: 12.5, color: "var(--error)", marginTop: -10, marginBottom: 14 }}>Mật khẩu nhập lại không khớp.</div>
       ) : null}
-      <FieldLabel>Loại tài khoản</FieldLabel>
-      <select value={accountType} onChange={(e) => handleAccountTypeChange(e.target.value as TheraAccountType)} style={{ ...inputStyle, marginBottom: isReview ? 10 : 14 }}>
-        {ACCOUNT_TYPE_OPTIONS.map((k) => (
-          <option key={k} value={k}>{ACCOUNT_TYPE_META[k]}</option>
-        ))}
-      </select>
-      {isReview ? (
-        <div style={{ display: "flex", gap: 8, marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "rgba(30,158,94,0.10)", border: "1px solid rgba(30,158,94,0.35)" }}>
-          <Icon name="shield" size={16} color="#1E9E5E" />
-          <div style={{ fontSize: 12.5, color: "var(--text-primary)", lineHeight: 1.5 }}>
-            <b>App Review (Apple)</b> — tài khoản này <b>toàn quyền</b>, thấy mọi tính năng và <b>không bao giờ bị khoá / hết hạn</b> (yêu cầu Apple 2.1). Quyền truy cập, Onboarding và Ngày hết hạn đã được đặt sẵn và khoá lại để không cấu hình nhầm.
-          </div>
-        </div>
-      ) : null}
-      <FieldLabel>Quyền truy cập</FieldLabel>
-      <select
-        value={isReview ? "admin_granted" : accessLevel}
-        onChange={(e) => setAccessLevel(e.target.value as TheraAccessLevel)}
-        disabled={isReview}
-        style={{ ...inputStyle, marginBottom: 14, opacity: isReview ? 0.6 : 1, cursor: isReview ? "not-allowed" : "pointer" }}
-      >
-        {ACCESS_LEVEL_OPTIONS.map((k) => (
-          <option key={k} value={k}>{ACCESS_LEVEL_META[k]}</option>
-        ))}
-      </select>
+
       <FieldLabel>Quốc gia / Thị trường</FieldLabel>
       <select value={country} onChange={(e) => setCountry(e.target.value as TheraAccountCountry)} style={{ ...inputStyle, marginBottom: 6 }}>
         {COUNTRY_OPTIONS.map((k) => (
@@ -236,40 +288,45 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
         Quyết định giá bán, link sản phẩm, video lộ trình và bài ghim mà tài khoản này thấy trong app.
         Ngôn ngữ hiển thị vẫn theo máy của người dùng, không theo ô này.
       </div>
-      <FieldLabel>Ngày hết hạn (tùy chọn)</FieldLabel>
-      <input
-        value={isReview ? "" : expiresAt}
-        onChange={(e) => setExpiresAt(e.target.value)}
-        type="date"
-        disabled={isReview}
-        placeholder={isReview ? "Không hết hạn" : undefined}
-        style={{ ...inputStyle, marginBottom: 14, opacity: isReview ? 0.6 : 1, cursor: isReview ? "not-allowed" : "auto" }}
-      />
-      <FieldLabel>Yêu cầu onboarding</FieldLabel>
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        {([[true, "Có"], [false, "Không"]] as const).map(([v, l]) => (
-          <button
-            key={l}
-            onClick={() => !isReview && setOnboardingRequired(v)}
-            disabled={isReview}
-            style={{
-              flex: 1,
-              border: onboardingRequired === v ? "none" : "1px solid var(--border-input)",
-              background: onboardingRequired === v ? "var(--color-primary)" : "none",
-              color: onboardingRequired === v ? "#fff" : "var(--text-primary)",
-              borderRadius: 10,
-              padding: "9px 0",
-              fontFamily: "var(--font-family)",
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: isReview ? "not-allowed" : "pointer",
-              opacity: isReview && onboardingRequired !== v ? 0.5 : 1,
-            }}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
+
+      {/* Access / expiry / onboarding only matter for the customer-like types.
+          App Review is forced to its full-access, never-locked preset, so these
+          are hidden entirely for it. */}
+      {!isReview ? (
+        <Fragment>
+          <FieldLabel>Quyền truy cập</FieldLabel>
+          <select value={accessLevel} onChange={(e) => setAccessLevel(e.target.value as TheraAccessLevel)} style={{ ...inputStyle, marginBottom: 14 }}>
+            {ACCESS_LEVEL_OPTIONS.map((k) => (
+              <option key={k} value={k}>{ACCESS_LEVEL_META[k]}</option>
+            ))}
+          </select>
+          <FieldLabel>Ngày hết hạn (tùy chọn)</FieldLabel>
+          <input value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} type="date" style={{ ...inputStyle, marginBottom: 14 }} />
+          <FieldLabel>Yêu cầu onboarding</FieldLabel>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {([[true, "Có"], [false, "Không"]] as const).map(([v, l]) => (
+              <button
+                key={l}
+                onClick={() => setOnboardingRequired(v)}
+                style={{
+                  flex: 1,
+                  border: onboardingRequired === v ? "none" : "1px solid var(--border-input)",
+                  background: onboardingRequired === v ? "var(--color-primary)" : "none",
+                  color: onboardingRequired === v ? "#fff" : "var(--text-primary)",
+                  borderRadius: 10,
+                  padding: "9px 0",
+                  fontFamily: "var(--font-family)",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </Fragment>
+      ) : null}
       <FieldLabel>Ghi chú</FieldLabel>
       <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
     </Modal>
@@ -497,7 +554,7 @@ export function TheraAccountsView() {
 
   return (
     <TableShell
-      subtitle="Tài khoản do Admin cấp trực tiếp — App Review, nhân viên, đối tác, tester, chăm sóc khách hàng. Đăng nhập bằng Username/Password, không dùng Google/Apple."
+      subtitle="Tài khoản đặc biệt do Admin cấp — App Review / QA toàn quyền không khoá, nhân viên (CSKH), tester. Khách hàng thường tự đăng ký trong app; tab này chỉ dành cho những quyền self-service không có. Đăng nhập bằng Username hoặc Email + mật khẩu."
       action={
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <MarketSelect options={MARKET_FILTER_TABS} value={marketFilter} onChange={setMarketFilter} />
