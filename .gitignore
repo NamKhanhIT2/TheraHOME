@@ -16,3 +16,8 @@
 **/supabase/.temp/
 **/supabase/.branches/
 **/.temp/
+
+# Local DB backups (never commit — contains PII)
+backups/
+*.dump
+*.dump.gpg

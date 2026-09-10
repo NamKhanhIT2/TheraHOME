@@ -1,0 +1,73 @@
+# Free-tier safety net: Supabase Free has NO managed backups (daily backups
+# and Point-in-Time Recovery are Pro-only), so this workflow takes its place.
+# It runs on GitHub's runners (not your Mac), dumps the whole database with
+# pg_dump, encrypts it (AES-256) so the artifact is never plaintext PII, and
+# stores it as a downloadable build artifact.
+#
+# One-time setup — GitHub → repo → Settings → Secrets and variables → Actions:
+#   SUPABASE_DB_URL     Dashboard → Connect → "Session pooler" URI (IPv4, works
+#                       from CI), password included. Looks like:
+#                       postgresql://postgres.nyjvtvmllwbyfokldgtj:PWD@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
+#   BACKUP_PASSPHRASE   any long random string; you need it to decrypt. Keep it
+#                       somewhere safe OUTSIDE this repo (a password manager).
+#
+# Restore later:
+#   gpg --batch --passphrase "$BACKUP_PASSPHRASE" -d db-YYYYMMDD.dump.gpg > db.dump
+#   pg_restore --clean --if-exists -d "$SUPABASE_DB_URL" db.dump
+
+name: DB Backup
+
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 18:00 UTC = 01:00 giờ VN, hằng ngày
+  workflow_dispatch: {}      # cho phép chạy tay từ tab Actions
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — skip until secrets are set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::SUPABASE_DB_URL secret is not set yet — skipping (add it in repo Settings → Secrets)."
+            echo "skip=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install PostgreSQL 17 client
+        if: env.skip != 'true'
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Dump + encrypt
+        if: env.skip != 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
+            echo "::error::BACKUP_PASSPHRASE secret is not set."; exit 1
+          fi
+          STAMP="$(date -u +%Y%m%d-%H%M)"
+          OUT="db-${STAMP}.dump.gpg"
+          /usr/lib/postgresql/17/bin/pg_dump -Fc --no-owner --no-privileges "$SUPABASE_DB_URL" \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "$BACKUP_PASSPHRASE" -o "$OUT"
+          ls -lh "$OUT"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        if: env.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OUT }}
+          path: ${{ env.OUT }}
+          retention-days: 30
