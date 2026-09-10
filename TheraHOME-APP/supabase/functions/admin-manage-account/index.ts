@@ -108,6 +108,22 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
     return jsonResponse({ error: "invalid_email" }, 400);
   }
 
+  // Staff/issued usernames are unique case-insensitively
+  // (profiles_staff_username_unique_idx on lower(username) for non-'normal'
+  // accounts). Check up front so a collision is a clear 400 the web can name,
+  // instead of surfacing as a 500 only after the auth user already exists.
+  // `_` is a LIKE wildcard and is allowed in usernames, so escape it.
+  const usernamePattern = username.replace(/[_%]/g, (m) => `\\${m}`);
+  const { data: usernameTaken, error: usernameLookupError } = await adminClient
+    .from("profiles")
+    .select("id")
+    .ilike("username", usernamePattern)
+    .neq("account_type", "normal")
+    .limit(1)
+    .maybeSingle();
+  if (usernameLookupError) return fail("username_lookup", usernameLookupError);
+  if (usernameTaken) return jsonResponse({ error: "username_already_registered" }, 400);
+
   const email = providedEmail || `${username}@${SYNTHETIC_EMAIL_DOMAIN}`;
   const { data: created, error: createError } = await adminClient.auth.admin.createUser({
     email,
