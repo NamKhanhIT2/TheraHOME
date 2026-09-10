@@ -80,7 +80,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#F3F7FC"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "extra": {
       "router": {},

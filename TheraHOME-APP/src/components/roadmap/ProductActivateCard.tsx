@@ -133,12 +133,17 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
     paddingHorizontal: 14,
+    // Vertical padding lives on the row, not the TextInput: an iOS TextInput
+    // with its own paddingVertical renders the placeholder low/off-centre.
+    // With zero field padding the text is a bare line the row centres,
+    // aligned with the icon.
+    paddingVertical: 14,
     marginTop: 16,
   },
   input: {
     flex: 1,
     minWidth: 0,
-    paddingVertical: 13,
+    paddingVertical: 0,
     fontSize: 15.5,
   },
 });

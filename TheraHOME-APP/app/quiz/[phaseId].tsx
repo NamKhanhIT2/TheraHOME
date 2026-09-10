@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Alert, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import Reanimated, { FadeIn } from 'react-native-reanimated';
+import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
@@ -12,7 +12,11 @@ import { BackBar } from '@/components/ui/BackBar';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
+import { SurveySuggestion } from '@/components/roadmap/SurveySuggestion';
 import { useI18n } from '@/lib/i18n';
+
+// Soft wellness backdrop for the suggestion screen (owner-supplied).
+const WELLNESS_BG = require('../../assets/suggestion-bg.png');
 
 export default function QuizScreen() {
   const theme = useTheme();
@@ -81,29 +85,19 @@ export default function QuizScreen() {
     const suggestionBody = get('survey_suggestion_body', t('surveySuggestBody'));
     return (
       <ScreenContainer edges={['top']}>
+        <Image source={WELLNESS_BG} resizeMode="cover" style={StyleSheet.absoluteFill} />
         <View style={styles.suggestHeader}>
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel={t('close')}
-            style={[styles.closeBtn, { backgroundColor: theme.colors.bgCardAlt }]}
+            style={[styles.closeBtn, { backgroundColor: 'rgba(255,255,255,0.6)' }]}
           >
             <Icon name="x" size={20} color={theme.colors.textSecondary} />
           </Pressable>
         </View>
-        <Reanimated.View entering={FadeIn.duration(240)} style={styles.suggestBody}>
-          <View style={[styles.suggestIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-            <Icon name="sparkles" size={30} color={theme.colors.primary} />
-          </View>
-          <Text style={[theme.type.h1, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{suggestionTitle}</Text>
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 12, lineHeight: 24 }]}>
-            {suggestionBody}
-          </Text>
-          <Button style={{ width: '100%', marginTop: 28 }} onPress={() => router.back()}>
-            {t('quizContinue')}
-          </Button>
-        </Reanimated.View>
+        <SurveySuggestion title={suggestionTitle} body={suggestionBody} onClose={() => router.back()} />
       </ScreenContainer>
     );
   }
@@ -194,20 +188,5 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  suggestBody: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  suggestIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
   },
 });

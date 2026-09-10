@@ -67,23 +67,20 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, enabled, lo
 
   if (!hasQuiz) return null;
 
-  // Survey not submitted yet: the take-survey prompt (while expanded).
+  // Survey not submitted yet: available. No "take survey" label — just a
+  // brightened, bordered card that invites the tap (per explicit request).
   if (!quizDone) {
     if (collapsed) return null;
     return (
       <Pressable
         onPress={() => router.push({ pathname: '/quiz/[phaseId]', params: { phaseId, productId, phaseName } })}
-        style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}
+        style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.primaryTint05, borderRadius: theme.radius.lg, padding: theme.cardPadding, borderWidth: 1.5, borderColor: theme.colors.primary }]}
       >
         <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
           <Icon name="clipboard-check" size={19} color={theme.colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('quizTitle')}</Text>
-          <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>{phaseName}</Text>
-        </View>
-        <View style={[styles.quizCta, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md }]}>
-          <Text style={[theme.type.captionSm, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]}>{t('quizTakeQuiz')}</Text>
         </View>
       </Pressable>
     );
@@ -93,22 +90,30 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, enabled, lo
 
   // Already answered: the survey is done once, so tapping this row re-opens
   // the "Gợi ý từ TheraHOME" screen (the quiz screen shows the suggestion,
-  // not the questions, once an attempt exists) — per explicit request.
+  // not the questions, once an attempt exists). Plain resting card — no
+  // "Đã hoàn thành" label, no phase name (per explicit request).
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/quiz/[phaseId]', params: { phaseId, productId, phaseName } })}
-      style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, marginBottom: 0 }]}
+      style={[
+        styles.quizRow,
+        theme.shadows.card,
+        {
+          backgroundColor: theme.colors.successTint,
+          borderRadius: theme.radius.lg,
+          padding: theme.cardPadding,
+          marginBottom: 0,
+          // Bright border marks the survey as done (per request).
+          borderWidth: 1.5,
+          borderColor: theme.colors.success,
+        },
+      ]}
     >
-      <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-        <Icon name="clipboard-check" size={19} color={theme.colors.primary} />
+      <View style={[styles.quizIcon, { backgroundColor: theme.colors.successTint }]}>
+        <Icon name="check" size={19} color={theme.colors.success} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('quizTitle')}</Text>
-        <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>{phaseName}</Text>
-      </View>
-      <View style={[styles.doneBadge, { backgroundColor: theme.colors.successTint }]}>
-        <Icon name="check" size={13} color={theme.colors.success} />
-        <Text style={[theme.type.captionSm, { color: theme.colors.success, fontFamily: theme.fontFamily.semiBold }]}>{t('quizCompleted')}</Text>
       </View>
     </Pressable>
   );
@@ -126,17 +131,5 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  quizCta: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  doneBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
   },
 });
