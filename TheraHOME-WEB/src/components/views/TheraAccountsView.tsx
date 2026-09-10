@@ -264,7 +264,10 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       <FieldLabel>Tên hiển thị</FieldLabel>
       <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ví dụ: App Review iOS" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Username</FieldLabel>
-      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 14 }} />
+      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 6 }} />
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+        Tên hiển thị trong app / cộng đồng — <b>có thể trùng</b> với tài khoản khác. Không dùng để đăng nhập.
+      </div>
       <FieldLabel>Email (tùy chọn)</FieldLabel>
       <input
         value={email}
@@ -496,7 +499,9 @@ export function TheraAccountsView() {
       return;
     }
     const known: Record<string, string> = {
-      username_already_registered: "Tên đăng nhập này đã được sử dụng.",
+      // Only reachable when two NO-email accounts would share the synthetic
+      // <username>@thera.local auth email — the username itself may repeat.
+      username_already_registered: "Đã có tài khoản không-email dùng tên này (trùng địa chỉ username@thera.local). Thêm Email hoặc chọn tên khác.",
       email_already_registered: "Email này đã được dùng cho một tài khoản khác.",
       invalid_email: "Email không hợp lệ.",
       password_too_weak: "Mật khẩu chưa đủ mạnh — cần tối thiểu 8 ký tự, gồm chữ, số và ký tự đặc biệt.",
