@@ -19,6 +19,14 @@ const BRANDMARK = require('../../../assets/brandmark-gradient.png');
 //   ~text~  → dimmed (muted colour), for less important lines
 // parseMarkup strips the markers and returns the display text plus a per-char
 // tag, so the typewriter types the clean text and each character keeps its style.
+// Text colours for this screen are FIXED, never theme tokens: the wellness
+// background image is always light, so theme.colors.textPrimary (white in dark
+// mode) made every unmarked line invisible. Same brand palette as the brandmark
+// styles at the bottom of this file — navy body, soft grey for ~dim~, blue for *em*.
+const SUGGESTION_TEXT = '#174C78';
+const SUGGESTION_DIM = '#6E84A2';
+const SUGGESTION_EM = '#078BE4';
+
 type MTag = 'normal' | 'em' | 'dim';
 function parseMarkup(raw: string): { display: string; tags: MTag[] } {
   let display = '';
@@ -237,10 +245,14 @@ export function SurveySuggestion({ title, body, onClose }: { title: string; body
   // Both parts (Phần 1 · Tiêu đề and Phần 2 · Nội dung) share one style — same
   // size, weight and colour, so neither reads as a "heading" over the other
   // (per explicit request).
+  // FIXED colours, not theme tokens: this screen sits on a fixed LIGHT wellness
+  // background image, so in dark mode `textPrimary` came out white and the
+  // whole text vanished into the image (owner screenshot, build 20). Navy /
+  // grey / blue below are the brand colours already used for the brandmark.
   const partTextStyle = {
     fontSize: 20,
     lineHeight: 29,
-    color: theme.colors.textPrimary,
+    color: SUGGESTION_TEXT,
     fontFamily: theme.fontFamily.semiBold,
   };
 
@@ -255,7 +267,7 @@ export function SurveySuggestion({ title, body, onClose }: { title: string; body
     return runs.map((r, i) => (
       <Text
         key={i}
-        style={r.tag === 'em' ? { color: theme.colors.primary } : r.tag === 'dim' ? { color: theme.colors.textMuted } : undefined}
+        style={r.tag === 'em' ? { color: SUGGESTION_EM } : r.tag === 'dim' ? { color: SUGGESTION_DIM } : undefined}
       >
         {r.text}
       </Text>
@@ -335,7 +347,7 @@ export function SurveySuggestion({ title, body, onClose }: { title: string; body
             </Button>
           </Reanimated.View>
         ) : (
-          <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 22 }]}>{t('tapToSkip')}</Text>
+          <Text style={[theme.type.captionSm, { color: SUGGESTION_DIM, marginTop: 22 }]}>{t('tapToSkip')}</Text>
         )
       ) : null}
 

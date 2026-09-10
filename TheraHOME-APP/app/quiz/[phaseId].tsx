@@ -94,7 +94,10 @@ export default function QuizScreen() {
             accessibilityLabel={t('close')}
             style={[styles.closeBtn, { backgroundColor: 'rgba(255,255,255,0.6)' }]}
           >
-            <Icon name="x" size={20} color={theme.colors.textSecondary} />
+            {/* Fixed navy, not a theme token: this X sits on a white disc over the
+                always-light wellness image, so textSecondary (pale in dark mode)
+                made it vanish (owner screenshot, build 20). */}
+            <Icon name="x" size={20} color="#174C78" />
           </Pressable>
         </View>
         <SurveySuggestion title={suggestionTitle} body={suggestionBody} onClose={() => router.back()} />
