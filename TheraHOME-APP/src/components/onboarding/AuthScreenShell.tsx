@@ -8,13 +8,14 @@ import { RunnerDoor } from '@/components/onboarding/RunnerDoor';
 import { AppleLogo } from '@/components/AppleLogo';
 import { GoogleGLogo } from '@/components/GoogleGLogo';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
+import { isPasswordStrongEnough } from '@/lib/authAccount';
 
 const BACKGROUND = require('../../../assets/auth-wellness-background.png');
 const BRANDMARK = require('../../../assets/brandmark-gradient.png');
 const COPY = {
-  vi: { signInTitle: 'Chào mừng trở lại', signInSubtitle: 'Đăng nhập để tiếp tục hành trình chăm sóc sức khỏe', createTitle: 'Tạo tài khoản', createSubtitle: 'Bắt đầu hành trình khỏe mạnh hơn cùng TheraHOME', identity: 'Email hoặc tên đăng nhập', username: 'Tên đăng nhập', email: 'Email', password: 'Mật khẩu', forgot: 'Quên mật khẩu?', signIn: 'Đăng nhập', create: 'Đăng ký', or: 'hoặc', newUser: 'Bạn mới biết đến TheraHOME?', createLink: 'Tạo tài khoản', haveAccount: 'Bạn đã có tài khoản?', signInLink: 'Đăng nhập', legalPrefix: 'Bằng việc tiếp tục, bạn đồng ý với', terms: 'Điều khoản sử dụng', and: 'và', privacy: 'Chính sách quyền riêng tư' },
-  en: { signInTitle: 'Welcome back', signInSubtitle: 'Sign in to continue your wellness journey', createTitle: 'Create account', createSubtitle: 'Begin your healthier journey with TheraHOME', identity: 'Email or username', username: 'Username', email: 'Email', password: 'Password', forgot: 'Forgot password?', signIn: 'Login', create: 'Register', or: 'or', newUser: 'New to TheraHOME?', createLink: 'Create account', haveAccount: 'Already have an account?', signInLink: 'Login', legalPrefix: 'By continuing, you agree to our', terms: 'Terms of Service', and: 'and', privacy: 'Privacy Policy' },
-  ms: { signInTitle: 'Selamat kembali', signInSubtitle: 'Log masuk untuk meneruskan perjalanan kesejahteraan anda', createTitle: 'Cipta akaun', createSubtitle: 'Mulakan perjalanan lebih sihat bersama TheraHOME', identity: 'E-mel atau nama pengguna', username: 'Nama pengguna', email: 'E-mel', password: 'Kata laluan', forgot: 'Lupa kata laluan?', signIn: 'Log masuk', create: 'Daftar', or: 'atau', newUser: 'Baharu di TheraHOME?', createLink: 'Cipta akaun', haveAccount: 'Sudah mempunyai akaun?', signInLink: 'Log masuk', legalPrefix: 'Dengan meneruskan, anda bersetuju dengan', terms: 'Terma Perkhidmatan', and: 'dan', privacy: 'Dasar Privasi' },
+  vi: { signInTitle: 'Chào mừng trở lại', signInSubtitle: 'Đăng nhập để tiếp tục hành trình chăm sóc sức khỏe', createTitle: 'Tạo tài khoản', createSubtitle: 'Bắt đầu hành trình khỏe mạnh hơn cùng TheraHOME', identity: 'Email hoặc tên đăng nhập', username: 'Tên đăng nhập', email: 'Email', password: 'Mật khẩu', passwordHint: 'Tối thiểu 8 ký tự · gồm chữ, số và ký tự đặc biệt', forgot: 'Quên mật khẩu?', signIn: 'Đăng nhập', create: 'Đăng ký', or: 'hoặc', newUser: 'Bạn mới biết đến TheraHOME?', createLink: 'Tạo tài khoản', haveAccount: 'Bạn đã có tài khoản?', signInLink: 'Đăng nhập', legalPrefix: 'Bằng việc tiếp tục, bạn đồng ý với', terms: 'Điều khoản sử dụng', and: 'và', privacy: 'Chính sách quyền riêng tư' },
+  en: { signInTitle: 'Welcome back', signInSubtitle: 'Sign in to continue your wellness journey', createTitle: 'Create account', createSubtitle: 'Begin your healthier journey with TheraHOME', identity: 'Email or username', username: 'Username', email: 'Email', password: 'Password', passwordHint: 'At least 8 characters · a letter, a number and a special character', forgot: 'Forgot password?', signIn: 'Login', create: 'Register', or: 'or', newUser: 'New to TheraHOME?', createLink: 'Create account', haveAccount: 'Already have an account?', signInLink: 'Login', legalPrefix: 'By continuing, you agree to our', terms: 'Terms of Service', and: 'and', privacy: 'Privacy Policy' },
+  ms: { signInTitle: 'Selamat kembali', signInSubtitle: 'Log masuk untuk meneruskan perjalanan kesejahteraan anda', createTitle: 'Cipta akaun', createSubtitle: 'Mulakan perjalanan lebih sihat bersama TheraHOME', identity: 'E-mel atau nama pengguna', username: 'Nama pengguna', email: 'E-mel', password: 'Kata laluan', passwordHint: 'Sekurang-kurangnya 8 aksara · huruf, nombor dan aksara khas', forgot: 'Lupa kata laluan?', signIn: 'Log masuk', create: 'Daftar', or: 'atau', newUser: 'Baharu di TheraHOME?', createLink: 'Cipta akaun', haveAccount: 'Sudah mempunyai akaun?', signInLink: 'Log masuk', legalPrefix: 'Dengan meneruskan, anda bersetuju dengan', terms: 'Terma Perkhidmatan', and: 'dan', privacy: 'Dasar Privasi' },
 } satisfies Record<AppLanguage, Record<string, string>>;
 
 export interface AuthFormValues { username: string; email: string; password: string }
@@ -41,7 +42,7 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
-  const canContinue = creating ? !!username.trim() && !!email.trim() && !!password : !!username.trim() && !!password;
+  const canContinue = creating ? !!username.trim() && !!email.trim() && isPasswordStrongEnough(password) : !!username.trim() && !!password;
   return (
     <AuthLayout brandGap={creating ? 26 : 38}>
       <>
@@ -67,6 +68,11 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
                   <TextInput value={password} onChangeText={setPassword} onFocus={() => setPasswordFocused(true)} onBlur={() => setPasswordFocused(false)} placeholder={copy.password} placeholderTextColor="#8292AA" secureTextEntry={!showPassword} textContentType={creating ? 'newPassword' : 'password'} autoCapitalize="none" style={styles.input} />
                   <Pressable accessibilityRole="button" onPress={() => setShowPassword((value) => !value)} hitSlop={10}><Icon name={showPassword ? 'eye-off' : 'eye'} size={22} color="#627999" /></Pressable>
                 </View>
+                {creating ? (
+                  <Text style={{ fontSize: 12, marginTop: 6, marginLeft: 4, color: password.length > 0 && !isPasswordStrongEnough(password) ? '#D14343' : '#6E84A2' }}>
+                    {copy.passwordHint}
+                  </Text>
+                ) : null}
               </View>
               {!creating ? <Pressable accessibilityRole="button" onPress={onForgot} style={styles.forgot}><Text style={styles.link}>{copy.forgot}</Text></Pressable> : null}
               {error ? <Text style={styles.error}>{error}</Text> : null}

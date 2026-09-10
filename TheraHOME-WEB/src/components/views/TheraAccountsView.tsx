@@ -101,6 +101,14 @@ function toDateInputValue(iso: string | null) {
 // to stay a valid email local-part once the `.local` suffix is appended.
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 
+// Password policy (owner, 2026-09-10) — kept in sync with the app
+// (authAccount.ts) and the admin-manage-account Edge Function: at least 8
+// characters mixing a letter, a digit and a special character.
+function isPasswordStrongEnough(pw: string): boolean {
+  return pw.length >= 8 && /[A-Za-z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
+}
+const PASSWORD_HINT = "Tối thiểu 8 ký tự, gồm chữ, số và ký tự đặc biệt.";
+
 function PasswordField({ label, value, onChange, placeholder, style }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; style?: React.CSSProperties }) {
   const [visible, setVisible] = useState(false);
   return (
@@ -170,8 +178,9 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
   // Login is by email only now (owner, 2026-09-10), so every issued account
   // must have a real, deliverable email — it's required, not optional.
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const passwordsMatch = password.length >= 8 && password === confirmPassword;
-  const canSubmit = !!fullName.trim() && usernameValid && emailValid && passwordsMatch && !submitting;
+  const passwordStrong = isPasswordStrongEnough(password);
+  const passwordsMatch = password === confirmPassword;
+  const canSubmit = !!fullName.trim() && usernameValid && emailValid && passwordStrong && passwordsMatch && !submitting;
 
   async function submit() {
     if (!canSubmit) return;
@@ -275,7 +284,8 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
           Bắt buộc — tài khoản <b>đăng nhập vào app bằng email này</b> (và đặt lại mật khẩu qua email).
         </div>
       )}
-      <PasswordField label="Password" value={password} onChange={setPassword} placeholder="Tối thiểu 8 ký tự" style={{ marginBottom: 14 }} />
+      <PasswordField label="Password" value={password} onChange={setPassword} placeholder="Tối thiểu 8 ký tự" style={{ marginBottom: 6 }} />
+      <div style={{ fontSize: 12, color: password.length > 0 && !passwordStrong ? "var(--error)" : "var(--text-muted)", marginBottom: 14 }}>{PASSWORD_HINT}</div>
       <PasswordField label="Nhập lại Password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Nhập lại để xác nhận" style={{ marginBottom: 14 }} />
       {confirmPassword && !passwordsMatch ? (
         <div style={{ fontSize: 12.5, color: "var(--error)", marginTop: -10, marginBottom: 14 }}>Mật khẩu nhập lại không khớp.</div>
@@ -423,8 +433,10 @@ function ResetPasswordModal({ account, onClose, onReset }: { account: TheraAccou
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const passwordStrong = isPasswordStrongEnough(password);
+
   async function submit() {
-    if (password.length < 8 || submitting) return;
+    if (!passwordStrong || submitting) return;
     setSubmitting(true);
     try {
       await onReset(password);
@@ -441,12 +453,13 @@ function ResetPasswordModal({ account, onClose, onReset }: { account: TheraAccou
       footer={
         <Fragment>
           <GhostBtn onClick={onClose}>Hủy</GhostBtn>
-          <PrimaryBtn onClick={submit} disabled={submitting || password.length < 8}>{submitting ? "Đang lưu..." : "Đặt lại mật khẩu"}</PrimaryBtn>
+          <PrimaryBtn onClick={submit} disabled={submitting || !passwordStrong}>{submitting ? "Đang lưu..." : "Đặt lại mật khẩu"}</PrimaryBtn>
         </Fragment>
       }
     >
       <FieldLabel>Mật khẩu mới</FieldLabel>
-      <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Tối thiểu 8 ký tự" autoComplete="new-password" name="thera-reset-password" style={inputStyle} />
+      <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Tối thiểu 8 ký tự" autoComplete="new-password" name="thera-reset-password" style={{ ...inputStyle, marginBottom: 6 }} />
+      <div style={{ fontSize: 12, color: password.length > 0 && !passwordStrong ? "var(--error)" : "var(--text-muted)" }}>{PASSWORD_HINT}</div>
       <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--text-muted)" }}>
         Admin không thể xem lại mật khẩu cũ — chỉ có thể đặt mật khẩu mới.
       </div>
@@ -486,6 +499,8 @@ export function TheraAccountsView() {
       username_already_registered: "Tên đăng nhập này đã được sử dụng.",
       email_already_registered: "Email này đã được dùng cho một tài khoản khác.",
       invalid_email: "Email không hợp lệ.",
+      password_too_weak: "Mật khẩu chưa đủ mạnh — cần tối thiểu 8 ký tự, gồm chữ, số và ký tự đặc biệt.",
+      password_too_short: "Mật khẩu chưa đủ mạnh — cần tối thiểu 8 ký tự, gồm chữ, số và ký tự đặc biệt.",
     };
     pushToast(known[message] ?? genericMessage);
   }

@@ -34,6 +34,12 @@ const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 // (SQL) maps a typed username back to this address at login time.
 const SYNTHETIC_EMAIL_DOMAIN = "thera.local";
 
+// Password policy (owner, 2026-09-10) — same rule as the app (authAccount.ts)
+// and the web admin: >= 8 chars mixing a letter, a digit and a special char.
+function isPasswordStrongEnough(pw: string): boolean {
+  return pw.length >= 8 && /[A-Za-z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -120,8 +126,8 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
   if (!COUNTRIES.includes(country)) {
     return jsonResponse({ error: "invalid_country" }, 400);
   }
-  if (password.length < 8) {
-    return jsonResponse({ error: "password_too_short" }, 400);
+  if (!isPasswordStrongEnough(password)) {
+    return jsonResponse({ error: "password_too_weak" }, 400);
   }
   // A provided email must be a real, deliverable address — never one on the
   // synthetic domain (that would defeat the point and collide with a
@@ -309,8 +315,8 @@ async function handleResetPassword(adminClient: any, payload: Record<string, unk
   if (!userId || !newPassword) {
     return jsonResponse({ error: "missing_required_field" }, 400);
   }
-  if (newPassword.length < 8) {
-    return jsonResponse({ error: "password_too_short" }, 400);
+  if (!isPasswordStrongEnough(newPassword)) {
+    return jsonResponse({ error: "password_too_weak" }, 400);
   }
   const { error } = await adminClient.auth.admin.updateUserById(userId, { password: newPassword });
   if (error) {

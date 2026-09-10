@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { AuthLayout, AuthInput, PrimaryAuthButton, authStyles as s } from '@/components/onboarding/AuthScreenShell';
-import { AuthError, authErrorKey, updatePassword } from '@/lib/authAccount';
+import { AuthError, authErrorKey, isPasswordStrongEnough, updatePassword } from '@/lib/authAccount';
 import { useI18n } from '@/lib/i18n';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -43,10 +43,11 @@ export default function ResetPasswordScreen() {
       <Text style={s.subtitle}>{t('authNewPasswordSubtitle')}</Text>
       <View style={s.fields}>
         <AuthInput icon="lock" value={password} onChangeText={setPassword} placeholder={t('authNewPassword')} secureTextEntry textContentType="newPassword" />
+        <Text style={{ fontSize: 12, marginTop: 6, marginLeft: 4, color: password.length > 0 && !isPasswordStrongEnough(password) ? '#D14343' : '#6E84A2' }}>{t('passwordHint')}</Text>
         <AuthInput icon="lock" value={confirm} onChangeText={setConfirm} placeholder={t('authConfirmPassword')} secureTextEntry textContentType="newPassword" />
       </View>
       {error ? <Text style={s.error}>{error}</Text> : null}
-      <PrimaryAuthButton disabled={!password || !confirm || busy} busy={busy} label={t('authSavePassword')} onPress={() => void submit()} />
+      <PrimaryAuthButton disabled={!isPasswordStrongEnough(password) || password !== confirm || busy} busy={busy} label={t('authSavePassword')} onPress={() => void submit()} />
     </AuthLayout>
   );
 }

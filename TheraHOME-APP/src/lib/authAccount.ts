@@ -78,8 +78,16 @@ export function isUsernameWellFormed(username: string): boolean {
  * password in the app is set through one of the two functions below. */
 const PASSWORD_MIN_LENGTH = 8;
 
+/** Password policy (owner, 2026-09-10): at least 8 characters, and must mix a
+ * letter, a digit and a special character. Kept in sync with the same rule in
+ * the web admin and the admin-manage-account Edge Function. */
 export function isPasswordStrongEnough(password: string): boolean {
-  return password.length >= PASSWORD_MIN_LENGTH;
+  return (
+    password.length >= PASSWORD_MIN_LENGTH &&
+    /[A-Za-z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+  );
 }
 
 /**
