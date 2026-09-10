@@ -51,10 +51,16 @@ export interface ProfileRow {
   notifyReplies: boolean;
   notifyReactions: boolean;
   notifyCommunity: boolean;
+  // Set by the `delete_account` RPC when the user deletes their account. The
+  // account is also banned at the auth layer (so it can't sign back in), but
+  // RootNavigator (app/_layout.tsx) treats a non-null value as a hard signal
+  // to sign out immediately — belt-and-suspenders in case a live session
+  // outlives the ban, or support ever clears the ban without the profile.
+  deletedAt: string | null;
 }
 
 const PROFILE_COLUMNS =
-  'full_name, email, phone, avatar_url, treatment_area, goal, language, language_explicit, data_sharing_enabled, daily_reminder_enabled, daily_reminder_time, evening_reminder_enabled, evening_reminder_time, locked, expires_at, onboarding_completed, country_confirmed, country, notify_comments, notify_replies, notify_reactions, notify_community, account_type';
+  'full_name, email, phone, avatar_url, treatment_area, goal, language, language_explicit, data_sharing_enabled, daily_reminder_enabled, daily_reminder_time, evening_reminder_enabled, evening_reminder_time, locked, expires_at, onboarding_completed, country_confirmed, country, notify_comments, notify_replies, notify_reactions, notify_community, account_type, deleted_at';
 
 export function useProfile(userId: string | undefined) {
   return useQuery({
@@ -86,6 +92,7 @@ export function useProfile(userId: string | undefined) {
         notifyReplies: data.notify_replies,
         notifyReactions: data.notify_reactions,
         notifyCommunity: data.notify_community,
+        deletedAt: data.deleted_at,
       };
     },
     enabled: !!userId,

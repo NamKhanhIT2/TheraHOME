@@ -51,3 +51,4 @@ google-play-service-account.json
 # The listing copy and screenshots next to it ARE tracked (see play-assets/).
 *.aab
 *.apk
+scripts/testers-credentials.csv

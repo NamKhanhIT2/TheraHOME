@@ -249,6 +249,15 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     language,
   ]);
 
+  // A deleted account (delete_account sets profiles.deleted_at and bans the
+  // auth row) must never stay in the app. The ban already blocks re-login, so
+  // this only fires for a session that outlived the ban; sign out so the gate
+  // falls back to onboarding rather than showing a scrubbed, empty shell.
+  useEffect(() => {
+    if (!profile?.deletedAt) return;
+    void supabase.auth.signOut().catch((e: unknown) => { if (__DEV__) console.warn('signOut (deleted) failed:', e); });
+  }, [profile?.deletedAt]);
+
   useEffect(() => {
     if (!profile || blockedReason) return;
     // App Review accounts are never blocked or expired (per explicit
