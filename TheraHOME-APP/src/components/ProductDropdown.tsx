@@ -80,7 +80,7 @@ export function ProductDropdown({ product, products, onSelect }: ProductDropdown
               style={[
                 styles.menu,
                 theme.shadows.card,
-                { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md },
+                { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.borderInput },
               ]}
             >
               {products.map((p) => (

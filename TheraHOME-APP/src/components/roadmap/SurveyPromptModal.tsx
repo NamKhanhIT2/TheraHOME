@@ -25,10 +25,10 @@ export function SurveyPromptModal({ phaseName, onTake, onLater }: SurveyPromptMo
   const { t } = useI18n();
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onLater}>
-      <Pressable style={styles.backdrop} onPress={onLater}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={onLater}>
         <Pressable
           onPress={(event) => event.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}
         >
           <View style={[styles.icon, { backgroundColor: theme.colors.primaryTint10 }]}>
             <Icon name="clipboard-check" size={26} color={theme.colors.primary} />
@@ -53,7 +53,6 @@ export function SurveyPromptModal({ phaseName, onTake, onLater }: SurveyPromptMo
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,

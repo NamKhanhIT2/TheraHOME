@@ -246,13 +246,13 @@ export default function HumanChatScreen() {
           onCancelReply={() => setReplyingTo(null)}
         />
         {viewer ? <ChatMediaViewer uri={viewer.uri} kind={viewer.kind} onClose={() => setViewer(null)} /> : null}
-        <Modal visible={!!actionMessage} transparent animationType="none" onRequestClose={() => { setActionMessage(null); setActionOrigin(null); }}><Pressable style={styles.backdrop} onPress={() => { setActionMessage(null); setActionOrigin(null); }}><View style={[styles.actionContent, { top: actionTop, ...(actionOwn ? { right: 16 } : { left: 16 }) }]}><View style={[styles.reactionBar, { backgroundColor: theme.colors.bgCard }]}>{REACTIONS.map((emoji) => <Pressable key={emoji} style={[styles.reactionChoice, selectedActionEmoji === emoji ? { backgroundColor: theme.colors.bgCardAlt } : undefined]} onPress={() => actionMessage && void react(actionMessage, emoji)}><ReactionAsset emoji={emoji} size={29} /></Pressable>)}</View><View style={[styles.sheet, { backgroundColor: theme.colors.bgCard }]}><ActionRow icon="message-circle" text={t('reply')} onPress={() => void action('reply')} /><ActionRow icon="copy" text={t('copyText')} onPress={() => void action('copy')} /></View></View></Pressable></Modal>
+        <Modal visible={!!actionMessage} transparent animationType="none" onRequestClose={() => { setActionMessage(null); setActionOrigin(null); }}><Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={() => { setActionMessage(null); setActionOrigin(null); }}><View style={[styles.actionContent, { top: actionTop, ...(actionOwn ? { right: 16 } : { left: 16 }) }]}><View style={[styles.reactionBar, { backgroundColor: theme.colors.bgCard, borderWidth: 1, borderColor: theme.colors.divider }]}>{REACTIONS.map((emoji) => <Pressable key={emoji} style={[styles.reactionChoice, selectedActionEmoji === emoji ? { backgroundColor: theme.colors.bgCardAlt } : undefined]} onPress={() => actionMessage && void react(actionMessage, emoji)}><ReactionAsset emoji={emoji} size={29} /></Pressable>)}</View><View style={[styles.sheet, { backgroundColor: theme.colors.bgCard, borderWidth: 1, borderColor: theme.colors.divider }]}><ActionRow icon="message-circle" text={t('reply')} onPress={() => void action('reply')} /><ActionRow icon="copy" text={t('copyText')} onPress={() => void action('copy')} /></View></View></Pressable></Modal>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
 
-function ActionRow({ icon, text, onPress }: { icon: string; text: string; onPress: () => void }) { const theme = useTheme(); return <Pressable style={styles.actionRow} onPress={onPress}><Icon name={icon} size={19} color={theme.colors.textPrimary} /><Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{text}</Text></Pressable>; }
+function ActionRow({ icon, text, onPress }: { icon: string; text: string; onPress: () => void }) { const theme = useTheme(); return <Pressable style={[styles.actionRow, { borderBottomColor: theme.colors.divider }]} onPress={onPress}><Icon name={icon} size={19} color={theme.colors.textPrimary} /><Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{text}</Text></Pressable>; }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -269,11 +269,11 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 12, paddingVertical: 14, gap: 2, flexGrow: 1, justifyContent: 'flex-end' },
   messageRow: { width: '100%' },
   messageTime: { alignSelf: 'center', fontSize: 10, lineHeight: 14, marginVertical: 3 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.24)' },
+  backdrop: { flex: 1 },
   actionContent: { position: 'absolute', gap: 12, alignItems: 'flex-end' },
   reactionBar: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 40, paddingHorizontal: 14, paddingVertical: 11 },
   reactionChoice: { borderRadius: 20, padding: 2 },
   sheet: { width: 230, borderRadius: 20, overflow: 'hidden' },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#D5D9E0' },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   listBottomSpacer: { height: 8 },
 });

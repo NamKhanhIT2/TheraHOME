@@ -66,8 +66,8 @@ function TimeRow({ icon, title, sub, value, onChange, isLast }: { icon: string; 
         <Text style={[theme.type.bodyStrong, { color: theme.colors.primaryDark, fontFamily: theme.fontFamily.bold }]}>{value}</Text>
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <View style={[styles.timeSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+        <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={() => setOpen(false)}>
+          <View style={[styles.timeSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}>
             <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.timeOptions}>
               {TIME_OPTIONS.map((t) => (
                 <Pressable
@@ -287,7 +287,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,24,34,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,

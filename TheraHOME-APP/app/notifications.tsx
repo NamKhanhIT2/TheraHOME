@@ -204,11 +204,11 @@ export default function NotificationInboxScreen() {
                 const bodyText = notification.type === 'schedule' && notification.relatedDayNumber != null ? t('dayUnlockedBody') : notification.body;
                 return <Pressable key={notification.id} onPress={() => openNotification(notification)} style={[styles.row, index < displayedItems.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.divider } : null, { backgroundColor: notification.read ? 'transparent' : theme.colors.primaryTint05 }]}>
                   <View style={styles.avatarWrap}>
-                    {notification.actorAvatarUrl ? <RemoteImage uri={notification.actorAvatarUrl} contentFit="cover" style={[styles.avatarImage, { backgroundColor: theme.colors.bgCardAlt }]} /> : useBrandAvatar ? <Image source={THERAHOME_AVATAR} style={styles.avatarImage} /> : useSpecialistAvatar ? <Image source={SPECIALIST_AVATAR} style={styles.avatarImage} /> : <View style={[styles.initialAvatar, { backgroundColor: notificationStyle.bg }]}><Text style={[styles.initials, { color: notificationStyle.color }]}>{initials(actorName)}</Text></View>}
+                    {notification.actorAvatarUrl ? <RemoteImage uri={notification.actorAvatarUrl} contentFit="cover" style={[styles.avatarImage, { backgroundColor: theme.colors.bgCardAlt }]} /> : useBrandAvatar ? <Image source={THERAHOME_AVATAR} style={[styles.avatarImage, { backgroundColor: theme.colors.bgCardAlt }]} /> : useSpecialistAvatar ? <Image source={SPECIALIST_AVATAR} style={[styles.avatarImage, { backgroundColor: theme.colors.bgCardAlt }]} /> : <View style={[styles.initialAvatar, { backgroundColor: notificationStyle.bg }]}><Text style={[styles.initials, { color: notificationStyle.color }]}>{initials(actorName)}</Text></View>}
                     {reactionEmoji ? (
-                      <View style={[styles.actionBadge, styles.reactionBadge]}><Text style={styles.reactionBadgeEmoji}>{reactionEmoji}</Text></View>
+                      <View style={[styles.actionBadge, { borderColor: theme.colors.bgCard, backgroundColor: theme.colors.bgCard }]}><Text style={styles.reactionBadgeEmoji}>{reactionEmoji}</Text></View>
                     ) : (
-                      <View style={[styles.actionBadge, { backgroundColor: notificationStyle.color }]}><Icon name={notificationStyle.icon} size={14} color="#fff" strokeWidth={2.4} /></View>
+                      <View style={[styles.actionBadge, { borderColor: theme.colors.bgCard, backgroundColor: notificationStyle.color }]}><Icon name={notificationStyle.icon} size={14} color="#fff" strokeWidth={2.4} /></View>
                     )}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
@@ -263,11 +263,10 @@ const styles = StyleSheet.create({
   groupCard: { overflow: 'hidden' },
   row: { flexDirection: 'row', gap: 9, alignItems: 'flex-start', paddingVertical: 8, paddingLeft: 12, paddingRight: 8 },
   avatarWrap: { width: 42, height: 42, flexShrink: 0, position: 'relative' },
-  avatarImage: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#EAF2FE' },
+  avatarImage: { width: 42, height: 42, borderRadius: 21 },
   initialAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   initials: { fontSize: 14, fontWeight: '800' },
-  actionBadge: { position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  reactionBadge: { backgroundColor: '#fff' },
+  actionBadge: { position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   reactionBadgeEmoji: { fontSize: 13 },
   thumbnail: { width: 40, height: 40, borderRadius: 8, flexShrink: 0, marginLeft: 4 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

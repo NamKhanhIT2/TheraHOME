@@ -14,6 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 import { useOnboardingContent } from '@/hooks/useOnboardingContent';
@@ -455,6 +456,8 @@ export default function QuestionsScreen() {
     <ScreenContainer style={isShowcaseQuestion ? styles.priorityScreen : undefined}>
       {isShowcaseQuestion ? (
         <>
+          {/* priorityScreen paints a fixed light background regardless of theme. */}
+          <StatusBar style="dark" />
           <Animated.View
             pointerEvents="none"
             style={[

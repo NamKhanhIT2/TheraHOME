@@ -398,12 +398,6 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 20,
   },
-  videoLoader: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#fff',
-  },
   videoTip: {
     flexDirection: 'row',
     alignItems: 'flex-start',

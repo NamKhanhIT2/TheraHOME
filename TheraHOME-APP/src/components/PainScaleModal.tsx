@@ -110,10 +110,10 @@ export function PainScaleModal({ dayId, onCancel, onConfirm, submitting }: PainS
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={submitting ? undefined : onCancel}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={submitting ? undefined : onCancel}>
         <Pressable
           onPress={(e) => e.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.space[5] }]}
+          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider, padding: theme.space[5] }]}
         >
           <Text style={[theme.type.h2, { color: theme.colors.textPrimary }]}>
             {t('day')} {dayId} · {t('discomfortToday')}
@@ -141,7 +141,6 @@ export function PainScaleModal({ dayId, onCancel, onConfirm, submitting }: PainS
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,24,34,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,

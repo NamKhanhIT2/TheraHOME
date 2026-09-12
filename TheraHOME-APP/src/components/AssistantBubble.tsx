@@ -104,13 +104,15 @@ export function AssistantBubble({ onOpenAIChat, onOpenSupportChat, bottomOffset 
         <View style={[styles.badge, { backgroundColor: theme.colors.success, borderColor: theme.dark ? theme.colors.bgApp : '#fff' }]} />
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+        <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={() => setOpen(false)}>
           <Pressable
             onPress={(e) => e.stopPropagation()}
             style={[
               styles.sheet,
               {
                 backgroundColor: theme.colors.bgCard,
+                borderWidth: 1,
+                borderColor: theme.colors.divider,
                 borderTopLeftRadius: theme.radius.lg,
                 borderTopRightRadius: theme.radius.lg,
                 paddingBottom: 24 + insets.bottom,
@@ -218,7 +220,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,24,34,0.45)',
     justifyContent: 'flex-end',
   },
   sheet: {

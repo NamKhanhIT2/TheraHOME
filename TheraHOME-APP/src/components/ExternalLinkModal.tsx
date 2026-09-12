@@ -57,11 +57,11 @@ export function ExternalLinkModal({ url, onClose }: ExternalLinkModalProps) {
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
       {submitting ? null : (
         <Reanimated.View entering={FadeIn.duration(180)} style={styles.backdropFill}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={onClose}>
           <Reanimated.View entering={FadeIn.duration(220).delay(40).easing(Easing.out(Easing.quad))}>
           <Pressable
             onPress={(e) => e.stopPropagation()}
-            style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.space[5] }]}
+            style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider, padding: theme.space[5] }]}
           >
             <View style={[styles.iconCircle, { backgroundColor: theme.colors.bgCardAlt }]}>
               <Icon name="external-link" size={20} color={theme.colors.textSecondary} />
@@ -95,7 +95,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,24,34,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,

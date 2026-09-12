@@ -331,6 +331,8 @@ export function PainChart({ data }: PainChartProps) {
                 left: Math.max(12, Math.min(menuAnchor.x - 76, windowWidth - 112)),
                 backgroundColor: theme.colors.bgCard,
                 borderRadius: theme.radius.md,
+                borderWidth: 1,
+                borderColor: theme.colors.divider,
               },
             ]}
           >

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
@@ -85,6 +86,8 @@ export default function QuizScreen() {
     const suggestionBody = get('survey_suggestion_body', t('surveySuggestBody'));
     return (
       <ScreenContainer edges={['top']}>
+        {/* Always-light wellness image: override the theme-driven global StatusBar. */}
+        <StatusBar style="dark" />
         <Image source={WELLNESS_BG} resizeMode="cover" style={StyleSheet.absoluteFill} />
         <View style={styles.suggestHeader}>
           <Pressable

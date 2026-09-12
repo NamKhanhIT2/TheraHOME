@@ -225,8 +225,8 @@ export default function ActivationScreen() {
         </Card>
 
         <Modal visible={codePickerOpen} transparent animationType="fade" onRequestClose={() => setCodePickerOpen(false)}>
-          <Pressable style={styles.codeOverlay} onPress={() => setCodePickerOpen(false)}>
-            <Pressable onPress={() => undefined} style={[styles.codeSheet, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+          <Pressable style={[styles.codeOverlay, { backgroundColor: theme.colors.overlayScrim }]} onPress={() => setCodePickerOpen(false)}>
+            <Pressable onPress={() => undefined} style={[styles.codeSheet, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}>
               {DIALLING_CODES.map((entry) => {
                 const selected = entry.code === activeCode;
                 return (
@@ -265,7 +265,6 @@ const styles = StyleSheet.create({
   },
   codeOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(9,17,28,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
