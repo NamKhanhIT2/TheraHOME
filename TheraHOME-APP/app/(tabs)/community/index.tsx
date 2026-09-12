@@ -598,7 +598,7 @@ export default function CommunityScreen() {
       <Modal visible={!!menuTarget} transparent animationType="none" onRequestClose={() => setMenuTarget(null)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuTarget(null)}>
           {menuTarget ? <View style={[styles.menuAnchor, { top: Math.max(12, Math.min(menuTarget.y + 8, WINDOW_HEIGHT - 290)), left: Math.max(12, Math.min(menuTarget.x - 180, WINDOW_WIDTH - 202)) }]}>
-            <View style={[styles.menu, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md }]}> 
+            <View style={[styles.menu, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.divider }]}>
               <Pressable onPress={() => handleMenuAction(menuTarget.post, 'save')} style={styles.menuItem}><Icon name="bookmark" size={15} color={theme.colors.textSecondary} /><Text style={[theme.type.caption, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.semiBold }]}>{savedSet.has(menuTarget.post.id) ? t('unsave') : t('savePost')}</Text></Pressable>
               <Pressable onPress={() => handleMenuAction(menuTarget.post, 'hide')} style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: theme.colors.divider }]}><Icon name="eye" size={15} color={theme.colors.textSecondary} /><Text style={[theme.type.caption, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.semiBold }]}>{t('hidePost')}</Text></Pressable>
               {menuTarget.post.authorId === userId ? <Pressable onPress={() => handleMenuAction(menuTarget.post, 'delete')} style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: theme.colors.divider }]}><Icon name="trash-2" size={15} color={theme.colors.error} /><Text style={[theme.type.caption, { color: theme.colors.error, fontFamily: theme.fontFamily.semiBold }]}>{t('deletePost')}</Text></Pressable> : <>
@@ -612,7 +612,7 @@ export default function CommunityScreen() {
 
       <Modal visible={!!reportTarget} transparent animationType="fade" onRequestClose={() => setReportTarget(null)}>
         <Pressable style={[styles.reportBackdrop, { paddingBottom: 28 + insets.bottom }]} onPress={() => setReportTarget(null)}>
-          <Pressable style={[styles.reportSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+          <Pressable style={[styles.reportSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}>
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginBottom: 4 }]}>{t('reportPost')}</Text>
             <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginBottom: 14 }]}>{t('chooseReportReason')}</Text>
             {reportReasons.map((r) => (
@@ -779,7 +779,9 @@ const styles = StyleSheet.create({
   },
   menuBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(10, 18, 34, 0.08)',
+    // Was 0.08 — effectively no scrim, so the anchored menu had no separation
+    // from a dark page in dark mode (owner report 2026-09-12).
+    backgroundColor: 'rgba(20, 24, 34, 0.30)',
   },
   menuAnchor: {
     position: 'absolute',
@@ -855,6 +857,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
+    // Scrim (same value as DeleteAccountModal). Without it the sheet relied on
+    // shadows.card alone, which is invisible on a dark background — in dark
+    // mode the popup blended into the page (owner report 2026-09-12).
+    backgroundColor: 'rgba(20, 24, 34, 0.45)',
   },
   reportSheet: {
     width: '100%',
