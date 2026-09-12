@@ -39,10 +39,10 @@ export function ProductVideoModal({ title, url, onClose }: ProductVideoModalProp
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={onClose}>
         <Pressable
           onPress={(event) => event.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}
         >
           <View style={styles.header}>
             <Text numberOfLines={2} style={[theme.type.h2, { color: theme.colors.textPrimary, flex: 1 }]}>{title}</Text>
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backdrop: { flex: 1, backgroundColor: 'rgba(20,24,34,0.55)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   card: { width: '100%', maxWidth: 520, padding: 16, overflow: 'hidden' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   video: { width: '100%', aspectRatio: 16 / 9, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 12 },

@@ -17,10 +17,10 @@ export function ShareStoryModal({ onClose, onSupport, onShare }: ShareStoryModal
   const { t } = useI18n();
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={onClose}>
         <Pressable
           onPress={(e) => e.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.space[5] }]}
+          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider, padding: theme.space[5] }]}
         >
           {/* hitSlop pads the touch target to ~56pt — the visible 32pt disc
               alone was below Apple's 44pt minimum and reported hard to hit. */}
@@ -50,7 +50,6 @@ export function ShareStoryModal({ onClose, onSupport, onShare }: ShareStoryModal
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,24,34,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,

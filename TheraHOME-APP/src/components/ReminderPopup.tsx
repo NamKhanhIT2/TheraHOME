@@ -107,8 +107,8 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
 
   return (
     <Modal visible transparent animationType="fade">
-      <View style={styles.backdrop}>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+      <View style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]}>
+        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}>
           <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('reminderPopupTitle')}</Text>
           <View style={styles.rows}>
             <ToggleRow icon="sun" label={t('morning')} time={morningTime} value={morningOn} onChange={setMorningOn} onPressTime={() => setPickingTimeFor('morning')} />
@@ -128,8 +128,8 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
       </View>
 
       <Modal visible={!!pickingTimeFor} transparent animationType="fade" onRequestClose={() => setPickingTimeFor(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setPickingTimeFor(null)}>
-          <View style={[styles.timeSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+        <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={() => setPickingTimeFor(null)}>
+          <View style={[styles.timeSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}>
             <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.timeOptions}>
               {TIME_OPTIONS.map((time) => {
                 const current = pickingTimeFor === 'morning' ? morningTime : eveningTime;
@@ -158,7 +158,6 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,24,34,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 28,

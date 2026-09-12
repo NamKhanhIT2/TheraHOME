@@ -124,7 +124,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
             ) : (
               <Image source={{ uri: attachment.uri }} style={styles.preview} />
             )}
-            <Pressable onPress={onRemoveAttachment} style={styles.remove} hitSlop={6}>
+            <Pressable onPress={onRemoveAttachment} style={[styles.remove, { borderColor: theme.colors.bgApp }]} hitSlop={6}>
               <Icon name="x" size={12} color="#fff" />
             </Pressable>
           </View>
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   attachmentTray: { paddingHorizontal: 16, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
   preview: { width: 76, height: 76, borderRadius: 12 },
   videoPreview: { backgroundColor: '#202838', alignItems: 'center', justifyContent: 'center' },
-  remove: { position: 'absolute', right: -7, top: -7, width: 21, height: 21, borderRadius: 11, backgroundColor: '#E5484D', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  remove: { position: 'absolute', right: -7, top: -7, width: 21, height: 21, borderRadius: 11, backgroundColor: '#E5484D', alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
   tool: { width: 34, height: 40, alignItems: 'center', justifyContent: 'center' },
   input: { flex: 1, minWidth: 0, maxHeight: 112, borderWidth: 1, borderRadius: 20, paddingVertical: 9, paddingHorizontal: 14, fontSize: 15 },

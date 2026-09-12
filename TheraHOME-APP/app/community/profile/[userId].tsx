@@ -106,9 +106,9 @@ export default function CommunityProfileScreen() {
             <Text style={[theme.type.caption, styles.bio, { color: theme.colors.textSecondary }]}>{t('officialBio')}</Text>
           ) : (
             <View style={styles.stats}>
-              <View style={styles.stat}><Text style={styles.statValue}>🔥 {profile!.currentStreak}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('dayStreak')}</Text></View>
-              <View style={[styles.stat, { borderLeftColor: theme.colors.divider }]}><Text style={styles.statValue}>✓ {profile!.completedPrograms}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('completedRoadmaps')}</Text></View>
-              <View style={[styles.stat, { borderLeftColor: theme.colors.divider }]}><Text style={styles.statValue}>📝 {profile!.postsCount}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('sharedPosts')}</Text></View>
+              <View style={styles.stat}><Text style={[styles.statValue, { color: theme.colors.textPrimary }]}>🔥 {profile!.currentStreak}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('dayStreak')}</Text></View>
+              <View style={[styles.stat, { borderLeftColor: theme.colors.divider }]}><Text style={[styles.statValue, { color: theme.colors.textPrimary }]}>✓ {profile!.completedPrograms}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('completedRoadmaps')}</Text></View>
+              <View style={[styles.stat, { borderLeftColor: theme.colors.divider }]}><Text style={[styles.statValue, { color: theme.colors.textPrimary }]}>📝 {profile!.postsCount}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('sharedPosts')}</Text></View>
             </View>
           )}
         </View>
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   bio: { textAlign: 'center', marginTop: 8, lineHeight: 20 },
   stats: { flexDirection: 'row', width: '100%', marginTop: 18 },
   stat: { flex: 1, alignItems: 'center', gap: 2, borderLeftWidth: 1 },
-  statValue: { fontSize: 15, fontWeight: '800', color: '#16213A' },
+  statValue: { fontSize: 15, fontWeight: '800' },
   tabs: { gap: 8, paddingVertical: 18, paddingRight: 20 },
   tab: { borderWidth: 1, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 14 },
   post: { borderRadius: 16, padding: 15 },

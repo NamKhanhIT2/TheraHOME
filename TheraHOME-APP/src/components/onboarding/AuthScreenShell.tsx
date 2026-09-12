@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Animated, Image, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icons/Icon';
 import { RunnerDoor } from '@/components/onboarding/RunnerDoor';
@@ -111,6 +112,8 @@ export function AuthLayout({ children, brandGap = 38 }: { children: React.ReactN
   const insets = useSafeAreaInsets();
   return (
     <ImageBackground source={BACKGROUND} resizeMode="cover" style={styles.screen}>
+      {/* Fixed light palette: override the theme-driven global StatusBar. */}
+      <StatusBar style="dark" />
       <View pointerEvents="none" style={styles.softOverlay} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 16 }]}>

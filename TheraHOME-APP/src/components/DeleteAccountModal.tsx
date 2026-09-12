@@ -38,10 +38,10 @@ export function DeleteAccountModal({ onCancel }: DeleteAccountModalProps) {
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={onCancel}>
+      <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={onCancel}>
         <Pressable
           onPress={(e) => e.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.space[5] }]}
+          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider, padding: theme.space[5] }]}
         >
           <View style={[styles.iconCircle, { backgroundColor: theme.colors.errorTint }]}>
             <Icon name="lock" size={20} color={theme.colors.error} />
@@ -75,7 +75,6 @@ export function DeleteAccountModal({ onCancel }: DeleteAccountModalProps) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,24,34,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,

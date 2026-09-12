@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import Reanimated, {
   Easing,
   runOnJS,
@@ -111,6 +112,8 @@ export function MascotLampIntro({ onDone }: { onDone: () => void }) {
         setSize((s) => (s.w === width && s.h === height ? s : { w: width, h: height }));
       }}
     >
+      {/* Fixed dark backdrop: override the theme-driven global StatusBar while the intro shows. */}
+      <StatusBar style="light" />
       <Reanimated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} />
 
       {/* Mascot, spotlit under the cone. */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useQueryClient } from '@tanstack/react-query';
@@ -94,6 +95,8 @@ export default function ConsentScreen() {
   if (loading) {
     return (
       <View style={[styles.analyzingRoot, { backgroundColor: ANALYZING_BG, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        {/* Fixed dark background: override the theme-driven global StatusBar while this screen shows. */}
+        <StatusBar style="light" />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('backLabel')}
