@@ -629,7 +629,10 @@ export default function CommunityScreen() {
 
       {toast ? (
         <View style={[styles.toast, { backgroundColor: theme.colors.textPrimary, borderRadius: theme.radius.md }]}>
-          <Text style={[theme.type.caption, { color: '#fff', textAlign: 'center' }]}>{toast}</Text>
+          {/* Inverse-of-theme pill: dark on light, light on dark. The text must
+              invert with it — a fixed '#fff' vanished in dark mode, where
+              textPrimary (the pill) is itself white (owner report 2026-09-12). */}
+          <Text style={[theme.type.caption, { color: theme.colors.bgCard, textAlign: 'center' }]}>{toast}</Text>
         </View>
       ) : null}
     </ScreenContainer>

@@ -241,7 +241,9 @@ export default function CreatePostScreen() {
                   <Image source={{ uri: item.uri }} style={[styles.mediaThumb, { borderRadius: theme.radius.sm }]} resizeMode="cover" />
                 )}
                 <Pressable onPress={() => removeMedia(index)} style={[styles.removeThumb, { backgroundColor: theme.colors.textPrimary }]}>
-                  <Icon name="x" size={12} color="#fff" />
+                  {/* Inverse-of-theme disc: the icon must invert too, or it is
+                      white-on-white in dark mode (owner report 2026-09-12). */}
+                  <Icon name="x" size={12} color={theme.colors.bgCard} />
                 </Pressable>
               </View>
             ))}
