@@ -117,10 +117,12 @@ function askSecret(question) {
 }
 
 // The two accounts. Keep these in sync with docs/qa-android-test-plan.md.
+// Home greets with the LAST word of full_name, so no name ends in brackets —
+// 'QA Giao diện (Android)' greeted the tester as "Chào, (Android)".
 const ACCOUNTS = [
   {
     username: 'uitester',
-    full_name: 'QA Giao diện (Android)',
+    full_name: 'QA Giao diện Android',
     account_type: 'review',
     access_level: 'admin_granted',
     // Skip the questionnaire: this account exists to inspect screens, and the
@@ -131,7 +133,7 @@ const ACCOUNTS = [
   },
   {
     username: 'qatester',
-    full_name: 'QA Chức năng (Android)',
+    full_name: 'QA Chức năng Android',
     account_type: 'tester',
     access_level: 'free',
     // Start at the very beginning: the questionnaire is itself under test.
