@@ -13,8 +13,14 @@ khách thật*.
 | Bộ câu hỏi đầu vào | Bỏ qua | Phải làm |
 | Duyệt bài cộng đồng | Lên thẳng, không giới hạn tần suất | Vào hàng chờ duyệt, có giới hạn |
 
-Tạo tài khoản: `node scripts/create-android-qa-accounts.mjs` (xem đầu file
-script để biết biến môi trường). Mật khẩu sinh ra tại máy bạn và ghi vào
+Tạo tài khoản: `node scripts/create-android-qa-accounts.mjs` chạy trong thư mục
+`TheraHOME-APP`. Script tự đọc URL + khoá publishable từ `.env`, rồi **hỏi email
+và mật khẩu admin ngay tại dòng lệnh** (mật khẩu không hiện ra, không vào lịch sử
+shell). Đừng truyền mật khẩu qua biến môi trường: zsh tương tác nuốt `!` và `$`,
+nên mật khẩu đúng chính sách vẫn tới server ở dạng sai — đó chính là lỗi
+`invalid_credentials` ngày 13/09.
+
+Mật khẩu hai tài khoản QA sinh ra tại máy bạn và ghi vào
 `scripts/android-qa-credentials.csv` (đã git-ignore).
 
 Email kích hoạt `qatester@thera.local` đã nằm sẵn trong allow-list TheraNECK+.
