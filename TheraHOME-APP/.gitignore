@@ -51,4 +51,6 @@ google-play-service-account.json
 # The listing copy and screenshots next to it ARE tracked (see play-assets/).
 *.aab
 *.apk
+# Account credentials the QA scripts generate on your machine — never commit.
 scripts/testers-credentials.csv
+scripts/android-qa-credentials.csv
