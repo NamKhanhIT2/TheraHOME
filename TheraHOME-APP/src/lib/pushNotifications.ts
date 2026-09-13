@@ -222,6 +222,12 @@ export function registerLocalReminderInboxSync(getUserId: () => string | undefin
   return () => subscription.remove();
 }
 
+// Keyed per USER as well as per day: the marker used to be
+// "<kind>_<date>" alone, so on a device where two accounts signed in on the
+// same day the first one claimed the day and every later account silently got
+// no inbox row at all (found 2026-09-13 — the owner's own account claimed the
+// morning marker at 09:50 and both QA accounts were skipped for the rest of
+// the day). Old markers in the previous format simply never match again.
 const REMINDER_BACKFILL_KEY_PREFIX = 'thera_reminder_backfilled_';
 
 /** A local reminder's OS trigger only fires while the device is on, and
@@ -246,7 +252,7 @@ const REMINDER_BACKFILL_KEY_PREFIX = 'thera_reminder_backfilled_';
  * and covers any caller added later. */
 const backfillInFlight = new Set<string>();
 
-async function backfillTodayReminderIfDue(kind: ReminderKind, enabled: boolean, time: string, title: string, body: string, destination: string): Promise<void> {
+async function backfillTodayReminderIfDue(userId: string, kind: ReminderKind, enabled: boolean, time: string, title: string, body: string, destination: string): Promise<void> {
   if (!enabled) return;
   const [hour, minute] = time.split(':').map(Number);
   if (Number.isNaN(hour) || Number.isNaN(minute)) return;
@@ -255,7 +261,7 @@ async function backfillTodayReminderIfDue(kind: ReminderKind, enabled: boolean, 
   if (now.getHours() < hour || (now.getHours() === hour && now.getMinutes() < minute)) return;
 
   const dateKey = localDateString(now);
-  const storageKey = `${REMINDER_BACKFILL_KEY_PREFIX}${kind}_${dateKey}`;
+  const storageKey = `${REMINDER_BACKFILL_KEY_PREFIX}${userId}_${kind}_${dateKey}`;
   if (backfillInFlight.has(storageKey)) return;
   const already = await AsyncStorage.getItem(storageKey).catch(() => null);
   if (already) return;
@@ -277,6 +283,7 @@ async function backfillTodayReminderIfDue(kind: ReminderKind, enabled: boolean, 
  * resolves the same copy `scheduleDailyReminder`/`scheduleEveningReminder`
  * would have scheduled, then backfills each into the inbox if due. */
 export async function backfillTodaysReminders(
+  userId: string | undefined,
   dailyEnabled: boolean,
   dailyTime: string,
   eveningEnabled: boolean,
@@ -284,12 +291,15 @@ export async function backfillTodaysReminders(
   language: AppLanguage = 'vi',
   dayNumber?: number,
 ): Promise<void> {
+  // No signed-in user means there is no inbox to write to, and writing under
+  // a device-wide key is exactly the bug this parameter exists to prevent.
+  if (!userId) return;
   const dailyFallback = { title: translate(language, 'dailyReminderTitle'), body: translate(language, 'dailyReminderBody', { day: dayNumber ?? '' }) };
   const dailyCopy = await resolveSystemTemplate('daily_workout', language, dailyFallback, { day: dayNumber ?? '' });
-  await backfillTodayReminderIfDue('daily', dailyEnabled, dailyTime, dailyCopy.title, dailyCopy.body, 'roadmap');
+  await backfillTodayReminderIfDue(userId, 'daily', dailyEnabled, dailyTime, dailyCopy.title, dailyCopy.body, 'roadmap');
 
   const eveningFallback = { title: translate(language, 'dailyReminderTitle'), body: translate(language, 'eveningReminderBody') };
   const eveningCopy = await resolveSystemTemplate('evening_reminder', language, eveningFallback, {});
-  await backfillTodayReminderIfDue('evening', eveningEnabled, eveningTime, eveningCopy.title, eveningCopy.body, 'roadmap');
+  await backfillTodayReminderIfDue(userId, 'evening', eveningEnabled, eveningTime, eveningCopy.title, eveningCopy.body, 'roadmap');
 }
 

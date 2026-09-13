@@ -142,7 +142,8 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // additionally touches it on every foreground, throttled client-side so a
   // user bouncing in and out doesn't spam the RPC.
   useEffect(() => {
-    if (!session?.user.id) return;
+    const activeUserId = session?.user.id;
+    if (!activeUserId) return;
     const touch = () => {
       const now = Date.now();
       if (now - lastLoginTouchRef.current < LAST_LOGIN_TOUCH_MIN_INTERVAL_MS) return;
@@ -161,7 +162,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
       if (!s) return;
       void (async () => {
         try {
-          await backfillTodaysReminders(s.dailyEnabled, s.dailyTime, s.eveningEnabled, s.eveningTime, s.language, s.dayNumber);
+          await backfillTodaysReminders(activeUserId, s.dailyEnabled, s.dailyTime, s.eveningEnabled, s.eveningTime, s.language, s.dayNumber);
         } catch (error) {
           if (__DEV__) console.warn('Reminder inbox sync skipped while offline:', error);
         }
@@ -235,12 +236,13 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
       .catch((error: unknown) => {
         if (__DEV__) console.warn('Evening reminder scheduling failed:', error);
       });
-    void backfillTodaysReminders(profile.dailyReminderEnabled, profile.dailyReminderTime, profile.eveningReminderEnabled, profile.eveningReminderTime, language as AppLanguage, currentDay)
+    void backfillTodaysReminders(userId, profile.dailyReminderEnabled, profile.dailyReminderTime, profile.eveningReminderEnabled, profile.eveningReminderTime, language as AppLanguage, currentDay)
       .catch((error: unknown) => {
         if (__DEV__) console.warn('Reminder inbox backfill skipped while offline:', error);
       });
   }, [
     inApp,
+    userId,
     profile?.dailyReminderEnabled,
     profile?.dailyReminderTime,
     profile?.eveningReminderEnabled,
