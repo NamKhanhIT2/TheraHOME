@@ -65,26 +65,54 @@ if (!ANON_KEY) {
 // Asking at the prompt instead of taking ADMIN_PASSWORD from the environment:
 // an interactive zsh expands ! and $ inside an unquoted value, so a password
 // that obeys the letter+digit+symbol policy often reaches the server mangled —
-// which is exactly what "invalid_credentials" looked like on 2026-09-13. Typed
-// here it is never mangled, never lands in shell history, and is never echoed.
-function ask(question, hidden) {
+// which is exactly what "invalid_credentials" looked like on 2026-09-13.
+function ask(question) {
   return new Promise((resolve) => {
     const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    let masked = false;
-    if (hidden) {
-      masked = true;
-      const onData = () => {
-        if (masked) process.stdout.write(`\x1B[2K\x1B[200D${question}`);
-      };
-      process.stdin.on('data', onData);
-      rl.once('close', () => process.stdin.removeListener('data', onData));
-    }
     rl.question(question, (answer) => {
-      masked = false;
       rl.close();
-      if (hidden) process.stdout.write('\n');
       resolve(answer.trim());
     });
+  });
+}
+
+// Reads a secret with the terminal's echo turned OFF at the driver level.
+//
+// The first attempt (2026-09-13) let readline echo each character and then
+// redrew the line over it. On screen that looks masked, but the byte stream
+// still carries every keystroke, so the admin password ended up in the
+// terminal scrollback. Raw mode never emits the character at all, which is
+// the only version that is actually hidden.
+function askSecret(question) {
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    if (!stdin.isTTY || typeof stdin.setRawMode !== 'function') {
+      console.error('Khong phai terminal that — dat ADMIN_PASSWORD roi chay lai.');
+      process.exit(1);
+    }
+    process.stdout.write(question);
+    const wasRaw = stdin.isRaw;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+    let buffer = '';
+    const finish = (value, code) => {
+      stdin.removeListener('data', onData);
+      stdin.setRawMode(wasRaw);
+      stdin.pause();
+      process.stdout.write('\n');
+      if (code !== undefined) process.exit(code);
+      resolve(value);
+    };
+    const onData = (chunk) => {
+      for (const ch of chunk) {
+        if (ch === '\r' || ch === '\n' || ch === '\u0004') return finish(buffer);
+        if (ch === '\u0003') return finish('', 130); // Ctrl-C
+        if (ch === '\u007f' || ch === '\b') { buffer = buffer.slice(0, -1); continue; }
+        if (ch >= ' ') buffer += ch;
+      }
+    };
+    stdin.on('data', onData);
   });
 }
 
@@ -128,8 +156,8 @@ async function getAdminToken() {
   const identifier =
     process.env.ADMIN_EMAIL ||
     process.env.ADMIN_USERNAME ||
-    (await ask('Email admin (vi du therahome@thera.local): ', false));
-  const password = process.env.ADMIN_PASSWORD || (await ask('Mat khau admin (khong hien ra): ', true));
+    (await ask('Email admin (vi du therahome@thera.local): '));
+  const password = process.env.ADMIN_PASSWORD || (await askSecret('Mat khau admin (khong hien ra): '));
   if (!identifier || !password) {
     console.error('Thieu email hoac mat khau admin.');
     process.exit(1);
