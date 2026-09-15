@@ -1328,3 +1328,46 @@ nhân viên trong schema, nới ra là một thay đổi bảo mật không đá
 Thay vào đó tab yêu cầu đăng nhập, cũng đúng chỗ design đặt nó (bên trong vỏ
 đã đăng nhập). Cửa hàng thì khác: `store_*` có `public read USING (true)` không
 đụng `current_web_roles`, nên xem được khi chưa đăng nhập.
+
+### Soát lại logic tab Luyện tập cho khớp app (2026-09-15, tối)
+
+Chủ dự án yêu cầu đảm bảo logic web giống app. Đọc đối chiếu trực tiếp
+`usePrograms.ts`, `useRequestDay.ts`, `useAccessibleProgress.ts`,
+`app/day/[dayId].tsx` — tìm ra **10 chỗ lệch**, đã sửa hết.
+
+**Nghiêm trọng nhất — đánh dấu hoàn thành sai thời điểm.** Web dùng `<iframe>`
+trần và ghi nhận ở sự kiện `load`, tức **ngay khi mở ngày**, chưa xem giây nào
+video đã tính hoàn thành và điện thoại cũng thấy done. App ghi ở
+`state === 'playing'`. Đã thay bằng YouTube IFrame Player API
+(`YouTubeLesson.tsx`) nghe `onStateChange === PLAYING`, đúng luật app.
+
+**Lệch múi giờ DST — sai vĩnh viễn với khách Mỹ.** `daysSinceLocal` của tôi
+dùng `Math.floor`, app dùng `Math.round`. Hai đầu đều chuẩn hoá về nửa đêm địa
+phương nên khoảng cách luôn là bội số 24h — *trừ* khi vắt qua ngày đổi giờ,
+lúc đó là 23h hoặc 25h. Kiểm bằng `TZ=America/New_York`: hoạt hoá 01/03/2026,
+tới 09/03 app ra ngày 9 còn web ra ngày 8, và lệch này **giữ nguyên tới mùa
+thu**. Đã copy nguyên văn hàm của app.
+
+Tám chỗ còn lại:
+
+| # | Lệch | Sửa |
+|---|---|---|
+| 3 | `canRecordWatch` — app chỉ ghi cho ngày `current`/`missed` | thêm |
+| 4 | Tài khoản App Review bỏ qua mọi khoá ngày (app có, server `mark_day_watched` cũng có ngoại lệ khớp) | thêm `canOpenDay(day, isReviewAccount)` |
+| 5 | Khoá giai đoạn trả phí — web mở được ngày thuộc giai đoạn chưa mua | loại khỏi `totalDays` và chặn mở |
+| 6 | `roadmap_published = false` — app từ chối mở ngày | thêm thẻ "đang hoàn thiện" |
+| 7 | Chống bấm hai lần ở thang đau (app đã từng ghi 2 dòng `pain_logs`) | thêm chốt `gateBusy` |
+| 8 | Thứ tự `user_programs` — app order theo `activated_at` **rồi `id`** cho tất định | thêm |
+| 9 | Chọn lộ trình — app hỏi `get_default_product_for_contact` (thứ khách thật sự mua), web lấy dòng đầu | dùng RPC, fallback dòng đầu |
+| 10 | `pain_logs` lọc theo `user_id`, app lọc theo `user_program_id` | đổi |
+| 11 | Lỗi `mark_day_watched` chỉ `console.error`, app báo người dùng | hiện thông báo |
+
+Khoá giai đoạn hiện **vô hiệu** — không giai đoạn nào có `apple_product_id`
+hay `google_product_id` (đúng như ghi chú IAP Giai đoạn 3 chưa dựng). Nhưng
+web không có đường bán, nên khi Giai đoạn 3 ra mắt, web sẽ khoá và trỏ khách
+sang app thay vì để lọt nội dung trả phí.
+
+Kiểm chứng: viết test đối chiếu chạy **cùng lúc** hàm của app và hàm của web
+(`daysSinceLocal` + `deriveDayStatus`) trên 656 tổ hợp — mọi ngày hoạt hoá từ
+60 ngày trước tới 3 ngày sau, các mốc DST Mỹ, và toàn bộ ma trận
+ngày × trạng thái × hôm-nay: **0 lệch**.

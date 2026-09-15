@@ -18,7 +18,10 @@ import { LandingButton } from "@/components/landing/LandingButton";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { StoreTab } from "@/components/landing/StoreTab";
 import { CommunityTab } from "@/components/landing/CommunityTab";
+import { YouTubeLesson } from "@/components/landing/YouTubeLesson";
 import {
+  canOpenDay,
+  canRecordWatch,
   fetchPainTrend,
   fetchTrainingProgram,
   fetchWaterToday,
@@ -42,6 +45,10 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; 
   missed: { bg: "rgba(255,182,72,0.14)", border: "rgba(255,182,72,0.4)", color: "#FFC978", label: "Bỏ lỡ" },
   upcoming: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", label: "Sắp tới" },
   locked: { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", label: "Chưa mở" },
+  // A paid phase the customer has not unlocked. Inert today — no phase carries
+  // a store product id yet — but it must not leak when Giai đoạn 3 ships, and
+  // the web has no way to sell it, so it points at the app.
+  phaseLocked: { bg: "rgba(255,182,72,0.1)", border: "rgba(255,182,72,0.32)", color: "#FFC978", label: "Cần mở khoá" },
 };
 
 type TabId = "lo-trinh" | "cua-hang" | "cong-dong";
@@ -119,20 +126,27 @@ function PainScaleModal({ dayNumber, busy, onConfirm, onCancel }: { dayNumber: n
 
 function DayDetail({ program, day, onWatched, onBack }: { program: TrainingProgram; day: TrainingDay; onWatched: () => void; onBack: () => void }) {
   const [recorded, setRecorded] = useState(day.status === "done");
-  const videoId = day.videoUrl ? youtubeVideoId(day.videoUrl.startsWith("http") ? day.videoUrl : `https://${day.videoUrl}`) : "";
+  const [recordError, setRecordError] = useState("");
+  const raw = day.videoUrl ? (day.videoUrl.startsWith("http") ? day.videoUrl : `https://${day.videoUrl}`) : "";
+  const videoId = raw ? youtubeVideoId(raw) : "";
+  // The app only records for today's day or a missed one; a finished day is
+  // already done and nothing else is openable.
+  const recordable = canRecordWatch(day);
 
-  // Mechanic 3: watching completes the day. The design has no complete button
-  // and neither does this — the record happens when the video is played.
   const record = useCallback(async () => {
-    if (recorded) return;
+    if (recorded || !recordable) return;
     try {
       await markDayWatched(program.userProgramId, day.programDayId);
       setRecorded(true);
+      setRecordError("");
       onWatched();
     } catch (error) {
       console.error("Unable to record this day as watched", error);
+      // The app alerts here rather than failing silently — a customer who
+      // watched the video needs to know it was not counted.
+      setRecordError("Không ghi nhận được buổi tập. Vui lòng thử lại.");
     }
-  }, [recorded, program.userProgramId, day.programDayId, onWatched]);
+  }, [recorded, recordable, program.userProgramId, day.programDayId, onWatched]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -150,18 +164,9 @@ function DayDetail({ program, day, onWatched, onBack }: { program: TrainingProgr
 
       {videoId ? (
         <>
-          <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", borderRadius: 20, overflow: "hidden", background: "#000", border: "1px solid rgba(255,255,255,0.1)" }}>
-            <iframe
-              src={`https://www.youtube.com/embed/${videoId}?rel=0&playsinline=1`}
-              title={`Ngày ${day.dayNumber}`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              onLoad={() => void record()}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
-            />
-          </div>
+          <YouTubeLesson videoId={videoId} title={`Ngày ${day.dayNumber}`} onPlay={() => void record()} />
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14 }}>
-            <a href={day.videoUrl!.startsWith("http") ? day.videoUrl! : `https://${day.videoUrl!}`} target="_blank" rel="noreferrer" onClick={() => void record()} style={{ padding: "12px 20px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.16)", fontSize: 14, color: "rgba(255,255,255,0.86)" }}>
+            <a href={raw} target="_blank" rel="noreferrer" onClick={() => void record()} style={{ padding: "12px 20px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.16)", fontSize: 14, color: "rgba(255,255,255,0.86)" }}>
               Xem trên YouTube
             </a>
             <span style={{ fontSize: 13, color: "rgba(255,255,255,0.58)" }}>
@@ -184,6 +189,7 @@ function DayDetail({ program, day, onWatched, onBack }: { program: TrainingProgr
             Bật video ở trên hoặc bấm &ldquo;Xem trên YouTube&rdquo; — ngày này sẽ tự động được ghi nhận hoàn thành.
           </p>
         ) : null}
+        {recordError ? <span style={{ fontSize: 13, color: "var(--error)" }}>{recordError}</span> : null}
       </div>
 
       {day.supportToolsUrl ? (
@@ -257,9 +263,11 @@ export default function TrainingPage() {
   // the effect, which is the cascading-render pattern react-hooks rejects.
   const loading = userId === undefined || (userId !== null && program === undefined);
 
-  /** Mechanic 2: an openable day with no pain log shows the scale first. */
+  /** Mechanic 2: an openable day with no pain log shows the scale first.
+   * Openability itself is canOpenDay — which carries the App Review bypass and
+   * the paid-phase lock, both of which the app applies here too. */
   function requestDay(day: TrainingDay) {
-    if (day.status === "locked" || day.status === "upcoming") return;
+    if (!program || !canOpenDay(day, program.isReviewAccount)) return;
     if (!day.hasPainLog) {
       setGateDay(day);
       return;
@@ -268,7 +276,10 @@ export default function TrainingPage() {
   }
 
   async function confirmPain(score: number) {
-    if (!gateDay || !userId || !program) return;
+    // `gateBusy` reaches the modal's button as a disabled prop, which cannot
+    // stop a second tap dispatched before the re-render commits — in the app
+    // that wrote two pain_logs rows for one day, so guard here as well.
+    if (!gateDay || !userId || !program || gateBusy) return;
     setGateBusy(true);
     // A logging failure must never block the workout, so this resolves either way.
     await logPain(userId, program.userProgramId, gateDay.programDayId, score);
@@ -359,7 +370,7 @@ export default function TrainingPage() {
                 </h1>
                 <span style={{ fontSize: 14, color: "rgba(255,255,255,0.62)" }}>{today?.phaseName ?? ""}</span>
               </div>
-              {today && (today.status === "current" || today.status === "missed") ? (
+              {today && canOpenDay(today, program.isReviewAccount) && today.status !== "done" ? (
                 <LandingButton onClick={() => requestDay(today)}>Bắt đầu hôm nay</LandingButton>
               ) : null}
             </div>
@@ -405,12 +416,21 @@ export default function TrainingPage() {
               </div>
             </div>
 
+            {!program.roadmapPublished ? (
+              <div style={{ ...card, borderColor: "rgba(255,182,72,0.32)", background: "rgba(255,182,72,0.1)" }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "#FFC978" }}>Lộ trình đang hoàn thiện</span>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.7)" }}>
+                  Các buổi tập sẽ mở khi đội ngũ xuất bản lộ trình cho sản phẩm này.
+                </p>
+              </div>
+            ) : null}
+
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <h2 style={{ margin: 0, fontSize: "clamp(20px, 2.2vw, 28px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.015em" }}>Lộ trình</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
                 {program.days.map((d) => {
-                  const st = STATUS_STYLE[d.status];
-                  const openable = d.status !== "locked" && d.status !== "upcoming";
+                  const st = d.phaseLocked ? STATUS_STYLE.phaseLocked : STATUS_STYLE[d.status];
+                  const openable = canOpenDay(d, program.isReviewAccount);
                   return (
                     <button
                       key={d.programDayId}
@@ -428,6 +448,11 @@ export default function TrainingPage() {
               <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
                 Mỗi ngày mở thêm một buổi. Tiến độ dùng chung với ứng dụng trên điện thoại.
               </p>
+              {program.days.some((d) => d.phaseLocked) ? (
+                <p style={{ margin: 0, fontSize: 13, color: "#FFC978" }}>
+                  Có giai đoạn cần mở khoá. Việc mua chỉ thực hiện trong ứng dụng trên điện thoại.
+                </p>
+              ) : null}
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>

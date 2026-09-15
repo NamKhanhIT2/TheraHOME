@@ -2,21 +2,33 @@
 // mobile app shows. Same Supabase project, same rows: a day watched here is
 // done on the phone and vice versa.
 //
-// THREE MECHANICS MUST MATCH THE APP EXACTLY. They are subtle and the backend
-// docs described the superseded version until 2026-09-15, so they are spelled
-// out here rather than left to be rediscovered:
+// EVERY RULE HERE MUST MATCH THE APP. They are subtle, the backend docs
+// described a superseded version until 2026-09-15, and a mismatch shows up as
+// the web and the phone disagreeing about the same customer. Audited against
+// TheraHOME-APP on 2026-09-15; the app file each rule comes from is named.
 //
-//  1. Which day is open is NOT `user_programs.current_day`. It is derived on
-//     the client from `activated_at` by LOCAL calendar day — one day unlocks
-//     per local midnight. Mirrors daysSinceLocal/deriveDayStatus in
-//     TheraHOME-APP/src/hooks/usePrograms.ts.
-//  2. Opening a day that has no pain log yet is gated behind the pain scale;
-//     confirming inserts that day's pain_logs row. A logging failure must
-//     never block the workout.
-//  3. There is no "complete" button. Watching the video completes the day via
-//     the `mark_day_watched` RPC, which is idempotent and returns true only on
-//     the newly-marked transition. `complete_day` still exists in the database
-//     and is still granted, but nothing calls it — do not use it.
+//  1. Which day is open is NOT `user_programs.current_day`. It is derived from
+//     `activated_at` by LOCAL calendar day (usePrograms.ts daysSinceLocal /
+//     deriveDayStatus). Math.ROUND, not floor — see daysSinceLocal below.
+//  2. Opening a day with no pain log is gated behind the pain scale
+//     (useRequestDay.ts); a logging failure must never block the workout, and
+//     a second tap must not write a second row.
+//  3. No "complete" button: completion is `mark_day_watched`, fired when the
+//     video actually STARTS PLAYING (app/day/[dayId].tsx, `state === 'playing'`)
+//     — not when the player loads — and only for a 'current' or 'missed' day.
+//     `complete_day` still exists in the database and is still granted, but
+//     nothing calls it. Do not use it.
+//  4. An App Review account (`account_type = 'review'`) bypasses every day
+//     lock (useRequestDay.ts), matching mark_day_watched's own server-side
+//     exemption.
+//  5. A paid, unpurchased phase's days are excluded from "Ngày N / X" and
+//     cannot be opened (useAccessibleProgress.ts). A phase is paid when
+//     phase_promos carries a store product id — today none do.
+//  6. An unpublished roadmap (`products.roadmap_published = false`) shows a
+//     "đang hoàn thiện" notice instead of openable days.
+//  7. The programme shown is the one `get_default_product_for_contact` names
+//     — what they actually bought — with the first row (ordered by
+//     activated_at THEN id, for determinism) as the fallback.
 import { supabase } from "./supabase";
 
 export type DayStatus = "done" | "current" | "missed" | "upcoming" | "locked";
@@ -35,6 +47,8 @@ export interface TrainingDay {
   /** dbStatus reconciled with the calendar. This is what the UI shows. */
   status: DayStatus;
   hasPainLog: boolean;
+  /** This day sits in a paid phase the customer has not unlocked. */
+  phaseLocked: boolean;
 }
 
 export interface TrainingProgram {
@@ -42,10 +56,17 @@ export interface TrainingProgram {
   productId: string;
   productName: string;
   activatedAt: string;
+  /** Days the customer can actually reach: a paid, unpurchased phase's days
+   * are excluded, the same rule the app's useAccessibleProgress applies. */
   totalDays: number;
   /** 1-based, capped at totalDays. */
   todayDay: number;
   days: TrainingDay[];
+  /** account_type === 'review'. App Review accounts bypass every day lock —
+   * the app does this, and mark_day_watched has a matching server exemption. */
+  isReviewAccount: boolean;
+  /** False = the roadmap is still a draft; the app refuses to open days. */
+  roadmapPublished: boolean;
 }
 
 /** Local calendar date as YYYY-MM-DD. Never toISOString(), which is UTC and
@@ -55,13 +76,20 @@ export function localDateString(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Whole local days between two dates, counting the activation day as day 1. */
+/** Whole local calendar days elapsed since `iso` (0 on the activation day
+ * itself) — local midnight is the unlock boundary.
+ *
+ * Byte-for-byte the app's daysSinceLocal, including `Math.round`. Round, not
+ * floor: both ends are normalised to local midnight, so the gap is an exact
+ * multiple of 24h EXCEPT across a DST change, where it is 23h or 25h. Floor
+ * would swallow a whole day for a US customer every spring, unlocking their
+ * day late and disagreeing with their phone. */
 export function daysSinceLocal(iso: string): number {
   const start = new Date(iso);
-  const a = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const now = new Date();
-  const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.floor((b.getTime() - a.getTime()) / 86400000);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((today.getTime() - start.getTime()) / 86_400_000));
 }
 
 export function deriveDayStatus(dayNumber: number, dbStatus: string | null, todayDay: number): DayStatus {
@@ -81,23 +109,30 @@ function pickMarket<T>(market: string | null, vn: T, us: T, ms: T): T {
 }
 
 export async function fetchTrainingProgram(userId: string): Promise<TrainingProgram | null> {
-  const [{ data: programs, error: pErr }, { data: profile }] = await Promise.all([
+  const [{ data: programs, error: pErr }, { data: profile }, { data: defaultProductId }] = await Promise.all([
     supabase
       .from("user_programs")
       .select("id, product_id, activated_at")
       .eq("user_id", userId)
-      .order("activated_at", { ascending: true }),
-    supabase.from("profiles").select("market").eq("id", userId).maybeSingle(),
+      // Both keys, like the app: an unordered result made "first programme"
+      // effectively random per fetch for a customer with two devices.
+      .order("activated_at", { ascending: true })
+      .order("id", { ascending: true }),
+    supabase.from("profiles").select("market, account_type").eq("id", userId).maybeSingle(),
+    // Which roadmap they actually bought. claim_user_access_contact grants the
+    // whole catalog, so user_programs alone cannot tell — same RPC the app uses.
+    supabase.rpc("get_default_product_for_contact").then((r) => ({ data: r.data as string | null })),
   ]);
   if (pErr) throw pErr;
-  const program = programs?.[0];
-  if (!program) return null;
+  if (!programs?.length) return null;
+  const program = programs.find((p) => p.product_id === defaultProductId) ?? programs[0];
 
   const market = (profile as { market?: string } | null)?.market ?? null;
+  const isReviewAccount = (profile as { account_type?: string } | null)?.account_type === "review";
 
   const [{ data: product }, { data: days, error: dErr }, { data: mine }, { data: phases }, { data: pains }] =
     await Promise.all([
-      supabase.from("products").select("name, total_days").eq("id", program.product_id).maybeSingle(),
+      supabase.from("products").select("name, total_days, roadmap_published").eq("id", program.product_id).maybeSingle(),
       supabase
         .from("program_days")
         .select("id, day_number, day_type, phase_id, video_url_vn, video_url_us, video_url_malay, support_tools_url_vn, support_tools_url_us, support_tools_url_malay, support_tools_label_vn, support_tools_label_us, support_tools_label_malay")
@@ -105,16 +140,42 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
         .order("day_number"),
       supabase.from("user_program_days").select("program_day_id, status, completed_at").eq("user_program_id", program.id),
       supabase.from("program_phases").select("id, name, name_en, name_ms").eq("product_id", program.product_id),
-      supabase.from("pain_logs").select("program_day_id").eq("user_id", userId),
+      // Scoped to this programme, like the app's check — not to the whole user.
+      supabase.from("pain_logs").select("program_day_id").eq("user_program_id", program.id),
     ]);
   if (dErr) throw dErr;
+
+  const phaseIds = [...new Set((days ?? []).map((d) => d.phase_id).filter(Boolean))] as string[];
+
+  // A phase is PAID only when it carries a store product id. The app reads the
+  // column for its own platform; the web has no store at all, so either one
+  // marks the phase as something this client cannot sell — the days are hidden
+  // and the customer is pointed at the app, rather than being shown a day they
+  // have not bought. Today both columns are null (Phase 3 is not built yet), so
+  // this is inert — but it must not leak the moment that changes.
+  const [{ data: promos }, { data: purchases }] = await Promise.all([
+    phaseIds.length
+      ? supabase.from("phase_promos").select("phase_id, apple_product_id, google_product_id").in("phase_id", phaseIds)
+      : Promise.resolve({ data: [] as { phase_id: string; apple_product_id: string | null; google_product_id: string | null }[] }),
+    supabase.from("phase_purchases").select("phase_id").eq("user_id", userId),
+  ]);
+  const paidPhases = new Set(
+    (promos ?? []).filter((p) => p.apple_product_id !== null || p.google_product_id !== null).map((p) => p.phase_id),
+  );
+  const purchasedPhases = new Set((purchases ?? []).map((p) => p.phase_id));
+  const phaseIsLocked = (phaseId: string | null) =>
+    !isReviewAccount && !!phaseId && paidPhases.has(phaseId) && !purchasedPhases.has(phaseId);
 
   const statusByDay = new Map((mine ?? []).map((r) => [r.program_day_id, r]));
   const phaseById = new Map((phases ?? []).map((p) => [p.id, pickMarket(market, p.name, p.name_en, p.name_ms)]));
   const painDays = new Set((pains ?? []).map((p) => p.program_day_id));
 
-  const totalDays = product?.total_days ?? (days?.length || 14);
-  const todayDay = Math.min(Math.max(daysSinceLocal(program.activated_at) + 1, 1), totalDays);
+  const allDays = days ?? [];
+  // Reachable days only — an unpurchased paid phase does not count toward
+  // "Ngày N / X", exactly as useAccessibleProgress computes it.
+  const reachable = allDays.filter((d) => !phaseIsLocked(d.phase_id));
+  const totalDays = reachable.length || product?.total_days || allDays.length || 14;
+  const todayDay = Math.min(daysSinceLocal(program.activated_at) + 1, totalDays);
 
   return {
     userProgramId: program.id,
@@ -123,7 +184,9 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
     activatedAt: program.activated_at,
     totalDays,
     todayDay,
-    days: (days ?? []).map((d) => {
+    isReviewAccount,
+    roadmapPublished: product?.roadmap_published !== false,
+    days: allDays.map((d) => {
       const own = statusByDay.get(d.id);
       return {
         programDayId: d.id,
@@ -137,9 +200,25 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
         completedAt: own?.completed_at ?? null,
         status: deriveDayStatus(d.day_number, own?.status ?? null, todayDay),
         hasPainLog: painDays.has(d.id),
+        phaseLocked: phaseIsLocked(d.phase_id),
       };
     }),
   };
+}
+
+/** Can this day be opened? Mirrors useRequestDay: locked/upcoming are closed,
+ * a paid-unpurchased phase is closed, and an App Review account opens anything
+ * (the server's mark_day_watched carries the same exemption). */
+export function canOpenDay(day: TrainingDay, isReviewAccount: boolean): boolean {
+  if (isReviewAccount) return true;
+  if (day.phaseLocked) return false;
+  return day.status !== "locked" && day.status !== "upcoming";
+}
+
+/** Can watching this day record completion? The app restricts it to today and
+ * missed days — a finished day is already done, and nothing else is openable. */
+export function canRecordWatch(day: TrainingDay): boolean {
+  return day.status === "current" || day.status === "missed";
 }
 
 /** Mechanic 3. Idempotent; true only when this call is what marked it. */
