@@ -17,17 +17,16 @@ export const metadata = {
 
 const S = (n: string) => `/landing/app/${n}.png`;
 
-// The three real app captures shipped to the Play Store. The design lists
-// five distinct screens; we have three, so the ring repeats them — which it
-// does anyway (its own list repeats three of five to fill eight slots).
+// Five real app captures, which is exactly the set the design lists. The ring
+// needs eight cards, so three repeat — as the design's own list does.
 const CARDS: CarouselCard[] = [
-  { src: S("store"), alt: "Cửa hàng trong ứng dụng" },
-  { src: S("community"), alt: "Cộng đồng TheraHome" },
+  { src: S("home"), alt: "Màn hình chính" },
+  { src: S("roadmap"), alt: "Lộ trình 14 ngày" },
   { src: S("ai-chat"), alt: "Trợ lý TheraAI" },
-  { src: S("store"), alt: "" },
-  { src: S("community"), alt: "" },
-  { src: S("ai-chat"), alt: "" },
-  { src: S("store"), alt: "" },
+  { src: S("community"), alt: "Cộng đồng TheraHome" },
+  { src: S("store"), alt: "Cửa hàng trong ứng dụng" },
+  { src: S("home"), alt: "" },
+  { src: S("roadmap"), alt: "" },
   { src: S("community"), alt: "" },
 ];
 
@@ -151,7 +150,7 @@ export default function AppPage() {
           </div>
           <div style={{ flex: "0 1 380px", display: "flex", justifyContent: "center", position: "relative" }}>
             <span aria-hidden="true" style={{ position: "absolute", inset: "6% 12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,127,217,0.45), rgba(0,0,0,0) 70%)", filter: "blur(30px)", animation: "landingGlowPulse 7s ease-in-out infinite" }} />
-            <PhoneShot src={S("store")} alt="Cửa hàng trong ứng dụng TheraAI" max={360} seconds={12} />
+            <PhoneShot src={S("home")} alt="Màn hình chính ứng dụng TheraAI" max={360} seconds={12} />
           </div>
         </div>
       </section>
@@ -164,7 +163,7 @@ export default function AppPage() {
             title="Lộ trình 14 ngày, chia theo từng giai đoạn"
             body="Mỗi ngày một buổi 15–20 phút, đánh dấu hoàn thành ngay trong app. Hết mỗi giai đoạn có bài tự đánh giá để lộ trình điều chỉnh theo tình trạng của bạn."
             chips={["Giai đoạn rõ ràng", "Đánh dấu hoàn thành", "Tự đánh giá theo giai đoạn"]}
-            art={<PhoneShot src={S("store")} alt="Ứng dụng TheraAI trên điện thoại" seconds={13} />}
+            art={<PhoneShot src={S("roadmap")} alt="Lộ trình 14 ngày trong ứng dụng" seconds={13} />}
           />
 
           <Feature
@@ -172,7 +171,7 @@ export default function AppPage() {
             eyebrowText="Buổi tập có video"
             title="Làm theo video từng ngày, không phải đoán"
             body="Mỗi ngày có video hướng dẫn riêng, xem trực tiếp trong app hoặc chiếu lên TV. Xem xong buổi đó tự động được ghi nhận hoàn thành."
-            art={<PhoneShot src={S("ai-chat")} alt="Trợ lý TheraAI trong ứng dụng" float="b" seconds={14} />}
+            art={<PhoneShot src={S("store")} alt="Buổi tập trong ứng dụng" float="b" seconds={14} />}
           />
 
           <Feature
