@@ -44,7 +44,12 @@ still waiting on their phase:
   `TH-NECK-1037` / `TH-BACK-1074` / `TH-NECK-2210` / `TH-BACK-2381`, all
   `status='pending'` until someone actually activates one), **plus real rows
   synced automatically from the connected Shopify store** — see the
-  `shopify-order-webhook` Edge Function below. **No client RLS policy at all
+  `shopify-order-webhook` Edge Function below. Since 2026-09-15 an insert here
+  also fires `c_enqueue_activation_contacts`, which queues the order's phone
+  and email into `product_activation_contacts` with `disabled = true` (listed
+  in the WEB Kích hoạt tab, granting nothing until CSKH approves) — migration
+  `202609151000_shopify_orders_feed_activation_queue.sql`. The trigger
+  swallows its own errors, so nothing it does can fail an order insert. **No client RLS policy at all
   on this table by design** — reachable only through `SECURITY DEFINER`
   functions, callable by `authenticated` only: `lookup_order(p_phone,
   p_email)`, `lookup_order_by_code(p_code)`, and
@@ -193,7 +198,13 @@ true`, since Shopify redelivers webhooks at-least-once): `phone`/`email`
 pulled from the order/customer/shipping-address with fallback and
 normalized (digits-only, `84`-prefix → `0`, email lowercased),
 `activation_code` = `TH-<order_number>`, `order_date` from the order's
-`created_at`. **`product_id` is always hardcoded to `'neck-plus'`** — the
+`created_at`. **Phone normalization changed 2026-09-15**: it used to emit the
+domestic form (`+84 912 345 678` -> `0912345678`), which silently dropped the
+`+` from a UK/Malaysian number and left it unmatchable; it now ports
+`normalize_phone_e164(raw, '84')` 1:1 and emits `+84…`/`+44…`. Rows written
+before that keep working — both functions that read `orders.phone`
+(`get_default_product_for_contact`, `enqueue_order_activation_contacts`) wrap
+it in the normalizer, which is idempotent on an already-`+`-prefixed value. **`product_id` is always hardcoded to `'neck-plus'`** — the
 Shopify catalog currently has `TheraNECK+` (the only real device match),
 `TheraPillow`, and a `Combo` bundle, none of which map cleanly to the app's
 other 3 device programs, and the product decision (made with the user) was

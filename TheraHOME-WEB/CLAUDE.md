@@ -144,13 +144,18 @@ same RPC. For a STAFF contact a successful claim provisions every current
 product program; an ordinary customer is provisioned only the products their
 phone/email is listed against in the "Kích hoạt" tab (`product_activation_contacts`),
 one product at a time. Database triggers back-fill days added later, and add a
-newly created product only to staff/review accounts. A Shopify order does NOT
-by itself grant app access: `shopify-order-webhook` writes `orders` only, so
-CSKH still enters the contact in the Kích hoạt tab (2026-09-05: verified, and
-intentional under per-product activation). Admin's app-user list reads
+newly created product only to staff/review accounts. A Shopify order still does
+NOT by itself grant app access, but the mechanism changed on 2026-09-15. The
+order no longer stops at `orders` — a trigger queues its phone and email into
+`product_activation_contacts` with `disabled = true`, which every access path
+already treats as "listed but grants nothing". They show in the Kích hoạt tab
+as "Đơn Shopify chờ duyệt"; CSKH presses Duyệt (an UPDATE flipping `disabled`)
+and only then is access granted. So the human gate is intact — CSKH just
+approves a pre-filled row instead of retyping the number. Admin's app-user list reads
 `user_access_contacts`, so an OAuth login alone is not counted as an active
 app user. The migration is stored in
-`TheraHOME-APP/supabase/migrations/202608180001_unique_contact_catalog_access.sql`.
+`TheraHOME-APP/supabase/migrations/202608180001_unique_contact_catalog_access.sql`;
+the Shopify queue is `202609151000_shopify_orders_feed_activation_queue.sql`.
 
 ## Relationship to the mobile app / shared backend
 

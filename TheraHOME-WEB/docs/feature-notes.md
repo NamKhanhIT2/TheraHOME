@@ -1080,3 +1080,106 @@ chạy khi chưa có `username = 'therahome'` và không nên sửa lại lịch
 đường đăng nhập trên mobile. Đã thử gọi `auth-sign-in` bằng địa chỉ mới:
 trả về phiên hợp lệ; `account_type='admin'`, `locked=false`,
 `expires_at=null` nên `current_web_roles()` vẫn cho `{admin,cskh}`.
+
+## 2026-09-15 — Đơn Shopify tự vào tab Kích hoạt (chờ CSKH duyệt)
+
+Trước đây `shopify-order-webhook` ghi đúng một bảng: `orders`. Tab Kích hoạt
+đọc `product_activation_contacts` — bảng hoàn toàn khác — nên mỗi đơn về, CSKH
+phải gõ lại số điện thoại khách sang tab này. Kết quả: **219 đơn** trong DB mà
+tab Kích hoạt mới có **30 dòng**, chỉ 3 số trùng nhau. Hơn 200 khách đã mua
+hàng nhưng không có đường vào app.
+
+Nay đơn Shopify tự đẩy SĐT + email sang tab Kích hoạt, nhưng ở trạng thái
+**chờ duyệt** — CSKH bấm Duyệt mới cấp quyền. Chủ dự án chọn có bước duyệt
+thay vì cấp thẳng: webhook không xử lý `orders/cancelled` nên đơn huỷ vẫn
+trôi vào, và một đơn tự nó chưa phải bằng chứng nên cho vào app.
+
+### Vì sao không cần bảng mới, không cần RPC mới, không cần build lại app
+
+Cột `disabled` trên `product_activation_contacts` đã có sẵn từ
+`202609011000_per_product_activation.sql` và **mọi** đường cấp quyền đã kiểm
+tra nó — kiểm chứng trực tiếp trên DB thật, không suy đoán:
+`activate_product_by_contact` (`and pac.disabled = false`),
+`claim_user_access_contact` (2 chỗ, gồm cổng raise `order_contact_not_found`),
+và `auto_claim_product_activation_contact` (`if new.disabled then return new`).
+Tức `disabled = true` **đã sẵn** nghĩa là "có trong bảng nhưng không cấp gì" —
+đúng y trạng thái chờ duyệt. Dùng lại nó nên không RPC nào phải đổi.
+
+App vì thế không phải build lại: nó chỉ gọi `claim_user_access_contact`,
+`activate_product_by_contact`, `get_default_product_for_contact`, không bao giờ
+đọc thẳng `orders`/`product_activation_contacts`, và mọi truy vấn quyền đều là
+truy vấn sống. Điều này đáng lưu hơn bình thường vì app **không có OTA**
+(`expo-updates` không cài, bị tắt trong cả `Expo.plist` lẫn `AndroidManifest`),
+nên đổi tên một RPC / một tham số / một trong 5 chuỗi lỗi mà
+`app/activate.tsx:126-138` so khớp là phải nộp store lại.
+
+### Migration `202609151000_shopify_orders_feed_activation_queue.sql`
+
+- 3 cột mới trên `product_activation_contacts`: `source_order_id` (null = thêm
+  tay như cũ), `approved_at`, `approved_by`. `source_order_id` kiêm luôn khoá
+  gộp dòng — SĐT và email của cùng một đơn dùng chung nó.
+- `enqueue_order_activation_contacts(order_id)` — chuẩn hoá SĐT qua
+  `normalize_phone_e164(phone,'84')` (`orders.phone` lưu dạng nội địa `0912…`,
+  `normalized_value` là E.164 `+84912…`), tự validate bằng **đúng** regex của
+  trigger BEFORE rồi bỏ qua giá trị hỏng, `on conflict do nothing`.
+  - Tự validate là bắt buộc chứ không phải cẩn thận thừa: trigger BEFORE raise
+    `invalid_contact`, mà lỗi đó trong AFTER INSERT ON orders sẽ làm **hỏng cả
+    lệnh insert đơn hàng** → webhook 500 → Shopify gửi lại vô hạn.
+- Trigger `c_enqueue_activation_contacts AFTER INSERT ON orders`, bọc
+  `EXCEPTION WHEN OTHERS` → hàng chờ lỗi cũng không bao giờ làm mất đơn.
+  Đặt ở DB chứ không sửa Edge Function để bắt mọi đường ghi vào `orders` và
+  khỏi phải deploy lại function.
+- **Chỗ dễ sai nhất**: `b_auto_claim_product_activation_contact` vốn là AFTER
+  **INSERT ONLY**. Nó là thứ mở lộ trình cho khách đã có tài khoản. Để nguyên
+  thì bấm Duyệt (một UPDATE) sẽ không mở khoá cho ai cả. Đã mở rộng thành
+  `after insert or update of disabled`, thêm chốt `tg_op = 'UPDATE' and
+  old.disabled is not distinct from new.disabled → return` để UPDATE không đổi
+  `disabled` thì không chạy lại. Không đệ quy: lệnh `update … set
+  claimed_by_user_id` bên trong hàm không nhắc `disabled`, mà `update of
+  disabled` chỉ kích hoạt khi cột đó nằm trong SET.
+- `approved_at`/`approved_by` do trigger BEFORE tự đóng dấu từ `auth.uid()`,
+  client không gửi lên — và vì policy RLS là `FOR ALL` (staff update thẳng qua
+  PostgREST được), để logic này trong trigger thay vì trong một RPC là cách duy
+  nhất không bị đi vòng.
+- Backfill 219 đơn ngay trong migration.
+
+Kết quả đo được sau khi chạy: **321 dòng chờ** (214 SĐT + 107 email) trải trên
+**216 đơn**, còn số dòng đang cấp quyền vẫn **đúng 30** và `user_programs` vẫn
+**đúng 19** — không ai bị cấp quyền ngoài ý muốn.
+
+### `202609151100_activation_queue_ordering_and_index.sql`
+
+Backfill chạy trong một transaction nên cả 321 dòng dính **cùng một**
+`created_at` tới từng micro giây → danh sách "mới nhất trước" thật ra là thứ
+tự vật lý, mà hàng chờ lại phân trang 20 đơn một. Đã gán lại `created_at` theo
+`orders.created_at` (nay 216 mốc khác nhau, trải 16/08→15/09) + thêm partial
+index cho truy vấn hàng chờ. Lệnh UPDATE này cố ý **không** nhắc `disabled`
+nên trigger auto-claim không chạy, không cấp quyền cho ai.
+
+### WEB
+
+- `db.ts`: `ActivationContact` thêm `sourceOrderId`/`disabled`/`approvedAt`;
+  thêm `approveOrderActivationContacts`, `approveAllQueuedActivationContacts`
+  (một câu UPDATE, không lặp 216 request), `dismissOrderActivationContacts`.
+  Dọn luôn `normalized` chết ở `addProductActivationContact` — nó tính dạng
+  `0912…` cũ và bị trigger BEFORE ghi đè, đọc vào tưởng web lưu dạng nội địa.
+- `ActivationView.tsx`: khối "Đơn Shopify chờ duyệt" trên cùng, gộp theo
+  `sourceOrderId` nên **một khách một dòng** (`+84856239030 / khach@gmail.com`,
+  SĐT trước), phân trang 20 + "Xem thêm", `Duyệt` / `Bỏ qua` / `Duyệt tất cả`.
+  Danh sách đã cấp quyền cũng gộp cùng kiểu — đây là yêu cầu "tránh nhiều dòng
+  gây rối". Dòng thêm tay (`sourceOrderId === null`) vẫn mỗi liên hệ một dòng.
+  `Bỏ qua` có hộp xác nhận vì nó xoá cứng dòng chờ.
+- Đếm ở đầu thẻ sản phẩm đổi từ "N liên hệ" sang "N khách" cho khớp việc gộp,
+  và **chỉ đếm dòng đã duyệt** — nếu không tab sẽ hiện 351 liên hệ với 321
+  dòng chưa duyệt trông y như đã cấp quyền.
+
+### Sửa kèm: `normalizePhone` của webhook
+
+Hàm này trả dạng nội địa cũ, và với số ngoài VN thì mất luôn dấu `+`:
+`+44 7911 123456` → `447911123456`, sau đó `normalize_phone_e164(…, '84')` đọc
+thành `+84447911123456` — sai hoàn toàn. Đã port 1:1 logic của
+`normalize_phone_e164`. An toàn ngược: chỉ có 2 hàm đụng `orders.phone`
+(`get_default_product_for_contact` và `enqueue_order_activation_contacts`) và
+cả hai đều bọc normalizer, vốn idempotent với giá trị đã có `+`. **Không** ghi
+lại 218 dòng `orders.phone` cũ — không cần và chỉ thêm rủi ro.
+Cần `supabase functions deploy shopify-order-webhook`; không phải build app.

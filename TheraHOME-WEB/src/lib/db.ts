@@ -751,10 +751,18 @@ export async function uploadStoreItemImage(itemId: string, file: File) {
 }
 
 // ---------------------------------------------------------------------------
-// Kích hoạt (per-product activation contacts) — CSKH manually lists the
-// phone/email allowed to activate each product; the mobile app's
-// claim_user_access_contact / activate_product_by_contact RPCs match against
-// these rows. See migration 202609011000_per_product_activation.sql.
+// Kích hoạt (per-product activation contacts) — the phone/email allowed to
+// activate each product; the mobile app's claim_user_access_contact /
+// activate_product_by_contact RPCs match against these rows. See migration
+// 202609011000_per_product_activation.sql.
+//
+// Two ways in. CSKH still types a contact by hand (`sourceOrderId === null`),
+// and since 202609151000 a Shopify order queues its own phone + email here
+// with `disabled = true` — listed, but granting nothing until CSKH approves.
+// `disabled` is the whole pending mechanism: every access path in the DB
+// already requires `disabled = false`, so no RPC and no app build was
+// involved. Approving is just flipping that flag; the DB stamps approvedAt
+// and provisions the product if the contact already belongs to an account.
 // ---------------------------------------------------------------------------
 
 export interface ActivationProduct {
@@ -780,12 +788,18 @@ export interface ActivationContact {
   claimedAt: string | null;
   note: string | null;
   createdAt: string;
+  /** Order this came from; null = added by hand. Also the key the UI groups a
+   * phone and an email of the same order under, so one customer is one line. */
+  sourceOrderId: string | null;
+  /** True = queued from an order, awaiting CSKH approval, granting nothing. */
+  disabled: boolean;
+  approvedAt: string | null;
 }
 
 export async function fetchProductActivationContacts(): Promise<ActivationContact[]> {
   const { data, error } = await supabase
     .from("product_activation_contacts")
-    .select("id, product_id, contact_value, contact_type, claimed_by_user_id, claimed_at, note, created_at")
+    .select("id, product_id, contact_value, contact_type, claimed_by_user_id, claimed_at, note, created_at, source_order_id, disabled, approved_at")
     .order("created_at", { ascending: false });
   if (error) throw error;
   const rows = data ?? [];
@@ -805,6 +819,9 @@ export async function fetchProductActivationContacts(): Promise<ActivationContac
     claimedAt: r.claimed_at,
     note: r.note,
     createdAt: r.created_at,
+    sourceOrderId: r.source_order_id,
+    disabled: r.disabled === true,
+    approvedAt: r.approved_at,
   }));
 }
 
@@ -815,19 +832,65 @@ export async function fetchProductActivationContacts(): Promise<ActivationContac
 export async function addProductActivationContact(productId: string, contact: string): Promise<void> {
   const trimmed = contact.trim();
   const isEmail = trimmed.includes("@");
-  const digits = trimmed.replace(/\D/g, "");
-  const normalized = isEmail ? trimmed.toLowerCase() : digits.startsWith("84") ? "0" + digits.slice(2) : digits;
   const { error } = await supabase.from("product_activation_contacts").insert({
     product_id: productId,
     contact_value: trimmed,
+    // Both are overwritten by the BEFORE trigger from contact_value; they are
+    // here only because the columns are NOT NULL. (This used to compute a
+    // legacy "0912…" normalized_value, which read as if the web stored the
+    // domestic form when the row always ended up +84912….)
     contact_type: isEmail ? "email" : "phone",
-    normalized_value: normalized,
+    normalized_value: trimmed,
   });
   if (error) throw error;
 }
 
 export async function deleteProductActivationContact(id: string): Promise<void> {
   await runDelete(supabase.from("product_activation_contacts").delete().eq("id", id).select("id"));
+}
+
+/** Duyệt một đơn: every queued contact of that order starts granting access.
+ * `approved_at`/`approved_by` are stamped by the DB, not sent from here, so a
+ * client cannot claim someone else approved it. The same UPDATE fires the
+ * auto-claim trigger, which unlocks the product immediately for a customer who
+ * already has an account. */
+export async function approveOrderActivationContacts(sourceOrderId: string): Promise<void> {
+  const { error } = await supabase
+    .from("product_activation_contacts")
+    .update({ disabled: false })
+    .eq("source_order_id", sourceOrderId)
+    .eq("disabled", true);
+  if (error) throw error;
+}
+
+/** Duyệt cả hàng chờ in one statement rather than one request per order —
+ * the queue opens at 200+ orders, so a loop would be both slow and a partial
+ * failure waiting to happen. */
+export async function approveAllQueuedActivationContacts(): Promise<number> {
+  const { data, error } = await supabase
+    .from("product_activation_contacts")
+    .update({ disabled: false })
+    .eq("disabled", true)
+    .not("source_order_id", "is", null)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length;
+}
+
+/** Bỏ qua một đơn: drop its queued rows. Only ever touches rows still pending,
+ * so an already-approved contact can never be removed by this path — that
+ * still goes through the per-contact delete above. A Shopify redelivery will
+ * not resurrect them: the orders upsert ignores duplicates, so no new orders
+ * row means the queueing trigger never runs again. */
+export async function dismissOrderActivationContacts(sourceOrderId: string): Promise<void> {
+  await runDelete(
+    supabase
+      .from("product_activation_contacts")
+      .delete()
+      .eq("source_order_id", sourceOrderId)
+      .eq("disabled", true)
+      .select("id"),
+  );
 }
 
 // ---------------------------------------------------------------------------

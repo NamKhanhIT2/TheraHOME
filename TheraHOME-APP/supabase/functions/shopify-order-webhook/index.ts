@@ -1,5 +1,10 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+// `npm:` is resolved by Supabase Edge Runtime's package cache. The JSR
+// registry rejects anonymous manifest fetches during CLI bundling (403 on
+// jsr.io/@supabase/functions-js/meta.json), which is why auth-sign-in,
+// dispatch-push and dispatch-upsell-campaigns already import this way. The
+// `edge-runtime.d.ts` side-effect import was types-only; Deno.serve is
+// ambient in the runtime, so dropping it changes nothing at run time.
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 // Auto-injected by Supabase into every Edge Function — no manual setup needed.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -89,6 +94,11 @@ Deno.serve(async (req: Request) => {
   // Service-role client: no caller identity exists on an inbound webhook,
   // and `orders` has zero RLS policies (by design — see CLAUDE.md), so this
   // is the only way to write here.
+  //
+  // This insert is no longer the end of the line: a DB trigger
+  // (202609151000) queues this phone and email into the WEB "Kích hoạt" tab
+  // as rows awaiting CSKH approval. The trigger swallows its own errors, so
+  // nothing it does can fail this upsert and make Shopify redeliver.
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { error } = await adminClient.from("orders").upsert(
     {
@@ -112,12 +122,25 @@ Deno.serve(async (req: Request) => {
   });
 });
 
+// E.164, mirroring the SQL `normalize_phone_e164(raw, '84')` step for step so
+// a number stored here and the same number stored as an activation contact are
+// the same string. This used to emit the domestic form ("+84 912 345 678" ->
+// "0912345678"), which was fine while the store was Vietnam-only but dropped
+// the "+" from a UK or Malaysian number: "+44 7911 123456" became
+// "447911123456", which the Vietnam-defaulting normalizer would later read as
+// "+84447911123456" and match against nobody. Rows written before this change
+// keep working — every reader wraps orders.phone in the normalizer, and a
+// leading "0" still resolves with the same '84' default.
 function normalizePhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const digits = raw.replace(/[^0-9]/g, "");
+  const value = raw.trim();
+  const digits = value.replace(/[^0-9]/g, "");
   if (!digits) return null;
-  if (digits.startsWith("84") && digits.length > 2) return "0" + digits.slice(2);
-  return digits;
+  const isIntl = value.startsWith("+") || digits.startsWith("00");
+  if (isIntl) return digits.startsWith("00") ? "+" + digits.slice(2) : "+" + digits;
+  if (digits.startsWith("0")) return "+84" + digits.slice(1);
+  if (digits.startsWith("84")) return "+" + digits;
+  return "+84" + digits;
 }
 
 function normalizeEmail(raw: string | null | undefined): string | null {
