@@ -1183,3 +1183,27 @@ thành `+84447911123456` — sai hoàn toàn. Đã port 1:1 logic của
 cả hai đều bọc normalizer, vốn idempotent với giá trị đã có `+`. **Không** ghi
 lại 218 dòng `orders.phone` cũ — không cần và chỉ thêm rủi ro.
 Cần `supabase functions deploy shopify-order-webhook`; không phải build app.
+
+### Sửa sau khi chủ dự án xem tab thật (2026-09-15, chiều)
+
+Hai phản hồi khi nhìn tab trên `ad.therahomeai.com`:
+
+**"Tab kích hoạt không có thêm thủ công nữa à?"** — vẫn còn, nhưng bị chôn.
+Ô thêm tay nằm trong thẻ từng sản phẩm, mà khối chờ duyệt ở trên hiện 20 dòng
+nên đẩy nó xuống mấy màn hình, nhìn như đã bị gỡ. Sửa: khối chờ mặc định chỉ
+hiện **6 đơn** ("Xem thêm" +20), thêm nút thu gọn ở tiêu đề, và nói thẳng
+trong cả đoạn mô tả đầu tab lẫn trong khối chờ rằng khách không mua qua
+Shopify thì thêm tay ở ô của từng sản phẩm. Bài học: thêm một khối dài lên
+đầu một tab đang có thì phải tính lại đường đi của thao tác cũ.
+
+**Định dạng SĐT** — chủ dự án để tự quyết, kèm thông tin app phục vụ US, VN,
+Malaysia. Giữ **E.164 nhưng tách nhóm cho dễ đọc**: `+84 902 846 888`,
+`+1 415 555 0123`, `+60 123 456 789`. Không dùng dạng nội địa `0902846888`:
+đa thị trường thì nó nhập nhằng, và số `+1`/`+60` vốn không có số 0 đầu để mà
+hiển thị. E.164 cũng đúng bằng chuỗi khách phải khớp, nên cái CSKH đọc chính
+là cái DB so sánh. Bù lại: `title=` giữ giá trị gốc khi rê chuột, và ô tìm
+kiếm nhận **mọi dạng gõ** — `0902846888`, `902 846 888`, `+84902846888` đều
+quy về cùng chuỗi chữ số (bỏ số 0 đầu, tối thiểu 4 chữ số để không khớp bừa).
+
+Ghi nhận thêm: trong lúc sửa, số đơn tự tăng 219 → 222 do đơn Shopify thật về
+và tự vào hàng chờ — xác nhận trigger chạy đúng trên production.

@@ -43,9 +43,13 @@ function addErrorMessage(error: unknown): string {
  */
 const DIALLING_CODES = ["84", "44", "60", "1"] as const;
 
-/** How many queued orders to render before "Xem thêm". The queue opened at
- * 216 orders on the day this shipped; drawing all of them at once is a wall. */
-const QUEUE_PAGE = 20;
+/** How many queued orders to show before "Xem thêm". Deliberately small: the
+ * per-product cards underneath are where a contact gets added BY HAND, and
+ * that is still the only route for a customer who did not buy on Shopify. At
+ * 20 rows the queue buried them under several screens of scrolling and the
+ * manual box looked like it had been removed. */
+const QUEUE_FIRST_PAGE = 6;
+const QUEUE_MORE = 20;
 
 /** What the database stores: E.164, no separators. The leading trunk zero of a
  * domestic number is dropped — it is not part of the international form, and a
@@ -57,6 +61,28 @@ function toStoredContact(diallingCode: string, typed: string): string {
   return digits ? `+${diallingCode}${digits}` : "";
 }
 
+/** Phone numbers stay in the stored E.164 form, only spaced out to be read.
+ * The app serves VN, US and Malaysia, so the domestic "0902846888" is not an
+ * option here: it is ambiguous across markets, and +1/+60 numbers have no
+ * trunk zero to show in the first place. E.164 is also exactly the string the
+ * customer has to match, so what CSKH reads is what the database compares.
+ * The raw value is still one hover away (title=) and search accepts whatever
+ * shape someone types. */
+function formatContact(value: string, type: "email" | "phone"): string {
+  if (type === "email" || !value.startsWith("+")) return value;
+  const digits = value.slice(1);
+  const code = DIALLING_CODES.find((c) => digits.startsWith(c));
+  if (!code) return value;
+  const national = digits.slice(code.length);
+  const groups: string[] = [];
+  for (let i = 0; i < national.length; i += 3) groups.push(national.slice(i, i + 3));
+  // A trailing lone digit reads badly ("415 555 012 3") — fold it back.
+  if (groups.length > 1 && groups[groups.length - 1].length === 1) {
+    groups[groups.length - 2] += groups.pop();
+  }
+  return `+${code} ${groups.join(" ")}`;
+}
+
 /** One customer, not one contact: the phone and the email of a single order
  * are one entry. A hand-added contact has no order, so it stands alone. */
 interface ContactGroup {
@@ -64,8 +90,12 @@ interface ContactGroup {
   productId: string;
   sourceOrderId: string | null;
   rows: ActivationContact[];
-  /** "+84856239030 / khach@gmail.com" — phone first, the way CSKH reads it. */
+  /** "+84 856 239 030 / khach@gmail.com" — phone first, the way CSKH reads it. */
   label: string;
+  /** Exact stored values, shown on hover and searched against. */
+  rawLabel: string;
+  /** Every digit of every contact, so a search typed in any shape still hits. */
+  digits: string;
   note: string | null;
   claimedByUserId: string | null;
   claimedByName: string | null;
@@ -87,6 +117,8 @@ function groupContacts(rows: ActivationContact[]): ContactGroup[] {
       sourceOrderId: row.sourceOrderId,
       rows: [row],
       label: "",
+      rawLabel: "",
+      digits: "",
       note: row.note,
       claimedByUserId: null,
       claimedByName: null,
@@ -99,7 +131,9 @@ function groupContacts(rows: ActivationContact[]): ContactGroup[] {
     // Phone first — it is the contact the customer actually ordered with and
     // the one they are most likely to type into the app.
     group.rows.sort((a, b) => (a.contactType === b.contactType ? 0 : a.contactType === "phone" ? -1 : 1));
-    group.label = group.rows.map((r) => r.contactValue).join(" / ");
+    group.label = group.rows.map((r) => formatContact(r.contactValue, r.contactType)).join(" / ");
+    group.rawLabel = group.rows.map((r) => r.contactValue).join(" / ");
+    group.digits = group.rows.map((r) => r.contactValue.replace(/[^0-9]/g, "")).join(" ");
     // `some`, not the first row: approving moves an order's phone and email
     // together, but if a pair ever ends up half-approved the order belongs in
     // the queue so someone can finish it, not silently in the granted list.
@@ -113,9 +147,15 @@ function groupContacts(rows: ActivationContact[]): ContactGroup[] {
 
 function matchesFilter(group: ContactGroup, needle: string): boolean {
   if (!needle) return true;
+  if (group.rawLabel.toLowerCase().includes(needle)) return true;
   if (group.label.toLowerCase().includes(needle)) return true;
   if ((group.claimedByName ?? "").toLowerCase().includes(needle)) return true;
-  return (group.note ?? "").toLowerCase().includes(needle);
+  if ((group.note ?? "").toLowerCase().includes(needle)) return true;
+  // Typing a number in any shape should find it: "0902846888", "902 846 888"
+  // and "+84902846888" all reduce to the same digits, minus the trunk zero
+  // that the E.164 form never carries.
+  const typedDigits = needle.replace(/[^0-9]/g, "").replace(/^0+/, "");
+  return typedDigits.length >= 4 && group.digits.includes(typedDigits);
 }
 
 export function ActivationView() {
@@ -129,10 +169,11 @@ export function ActivationView() {
   const [deleteTarget, setDeleteTarget] = useState<ContactGroup | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
-  const [queueShown, setQueueShown] = useState(QUEUE_PAGE);
+  const [queueShown, setQueueShown] = useState(QUEUE_FIRST_PAGE);
   const [approveAllOpen, setApproveAllOpen] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
   const [dismissTarget, setDismissTarget] = useState<ContactGroup | null>(null);
+  const [queueOpen, setQueueOpen] = useState(true);
 
   function reload() {
     Promise.all([fetchActivationProducts(), fetchProductActivationContacts()])
@@ -263,7 +304,7 @@ export function ActivationView() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 620 }}>
-          Thêm số điện thoại/email của khách vào đúng sản phẩm họ đã mua. Khi khách nhập thông tin này trong app, chỉ lộ trình của các sản phẩm có tên họ trong danh sách mới được mở khoá. Đơn Shopify tự vào mục &quot;chờ duyệt&quot; bên dưới.
+          Thêm số điện thoại/email của khách vào đúng sản phẩm họ đã mua. Khi khách nhập thông tin này trong app, chỉ lộ trình của các sản phẩm có tên họ trong danh sách mới được mở khoá. Hai đường vào: đơn Shopify tự rơi vào mục &quot;chờ duyệt&quot;, còn khách mua ngoài Shopify thì thêm tay ở ô của từng sản phẩm.
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--border-input)", borderRadius: 10, padding: "8px 12px", width: 260 }}>
           <Icon name="search" size={15} color="var(--text-muted)" />
@@ -287,12 +328,23 @@ export function ActivationView() {
               <PrimaryBtn icon="check" onClick={() => setApproveAllOpen(true)} disabled={approvingAll}>
                 Duyệt tất cả
               </PrimaryBtn>
+              <button
+                onClick={() => setQueueOpen((open) => !open)}
+                aria-label={queueOpen ? "Thu gọn hàng chờ" : "Mở hàng chờ"}
+                title={queueOpen ? "Thu gọn để xem danh sách sản phẩm bên dưới" : "Mở hàng chờ"}
+                style={{ border: "none", background: "none", cursor: "pointer", display: "flex", padding: 4 }}
+              >
+                <Icon name={queueOpen ? "chevron-down" : "chevron-right"} size={18} color="var(--text-muted)" />
+              </button>
             </span>
           }
         >
-          <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 8 }}>
-            Đơn từ Shopify về đây tự động và <strong>chưa cấp quyền gì</strong>. Bấm Duyệt thì khách kích hoạt được bằng SĐT hoặc email của đơn; nếu khách đã có tài khoản, lộ trình mở khoá ngay.
+          <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: queueOpen ? 8 : 0 }}>
+            Đơn từ Shopify về đây tự động và <strong>chưa cấp quyền gì</strong>. Bấm Duyệt thì khách kích hoạt được bằng SĐT hoặc email của đơn; nếu khách đã có tài khoản, lộ trình mở khoá ngay.{" "}
+            <strong>Khách không mua qua Shopify</strong> thì thêm tay ở ô của từng sản phẩm bên dưới, như trước nay.
           </div>
+          {queueOpen ? (
+          <>
           {queue.length === 0 ? (
             <div style={{ padding: "16px 0", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
               Không có đơn nào khớp tìm kiếm.
@@ -302,7 +354,7 @@ export function ActivationView() {
               <div key={group.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: i > 0 ? "1px solid var(--divider)" : "none" }}>
                 <Icon name="shopping-bag" size={15} color="var(--text-muted)" />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)", wordBreak: "break-word" }}>{group.label}</div>
+                  <div title={group.rawLabel} style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)", wordBreak: "break-word" }}>{group.label}</div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
                     {group.note ?? "Đơn Shopify"}
                     {products.length > 1 ? ` · ${productNameById.get(group.productId) ?? group.productId}` : ""}
@@ -319,10 +371,12 @@ export function ActivationView() {
           )}
           {queue.length > queueShown ? (
             <div style={{ textAlign: "center", paddingTop: 12 }}>
-              <GhostBtn onClick={() => setQueueShown((n) => n + QUEUE_PAGE)}>
+              <GhostBtn onClick={() => setQueueShown((n) => n + QUEUE_MORE)}>
                 Xem thêm ({queue.length - queueShown} đơn)
               </GhostBtn>
             </div>
+          ) : null}
+          </>
           ) : null}
         </SectionCard>
       ) : null}
@@ -391,7 +445,7 @@ export function ActivationView() {
                     color="var(--text-muted)"
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)", wordBreak: "break-word" }}>{group.label}</div>
+                    <div title={group.rawLabel} style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)", wordBreak: "break-word" }}>{group.label}</div>
                     {group.note ? <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>{group.note}</div> : null}
                   </div>
                   {group.claimedByUserId ? (
