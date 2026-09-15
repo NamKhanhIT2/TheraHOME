@@ -1044,3 +1044,39 @@ rơi vào mặc định "VN": dòng "Link sản phẩm" hiển thị link VN nga
 dropdown đang chọn UK/ML. Nay tải link của cả ba thị trường và hiển thị theo
 thị trường đang xem (có ghi rõ trong nhãn). Modal "Sửa thông tin" vẫn chỉ
 sửa link VN — đúng như `updateProductInfo` đã ghi chú từ 2026-09-05.
+
+## 2026-09-14 — Đăng nhập web đổi sang Email + mật khẩu
+
+`/thera-login` trước đây hỏi "Tên đăng nhập". Tab **Tài khoản TheraHOME**
+của Admin lại luôn nói ngược lại — "Đăng nhập bằng Email + mật khẩu", và ô
+Email ở đó là tuỳ chọn với ghi chú "Bỏ trống → đăng nhập bằng
+`username@thera.local`". Màn đăng nhập là chỗ duy nhất còn nói theo kiểu cũ,
+nên nay thống nhất theo tab cấp tài khoản: web chỉ hỏi **Email**.
+
+- `app/(auth)/thera-login/page.tsx`: ô đầu thành `type="email"`, placeholder
+  **Email**, `autoComplete="username"` (ô mật khẩu thêm
+  `autoComplete="current-password"` để trình duyệt/trình quản lý mật khẩu
+  điền đúng cặp). Báo lỗi đổi thành "Email hoặc mật khẩu không chính xác."
+- `src/lib/theraAccountAuth.ts`: đổi tên tham số, không đổi cách gọi — vẫn
+  gửi `identifier` cho Edge Function `auth-sign-in`.
+- **Không đụng tới `auth-sign-in`.** Hàm này dùng chung với mobile và đã tự
+  phân nhánh: có `@` thì đăng nhập thẳng bằng email, không có `@` thì mới
+  tra `profiles.username` (chỉ nhân viên). Web đơn giản là không bao giờ gửi
+  dạng không-`@` nữa, nên màn đăng nhập bằng tên trên app vẫn chạy nguyên.
+  Không cần deploy lại function.
+- Tài khoản không có email thật vẫn đăng nhập được: gõ đúng địa chỉ tổng hợp
+  `<username>@thera.local` mà `admin-manage-account` đã tạo cho họ.
+
+### Tài khoản admin duy nhất đổi địa chỉ
+
+Bản seed trong `202608230900_thera_accounts_web_roles_and_admin_seed.sql`
+tạo admin với email tổng hợp `therahome@thera.local`. Theo yêu cầu, tài
+khoản này (`c71c9b2c-…`) nay dùng **`hoankenny@therahomeai.com`** và mật
+khẩu mới — cập nhật thẳng trên Supabase (`auth.users.email` +
+`encrypted_password` băm bằng `extensions.crypt`, `auth.identities.
+identity_data`, `profiles.email`), không viết migration vì file seed chỉ
+chạy khi chưa có `username = 'therahome'` và không nên sửa lại lịch sử.
+`profiles.username` giữ nguyên `therahome` — nó vẫn là tên hiển thị và là
+đường đăng nhập trên mobile. Đã thử gọi `auth-sign-in` bằng địa chỉ mới:
+trả về phiên hợp lệ; `account_type='admin'`, `locked=false`,
+`expires_at=null` nên `current_web_roles()` vẫn cho `{admin,cskh}`.

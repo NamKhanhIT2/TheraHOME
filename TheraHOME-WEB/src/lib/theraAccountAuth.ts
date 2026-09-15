@@ -5,19 +5,21 @@
 // account_type as soon as the session exists, see migration
 // 202608230900_thera_accounts_web_roles_and_admin_seed.sql).
 //
-// This used to resolve the username to an email with the
-// `resolve_thera_login_email` RPC and then sign in with it. That RPC was
-// callable without signing in, so anyone could post a username and be handed
-// that person's real email address — a way to harvest every customer's
-// address one name at a time. The lookup now happens inside the
-// `auth-sign-in` Edge Function, which answers a wrong password and an
-// unknown name identically and never returns an address, and the RPC has
-// been revoked.
+// WEB signs in by EMAIL only, matching what the Tài khoản TheraHOME admin tab
+// already tells people when it issues an account ("Đăng nhập bằng Email +
+// mật khẩu"). Accounts created without a real address get the synthetic
+// `<username>@thera.local` the edge function derives, and that address is
+// what they type here. The shared `auth-sign-in` function still accepts a
+// bare username for the mobile screen; the web form simply never sends one.
+//
+// The lookup and the password check both happen inside `auth-sign-in`, which
+// answers a wrong password and an unknown address identically and never
+// returns an address of its own.
 import { supabase } from "./supabase";
 
-export async function signInWithTheraAccount(username: string, password: string): Promise<void> {
+export async function signInWithTheraAccount(email: string, password: string): Promise<void> {
   const { data, error } = await supabase.functions.invoke("auth-sign-in", {
-    body: { identifier: username.trim(), password },
+    body: { identifier: email.trim(), password },
   });
 
   if (error) {

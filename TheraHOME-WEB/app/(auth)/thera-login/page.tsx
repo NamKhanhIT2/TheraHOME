@@ -1,6 +1,6 @@
 "use client";
 
-// "Đăng nhập bằng tài khoản TheraHOME" — username/password, no OAuth. On
+// "Đăng nhập bằng tài khoản TheraHOME" — email/password, no OAuth. On
 // success this skips /verify entirely: current_web_roles() already resolves
 // admin/cskh roles straight from profiles.account_type once a session
 // exists, so AccessGate on /admin (or its own redirect to /care for a
@@ -11,20 +11,20 @@ import { signInWithTheraAccount } from "@/lib/theraAccountAuth";
 
 export default function TheraLoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit() {
-    if (!username.trim() || !password || submitting) return;
+    if (!email.trim() || !password || submitting) return;
     setSubmitting(true);
     setError("");
     try {
-      await signInWithTheraAccount(username.trim(), password);
+      await signInWithTheraAccount(email.trim(), password);
       router.push("/admin");
     } catch {
-      setError("Tên đăng nhập hoặc mật khẩu không chính xác.");
+      setError("Email hoặc mật khẩu không chính xác.");
     } finally {
       setSubmitting(false);
     }
@@ -58,11 +58,13 @@ export default function TheraLoginPage() {
           Dành cho Admin, chăm sóc khách hàng, và tài khoản được cấp riêng.
         </p>
         <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          placeholder="Tên đăng nhập"
+          placeholder="Email"
+          type="email"
           autoCapitalize="none"
+          autoComplete="username"
           autoFocus
           style={{
             width: "100%",
@@ -81,6 +83,7 @@ export default function TheraLoginPage() {
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder="Mật khẩu"
           type="password"
+          autoComplete="current-password"
           style={{
             width: "100%",
             marginTop: 12,
@@ -97,7 +100,7 @@ export default function TheraLoginPage() {
         ) : null}
         <button
           onClick={handleSubmit}
-          disabled={!username.trim() || !password || submitting}
+          disabled={!email.trim() || !password || submitting}
           style={{
             width: "100%",
             marginTop: 16,

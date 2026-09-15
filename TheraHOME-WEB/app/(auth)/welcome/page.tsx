@@ -4,7 +4,7 @@
 // still next-phase work — this wires up the actual sign-in options so the
 // auth flow works end to end, on a simple placeholder backdrop. Three
 // entry points: Google/Apple (OAuth, -> /verify's contact check) and
-// "tài khoản TheraHOME" (username/password, admin/cskh accounts skip
+// "tài khoản TheraHOME" (email/password, admin/cskh accounts skip
 // /verify entirely — see thera-login/page.tsx).
 import { useState } from "react";
 import { useRouter } from "next/navigation";
