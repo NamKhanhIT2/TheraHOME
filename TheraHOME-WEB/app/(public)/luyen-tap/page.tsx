@@ -7,15 +7,17 @@
 // the next time it refetches. The three mechanics that have to match are
 // documented at the top of src/lib/training.ts.
 //
-// Not ported: the Cửa hàng and Cộng đồng tabs of the design. Both are large
-// features that already exist in the app and neither is training; building
-// half of each here would be worse than linking out.
+// Four tabs, matching the design's own tab bar: Lộ trình (its Trang chủ and
+// Lộ trình tabs merged, since on a wide screen the summary and the day grid
+// fit together), Cửa hàng and Cộng đồng.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { supabase } from "@/lib/supabase";
 import { LandingButton } from "@/components/landing/LandingButton";
 import { LandingFooter } from "@/components/landing/LandingFooter";
+import { StoreTab } from "@/components/landing/StoreTab";
+import { CommunityTab } from "@/components/landing/CommunityTab";
 import {
   fetchPainTrend,
   fetchTrainingProgram,
@@ -41,6 +43,36 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; 
   upcoming: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", label: "Sắp tới" },
   locked: { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", label: "Chưa mở" },
 };
+
+type TabId = "lo-trinh" | "cua-hang" | "cong-dong";
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "lo-trinh", label: "Lộ trình" },
+  { id: "cua-hang", label: "Cửa hàng" },
+  { id: "cong-dong", label: "Cộng đồng" },
+];
+
+function TabBar({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
+  return (
+    <div role="tablist" style={{ display: "flex", gap: 8, padding: 6, borderRadius: 999, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", alignSelf: "flex-start", maxWidth: "100%", overflowX: "auto" }}>
+      {TABS.map((t) => {
+        const on = active === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(t.id)}
+            style={{ flex: "0 0 auto", padding: "10px 22px", borderRadius: 999, border: "none", fontFamily: "inherit", fontSize: 14.5, fontWeight: 600, cursor: "pointer", color: on ? "#fff" : "rgba(255,255,255,0.66)", background: on ? "var(--color-primary)" : "transparent" }}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function Spinner({ label }: { label: string }) {
   return <div style={{ ...shell, color: "rgba(255,255,255,0.6)" }}>{label}</div>;
@@ -172,14 +204,28 @@ export default function TrainingPage() {
   const [openDay, setOpenDay] = useState<TrainingDay | null>(null);
   const [gateDay, setGateDay] = useState<TrainingDay | null>(null);
   const [gateBusy, setGateBusy] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null));
-  }, []);
+  const [tab, setTab] = useState<TabId>("lo-trinh");
+  const [me, setMe] = useState<{ name: string; market: string | null }>({ name: "", market: null });
 
   /** Bumped to refetch — after a day is watched, or a pain log is written. */
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+      setUserId(session?.user.id ?? null);
+      if (!session) return;
+      // Name for the composer avatar, market for which store catalog to show.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, market")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      setMe({ name: profile?.full_name || session.user.email || "", market: profile?.market ?? null });
+    })();
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -210,48 +256,6 @@ export default function TrainingPage() {
   // Derived, not stored: a `loading` state would have to be cleared from inside
   // the effect, which is the cascading-render pattern react-hooks rejects.
   const loading = userId === undefined || (userId !== null && program === undefined);
-  if (loading) return <Spinner label="Đang tải lộ trình..." />;
-
-  if (userId === null) {
-    return (
-      <>
-        <div style={{ ...shell, display: "flex", flexDirection: "column", gap: 18, minHeight: "48vh", justifyContent: "center" }}>
-          <span style={eyebrow}>Luyện tập</span>
-          <h1 style={{ margin: 0, fontSize: "clamp(28px, 3.4vw, 44px)", fontWeight: 600, letterSpacing: "-0.02em", color: "#fff" }}>Đăng nhập để xem lộ trình của bạn</h1>
-          <p style={{ margin: 0, maxWidth: 520, fontSize: 16.5, lineHeight: 1.65, color: "rgba(255,255,255,0.66)" }}>
-            Dùng chung tài khoản với ứng dụng trên điện thoại — tiến độ hai bên là một.
-          </p>
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            <LandingButton href="/welcome">Đăng nhập</LandingButton>
-          </div>
-        </div>
-        <LandingFooter compact />
-      </>
-    );
-  }
-
-  if (!program) {
-    return (
-      <>
-        <div style={{ ...shell, display: "flex", flexDirection: "column", gap: 18, minHeight: "48vh", justifyContent: "center" }}>
-          <span style={eyebrow}>Luyện tập</span>
-          <h1 style={{ margin: 0, fontSize: "clamp(28px, 3.4vw, 44px)", fontWeight: 600, letterSpacing: "-0.02em", color: "#fff" }}>Chưa có lộ trình nào được kích hoạt</h1>
-          <p style={{ margin: 0, maxWidth: 560, fontSize: 16.5, lineHeight: 1.65, color: "rgba(255,255,255,0.66)" }}>
-            Lộ trình mở khi số điện thoại hoặc email bạn đặt hàng được kích hoạt. Nếu bạn vừa mua, hãy kích hoạt trong ứng dụng hoặc nhắn cho đội ngũ hỗ trợ.
-          </p>
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-            <LandingButton href="/san-pham">Xem sản phẩm</LandingButton>
-            <LandingButton href="/ung-dung" variant="secondary">Tải ứng dụng</LandingButton>
-          </div>
-        </div>
-        <LandingFooter compact />
-      </>
-    );
-  }
-
-  const doneCount = program.days.filter((d) => d.status === "done").length;
-  const pct = Math.round((doneCount / Math.max(1, program.totalDays)) * 100);
-  const today = program.days.find((d) => d.dayNumber === program.todayDay);
 
   /** Mechanic 2: an openable day with no pain log shows the scale first. */
   function requestDay(day: TrainingDay) {
@@ -264,10 +268,10 @@ export default function TrainingPage() {
   }
 
   async function confirmPain(score: number) {
-    if (!gateDay || !userId) return;
+    if (!gateDay || !userId || !program) return;
     setGateBusy(true);
     // A logging failure must never block the workout, so this resolves either way.
-    await logPain(userId, program!.userProgramId, gateDay.programDayId, score);
+    await logPain(userId, program.userProgramId, gateDay.programDayId, score);
     setGateBusy(false);
     setOpenDay(gateDay);
     setGateDay(null);
@@ -285,19 +289,68 @@ export default function TrainingPage() {
     }
   }
 
+  if (loading) return <Spinner label="Đang tải lộ trình..." />;
+
+  // A day open for training takes over the whole surface — the tab bar would
+  // only offer ways to lose your place mid-session.
+  if (tab === "lo-trinh" && openDay && program) {
+    return (
+      <>
+        <div style={shell}>
+          <DayDetail program={program} day={openDay} onBack={() => setOpenDay(null)} onWatched={refresh} />
+        </div>
+        <LandingFooter compact />
+      </>
+    );
+  }
+
+  const doneCount = program ? program.days.filter((d) => d.status === "done").length : 0;
+  const pct = program ? Math.round((doneCount / Math.max(1, program.totalDays)) * 100) : 0;
+  const today = program?.days.find((d) => d.dayNumber === program.todayDay);
+
   return (
     <>
-      <div style={shell}>
-        {openDay ? (
-          <DayDetail
-            program={program}
-            day={openDay}
-            onBack={() => setOpenDay(null)}
-            onWatched={() => refresh()}
-          />
-        ) : (
+      <div style={{ ...shell, display: "flex", flexDirection: "column", gap: "clamp(20px, 3vh, 32px)" }}>
+        <TabBar active={tab} onChange={setTab} />
+
+        {/* The store catalog is world-readable, so it renders signed out too. */}
+        {tab === "cua-hang" ? <StoreTab market={me.market} /> : null}
+
+        {tab === "cong-dong" ? <CommunityTab userId={userId} userName={me.name} /> : null}
+
+        {tab === "lo-trinh" && userId === null ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, minHeight: "38vh", justifyContent: "center" }}>
+            <span style={eyebrow}>Luyện tập</span>
+            <h1 style={{ margin: 0, fontSize: "clamp(28px, 3.4vw, 44px)", fontWeight: 600, letterSpacing: "-0.02em", color: "#fff" }}>
+              Đăng nhập để xem lộ trình của bạn
+            </h1>
+            <p style={{ margin: 0, maxWidth: 520, fontSize: 16.5, lineHeight: 1.65, color: "rgba(255,255,255,0.66)" }}>
+              Dùng chung tài khoản với ứng dụng trên điện thoại — tiến độ hai bên là một.
+            </p>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <LandingButton href="/welcome">Đăng nhập</LandingButton>
+            </div>
+          </div>
+        ) : null}
+
+        {tab === "lo-trinh" && userId !== null && !program ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, minHeight: "38vh", justifyContent: "center" }}>
+            <span style={eyebrow}>Luyện tập</span>
+            <h1 style={{ margin: 0, fontSize: "clamp(28px, 3.4vw, 44px)", fontWeight: 600, letterSpacing: "-0.02em", color: "#fff" }}>
+              Chưa có lộ trình nào được kích hoạt
+            </h1>
+            <p style={{ margin: 0, maxWidth: 560, fontSize: 16.5, lineHeight: 1.65, color: "rgba(255,255,255,0.66)" }}>
+              Lộ trình mở khi số điện thoại hoặc email bạn đặt hàng được kích hoạt. Nếu bạn vừa mua, hãy kích hoạt trong ứng dụng hoặc nhắn cho đội ngũ hỗ trợ.
+            </p>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <LandingButton href="/san-pham">Xem sản phẩm</LandingButton>
+              <LandingButton href="/ung-dung" variant="secondary">Tải ứng dụng</LandingButton>
+            </div>
+          </div>
+        ) : null}
+
+        {tab === "lo-trinh" && program ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "clamp(24px, 4vh, 40px)" }}>
-            {/* ---------------------------------------------------- header */}
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 20 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <span style={eyebrow}>{program.productName}</span>
@@ -311,7 +364,6 @@ export default function TrainingPage() {
               ) : null}
             </div>
 
-            {/* --------------------------------------------- progress cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "clamp(16px, 2vw, 24px)" }}>
               <div style={card}>
                 <span style={{ fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Tiến độ</span>
@@ -327,8 +379,8 @@ export default function TrainingPage() {
                 {pain.length ? (
                   <>
                     <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 76 }}>
-                      {pain.map((p, i) => (
-                        <div key={i} title={`${p.score}/10`} style={{ flex: 1, height: `${Math.max(6, (p.score / 10) * 100)}%`, borderRadius: 6, background: "linear-gradient(180deg, #4FB0F5, rgba(0,127,217,0.35))" }} />
+                      {pain.map((pt, i) => (
+                        <div key={i} title={`${pt.score}/10`} style={{ flex: 1, height: `${Math.max(6, (pt.score / 10) * 100)}%`, borderRadius: 6, background: "linear-gradient(180deg, #4FB0F5, rgba(0,127,217,0.35))" }} />
                       ))}
                     </div>
                     <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{pain.length} lần ghi gần nhất</span>
@@ -353,12 +405,11 @@ export default function TrainingPage() {
               </div>
             </div>
 
-            {/* ------------------------------------------------- the 14 days */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <h2 style={{ margin: 0, fontSize: "clamp(20px, 2.2vw, 28px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.015em" }}>Lộ trình</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
                 {program.days.map((d) => {
-                  const s = STATUS_STYLE[d.status];
+                  const st = STATUS_STYLE[d.status];
                   const openable = d.status !== "locked" && d.status !== "upcoming";
                   return (
                     <button
@@ -366,10 +417,10 @@ export default function TrainingPage() {
                       type="button"
                       onClick={() => requestDay(d)}
                       disabled={!openable}
-                      style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: "16px 18px", borderRadius: 18, textAlign: "left", fontFamily: "inherit", cursor: openable ? "pointer" : "default", background: s.bg, border: `1px solid ${s.border}`, color: "#fff" }}
+                      style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: "16px 18px", borderRadius: 18, textAlign: "left", fontFamily: "inherit", cursor: openable ? "pointer" : "default", background: st.bg, border: `1px solid ${st.border}`, color: "#fff" }}
                     >
                       <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Ngày {d.dayNumber}</span>
-                      <span style={{ fontSize: 13.5, fontWeight: 600, color: s.color }}>{s.label}</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: st.color }}>{st.label}</span>
                     </button>
                   );
                 })}
@@ -383,7 +434,7 @@ export default function TrainingPage() {
               <Link href="/ung-dung" style={{ fontSize: 14, color: "#7FBFFF" }}>Tải ứng dụng để tập trên điện thoại →</Link>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {gateDay ? (

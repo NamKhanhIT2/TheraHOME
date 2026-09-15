@@ -1290,3 +1290,41 @@ CSS sống sót nguyên vẹn; checkbox thành React state. `lang.js` thành
 setState trong effect chính là pattern `react-hooks/set-state-in-effect` chặn.
 Ngôn ngữ vẫn trung thực như design: mới có tiếng Việt, chọn English thì báo
 "sắp có" chứ không đổi nửa vời.
+
+### Tab Cửa hàng và Cộng đồng (2026-09-15, tiếp)
+
+Dựng nốt hai tab còn lại của `Dashboard.dc.html`, đều chạy trên dữ liệu thật
+dùng chung với app.
+
+**Cửa hàng** đọc `store_categories` + `store_items` theo `profiles.market`.
+Design hard-code hai thẻ "TheraNECK+ 120$" và "Ergonomic Pillow 45$" vì nó
+không có dữ liệu để đọc; bản web lấy catalog sống nên hiện đúng ba sản phẩm VN
+thật (Combo 1.490.000đ, TheraNECK+ 990.000₫, Gối 590.000đ) và Admin sửa ở tab
+Sản phẩm là trang này đổi theo. Nút "Dùng thử" chỉ hiện khi danh mục thật sự có
+`has_trial` **và** món đó có `preview_url` — design cho hiện luôn.
+
+**Cộng đồng** đăng bài bằng một lệnh insert trần chỉ gồm `author_id` + `text`.
+Năm trigger của DB lo phần còn lại: `set_author_info` (tên/avatar),
+`enforce_content_rate_limit`, `filter_unsafe_community_content`,
+`set_post_moderation_status`. Nhờ vậy bài đăng từ web hành xử **y hệt** bài
+đăng từ app — kể cả việc bị giữ chờ CSKH duyệt, và kể cả ngoại lệ của tài khoản
+App Review vốn nằm trong trigger chứ không nằm ở client. Bài mới mặc định
+`status = 'pending'` nên UI nói thẳng "đang chờ duyệt — bạn vẫn thấy nó, người
+khác thì chưa", thay vì để người dùng tưởng bài biến mất. Bình luận đi qua RPC
+`create_community_comment` chứ không insert thẳng, vì RPC giữ bộ đếm và cùng
+lớp kiểm duyệt.
+
+#### Một phát hiện: bảng tin không đọc được khi chưa đăng nhập
+
+Không phải do port. Policy `public read posts` OR bốn nhánh, trong đó có hai
+nhánh gọi `current_web_roles()` — mà `EXECUTE` của hàm này **chỉ cấp cho
+`authenticated`**. Khách vãng lai gọi vào là cả câu SELECT chết với
+`42501 permission denied for function current_web_roles`, dù nhánh đầu ("đã
+duyệt và không ẩn") lẽ ra đúng. Tức bảng tin xưa nay vốn chỉ đọc được khi đã
+đăng nhập.
+
+Đã chọn **không** nới `current_web_roles` cho `anon` — hàm đó gác mọi policy
+nhân viên trong schema, nới ra là một thay đổi bảo mật không đáng cho một tab.
+Thay vào đó tab yêu cầu đăng nhập, cũng đúng chỗ design đặt nó (bên trong vỏ
+đã đăng nhập). Cửa hàng thì khác: `store_*` có `public read USING (true)` không
+đụng `current_web_roles`, nên xem được khi chưa đăng nhập.

@@ -23,7 +23,7 @@ Pull and diff against the live project rather than trusting a local copy.
 | `Products.dc.html` | ported → `app/(public)/san-pham/` (incl. the 600vh scroll hero) |
 | `App.dc.html` | ported → `app/(public)/ung-dung/` (incl. the 3D carousel) |
 | `About.dc.html` | ported → `app/(public)/gioi-thieu/` |
-| `Dashboard.dc.html` | ported → `app/(public)/luyen-tap/`, wired to real Supabase data. Its Cửa hàng and Cộng đồng tabs are deliberately NOT built — both are large features the mobile app already has, and neither is training |
+| `Dashboard.dc.html` | ported → `app/(public)/luyen-tap/`, wired to real Supabase data, all three tabs (Lộ trình / Cửa hàng / Cộng đồng) |
 | `Auth.dc.html` | not ported: `/welcome` + `/thera-login` already are the one login door, and routing by role after sign-in lives in `src/lib/postSignInRoute.ts` |
 | `Product Reveal.dc.html` | not started |
 
