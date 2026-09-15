@@ -1,0 +1,325 @@
+/* Public landing site — ported from the Claude Design project
+   b34e8246-a1b9-44a1-ad8c-63a4025fd12a ("Hero scene three.js review"), frozen
+   copies in .design-reference/landing/.
+
+   Everything here is scoped under .landing-root on purpose. The landing is a
+   dark surface (#02030B, white text) while Admin/CSKH is the light app theme,
+   and both live in the same Next app on the same domain — a global rule for
+   one would wreck the other. The design's own `html, body { background:#02030B }`
+   is reproduced with :has() on the wrapper instead, so overscroll matches
+   without touching the admin pages. */
+
+body:has(.landing-root) {
+  background: #02030b;
+  color: #fff;
+}
+
+.landing-root {
+  /* Apple-like system stack: real SF Pro on Apple devices, Be Vietnam Pro
+     elsewhere — both carry full Vietnamese diacritics. */
+  --landing-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --nav-h: 84px;
+
+  background: #02030b;
+  color: #fff;
+  font-family: var(--landing-font);
+  font-synthesis: none;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.landing-root a {
+  color: #fff;
+  text-decoration: none;
+}
+.landing-root a:hover {
+  color: #7fbfff;
+}
+
+.landing-root [id] {
+  scroll-margin-top: 96px;
+}
+
+/* ---------------------------------------------------------------- reveals */
+
+@keyframes landingRevealUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Scroll-driven in CSS only. Where the browser lacks animation-timeline the
+   content is simply visible — deliberately no JS hide-then-reveal, which
+   leaves content stranded if the observer never fires. */
+@supports (animation-timeline: view()) {
+  .landing-root .reveal-scope > *,
+  .landing-root .reveal-scope > div > * {
+    animation: landingRevealUp 1ms linear both;
+    animation-timeline: view();
+    animation-range: entry 8% entry 62%;
+  }
+  /* cards in a row come in one after another */
+  .landing-root .reveal-scope > div > *:nth-child(2) {
+    animation-range: entry 14% entry 68%;
+  }
+  .landing-root .reveal-scope > div > *:nth-child(3) {
+    animation-range: entry 20% entry 74%;
+  }
+  .landing-root .reveal-scope > div > *:nth-child(4) {
+    animation-range: entry 26% entry 80%;
+  }
+}
+
+@keyframes landingFade {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The headline lands line by line: each line sits in an overflow-hidden box
+   and slides up from below it. */
+@keyframes landingLine {
+  from {
+    transform: translateY(110%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ------------------------------------------------------------------- nav */
+
+.landing-root .nav-logo img {
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), filter 240ms ease-out;
+}
+.landing-root .nav-logo:hover img {
+  transform: scale(1.07) rotate(-3deg);
+  filter: drop-shadow(0 0 18px rgba(0, 127, 217, 0.8));
+}
+
+.landing-root .nav-links > a,
+.landing-root .nav-dd > a {
+  white-space: nowrap;
+  flex: 0 0 auto;
+  position: relative;
+  transition: color 200ms ease-out, text-shadow 220ms ease-out;
+}
+
+/* underline grows from the centre, with the brand-blue glow */
+.landing-root .nav-links > a::after,
+.landing-root .nav-dd > a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px rgba(0, 127, 217, 0.95), 0 0 22px rgba(0, 127, 217, 0.55);
+  transform: scaleX(0);
+  transform-origin: 50% 50%;
+  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing-root .nav-links > a:hover,
+.landing-root .nav-dd > a:hover {
+  color: #fff !important;
+  text-shadow: 0 0 14px rgba(0, 127, 217, 0.9), 0 0 30px rgba(0, 127, 217, 0.45);
+}
+.landing-root .nav-links > a:hover::after,
+.landing-root .nav-dd:hover > a::after {
+  transform: scaleX(1);
+}
+.landing-root .nav-links-current::after,
+.landing-root .nav-dd.nav-dd-current > a::after {
+  transform: scaleX(1) !important;
+}
+
+.landing-root .nav-links a:focus-visible,
+.landing-root .nav-dd-panel a:focus-visible,
+.landing-root .nav-lang-panel a:focus-visible {
+  outline: 2px solid #4fb0f5;
+  outline-offset: 6px;
+  border-radius: 4px;
+}
+
+.landing-root .nav-dd > a svg {
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing-root .nav-dd:hover > a svg,
+.landing-root .nav-dd:focus-within > a svg {
+  transform: rotate(180deg);
+}
+.landing-root .nav-dd:hover .nav-dd-panel,
+.landing-root .nav-dd:focus-within .nav-dd-panel {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translate(-50%, 0) !important;
+}
+.landing-root .nav-dd-panel a {
+  transition: background 180ms ease-out, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing-root .nav-dd-panel a:hover {
+  background: rgba(0, 127, 217, 0.16);
+  transform: translateX(3px);
+}
+
+/* Language menu. The ::after is an invisible bridge so the pointer can cross
+   the gap between the trigger and the panel without the panel closing. */
+.landing-root .nav-lang {
+  cursor: pointer;
+}
+.landing-root .nav-lang::after {
+  content: "";
+  position: absolute;
+  left: -12px;
+  right: -12px;
+  top: 100%;
+  height: 22px;
+}
+.landing-root .nav-lang:hover,
+.landing-root .nav-lang:focus-within {
+  color: #fff;
+}
+.landing-root .nav-lang > svg:last-of-type {
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing-root .nav-lang:hover > svg:last-of-type,
+.landing-root .nav-lang:focus-within > svg:last-of-type {
+  transform: rotate(180deg);
+}
+.landing-root .nav-lang:hover .nav-lang-panel,
+.landing-root .nav-lang:focus-within .nav-lang-panel {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateY(0) !important;
+}
+.landing-root .nav-lang-panel a:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+
+.landing-root .nav-auth {
+  transition: color 180ms ease-out, text-shadow 200ms ease-out;
+}
+.landing-root .nav-auth:hover {
+  color: #7fbfff !important;
+  text-shadow: 0 0 14px rgba(0, 127, 217, 0.75);
+}
+
+/* ------------------------------------------------------- responsive nav */
+
+@media (max-width: 1023px) {
+  .landing-root .nav-links {
+    display: none !important;
+  }
+  .landing-root .nav-burger {
+    display: inline-flex !important;
+  }
+  .landing-root .nav-toggle:checked ~ .nav-mobile {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .landing-root .nav-account .nav-lang,
+  .landing-root .nav-account span[aria-hidden] {
+    display: none !important;
+  }
+}
+
+@media (max-width: 759px) {
+  .landing-root .nav-account {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root * {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}
+
+/* ------------------------------------------------------- app page motion */
+
+@keyframes landingAppFloat {
+  0%,
+  100% {
+    transform: perspective(1600px) rotateY(-10deg) rotateX(4deg) translateY(0);
+  }
+  50% {
+    transform: perspective(1600px) rotateY(-4deg) rotateX(2deg) translateY(-14px);
+  }
+}
+
+@keyframes landingAppFloatAlt {
+  0%,
+  100% {
+    transform: perspective(1600px) rotateY(9deg) rotateX(3deg) translateY(-8px);
+  }
+  50% {
+    transform: perspective(1600px) rotateY(3deg) rotateX(1deg) translateY(4px);
+  }
+}
+
+@keyframes landingGlowPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.04);
+  }
+}
+
+/* ----------------------------------------------------- about page motion */
+
+@keyframes landingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes landingSpinRev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes landingBreathe {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.85;
+  }
+}
+
+/* FAQ: hide the native marker and turn the plus into a minus when open */
+.landing-root details > summary::-webkit-details-marker {
+  display: none;
+}
+.landing-root details[open] > summary > svg {
+  transform: rotate(45deg);
+}
+.landing-root details > summary > svg {
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}

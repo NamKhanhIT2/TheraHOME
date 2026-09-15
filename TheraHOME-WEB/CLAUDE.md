@@ -31,9 +31,21 @@ surfaces, matching three HTML prototypes in the design project (see below):
   version of the same experience the mobile app provides. **Out of scope for
   now.**
 
-**This phase builds Admin + Customer Care only.** The public Web App surface
-is deliberately deferred — see the access-gate design below for how the
-current login flow is built to extend to it later without being reworked.
+**Admin + Customer Care shipped first; the public surface shipped
+2026-09-15.** It was built from a DIFFERENT Claude Design project —
+`b34e8246-a1b9-44a1-ad8c-63a4025fd12a` ("Hero scene three.js review"), not the
+`d030fe5f-…` one this file describes — though both share the same design
+system bundle. It lives in the `(public)` route group on the same domain:
+`/` (trang chủ), `/san-pham`, `/ung-dung`, `/gioi-thieu`, `/luyen-tap`. See
+`docs/feature-notes.md` (2026-09-15) and `.design-reference/landing/README.md`.
+
+There is **one login for everybody**. Where you land after signing in is
+decided by `current_web_roles()`, not by which page you came from —
+`src/lib/postSignInRoute.ts`: admin → `/admin`, cskh → `/care`, an ordinary
+customer → `/`. `/luyen-tap` is the customer training area and reads the same
+`user_programs`/`program_days` rows the mobile app does, so progress is shared,
+not copied; the three mechanics it must match are documented at the top of
+`src/lib/training.ts`.
 
 ## Source of truth is a Claude Design project, not this checkout
 

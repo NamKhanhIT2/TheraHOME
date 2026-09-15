@@ -1207,3 +1207,86 @@ quy về cùng chuỗi chữ số (bỏ số 0 đầu, tối thiểu 4 chữ s�
 
 Ghi nhận thêm: trong lúc sửa, số đơn tự tăng 219 → 222 do đơn Shopify thật về
 và tự vào hàng chờ — xác nhận trigger chạy đúng trên production.
+
+## 2026-09-15 — Trang công khai TheraHome (port từ Claude Design)
+
+Dựng toàn bộ trang giới thiệu công khai trong chính `TheraHOME-WEB`, cùng
+domain với bảng điều khiển Admin/CSKH. Nguồn: Claude Design project
+`b34e8246-a1b9-44a1-ad8c-63a4025fd12a` — **khác** với project
+`d030fe5f-…` mà CLAUDE.md ghi (Admin/Customer Care/Web App), nhưng dùng chung
+design system bundle `therahome-design-system-78705102-…` vốn đã port sẵn vào
+`src/design-tokens/tokens.css`, nên phần token không phải làm gì.
+
+### Cấu trúc
+
+Route group `(public)` có layout riêng: `/` (trang chủ), `/san-pham`,
+`/ung-dung`, `/gioi-thieu`, `/luyen-tap`. `app/page.tsx` cũ (redirect sang
+`/welcome`) bị xoá — `/` nay là trang chủ. `(auth)`, `/admin`, `/care` giữ
+nguyên.
+
+**Chủ đề tối đóng khung bằng `body:has(.landing-root)`**, không đặt global.
+Landing là nền `#02030B` chữ trắng còn app là chủ đề sáng, chung một Next app
+một domain — một luật global cho bên này sẽ phá bên kia. Đã kiểm: `/thera-login`
+vẫn `rgb(238,243,251)`.
+
+### Một cửa đăng nhập, ba đích đến
+
+Đây là điểm chủ dự án nhấn mạnh. Trước đó `/thera-login` đẩy **mọi người** vào
+`/admin` rồi để `AccessGate` đá ngược ra — chạy được với nhân viên nhưng khách
+thường rơi vào vòng chuyển hướng. Nay `src/lib/postSignInRoute.ts` hỏi
+`current_web_roles()` và rẽ: `admin` → `/admin`, `cskh` → `/care`, mảng rỗng
+(khách thường, 45/47 tài khoản) → `/`. Lỗi khi tra vai thì coi như khách
+thường — hướng an toàn và cũng là ca phổ biến nhất.
+
+Nav phản ánh trạng thái thật (Supabase session, không phải localStorage giả
+như `auth-state.js`): đăng nhập rồi thì cặp Đăng Ký/Đăng Nhập thành chip tài
+khoản, nav mọc thêm mục **Luyện tập**. Thêm một mục design chưa có: admin/cskh
+đang xem trang công khai có **Bảng điều khiển** để quay lại — một cửa đăng
+nhập nghĩa là cùng một người có thể ở cả hai phía.
+
+### Tab Luyện tập dùng chung database với app
+
+`/luyen-tap` đọc/ghi đúng những dòng mà mobile app dùng — `user_programs`,
+`user_program_days`, `program_days`, `pain_logs`, `water_logs` — nên tiến độ
+là **một**, không phải hai bản sao. Ba cơ chế bắt buộc khớp, ghi rõ ở đầu
+`src/lib/training.ts`:
+
+1. **Ngày nào đang mở không đọc từ `user_programs.current_day`** mà suy ở
+   client từ `activated_at` theo ngày lịch **địa phương**. Dùng
+   `localDateString()`, không `toISOString()` (UTC sẽ lật ngày sai múi giờ).
+2. **Cổng nhật ký đau**: ngày mở được mà chưa có `pain_logs` thì hiện thang
+   0–10 trước. Ghi log lỗi **không** được chặn buổi tập.
+3. **Không có nút "hoàn thành"** — xem video là xong, qua RPC
+   `mark_day_watched`. `complete_day` vẫn còn trong DB và vẫn cấp quyền cho
+   `authenticated` nhưng không ai gọi; đây đúng là cái bẫy làm người port dựng
+   nhầm, nên nói thẳng trong comment.
+
+Kiểm chứng bằng SQL trên khách thật: một người đang ở ngày 7 ra đúng
+`1:done 2:missed … 7:current 8:upcoming 9–14:locked`.
+
+### Hero cuộn 600vh của trang Sản phẩm
+
+`hero-scroll.js` chép **nguyên văn** vào `public/landing/hero-scroll.js`, nạp
+bằng `next/script`. Nó là custom element thuần trình duyệt, và phần biên đạo
+theo cuộn quá dày để viết lại mà không lệch. `ProductScrollHero` dò ảnh
+`device.png` trước: thiếu ảnh thì texture load hỏng và khách sẽ gặp **sáu màn
+hình cuộn trống**, nên nó hạ cấp xuống hero tĩnh một màn cùng nội dung chữ.
+
+### Ảnh còn thiếu
+
+`logo.png`, `hero-bg.png`, `device.png` và bộ `assets/app/*.png` **vượt giới
+hạn đọc 256 KiB của DesignSync** — kéo về bị cắt, thiếu chunk IEND, không
+render được. Đã xoá thay vì commit ảnh vỡ; `public/landing/README.md` ghi rõ
+cần export tay những file nào. `SafeImg` tự gỡ ảnh 404 (phải kiểm cả
+`naturalWidth` lúc mount, vì `onError` thường đã bắn xong trước khi React
+hydrate nên không bắt được).
+
+### Vài chỗ phải dịch chứ không chép được
+
+Design host **không chạy JS**, nên tương tác làm bằng CSS: menu mobile là
+`<input type=checkbox>` + `<label>`, reveal là `animation-timeline: view()`.
+CSS sống sót nguyên vẹn; checkbox thành React state. `lang.js` thành
+`useSyncExternalStore` (`src/lib/langPreference.ts`) — đọc localStorage rồi
+setState trong effect chính là pattern `react-hooks/set-state-in-effect` chặn.
+Ngôn ngữ vẫn trung thực như design: mới có tiếng Việt, chọn English thì báo
+"sắp có" chứ không đổi nửa vời.

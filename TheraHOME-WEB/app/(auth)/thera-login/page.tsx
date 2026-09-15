@@ -3,11 +3,13 @@
 // "Đăng nhập bằng tài khoản TheraHOME" — email/password, no OAuth. On
 // success this skips /verify entirely: current_web_roles() already resolves
 // admin/cskh roles straight from profiles.account_type once a session
-// exists, so AccessGate on /admin (or its own redirect to /care for a
-// cskh-only account) is all that's needed next.
+// exists, so the destination can be decided here — see
+// src/lib/postSignInRoute.ts. Staff land in their shell, everyone else on
+// the public site.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithTheraAccount } from "@/lib/theraAccountAuth";
+import { resolvePostSignInRoute } from "@/lib/postSignInRoute";
 
 export default function TheraLoginPage() {
   const router = useRouter();
@@ -22,7 +24,11 @@ export default function TheraLoginPage() {
     setError("");
     try {
       await signInWithTheraAccount(email.trim(), password);
-      router.push("/admin");
+      // One door, three destinations: admin -> /admin, cskh -> /care, and an
+      // ordinary customer -> the public site. This used to push everyone at
+      // /admin and lean on AccessGate to bounce them, which worked for staff
+      // but left a customer signing in here staring at a redirect loop.
+      router.push(await resolvePostSignInRoute());
     } catch {
       setError("Email hoặc mật khẩu không chính xác.");
     } finally {

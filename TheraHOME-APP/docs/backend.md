@@ -51,9 +51,14 @@ still waiting on their phase:
   `202609151000_shopify_orders_feed_activation_queue.sql`. The trigger
   swallows its own errors, so nothing it does can fail an order insert. **No client RLS policy at all
   on this table by design** — reachable only through `SECURITY DEFINER`
-  functions, callable by `authenticated` only: `lookup_order(p_phone,
-  p_email)`, `lookup_order_by_code(p_code)`, and
-  `activate_orders_by_contact(p_phone, p_email)`. Both `p_phone`-taking
+  functions. The three that used to serve that role — `lookup_order(p_phone,
+  p_email)`, `lookup_order_by_code(p_code)` and
+  `activate_orders_by_contact(p_phone, p_email)` — had EXECUTE **revoked from
+  `public, anon, authenticated`** in `202609021100_security_hardening.sql`, so
+  no client can call them any more; the legacy order-activation path is dead
+  (app access comes from `product_activation_contacts`, see Activation below).
+  What remains reachable is `admin_fetch_user_orders(p_user_id)`, gated on
+  `current_web_roles()`, plus the service role. Both `p_phone`-taking
   functions normalize through the shared `normalize_phone_vn(text)` helper
   (strips all non-digits, `84`-prefix → `0`) before comparing, since real
   Shopify phone numbers can arrive in `+84`/spaced/dashed formats that
@@ -87,12 +92,30 @@ still waiting on their phase:
   additions for all claimed users.
 - **Program progress** (real, Phase 3): `user_programs`, `user_program_days`,
   `pain_logs`, `water_logs` — all read/written by
-  `src/hooks/usePrograms.ts`/`useWaterLog.ts`. RPCs `activate_order(p_order_id)`
-  (`app/(onboarding)/activate.tsx`) and `complete_day(...)` (`useCompleteDay`,
-  called from `useRequestDay`'s pain-scale-modal confirm) — as of Phase 6,
-  `complete_day` also inserts a real `notifications` row (`type='schedule'`)
-  for the newly-unlocked next day, which is the only current writer into the
-  notifications table (see below).
+  `src/hooks/usePrograms.ts`/`useWaterLog.ts`.
+
+  **How a day is completed changed on 2026-08-31 and this section used to
+  describe the old way.** There is no "complete" button: a day counts as done
+  once its video is watched, via `mark_day_watched(p_user_program_id,
+  p_program_day_id)` (`useMarkDayWatched`, called from `app/day/[dayId].tsx`) —
+  idempotent, returns `true` only on the newly-marked transition. Which day is
+  open is **not** read from `user_programs.current_day` either; it is derived
+  on the client from `activated_at` by local calendar day (`daysSinceLocal` /
+  `deriveDayStatus` in `src/hooks/usePrograms.ts`, using `localDateString()`
+  from `src/lib/localDate.ts` — never `toISOString()`). `useRequestDay` still
+  gates opening any un-logged day behind the pain-scale modal, which inserts
+  that day's `pain_logs` row.
+
+  `complete_day(p_user_program_id, p_program_day_id, p_pain_score)` and
+  `activate_order(p_order_id)` **still exist in the database** and
+  `complete_day` is still granted to `authenticated`, but nothing calls either
+  one. Do not build against them — that is the trap this paragraph used to set.
+  (`complete_day` was also what inserted the `type='schedule'` inbox row for
+  the next unlocked day. With it unused, `type='schedule'` rows now come from
+  `record_local_reminder_notification(p_title, p_body, p_destination)`, which
+  the app's local daily/evening reminder calls from
+  `src/lib/pushNotifications.ts` — verified against the live table, where
+  `schedule` is still the most-written type.)
 - **Community** (real, Phase 4, expanded post-Phase-6 — see "Community
   expansion" below for the full picture): `community_posts`, `post_comments`
   (self-referencing `parent_comment_id`, depth ≤ 1 enforced by
