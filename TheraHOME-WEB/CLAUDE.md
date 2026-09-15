@@ -42,7 +42,9 @@ system bundle. It lives in the `(public)` route group on the same domain:
 There is **one login for everybody**. Where you land after signing in is
 decided by `current_web_roles()`, not by which page you came from —
 `src/lib/postSignInRoute.ts`: admin → `/admin`, cskh → `/care`, an ordinary
-customer → `/`. `/luyen-tap` is the customer training area and reads the same
+customer → `/`. The public entrance is `/dang-nhap` + `/dang-ky` (the design's
+`Auth.dc.html`, in the `(auth-screen)` group); `/welcome` and `/thera-login`
+remain as the internal entrances and run the same resolver. `/luyen-tap` is the customer training area and reads the same
 `user_programs`/`program_days` rows the mobile app does, so progress is shared,
 not copied; the three mechanics it must match are documented at the top of
 `src/lib/training.ts`.

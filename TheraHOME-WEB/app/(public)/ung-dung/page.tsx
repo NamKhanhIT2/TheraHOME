@@ -15,19 +15,19 @@ export const metadata = {
   description: "Hiểu rõ tình trạng hiện tại, theo dõi cơn đau mỗi ngày và đi theo một lộ trình phù hợp hơn với chính cơ thể mình.",
 };
 
-const S = (n: string) => `/landing/app/${n}.png`;
+const S = (n: string) => `/landing/app/${n}.jpg`;
 
-// Five real app captures, which is exactly the set the design lists. The ring
-// needs eight cards, so three repeat — as the design's own list does.
+// The seven finished App Store panels. The design's ring holds eight cards,
+// so one repeats.
 const CARDS: CarouselCard[] = [
   { src: S("home"), alt: "Màn hình chính" },
   { src: S("roadmap"), alt: "Lộ trình 14 ngày" },
-  { src: S("ai-chat"), alt: "Trợ lý TheraAI" },
+  { src: S("video"), alt: "Buổi tập có video hướng dẫn" },
   { src: S("community"), alt: "Cộng đồng TheraHome" },
-  { src: S("store"), alt: "Cửa hàng trong ứng dụng" },
+  { src: S("ai-chat"), alt: "Trợ lý TheraAI" },
+  { src: S("support"), alt: "Hỗ trợ từ đội ngũ TheraHome" },
+  { src: S("video-alt"), alt: "Buổi tập theo video" },
   { src: S("home"), alt: "" },
-  { src: S("roadmap"), alt: "" },
-  { src: S("community"), alt: "" },
 ];
 
 const eyebrow: CSSProperties = { fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--color-primary)" };
@@ -36,48 +36,16 @@ const featureH2: CSSProperties = { margin: 0, fontSize: "clamp(26px, 2.8vw, 40px
 const featureP: CSSProperties = { margin: 0, maxWidth: 520, fontSize: 16.5, lineHeight: 1.7, color: "rgba(255,255,255,0.66)" };
 const chip: CSSProperties = { fontSize: 13, padding: "8px 14px", borderRadius: 999, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.78)" };
 
-/** A floating phone screenshot. `float` picks which of the two drift keyframes. */
-function PhoneShot({ src, alt, ratio = 0.495, max = 330, float = "a", seconds = 13 }: {
-  src: string; alt: string; ratio?: number; max?: number; float?: "a" | "b"; seconds?: number;
+/** A floating App Store panel. `float` picks which of the two drift keyframes.
+ * These carry their own device mockup, so unlike the design's phone frame there
+ * is no bezel here — just the panel, its shadow and the drift. */
+function AppPanel({ src, alt, max = 330, float = "a", seconds = 13 }: {
+  src: string; alt: string; max?: number; float?: "a" | "b"; seconds?: number;
 }) {
   return (
-    <div style={{ position: "relative", width: "100%", maxWidth: max, aspectRatio: String(ratio), borderRadius: 26, overflow: "hidden", boxShadow: "0 45px 100px rgba(0,60,140,0.45)", animation: `${float === "a" ? "landingAppFloat" : "landingAppFloatAlt"} ${seconds}s ease-in-out infinite` }}>
-      <SafeImg src={src} style={{ position: "absolute", inset: 0, display: "block", width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
+    <div style={{ position: "relative", width: "100%", maxWidth: max, aspectRatio: "0.462", borderRadius: 22, overflow: "hidden", boxShadow: "0 45px 100px rgba(0,60,140,0.45)", animation: `${float === "a" ? "landingAppFloat" : "landingAppFloatAlt"} ${seconds}s ease-in-out infinite` }}>
+      <SafeImg src={src} style={{ position: "absolute", inset: 0, display: "block", width: "100%", height: "100%", objectFit: "contain" }} />
       <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clipPath: "inset(50%)" }}>{alt}</span>
-    </div>
-  );
-}
-
-/** The two chat mock-ups. Same shell, different transcript and heading. */
-function ChatMock({ title, subtitle, online, turns, placeholder, seconds, float }: {
-  title: string; subtitle: string; online?: boolean;
-  turns: { from: "user" | "them"; text: string }[]; placeholder: string; seconds: number; float: "a" | "b";
-}) {
-  return (
-    <div style={{ boxSizing: "border-box", display: "flex", flex: "0 0 auto", width: "min(320px, 100%)", height: 520, padding: 12, borderRadius: 38, overflow: "hidden", background: "linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.03))", border: "1px solid rgba(255,255,255,0.13)", boxShadow: "0 45px 100px rgba(0,60,140,0.45)", animation: `${float === "a" ? "landingAppFloat" : "landingAppFloatAlt"} ${seconds}s ease-in-out infinite` }}>
-      <div style={{ boxSizing: "border-box", position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 12, padding: "18px 16px", borderRadius: 28, background: "linear-gradient(180deg,#071325,#03080f)", overflow: "hidden" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <span style={{ width: 28, height: 28, borderRadius: "50%", background: online ? "rgba(79,176,245,0.28)" : "rgba(0,127,217,0.25)", flex: "0 0 auto" }} />
-          <span style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{title}</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.6)" }}>
-              {online ? <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#35C46A" }} /> : null}
-              {subtitle}
-            </span>
-          </span>
-        </span>
-        {turns.map((t, i) => (
-          <span
-            key={i}
-            style={{ maxWidth: "82%", alignSelf: t.from === "user" ? "flex-end" : "flex-start", background: t.from === "user" ? "var(--color-primary)" : "rgba(255,255,255,0.07)", color: t.from === "user" ? "#fff" : "rgba(255,255,255,0.88)", padding: "11px 14px", borderRadius: 16, fontSize: 13.5, lineHeight: 1.5 }}
-          >
-            {t.text}
-          </span>
-        ))}
-        <span style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 999, background: "rgba(255,255,255,0.06)", fontSize: 12.5, color: "rgba(255,255,255,0.55)" }}>
-          {placeholder}
-        </span>
-      </div>
     </div>
   );
 }
@@ -150,7 +118,7 @@ export default function AppPage() {
           </div>
           <div style={{ flex: "0 1 380px", display: "flex", justifyContent: "center", position: "relative" }}>
             <span aria-hidden="true" style={{ position: "absolute", inset: "6% 12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,127,217,0.45), rgba(0,0,0,0) 70%)", filter: "blur(30px)", animation: "landingGlowPulse 7s ease-in-out infinite" }} />
-            <PhoneShot src={S("home")} alt="Màn hình chính ứng dụng TheraAI" max={360} seconds={12} />
+            <AppPanel src={S("home")} alt="Màn hình chính ứng dụng TheraAI" max={360} seconds={12} />
           </div>
         </div>
       </section>
@@ -163,7 +131,7 @@ export default function AppPage() {
             title="Lộ trình 14 ngày, chia theo từng giai đoạn"
             body="Mỗi ngày một buổi 15–20 phút, đánh dấu hoàn thành ngay trong app. Hết mỗi giai đoạn có bài tự đánh giá để lộ trình điều chỉnh theo tình trạng của bạn."
             chips={["Giai đoạn rõ ràng", "Đánh dấu hoàn thành", "Tự đánh giá theo giai đoạn"]}
-            art={<PhoneShot src={S("roadmap")} alt="Lộ trình 14 ngày trong ứng dụng" seconds={13} />}
+            art={<AppPanel src={S("roadmap")} alt="Lộ trình 14 ngày trong ứng dụng" seconds={13} />}
           />
 
           <Feature
@@ -171,28 +139,14 @@ export default function AppPage() {
             eyebrowText="Buổi tập có video"
             title="Làm theo video từng ngày, không phải đoán"
             body="Mỗi ngày có video hướng dẫn riêng, xem trực tiếp trong app hoặc chiếu lên TV. Xem xong buổi đó tự động được ghi nhận hoàn thành."
-            art={<PhoneShot src={S("store")} alt="Buổi tập trong ứng dụng" float="b" seconds={14} />}
+            art={<AppPanel src={S("video")} alt="Buổi tập có video hướng dẫn" float="b" seconds={14} />}
           />
 
           <Feature
             eyebrowText="Trợ lý AI"
             title="Hỏi bất cứ lúc nào, trả lời ngay"
             body="Gợi ý buổi tập hôm nay, cách dùng thiết bị, điều chỉnh cường độ. Trợ lý được huấn luyện theo kiến thức của bác sĩ và chuyên gia trị liệu — không thay thế chẩn đoán của bác sĩ."
-            art={
-              <ChatMock
-                title="Trợ lý TheraAI"
-                subtitle="Trả lời ngay · không thay thế bác sĩ"
-                seconds={15}
-                float="a"
-                placeholder="Nhập câu hỏi của bạn…"
-                turns={[
-                  { from: "user", text: "Hôm nay tôi nên tập gì?" },
-                  { from: "them", text: "Ngày 6 của bạn: khởi động 2 phút, kéo giãn 26° trong 12 phút, EMS mức 2." },
-                  { from: "user", text: "Cổ còn hơi mỏi bên phải" },
-                  { from: "them", text: "Giảm EMS xuống mức 1 và thêm 3 phút nhiệt 41°. Tôi đã cập nhật buổi hôm nay." },
-                ]}
-              />
-            }
+            art={<AppPanel src={S("ai-chat")} alt="Trợ lý TheraAI trong ứng dụng" max={360} seconds={15} />}
           />
 
           <Feature
@@ -200,7 +154,7 @@ export default function AppPage() {
             eyebrowText="Cộng đồng"
             title="Đi cùng những người cùng hoàn cảnh"
             body="Chia sẻ hành trình, đọc mẹo từ người đi trước và từ đội ngũ TheraHome. Duy trì đều đặn dễ hơn khi không làm một mình."
-            art={<PhoneShot src={S("community")} alt="Cộng đồng TheraHome trong ứng dụng" ratio={0.637} max={380} float="b" seconds={13} />}
+            art={<AppPanel src={S("community")} alt="Cộng đồng TheraHome trong ứng dụng" max={360} float="b" seconds={13} />}
           />
 
           <Feature
@@ -208,22 +162,7 @@ export default function AppPage() {
             eyebrowText="Hỗ trợ thật"
             title="Nhắn là có người trả lời"
             body="Đội ngũ TheraHome hỗ trợ về tài khoản, lộ trình, thiết bị và ứng dụng — theo sát bạn suốt lộ trình, không chỉ lúc mới mua."
-            art={
-              <ChatMock
-                title="Đội ngũ TheraHome"
-                subtitle="Đang trực tuyến"
-                online
-                seconds={12.5}
-                float="b"
-                placeholder="Nhắn cho đội ngũ hỗ trợ…"
-                turns={[
-                  { from: "user", text: "Em mới nhận máy, bắt đầu thế nào ạ?" },
-                  { from: "them", text: "Chào anh! Anh mở app, chọn lộ trình 14 ngày rồi làm theo video Ngày 1 nhé." },
-                  { from: "user", text: "Giữa lộ trình cần hỏi thì sao?" },
-                  { from: "them", text: "Anh nhắn ngay ở đây, bọn em hỗ trợ về tài khoản, lộ trình, thiết bị và app." },
-                ]}
-              />
-            }
+            art={<AppPanel src={S("support")} alt="Hỗ trợ từ đội ngũ TheraHome" max={360} float="b" seconds={12.5} />}
           />
         </div>
       </section>

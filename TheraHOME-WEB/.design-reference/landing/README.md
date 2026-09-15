@@ -24,7 +24,7 @@ Pull and diff against the live project rather than trusting a local copy.
 | `App.dc.html` | ported → `app/(public)/ung-dung/` (incl. the 3D carousel) |
 | `About.dc.html` | ported → `app/(public)/gioi-thieu/` |
 | `Dashboard.dc.html` | ported → `app/(public)/luyen-tap/`, wired to real Supabase data, all three tabs (Lộ trình / Cửa hàng / Cộng đồng) |
-| `Auth.dc.html` | not ported: `/welcome` + `/thera-login` already are the one login door, and routing by role after sign-in lives in `src/lib/postSignInRoute.ts` |
+| `Auth.dc.html` | ported → `app/(auth-screen)/dang-nhap/` + `/dang-ky/` (`AuthPanel.tsx`), wired to real Supabase auth; role routing after sign-in stays in `src/lib/postSignInRoute.ts` |
 | `Product Reveal.dc.html` | not started |
 
 ## Scripts
@@ -50,3 +50,19 @@ because each needed to talk to real state the design only mocked.
   pair of `hero-bg.png` layers. Do not port them by assumption; ask first.
 - `assets/brand/logo.png` and `assets/hero-bg.png` exceed DesignSync's 256 KiB
   `get_file` cap and come back truncated. See `public/landing/README.md`.
+- **`Auth.dc.html` is one file with two states**; here it is two real routes,
+  `/dang-nhap` and `/dang-ky`, with the design's tab pair as `<Link>`s between
+  them — so the browser Back button and a shared link both behave. They sit in
+  an `(auth-screen)` group, **outside `(public)`**, because the site nav already
+  carries Đăng Nhập / Đăng Ký and rendering it on the auth screen itself showed
+  those links twice.
+- The design's **"Ghi nhớ đăng nhập" checkbox was dropped on purpose**:
+  supabase-js persists the session in localStorage either way, so the box would
+  have changed nothing. A control that does nothing is worse than no control.
+- Password rules are **not re-invented here** — `isPasswordStrong` mirrors the
+  app's `isPasswordStrongEnough` (`TheraHOME-APP/src/lib/authAccount.ts`) so the
+  same password is accepted on both, and the "email đã tồn tại" case uses the
+  same `identities.length === 0` decoy check Supabase returns.
+- The design's "Họ và tên" field writes `full_name`, **not** `username`:
+  `handle_new_user` validates `username` against a shape rule that rejects
+  spaces, so a Vietnamese full name would have been refused at the trigger.

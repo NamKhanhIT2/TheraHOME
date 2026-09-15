@@ -339,7 +339,7 @@ export default function TrainingPage() {
               Dùng chung tài khoản với ứng dụng trên điện thoại — tiến độ hai bên là một.
             </p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-              <LandingButton href="/welcome">Đăng nhập</LandingButton>
+              <LandingButton href="/dang-nhap">Đăng nhập</LandingButton>
             </div>
           </div>
         ) : null}

@@ -183,7 +183,7 @@ export function CommunityTab({ userId, userName }: { userId: string | null; user
           Bảng tin chỉ dành cho khách đã có tài khoản — cùng cộng đồng bạn thấy trong ứng dụng trên điện thoại.
         </p>
         <div style={{ display: "flex" }}>
-          <LandingButton href="/welcome">Đăng nhập</LandingButton>
+          <LandingButton href="/dang-nhap">Đăng nhập</LandingButton>
         </div>
       </div>
     );

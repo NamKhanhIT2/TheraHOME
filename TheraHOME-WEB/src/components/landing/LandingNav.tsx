@@ -25,10 +25,11 @@ export const NAV_LINKS = [
   { href: "/gioi-thieu", label: "Về chúng tôi" },
 ] as const;
 
-/** Where a customer signs in. The design points at its own Auth.dc.html; in
- * this app /welcome is already that screen (Google / Apple / TheraHOME
- * account), so it is wired there rather than duplicated. */
-const SIGN_IN = "/welcome";
+/** The design's own auth screen, now built: /dang-nhap and /dang-ky. The staff
+ * entrances (/welcome, /thera-login) stay where they are — they are reached
+ * from the console, not from the public site. */
+const SIGN_IN = "/dang-nhap";
+const SIGN_UP = "/dang-ky";
 
 function Chevron({ size = 10, width = 1.6 }: { size?: number; width?: number }) {
   return (
@@ -173,7 +174,7 @@ export function LandingNav() {
           ) : (
             <>
               <span aria-hidden="true" style={{ width: 1, height: 18, background: "rgba(255,255,255,0.22)" }} />
-              <Link href={SIGN_IN} className="nav-auth" style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", color: "#fff" }}>Đăng Ký</Link>
+              <Link href={SIGN_UP} className="nav-auth" style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", color: "#fff" }}>Đăng Ký</Link>
               <span aria-hidden="true" style={{ width: 1, height: 18, background: "rgba(255,255,255,0.22)" }} />
               <Link href={SIGN_IN} className="nav-auth" style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: "0.02em", color: "#fff" }}>Đăng Nhập</Link>
             </>
@@ -211,7 +212,7 @@ export function LandingNav() {
             ) : (
               <>
                 <Link href={SIGN_IN} onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, fontWeight: 600, color: "#fff" }}>Đăng Nhập</Link>
-                <Link href={SIGN_IN} onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, fontWeight: 600, color: "#7FBFFF" }}>Đăng Ký</Link>
+                <Link href={SIGN_UP} onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, fontWeight: 600, color: "#7FBFFF" }}>Đăng Ký</Link>
               </>
             )}
           </div>

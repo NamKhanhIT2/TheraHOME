@@ -323,3 +323,101 @@ body:has(.landing-root) {
 .landing-root details > summary > svg {
   transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* ------------------------------------------------------- auth screen */
+
+@keyframes landingAuthIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landingGlowDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate3d(-3%, 4%, 0) scale(1.08);
+    opacity: 0.8;
+  }
+}
+
+.landing-root .auth-field {
+  transition: border-color 200ms ease-out, box-shadow 240ms ease-out, background 200ms ease-out;
+}
+.landing-root .auth-field:focus-within {
+  border-color: rgba(0, 127, 217, 0.75) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 0 0 4px rgba(0, 127, 217, 0.16);
+}
+.landing-root .auth-field input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+}
+.landing-root .auth-field input::placeholder {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.landing-root .auth-social {
+  transition: background 180ms ease-out, border-color 180ms ease-out, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing-root .auth-social:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.landing-root .auth-tab {
+  transition: color 180ms ease-out;
+}
+
+.landing-root .nav-close {
+  transition: background 180ms ease-out, border-color 180ms ease-out, transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing-root .nav-close:hover {
+  background: rgba(0, 127, 217, 0.18);
+  border-color: rgba(0, 127, 217, 0.5);
+  color: #fff !important;
+  transform: translateY(-2px);
+}
+
+.landing-root .auth-lockup span {
+  transition: text-shadow 240ms ease-out;
+}
+.landing-root .auth-lockup:hover span {
+  text-shadow: 0 0 18px rgba(0, 127, 217, 0.7);
+}
+
+/* Wide enough for the aside: the card carries no lockup of its own. */
+@media (min-width: 1150px) {
+  .landing-root .auth-lockup {
+    display: none !important;
+  }
+}
+
+/* Narrow: the aside goes, the card centres, and the wordmark moves from the
+   nav to the lockup above the card so it is not shown twice. */
+@media (max-width: 1149px) {
+  .landing-root .auth-aside {
+    display: none !important;
+  }
+  .landing-root .auth-main {
+    justify-content: center !important;
+  }
+  .landing-root .auth-nav-word {
+    display: none !important;
+  }
+}

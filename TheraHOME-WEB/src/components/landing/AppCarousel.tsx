@@ -1,6 +1,12 @@
 "use client";
 
-// 3D ring carousel of app screens — port of carousel.js.
+// 3D ring carousel of the App Store panels — port of carousel.js.
+//
+// The design frames each card in a dark phone bezel because it was showing
+// bare screen captures. Ours are the finished App Store panels, which already
+// carry their own device mockup on a branded background, so the bezel is gone:
+// a frame inside a frame reads as a mistake. The card keeps the panel's own
+// 0.462 aspect so nothing is cropped.
 //
 // Rotation and per-card facing are driven in one rAF loop rather than by CSS
 // animation, because each card must be hidden once it turns away:
@@ -94,21 +100,16 @@ export function AppCarousel({ cards }: { cards: CarouselCard[] }) {
         {cards.map((c, i) => (
           <div
             key={`${c.src}-${i}`}
-            style={{ position: "absolute", left: "50%", top: "50%", width: 184, marginLeft: -92, aspectRatio: "0.5", borderRadius: 22, overflow: "hidden", border: "4px solid #191f27", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.10)", opacity: 0, transition: "opacity 220ms linear" }}
+            style={{ position: "absolute", left: "50%", top: "50%", width: 184, marginLeft: -92, aspectRatio: "0.462", borderRadius: 18, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,30,80,0.5)", opacity: 0, transition: "opacity 220ms linear" }}
           >
-            {/* object-fit, not the design's measured percentage offsets: those
-                were calibrated to its own screenshots. Ours are the real Play
-                Store captures, trimmed of the Android status and gesture bars
-                to 0.495 — near enough the 0.5 frame that cover crops nothing
-                worth keeping. */}
-            {/* eslint-disable-next-line @next/next/no-img-element -- fixed 184px frame inside a 3D ring; next/image manages neither */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- fixed 184px card inside a 3D ring; next/image manages neither */}
             <img
               src={c.src}
               alt={c.alt}
               loading={i === 0 ? undefined : "lazy"}
               decoding="async"
               onError={(e) => { e.currentTarget.style.display = "none"; }}
-              style={{ position: "absolute", inset: 0, display: "block", width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }}
+              style={{ position: "absolute", inset: 0, display: "block", width: "100%", height: "100%", objectFit: "contain" }}
             />
           </div>
         ))}

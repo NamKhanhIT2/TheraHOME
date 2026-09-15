@@ -1371,3 +1371,56 @@ Kiểm chứng: viết test đối chiếu chạy **cùng lúc** hàm của app 
 (`daysSinceLocal` + `deriveDayStatus`) trên 656 tổ hợp — mọi ngày hoạt hoá từ
 60 ngày trước tới 3 ngày sau, các mốc DST Mỹ, và toàn bộ ma trận
 ngày × trạng thái × hôm-nay: **0 lệch**.
+
+### Màn Đăng nhập/Đăng ký theo design + 7 ảnh App Store (2026-09-15, khuya)
+
+Chủ dự án báo hai việc: *"màn đăng nhập/đăng ký chưa giống với design, nó vẫn
+dùng màn cũ"* và *"ảnh ở tab App đang dùng ảnh cũ, trước đó tôi gửi 7 ảnh rồi
+đó"*.
+
+**1. Port `Auth.dc.html` → `/dang-nhap` + `/dang-ky`.** Trước đó tôi ghi trong
+`.design-reference/landing/README.md` là "không port, vì `/welcome` đã là cửa
+đăng nhập rồi". Lập luận đó đúng về *chức năng* nhưng sai về *yêu cầu*:
+`/welcome` là màn nội bộ cũ, không mang giao diện design. Đã dựng
+`AuthPanel.tsx` — cột trái lợi ích + thẻ kính có cặp tab Đăng Nhập / Đăng Ký,
+hiện/ẩn mật khẩu, checkbox điều khoản, nút Apple/Google.
+
+Một file design, **hai route thật**, cặp tab là `<Link>` giữa chúng — để nút
+Back của trình duyệt và việc gửi link cho nhau đều đúng. Đặt trong group
+`(auth-screen)`, **ngoài `(public)`**, vì nav trang công khai đã có sẵn hai
+link Đăng Nhập / Đăng Ký, render nó trên chính màn auth thì thấy trùng hai lần.
+
+Ba quyết định lệch design, có lý do:
+
+- **Bỏ ô "Ghi nhớ đăng nhập".** supabase-js lưu phiên vào localStorage dù có
+  tích hay không, nên ô đó sẽ không điều khiển gì. Một cái nút không làm gì tệ
+  hơn là không có nút.
+- **"Họ và tên" ghi vào `full_name`, không phải `username`.** Trigger
+  `handle_new_user` kiểm `username` theo shape rule không cho khoảng trắng —
+  tên tiếng Việt sẽ bị từ chối ngay ở database.
+- **Luật mật khẩu không viết lại**, chép từ `isPasswordStrongEnough` của app
+  (`TheraHOME-APP/src/lib/authAccount.ts`): 8 ký tự, có chữ + số + ký tự đặc
+  biệt. Cùng một mật khẩu phải được chấp nhận ở cả hai nơi. Trường hợp email
+  đã tồn tại cũng dùng đúng phép thử `identities.length === 0` của Supabase.
+
+Sau khi đăng nhập vẫn đi qua `resolvePostSignInRoute()` — admin → `/admin`,
+CSKH → `/care`, khách → `/`. Một cửa, ba đích, không đổi.
+
+Nav trang công khai và hai chỗ nhắc đăng nhập trong tab Luyện tập / Cộng đồng
+đã trỏ từ `/welcome` sang `/dang-nhap`. `/welcome` và `/thera-login` giữ
+nguyên — đó là lối vào nội bộ, tới từ console chứ không từ trang công khai.
+
+**2. Thay 7 ảnh App Store.** Bộ ảnh nằm ở
+`~/Downloads/TheraHOME_AppStore_7_Screenshots_1242x2688/`; tôi đã bỏ sót vì
+`ls ~/Downloads` chỉ liệt kê mức trên cùng, không vào thư mục con — **lần thứ
+hai trong ngày mắc đúng lỗi này** (lần trước là ảnh hero). Tìm file của chủ dự
+án thì phải `find`, không `ls`.
+
+Đây là **panel marketing hoàn chỉnh** (tiêu đề + màn hình đã lồng khung trên
+nền thương hiệu), không phải ảnh chụp màn trần. Nên đã **bỏ khung điện thoại**
+ở cả `AppCarousel` lẫn trang `/ung-dung`: panel tự mang khung rồi, bọc thêm
+một lớp nữa thì thành điện thoại trong điện thoại. Tỉ lệ 1242:2688 = 0.462,
+hai khung dùng đúng tỉ lệ đó với `object-fit: contain` — không cắt gì.
+
+Năm ảnh `app/*.png` cũ đã xoá. `ChatMock` (191 dòng) cũng xoá — chết từ lúc
+carousel đổi sang panel thật.
