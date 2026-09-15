@@ -1,8 +1,9 @@
 // Ứng dụng TheraAI — port of "App.dc.html".
 //
-// Screenshot crops are carried through verbatim: each phone image is a full
-// screen capture positioned inside a smaller frame by measured percentage
-// offsets, so recomputing them by eye would shift every screen.
+// The phone art is the real Play Store captures (play-assets/phone/), trimmed
+// of the Android status and gesture bars. The design's measured crop offsets
+// were calibrated to its own screenshots and are dropped in favour of
+// object-fit — see AppCarousel.
 import type { CSSProperties } from "react";
 import { LandingButton } from "@/components/landing/LandingButton";
 import { LandingFooter } from "@/components/landing/LandingFooter";
@@ -16,16 +17,18 @@ export const metadata = {
 
 const S = (n: string) => `/landing/app/${n}.png`;
 
+// The three real app captures shipped to the Play Store. The design lists
+// five distinct screens; we have three, so the ring repeats them — which it
+// does anyway (its own list repeats three of five to fill eight slots).
 const CARDS: CarouselCard[] = [
-  { src: S("home"), alt: "Màn hình chính", crop: { width: "136.45%", height: "147.49%", left: "-18.02%", top: "-47.49%" } },
-  { src: S("roadmap"), alt: "Lộ trình 14 ngày", crop: { width: "136.25%", height: "147.28%", left: "-18.13%", top: "-47.28%" } },
-  { src: S("community"), alt: "Buổi tập có video", crop: { width: "138.91%", height: "150.15%", left: "-23.14%", top: "-50.15%" } },
-  { src: S("video"), alt: "Cộng đồng", crop: { width: "138.08%", height: "149.25%", left: "-24.22%", top: "-49.25%" } },
-  { src: S("video2"), alt: "Hướng dẫn từng ngày", crop: { width: "139.12%", height: "150.38%", left: "-25.61%", top: "-50.38%" } },
-  // the ring needs enough cards to look continuous; the design repeats three
-  { src: S("home"), alt: "", crop: { width: "136.45%", height: "147.49%", left: "-18.02%", top: "-47.49%" } },
-  { src: S("roadmap"), alt: "", crop: { width: "136.25%", height: "147.28%", left: "-18.13%", top: "-47.28%" } },
-  { src: S("community"), alt: "", crop: { width: "138.91%", height: "150.15%", left: "-23.14%", top: "-50.15%" } },
+  { src: S("store"), alt: "Cửa hàng trong ứng dụng" },
+  { src: S("community"), alt: "Cộng đồng TheraHome" },
+  { src: S("ai-chat"), alt: "Trợ lý TheraAI" },
+  { src: S("store"), alt: "" },
+  { src: S("community"), alt: "" },
+  { src: S("ai-chat"), alt: "" },
+  { src: S("store"), alt: "" },
+  { src: S("community"), alt: "" },
 ];
 
 const eyebrow: CSSProperties = { fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--color-primary)" };
@@ -35,12 +38,12 @@ const featureP: CSSProperties = { margin: 0, maxWidth: 520, fontSize: 16.5, line
 const chip: CSSProperties = { fontSize: 13, padding: "8px 14px", borderRadius: 999, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.78)" };
 
 /** A floating phone screenshot. `float` picks which of the two drift keyframes. */
-function PhoneShot({ src, alt, crop, ratio = 0.548, max = 330, float = "a", seconds = 13 }: {
-  src: string; alt: string; crop: CSSProperties; ratio?: number; max?: number; float?: "a" | "b"; seconds?: number;
+function PhoneShot({ src, alt, ratio = 0.495, max = 330, float = "a", seconds = 13 }: {
+  src: string; alt: string; ratio?: number; max?: number; float?: "a" | "b"; seconds?: number;
 }) {
   return (
     <div style={{ position: "relative", width: "100%", maxWidth: max, aspectRatio: String(ratio), borderRadius: 26, overflow: "hidden", boxShadow: "0 45px 100px rgba(0,60,140,0.45)", animation: `${float === "a" ? "landingAppFloat" : "landingAppFloatAlt"} ${seconds}s ease-in-out infinite` }}>
-      <SafeImg src={src} style={{ position: "absolute", display: "block", ...crop }} />
+      <SafeImg src={src} style={{ position: "absolute", inset: 0, display: "block", width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
       <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clipPath: "inset(50%)" }}>{alt}</span>
     </div>
   );
@@ -148,7 +151,7 @@ export default function AppPage() {
           </div>
           <div style={{ flex: "0 1 380px", display: "flex", justifyContent: "center", position: "relative" }}>
             <span aria-hidden="true" style={{ position: "absolute", inset: "6% 12%", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,127,217,0.45), rgba(0,0,0,0) 70%)", filter: "blur(30px)", animation: "landingGlowPulse 7s ease-in-out infinite" }} />
-            <PhoneShot src={S("home")} alt="Màn hình chính ứng dụng TheraAI" max={360} seconds={12} crop={{ width: "124.22%", height: "147.06%", left: "-12.42%", top: "-47.06%" }} />
+            <PhoneShot src={S("store")} alt="Cửa hàng trong ứng dụng TheraAI" max={360} seconds={12} />
           </div>
         </div>
       </section>
@@ -161,7 +164,7 @@ export default function AppPage() {
             title="Lộ trình 14 ngày, chia theo từng giai đoạn"
             body="Mỗi ngày một buổi 15–20 phút, đánh dấu hoàn thành ngay trong app. Hết mỗi giai đoạn có bài tự đánh giá để lộ trình điều chỉnh theo tình trạng của bạn."
             chips={["Giai đoạn rõ ràng", "Đánh dấu hoàn thành", "Tự đánh giá theo giai đoạn"]}
-            art={<PhoneShot src={S("roadmap")} alt="Lộ trình 14 ngày trong ứng dụng" seconds={13} crop={{ width: "124.07%", height: "147.06%", left: "-12.41%", top: "-47.06%" }} />}
+            art={<PhoneShot src={S("store")} alt="Ứng dụng TheraAI trên điện thoại" seconds={13} />}
           />
 
           <Feature
@@ -169,7 +172,7 @@ export default function AppPage() {
             eyebrowText="Buổi tập có video"
             title="Làm theo video từng ngày, không phải đoán"
             body="Mỗi ngày có video hướng dẫn riêng, xem trực tiếp trong app hoặc chiếu lên TV. Xem xong buổi đó tự động được ghi nhận hoàn thành."
-            art={<PhoneShot src={S("community")} alt="Buổi tập có video hướng dẫn" float="b" seconds={14} crop={{ width: "125.00%", height: "148.15%", left: "-12.50%", top: "-48.15%" }} />}
+            art={<PhoneShot src={S("ai-chat")} alt="Trợ lý TheraAI trong ứng dụng" float="b" seconds={14} />}
           />
 
           <Feature
@@ -198,7 +201,7 @@ export default function AppPage() {
             eyebrowText="Cộng đồng"
             title="Đi cùng những người cùng hoàn cảnh"
             body="Chia sẻ hành trình, đọc mẹo từ người đi trước và từ đội ngũ TheraHome. Duy trì đều đặn dễ hơn khi không làm một mình."
-            art={<PhoneShot src={S("video")} alt="Cộng đồng TheraHome trong ứng dụng" ratio={0.637} max={380} float="b" seconds={13} crop={{ width: "108.70%", height: "149.70%", left: "-6.52%", top: "-49.70%" }} />}
+            art={<PhoneShot src={S("community")} alt="Cộng đồng TheraHome trong ứng dụng" ratio={0.637} max={380} float="b" seconds={13} />}
           />
 
           <Feature

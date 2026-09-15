@@ -15,9 +15,6 @@ import { useEffect, useRef } from "react";
 export interface CarouselCard {
   src: string;
   alt: string;
-  /** The screenshot is cropped to the phone frame with these — measured per
-   * image in the design, so they are carried through rather than recomputed. */
-  crop: { width: string; height: string; left: string; top: string };
 }
 
 const RADIUS = 300;
@@ -99,14 +96,19 @@ export function AppCarousel({ cards }: { cards: CarouselCard[] }) {
             key={`${c.src}-${i}`}
             style={{ position: "absolute", left: "50%", top: "50%", width: 184, marginLeft: -92, aspectRatio: "0.5", borderRadius: 22, overflow: "hidden", border: "4px solid #191f27", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.10)", opacity: 0, transition: "opacity 220ms linear" }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- fixed 184px frame, cropped by absolute offsets the design measured */}
+            {/* object-fit, not the design's measured percentage offsets: those
+                were calibrated to its own screenshots. Ours are the real Play
+                Store captures, trimmed of the Android status and gesture bars
+                to 0.495 — near enough the 0.5 frame that cover crops nothing
+                worth keeping. */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- fixed 184px frame inside a 3D ring; next/image manages neither */}
             <img
               src={c.src}
               alt={c.alt}
               loading={i === 0 ? undefined : "lazy"}
               decoding="async"
               onError={(e) => { e.currentTarget.style.display = "none"; }}
-              style={{ position: "absolute", display: "block", width: c.crop.width, height: c.crop.height, left: c.crop.left, top: c.crop.top }}
+              style={{ position: "absolute", inset: 0, display: "block", width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }}
             />
           </div>
         ))}
