@@ -12,21 +12,38 @@ import { addAISuggestedReply, deleteAISuggestedReply, fetchAIPrompt, fetchAISugg
 import { translateDrafts } from "@/lib/translate";
 
 export function AIPromptsView() {
-  const [prompt, setPrompt] = useState("");
+  // `null` until the row is actually in hand. It used to start as "" and stay
+  // "" when the fetch failed, with no loading gate — so the textarea rendered
+  // empty and "Lưu thay đổi" upserted that empty string straight over the live
+  // system prompt the AI assistant answers with (audit 2026-09-16).
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const [promptError, setPromptError] = useState(false);
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [replies, setReplies] = useState<AISuggestedReply[] | null>(null);
   const [newReply, setNewReply] = useState("");
   const [addingReply, setAddingReply] = useState(false);
 
   function reload() {
-    fetchAIPrompt().then(setPrompt).catch(() => pushToast("Không thể tải system prompt"));
+    // Both branches set the flag; resetting it synchronously here would be a
+    // setState in the effect body that calls reload() on mount.
+    fetchAIPrompt()
+      .then((value) => {
+        setPromptError(false);
+        setPrompt(value);
+      })
+      .catch(() => {
+        setPromptError(true);
+        pushToast("Không thể tải system prompt");
+      });
     fetchAISuggestedReplies().then(setReplies).catch(() => pushToast("Không thể tải phản hồi mẫu"));
   }
 
   useEffect(reload, []);
 
   async function savePrompt() {
-    if (savingPrompt) return;
+    // Never write a prompt that was never read — that is the overwrite this
+    // guard exists to stop.
+    if (savingPrompt || prompt === null) return;
     setSavingPrompt(true);
     try {
       await updateAIPrompt(prompt);
@@ -86,15 +103,35 @@ export function AIPromptsView() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard title="System prompt — Trợ lý AI" action={<PrimaryBtn onClick={savePrompt} disabled={savingPrompt}>{savingPrompt ? "Đang lưu..." : "Lưu thay đổi"}</PrimaryBtn>}>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          style={{ width: "100%", minHeight: 110, border: "1px solid var(--border-input)", borderRadius: 10, padding: 14, fontFamily: "var(--font-family)", fontSize: 13.5, lineHeight: 1.6, resize: "vertical", boxSizing: "border-box" }}
-        />
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-          Prompt này được Edge Function chat-ai-reply đọc trực tiếp mỗi khi Trợ lý AI trả lời — thay đổi có hiệu lực ngay, không cần deploy lại.
-        </div>
+      <SectionCard
+        title="System prompt — Trợ lý AI"
+        action={
+          prompt === null ? null : (
+            <PrimaryBtn onClick={savePrompt} disabled={savingPrompt}>{savingPrompt ? "Đang lưu..." : "Lưu thay đổi"}</PrimaryBtn>
+          )
+        }
+      >
+        {promptError ? (
+          <div style={{ color: "var(--text-secondary)", fontSize: 13.5 }}>
+            Không tải được system prompt nên phần soạn thảo đang tạm ẩn — lưu lúc này sẽ ghi đè mất prompt đang chạy.
+            <div style={{ marginTop: 10 }}>
+              <GhostBtn onClick={reload}>Thử lại</GhostBtn>
+            </div>
+          </div>
+        ) : prompt === null ? (
+          <div style={{ color: "var(--text-secondary)", fontSize: 13.5 }}>Đang tải...</div>
+        ) : (
+          <>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              style={{ width: "100%", minHeight: 110, border: "1px solid var(--border-input)", borderRadius: 10, padding: 14, fontFamily: "var(--font-family)", fontSize: 13.5, lineHeight: 1.6, resize: "vertical", boxSizing: "border-box" }}
+            />
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+              Prompt này được Edge Function chat-ai-reply đọc trực tiếp mỗi khi Trợ lý AI trả lời — thay đổi có hiệu lực ngay, không cần deploy lại.
+            </div>
+          </>
+        )}
       </SectionCard>
       <SectionCard
         title="Phản hồi mẫu"

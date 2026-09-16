@@ -36,6 +36,7 @@ export type DayStatus = "done" | "current" | "missed" | "upcoming" | "locked";
 export interface TrainingDay {
   programDayId: string;
   dayNumber: number;
+  phaseId: string;
   dayType: string;
   videoUrl: string | null;
   supportToolsUrl: string | null;
@@ -53,6 +54,9 @@ export interface TrainingDay {
 
 export interface TrainingProgram {
   userProgramId: string;
+  /** 'VN' | 'US' | 'MALAY' from profiles.country — exposed so callers pick the
+   * same market's copy as the day content, instead of re-deriving it. */
+  market: string | null;
   productId: string;
   productName: string;
   activatedAt: string;
@@ -192,6 +196,7 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
 
   return {
     userProgramId: program.id,
+    market,
     productId: program.product_id,
     productName: product?.name ?? program.product_id,
     activatedAt: program.activated_at,
@@ -204,6 +209,7 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
       return {
         programDayId: d.id,
         dayNumber: d.day_number,
+        phaseId: d.phase_id,
         dayType: d.day_type,
         videoUrl: pickMarket(market, d.video_url_vn, d.video_url_us, d.video_url_malay),
         supportToolsUrl: pickMarket(market, d.support_tools_url_vn, d.support_tools_url_us, d.support_tools_url_malay),
@@ -296,4 +302,135 @@ export function youtubeVideoId(url: string): string {
     url.match(/youtube\.com\/embed\/([^?&/]+)/)?.[1] ??
     ""
   );
+}
+
+// ---------------------------------------------------------------------------
+// End-of-phase survey — ported from the app's useQuiz.ts / PhaseFooter.tsx.
+//
+// The web had no survey at all: a customer who trained here was never asked,
+// one who answered on the phone saw no trace of it, and CSKH simply lost the
+// response (audit 2026-09-16). Same tables, same upsert key, same gate as the
+// app, so an answer given on either side shows on both.
+// ---------------------------------------------------------------------------
+
+export interface SurveyQuestion {
+  id: string;
+  question: string;
+  options: string[];
+}
+
+export interface PhaseSurvey {
+  phaseId: string;
+  phaseName: string;
+  /** The phase's last day — the survey opens when that day unlocks on the
+   * calendar, exactly as roadmap.tsx gates PhaseFooter. */
+  lastDayNumber: number;
+  questions: SurveyQuestion[];
+  answered: boolean;
+}
+
+interface QuizContentEntry {
+  question?: string;
+  options?: string[];
+}
+
+/** Every phase in this programme that HAS questions, with whether the customer
+ * has already answered. Phases without questions are omitted, matching the app
+ * (PhaseFooter renders nothing when the phase has no quiz). */
+export async function fetchPhaseSurveys(userId: string, days: TrainingDay[], market: string | null): Promise<PhaseSurvey[]> {
+  const phaseIds = Array.from(new Set(days.map((d) => d.phaseId)));
+  if (phaseIds.length === 0) return [];
+
+  const [{ data: questions, error: qErr }, { data: attempts, error: aErr }] = await Promise.all([
+    supabase.from("quiz_questions").select("id, phase_id, sort_order, content").in("phase_id", phaseIds).order("sort_order"),
+    supabase.from("user_quiz_attempts").select("phase_id").eq("user_id", userId).in("phase_id", phaseIds),
+  ]);
+  if (qErr) throw qErr;
+  if (aErr) throw aErr;
+
+  const answered = new Set((attempts ?? []).map((a) => a.phase_id));
+  // Admin authors `content` as { vi: {...}, en: {...}, ms: {...} }. Fall back
+  // the way usePhaseQuiz does: viewer's language, then Vietnamese, then any
+  // language that has a question at all — skip the row only if none does.
+  const language = market === "US" ? "en" : market === "MALAY" ? "ms" : "vi";
+  const byPhase = new Map<string, SurveyQuestion[]>();
+  for (const row of questions ?? []) {
+    const content = (row.content ?? {}) as unknown as Record<string, QuizContentEntry | undefined>;
+    const localized = content[language] ?? content.vi ?? Object.values(content).find((e) => e?.question);
+    if (!localized?.question) continue;
+    const list = byPhase.get(row.phase_id) ?? [];
+    list.push({ id: row.id, question: localized.question, options: localized.options ?? [] });
+    byPhase.set(row.phase_id, list);
+  }
+
+  return phaseIds
+    .filter((id) => (byPhase.get(id) ?? []).length > 0)
+    .map((id) => {
+      const phaseDays = days.filter((d) => d.phaseId === id);
+      return {
+        phaseId: id,
+        phaseName: phaseDays[0]?.phaseName ?? "",
+        lastDayNumber: Math.max(...phaseDays.map((d) => d.dayNumber)),
+        questions: byPhase.get(id) ?? [],
+        answered: answered.has(id),
+      };
+    })
+    .sort((a, b) => a.lastDayNumber - b.lastDayNumber);
+}
+
+/** Same upsert as useSubmitQuizAttempt, including the user_id+phase_id
+ * conflict key, so answering again overwrites rather than duplicating, and an
+ * answer given in the app is the same row. `score` stays 0: a survey has no
+ * right answers, the column is legacy. */
+export async function submitPhaseSurvey(
+  userId: string,
+  userProgramId: string,
+  survey: PhaseSurvey,
+  answers: Record<string, number>,
+): Promise<void> {
+  const snapshot: Record<string, { question: string; answer: string; optionIndex: number }> = {};
+  for (const q of survey.questions) {
+    const optionIndex = answers[q.id];
+    if (optionIndex == null) continue;
+    snapshot[q.id] = { question: q.question, answer: q.options[optionIndex] ?? "", optionIndex };
+  }
+  const { error } = await supabase.from("user_quiz_attempts").upsert(
+    {
+      user_id: userId,
+      user_program_id: userProgramId,
+      phase_id: survey.phaseId,
+      score: 0,
+      total_questions: survey.questions.length,
+      answers: snapshot,
+      completed_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,phase_id" },
+  );
+  if (error) throw error;
+}
+
+/** The admin-editable "Gợi ý từ TheraHOME" shown after submitting, resolved
+ * with the same precedence the app now uses: the reader's own column, then the
+ * bundled default, then the Vietnamese row. */
+export async function fetchSurveySuggestion(market: string | null): Promise<{ title: string; body: string }> {
+  const fallback = {
+    title: "Gợi ý từ TheraHOME",
+    body: "Cảm ơn bạn đã hoàn thành khảo sát! Hãy tiếp tục duy trì thói quen tập đều đặn mỗi ngày và lắng nghe cơ thể mình.",
+  };
+  const { data, error } = await supabase
+    .from("app_config")
+    .select("key, value_vi, value_en, value_ms")
+    .in("key", ["survey_suggestion_title", "survey_suggestion_body"]);
+  if (error) return fallback;
+  const pick = (key: string, bundled: string) => {
+    const row = (data ?? []).find((r) => r.key === key);
+    if (!row) return bundled;
+    const own = market === "US" ? row.value_en : market === "MALAY" ? row.value_ms : null;
+    if (market === "VN") return row.value_vi?.trim() || bundled;
+    return own?.trim() || bundled || row.value_vi?.trim() || "";
+  };
+  return {
+    title: pick("survey_suggestion_title", fallback.title),
+    body: pick("survey_suggestion_body", fallback.body),
+  };
 }

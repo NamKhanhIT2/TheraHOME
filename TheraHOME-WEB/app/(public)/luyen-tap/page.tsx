@@ -24,12 +24,16 @@ import {
   canOpenDay,
   canRecordWatch,
   fetchPainTrend,
+  fetchPhaseSurveys,
+  fetchSurveySuggestion,
   fetchTrainingProgram,
   fetchWaterToday,
   logPain,
   markDayWatched,
   setWaterToday,
+  submitPhaseSurvey,
   youtubeVideoId,
+  type PhaseSurvey,
   type TrainingDay,
   type TrainingProgram,
 } from "@/lib/training";
@@ -220,6 +224,12 @@ export default function TrainingPage() {
   const [gateBusy, setGateBusy] = useState(false);
   const [tab, setTab] = useState<TabId>("lo-trinh");
   const [me, setMe] = useState<{ name: string; market: string | null }>({ name: "", market: null });
+  const [surveys, setSurveys] = useState<PhaseSurvey[]>([]);
+  const [openSurvey, setOpenSurvey] = useState<PhaseSurvey | null>(null);
+  const [surveyAnswers, setSurveyAnswers] = useState<Record<string, number>>({});
+  const [surveyBusy, setSurveyBusy] = useState(false);
+  const [surveyError, setSurveyError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<{ title: string; body: string } | null>(null);
 
   /** Bumped to refetch — after a day is watched, or a pain log is written. */
   const [refreshKey, setRefreshKey] = useState(0);
@@ -264,6 +274,18 @@ export default function TrainingPage() {
       setProgram(p);
       setPain(tr);
       setWater(w);
+      // Surveys need the day list, so they follow rather than join the batch.
+      // A failure here must not blank the roadmap: no surveys simply means no
+      // survey section, the same as a programme whose phases have no questions.
+      if (p) {
+        const list = await fetchPhaseSurveys(userId, p.days, p.market).catch((error) => {
+          console.error("Unable to load the phase surveys", error);
+          return [] as PhaseSurvey[];
+        });
+        if (!cancelled) setSurveys(list);
+      } else if (!cancelled) {
+        setSurveys([]);
+      }
     })();
     return () => {
       cancelled = true;
@@ -298,6 +320,43 @@ export default function TrainingPage() {
     setOpenDay(gateDay);
     setGateDay(null);
     refresh();
+  }
+
+  function startSurvey(survey: PhaseSurvey) {
+    setSurveyAnswers({});
+    setSurveyError(null);
+    setSuggestion(null);
+    setOpenSurvey(survey);
+  }
+
+  async function sendSurvey() {
+    if (!openSurvey || !userId || !program || surveyBusy) return;
+    const unanswered = openSurvey.questions.some((q) => surveyAnswers[q.id] == null);
+    if (unanswered) {
+      setSurveyError("Trả lời hết các câu để gửi.");
+      return;
+    }
+    setSurveyBusy(true);
+    setSurveyError(null);
+    try {
+      await submitPhaseSurvey(userId, program.userProgramId, openSurvey, surveyAnswers);
+      // Mirrors the app: after submitting, and on every later open of an
+      // answered survey, the admin-editable suggestion replaces the questions.
+      setSuggestion(await fetchSurveySuggestion(program.market).catch(() => null));
+      setSurveys((list) => list.map((x) => (x.phaseId === openSurvey.phaseId ? { ...x, answered: true } : x)));
+    } catch (error) {
+      console.error("Unable to submit the phase survey", error);
+      setSurveyError("Chưa gửi được câu trả lời. Vui lòng kiểm tra kết nối rồi thử lại.");
+    } finally {
+      setSurveyBusy(false);
+    }
+  }
+
+  async function openAnswered(survey: PhaseSurvey) {
+    setSurveyAnswers({});
+    setSurveyError(null);
+    setOpenSurvey(survey);
+    setSuggestion(await fetchSurveySuggestion(program?.market ?? null).catch(() => null));
   }
 
   async function changeWater(next: number) {
@@ -462,6 +521,57 @@ export default function TrainingPage() {
                   Có giai đoạn cần mở khoá. Việc mua chỉ thực hiện trong ứng dụng trên điện thoại.
                 </p>
               ) : null}
+
+              {/* End-of-phase surveys. Same gate as the app: a survey opens the
+                  moment the phase's LAST day unlocks on the calendar, not when
+                  every day has been watched — and a review account opens any of
+                  them. Answers go to the same user_quiz_attempts row the phone
+                  writes, so either side sees the other's. */}
+              {surveys.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#fff" }}>Khảo sát &amp; đánh giá giai đoạn</h3>
+                  {surveys.map((sv) => {
+                    const unlocked = program.isReviewAccount || program.todayDay >= sv.lastDayNumber;
+                    const ready = sv.answered || unlocked;
+                    return (
+                      <button
+                        key={sv.phaseId}
+                        type="button"
+                        disabled={!ready}
+                        onClick={() => (sv.answered ? void openAnswered(sv) : startSurvey(sv))}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          padding: "14px 18px",
+                          borderRadius: 16,
+                          textAlign: "left",
+                          fontFamily: "inherit",
+                          cursor: ready ? "pointer" : "default",
+                          background: sv.answered ? "rgba(46,182,125,0.12)" : ready ? "rgba(79,176,245,0.14)" : "rgba(255,255,255,0.04)",
+                          border: `1px solid ${sv.answered ? "rgba(46,182,125,0.45)" : ready ? "rgba(79,176,245,0.45)" : "rgba(255,255,255,0.10)"}`,
+                          color: "#fff",
+                        }}
+                      >
+                        <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                          <span style={{ fontSize: 14.5, fontWeight: 600 }}>{sv.phaseName || "Khảo sát giai đoạn"}</span>
+                          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
+                            {sv.answered
+                              ? "Đã hoàn thành — xem lại gợi ý"
+                              : ready
+                                ? `${sv.questions.length} câu hỏi`
+                                : `Hoàn thành Ngày ${sv.lastDayNumber} để mở khoá`}
+                          </span>
+                        </span>
+                        <span style={{ fontSize: 13.5, fontWeight: 600, color: sv.answered ? "#6FD9A6" : ready ? "#7FBFFF" : "rgba(255,255,255,0.4)" }}>
+                          {sv.answered ? "Đã xong" : ready ? "Làm khảo sát" : "Chưa mở"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
@@ -475,6 +585,64 @@ export default function TrainingPage() {
 
       {gateDay ? (
         <PainScaleModal dayNumber={gateDay.dayNumber} busy={gateBusy} onConfirm={(s) => void confirmPain(s)} onCancel={() => setGateDay(null)} />
+      ) : null}
+
+      {openSurvey ? (
+        <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "rgba(2,3,11,0.72)", backdropFilter: "blur(8px)" }}>
+          <div style={{ width: "100%", maxWidth: 560, maxHeight: "86vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 18, padding: 26, borderRadius: 24, background: "rgba(8,14,26,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 30px 70px rgba(0,20,60,0.55)" }}>
+            {suggestion ? (
+              /* Answered: the admin-editable suggestion replaces the questions,
+                 exactly as the app's quiz screen does. */
+              <>
+                <h2 style={{ margin: 0, fontSize: 21, fontWeight: 600, color: "#fff" }}>{suggestion.title}</h2>
+                <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.7, color: "rgba(255,255,255,0.72)", whiteSpace: "pre-line" }}>{suggestion.body}</p>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <LandingButton onClick={() => { setOpenSurvey(null); setSuggestion(null); }} style={{ height: 44 }}>Đóng</LandingButton>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={eyebrow}>{openSurvey.phaseName}</span>
+                  <h2 style={{ margin: 0, fontSize: 21, fontWeight: 600, color: "#fff" }}>Khảo sát &amp; đánh giá giai đoạn</h2>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.62)" }}>
+                    Không có câu trả lời đúng hay sai — chọn điều đúng với bạn nhất để TheraHOME đồng hành tốt hơn.
+                  </p>
+                </div>
+                {openSurvey.questions.map((q, qi) => (
+                  <div key={q.id} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Câu {qi + 1}/{openSurvey.questions.length}</span>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>{q.question}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {q.options.map((opt, oi) => {
+                        const picked = surveyAnswers[q.id] === oi;
+                        return (
+                          <button
+                            key={oi}
+                            type="button"
+                            onClick={() => setSurveyAnswers((prev) => ({ ...prev, [q.id]: oi }))}
+                            style={{ padding: "12px 14px", borderRadius: 14, textAlign: "left", fontFamily: "inherit", fontSize: 14, cursor: "pointer", color: picked ? "#fff" : "rgba(255,255,255,0.78)", background: picked ? "rgba(79,176,245,0.18)" : "rgba(255,255,255,0.05)", border: `1px solid ${picked ? "var(--color-primary)" : "rgba(255,255,255,0.12)"}` }}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {surveyError ? <p style={{ margin: 0, fontSize: 13.5, color: "#FF9A9A" }}>{surveyError}</p> : null}
+                <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                  <button type="button" onClick={() => setOpenSurvey(null)} disabled={surveyBusy} style={{ padding: "12px 18px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.16)", background: "transparent", color: "rgba(255,255,255,0.8)", fontFamily: "inherit", fontSize: 14, cursor: "pointer" }}>
+                    Để sau
+                  </button>
+                  <LandingButton onClick={() => void sendSurvey()} disabled={surveyBusy} style={{ height: 44 }}>
+                    {surveyBusy ? "Đang gửi..." : "Gửi câu trả lời"}
+                  </LandingButton>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       ) : null}
 
       <LandingFooter compact />

@@ -37,6 +37,22 @@ async function runDelete(
   if (!data || data.length === 0) throw new Error("blocked_or_already_deleted");
 }
 
+/** Same problem as `runDelete`, same fix, for UPDATEs.
+ *
+ * PostgREST answers an update that matched NOTHING with `error: null`, so an
+ * RLS-blocked write is indistinguishable from a successful one and the caller
+ * toasts "Đã duyệt" over a row that never changed. Asking for the touched ids
+ * back turns that silence into a real error the existing catch blocks already
+ * surface. A 0-row result also covers the benign race of two tabs doing the
+ * same thing, which is why the message stays neutral. */
+async function runUpdate(
+  builder: PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
+): Promise<void> {
+  const { data, error } = await builder;
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("blocked_or_already_applied");
+}
+
 const ACCENT_COLORS: Record<string, string> = {
   primary: "var(--color-primary)",
   accentOrange: "var(--accent-orange)",
@@ -856,12 +872,14 @@ export async function deleteProductActivationContact(id: string): Promise<void> 
  * auto-claim trigger, which unlocks the product immediately for a customer who
  * already has an account. */
 export async function approveOrderActivationContacts(sourceOrderId: string): Promise<void> {
-  const { error } = await supabase
-    .from("product_activation_contacts")
-    .update({ disabled: false })
-    .eq("source_order_id", sourceOrderId)
-    .eq("disabled", true);
-  if (error) throw error;
+  await runUpdate(
+    supabase
+      .from("product_activation_contacts")
+      .update({ disabled: false })
+      .eq("source_order_id", sourceOrderId)
+      .eq("disabled", true)
+      .select("id"),
+  );
 }
 
 /** Duyệt cả hàng chờ in one statement rather than one request per order —
@@ -1282,8 +1300,7 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
  * trigger lets `admin` through and blocks `cskh` from changing anyone's
  * market but their own. */
 export async function updateAppUser(id: string, patch: { app_role?: SampleUserRole; locked?: boolean; country?: "VN" | "US" | "MALAY" }) {
-  const { error } = await supabase.from("profiles").update(patch).eq("id", id);
-  if (error) throw error;
+  await runUpdate(supabase.from("profiles").update(patch).eq("id", id).select("id"));
 }
 
 // Narrow admin/cskh contact edit — goes through admin_update_user_contact
@@ -1643,8 +1660,7 @@ export async function createChallenge(input: {
 }
 
 export async function setChallengeActive(id: string, active: boolean) {
-  const { error } = await supabase.from("challenges").update({ active }).eq("id", id);
-  if (error) throw error;
+  await runUpdate(supabase.from("challenges").update({ active }).eq("id", id).select("id"));
 }
 
 // ---------------------------------------------------------------------------
@@ -1766,8 +1782,7 @@ export async function fetchCommunityPosts(): Promise<(CommunityPost & CommunityP
 // other members until approved; the status change itself notifies the
 // author via a DB trigger).
 export async function setCommunityPostStatus(idKey: string, status: PostModerationStatus) {
-  const { error } = await supabase.from("community_posts").update({ status }).eq("id", idKey);
-  if (error) throw error;
+  await runUpdate(supabase.from("community_posts").update({ status }).eq("id", idKey).select("id"));
 }
 
 // Official posts are authored by Admin or CSKH via the staff-only RPC. They
@@ -1962,8 +1977,7 @@ export async function deleteCommunityComment(idKey: string) {
   await runDelete(supabase.from("post_comments").delete().eq("id", idKey).select("id"));
 }
 export async function hideCommunityComment(idKey: string, hidden: boolean) {
-  const { error } = await supabase.from("post_comments").update({ hidden }).eq("id", idKey);
-  if (error) throw error;
+  await runUpdate(supabase.from("post_comments").update({ hidden }).eq("id", idKey).select("id"));
 }
 
 // ---------------------------------------------------------------------------
@@ -2060,11 +2074,13 @@ export async function resolveContentReport(id: string, status: "resolved" | "dis
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { error } = await supabase
-    .from("content_reports")
-    .update({ status, resolved_by: user?.id ?? null, resolved_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
+  await runUpdate(
+    supabase
+      .from("content_reports")
+      .update({ status, resolved_by: user?.id ?? null, resolved_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id"),
+  );
 }
 
 // ---------------------------------------------------------------------------
