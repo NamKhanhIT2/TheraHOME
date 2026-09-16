@@ -8,6 +8,8 @@ import type { Metadata } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "@/styles/landing.css";
 import { LandingNav } from "@/components/landing/LandingNav";
+import { SiteContentProvider } from "@/components/landing/SiteContentProvider";
+import { getSiteContent } from "@/lib/siteContent";
 
 // The design asks for an Apple-like stack: real SF Pro on Apple devices, Be
 // Vietnam Pro everywhere else — both carry full Vietnamese diacritics. Loading
@@ -26,11 +28,20 @@ export const metadata: Metadata = {
     "TheraHome kết hợp thiết bị trị liệu, ứng dụng TheraAI và đội ngũ đồng hành, để việc phục hồi tại nhà có hướng đi rõ ràng thay vì làm theo cảm tính.",
 };
 
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
+// Re-render the marketing pages at most once a minute, so an edit in Admin →
+// Nội dung website appears without a deploy and without making every visit hit
+// the database. /luyen-tap is a client page and fetches its own data live, so
+// this does not delay anything a signed-in customer sees.
+export const revalidate = 60;
+
+export default async function PublicLayout({ children }: { children: React.ReactNode }) {
+  const content = await getSiteContent();
   return (
     <div className={`landing-root ${beVietnamPro.variable}`}>
-      <LandingNav />
-      <main>{children}</main>
+      <SiteContentProvider content={content}>
+        <LandingNav />
+        <main>{children}</main>
+      </SiteContentProvider>
     </div>
   );
 }

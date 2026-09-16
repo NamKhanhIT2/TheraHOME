@@ -1504,3 +1504,53 @@ Soát cả lớp lỗi chứ không chỉ chỗ đã biết: rút **mọi** cặ
 
 Ghi chú cho người sau: `store_categories` và `store_items` **thật sự có** cột
 `market` — đừng đổi nhầm chúng sang `country`.
+
+### Nội dung website — mục quản trị cho trang giới thiệu (2026-09-16)
+
+Trước đây mọi giá, số liệu, câu FAQ và thông tin liên hệ trên `/`, `/san-pham`,
+`/ung-dung`, `/gioi-thieu` đều hardcode trong TSX: đổi `990.000₫` phải sửa code
+và deploy lại. Giờ có mục **Nội dung website** trong Admin.
+
+**Bảng `site_content`** (`key text`, `value jsonb`), migration
+`202609160900_site_content.sql`. Đọc công khai (`anon`), ghi admin — cùng dạng
+policy với `app_config` / `legal_documents`.
+
+Hai quyết định đáng ghi:
+
+- **Không tái dụng `app_config`.** Policy SELECT của nó là `TO authenticated`,
+  mà trang giới thiệu do khách chưa đăng nhập đọc. Nó cũng là remote config
+  của app — trộn nội dung web vào sẽ không còn biết dòng nào thuộc bề mặt nào.
+- **`jsonb` chứ không phải cột text.** Hai trong bảy khoá là danh sách (4 số
+  liệu, 6 câu FAQ), không phải giá trị đơn.
+
+**Cố ý KHÔNG đưa mọi thứ vào form.** Tiêu đề lớn, văn xuôi từng khối, ba thẻ
+trụ cột vẫn nằm trong code: chúng được viết vừa khít một bố cục, và một cái ô
+cho phép dán ba đoạn văn vào chỗ tiêu đề một dòng sẽ làm vỡ trang mà không ai
+biết. Cái đưa vào là cái thật sự hay đổi: giá, nhãn khuyến mãi, số liệu, FAQ,
+liên hệ, link mạng xã hội và link tải app.
+
+**Giá trị mặc định nằm ở hai nơi, có chủ đích.** `DEFAULT_SITE_CONTENT` trong
+`src/lib/siteContent.ts` là đúng chuỗi trang đang chạy, và là thứ được dùng khi
+không đọc được bảng. Trang bán hàng phải hiện được giá thật ngay cả khi Supabase
+chết, chứ không để một khoảng trắng. Ghép theo **từng khoá**, nên một dòng hỏng
+không kéo theo các dòng còn lại.
+
+`(public)/layout.tsx` đặt `revalidate = 60` — sửa trong Admin thì khoảng một
+phút sau trang đổi, không phải deploy, cũng không bắt mỗi lượt xem đều truy vấn
+database. `/luyen-tap` là client page, tự lấy dữ liệu trực tiếp nên không bị
+độ trễ này.
+
+**`/privacy` và `/terms` giờ đọc `legal_documents`.** Admin có trình soạn thảo
+pháp lý từ lâu nhưng chỉ app đọc — nên sửa chính sách thì app đổi còn hai URL
+đã khai với App Store và Google Play vẫn hiện bản cũ. Giờ cả hai đọc cùng một
+bản ghi đè, và rơi về văn bản trong bundle khi chưa có bản ghi đè (hiện bảng
+đang rỗng nên không có gì đổi). Đọc lỗi **không được** làm trắng trang: URL này
+đã nộp cho hai cửa hàng, chính sách rỗng còn tệ hơn chính sách hơi cũ.
+
+Kiểm chứng:
+- Sửa `pricing.current` thẳng trong DB thành chuỗi kiểm thử → trang `/san-pham`
+  hiện đúng chuỗi đó, và chuỗi hardcode cũ biến mất. **Đây mới là phép thử thật**
+  — nó loại đúng kiểu lỗi hôm qua: đọc hỏng nhưng âm thầm rơi về mặc định trông
+  vẫn "đúng". Đã trả giá về `990.000₫` sau khi thử.
+- Trình soạn thảo nạp đúng giá trị thật từ DB (29 ô nhập, 10 ô văn bản).
+- RLS: `anon` SELECT được 7 dòng, `anon` UPSERT bị chặn `42501`.

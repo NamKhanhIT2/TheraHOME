@@ -10,6 +10,7 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { translateDrafts } from "./translate";
 import type { Product, ProgramPhase, ProgramDay, MarketContent, StoreCategory, StoreItem, CommunityPost, CommunityComment, NotificationItem } from "./mockData";
+import { fetchSiteContent, type SiteContent } from "./siteContent";
 import type {
   SampleUser,
   SampleUserRole,
@@ -2730,4 +2731,28 @@ export async function saveOnboardingText(input: OnboardingQuestionText, expected
       updated_at: new Date().toISOString(),
     }, { onConflict: "question_key,language" });
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Nội dung website (site_content) — marketing copy the public pages render
+// ---------------------------------------------------------------------------
+//
+// The public site reads the same table through src/lib/siteContent.ts, which
+// also owns the types and the built-in fallback copy. This half is the admin
+// write path only.
+
+export async function fetchSiteContentRows(): Promise<SiteContent> {
+  return fetchSiteContent();
+}
+
+/** One key at a time, so a failure part-way leaves the rest saved rather than
+ * rolling the whole form back to stale copy. Upsert, not update: a key the
+ * seed migration did not create (a later addition) still saves. */
+export async function saveSiteContentRows(patch: Partial<SiteContent>): Promise<void> {
+  for (const [key, value] of Object.entries(patch)) {
+    const { error } = await supabase
+      .from("site_content")
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+    if (error) throw error;
+  }
 }

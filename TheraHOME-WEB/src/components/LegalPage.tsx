@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { getLegalDoc, type LegalDocKey, type LegalLanguage } from "@/lib/appLegalContent";
+import { supabase } from "@/lib/supabase";
 import { LEGAL_LANGUAGES } from "@/lib/legalLanguage";
 
 /** Footer link wording per language. The documents themselves were already
@@ -95,11 +96,44 @@ export function LegalShell({
   );
 }
 
+
+/** The admin override if there is one, else the document compiled into the
+ * bundle. A failed read is not allowed to blank a legal page: these URLs are
+ * filed with Apple and Google, and an empty privacy policy is worse than a
+ * slightly stale one. */
+async function resolveLegalDoc(docKey: LegalDocKey, language: LegalLanguage) {
+  const fallback = getLegalDoc(docKey, language);
+  try {
+    const { data, error } = await supabase
+      .from("legal_documents")
+      .select("title, body")
+      .eq("doc_key", docKey)
+      .eq("language", language)
+      .maybeSingle();
+    if (error) throw error;
+    if (data?.body?.trim()) {
+      return { title: data.title?.trim() || fallback.title, text: data.body };
+    }
+  } catch (e) {
+    console.error("Unable to read the legal override, using the bundled text", e);
+  }
+  return fallback;
+}
+
 /** Public, unauthenticated rendering of one of the app's legal documents —
  * App Store Connect requires the privacy policy (and ideally the terms) to
- * be reachable at a plain web URL with no login. Server component, static. */
-export function LegalPage({ docKey, language }: { docKey: LegalDocKey; language: LegalLanguage }) {
-  const doc = getLegalDoc(docKey, language);
+ * be reachable at a plain web URL with no login.
+ *
+ * The admin console has had a legal editor (Nội dung ứng dụng → Nội dung pháp
+ * lý, writing `legal_documents`) since before these pages existed, but only the
+ * mobile app read it — so publishing a new policy changed the app and left the
+ * very URLs the stores were given showing the old text. Now both read the same
+ * override, with the bundled document as the fallback when no override exists
+ * (which is the case today: the table is empty).
+ *
+ * `legal_documents` grants SELECT to `anon`, so this works with no session. */
+export async function LegalPage({ docKey, language }: { docKey: LegalDocKey; language: LegalLanguage }) {
+  const doc = await resolveLegalDoc(docKey, language);
   return (
     <LegalShell title={doc.title} language={language}>
       <div style={{ whiteSpace: "pre-wrap", fontSize: 15, color: "var(--text-secondary, #3d4a58)" }}>{doc.text}</div>

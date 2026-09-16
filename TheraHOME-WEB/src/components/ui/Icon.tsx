@@ -99,6 +99,8 @@ export function Icon({ name, size = 24, color = "currentColor" }: IconProps) {
       return <svg {...p} {...STROKE_PROPS} stroke={color}><path d="M4 10v4M6.5 8v8M17.5 8v8M20 10v4M6.5 12h11" /></svg>;
     case "smartphone":
       return <svg {...p} {...STROKE_PROPS} stroke={color}><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M11 18.5h2" /></svg>;
+    case "globe":
+      return <svg {...p} {...STROKE_PROPS} stroke={color}><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3z" /></svg>;
     case "brain":
       return <svg {...p} {...STROKE_PROPS} stroke={color}><path d="M9 4.5a2.7 2.7 0 0 0-2.7 2.7 2.7 2.7 0 0 0-1.8 4.6 2.9 2.9 0 0 0 1.6 5A2.8 2.8 0 0 0 9 19.5V4.5z" /><path d="M15 4.5a2.7 2.7 0 0 1 2.7 2.7 2.7 2.7 0 0 1 1.8 4.6 2.9 2.9 0 0 1-1.6 5A2.8 2.8 0 0 1 15 19.5V4.5z" /></svg>;
     case "library":

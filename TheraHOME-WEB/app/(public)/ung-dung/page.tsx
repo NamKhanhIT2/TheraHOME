@@ -6,6 +6,7 @@
 // object-fit — see AppCarousel.
 import type { CSSProperties } from "react";
 import { LandingButton } from "@/components/landing/LandingButton";
+import { getSiteContent } from "@/lib/siteContent";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { AppCarousel, type CarouselCard } from "@/components/landing/AppCarousel";
 import { SafeImg } from "@/components/landing/SafeImg";
@@ -77,7 +78,8 @@ function Feature({ flip = false, art, eyebrowText, title, body, chips }: {
   );
 }
 
-export default function AppPage() {
+export default async function AppPage() {
+  const { app_links } = await getSiteContent();
   return (
     <>
       {/* -------------------------------------------------------- carousel */}
@@ -178,8 +180,8 @@ export default function AppPage() {
             Tải ứng dụng TheraAI, chấm vị trí đau và nhận lộ trình cá nhân hoá trong 5 giây.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16 }}>
-            <LandingButton href="https://apps.apple.com/">Tải trên App Store</LandingButton>
-            <LandingButton href="https://play.google.com/store/apps/details?id=ai.therahome" variant="secondary">Tải trên Google Play</LandingButton>
+            <LandingButton href={app_links.appStore}>Tải trên App Store</LandingButton>
+            <LandingButton href={app_links.playStore} variant="secondary">Tải trên Google Play</LandingButton>
           </div>
         </div>
       </section>

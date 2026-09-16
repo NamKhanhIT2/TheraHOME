@@ -49,6 +49,9 @@ export const NAV_ADMIN: NavItem[] = [
       { id: "legal-content", label: "Nội dung pháp lý", icon: "shield" },
     ],
   },
+  // site_content — giá, FAQ, liên hệ, số liệu trên trang giới thiệu công khai.
+  // Trước 2026-09-16 những giá trị này hardcode trong TSX, đổi giá phải deploy.
+  { id: "site-content", label: "Nội dung website", icon: "globe" },
   { id: "ai", label: "AI Prompts", icon: "brain" },
 ];
 

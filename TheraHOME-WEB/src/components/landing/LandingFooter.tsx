@@ -1,3 +1,5 @@
+"use client";
+
 // Site footer. The design ships two variants — a four-column one on the home
 // page and a compact row on App.dc.html — so this takes a `compact` flag
 // instead of being duplicated.
@@ -5,13 +7,13 @@
 // The policy links point at the app's own public legal pages, which already
 // exist and are what the stores were given: /privacy and /terms. The design's
 // placeholder "#" hrefs would have shipped dead links.
+//
+// The contact block and the social links are edited in Admin → Nội dung
+// website. This is a client component (it is rendered inside /luyen-tap, which
+// is one), so it reads them from context rather than fetching.
 import Link from "next/link";
 import { BrandMark } from "@/components/landing/BrandMark";
-
-const SOCIAL = [
-  { href: "https://www.facebook.com/profile.php?id=61580995314862", label: "Facebook" },
-  { href: "https://www.youtube.com/@bacsilong1974", label: "YouTube" },
-];
+import { useSiteContent } from "@/components/landing/SiteContentProvider";
 
 function Wordmark({ size = 18, withLogo = true }: { size?: number; withLogo?: boolean }) {
   return (
@@ -25,6 +27,11 @@ function Wordmark({ size = 18, withLogo = true }: { size?: number; withLogo?: bo
 }
 
 export function LandingFooter({ compact = false }: { compact?: boolean }) {
+  const { contact, social } = useSiteContent();
+  const SOCIAL = [
+    { href: social.facebook, label: "Facebook" },
+    { href: social.youtube, label: "YouTube" },
+  ];
   if (compact) {
     return (
       <footer style={{ padding: "clamp(56px, 8vh, 90px) clamp(20px, 4vw, 64px) 44px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
@@ -75,10 +82,10 @@ export function LandingFooter({ compact = false }: { compact?: boolean }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <h3 style={{ margin: 0, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Cần trợ giúp?</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.7)" }}>
-              <span>Tầng 11, toà RoxCenter, số 136 Hồ Tùng Mậu, Phú Diễn, Hà Nội</span>
-              <a href="tel:+84364263552" style={{ color: "rgba(255,255,255,0.7)" }}>0364.263.552</a>
-              <a href="mailto:support@therahomeai.com" style={{ color: "rgba(255,255,255,0.7)" }}>support@therahomeai.com</a>
-              <span>Thứ Hai – Thứ Sáu, 9:00 – 17:00</span>
+              <span>{contact.address}</span>
+              <a href={contact.phoneHref} style={{ color: "rgba(255,255,255,0.7)" }}>{contact.phone}</a>
+              <a href={`mailto:${contact.email}`} style={{ color: "rgba(255,255,255,0.7)" }}>{contact.email}</a>
+              <span>{contact.hours}</span>
             </div>
           </div>
         </div>

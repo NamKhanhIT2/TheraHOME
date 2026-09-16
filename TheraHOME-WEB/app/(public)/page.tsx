@@ -10,6 +10,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { LandingButton } from "@/components/landing/LandingButton";
 import { SafeImg } from "@/components/landing/SafeImg";
+import { getSiteContent } from "@/lib/siteContent";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 
 const HERO_BG = "/landing/hero-bg.png";
@@ -58,13 +59,9 @@ const h2: CSSProperties = {
   textWrap: "pretty",
 };
 
+// HERO_STATS and RESULTS now come from site_content — see src/lib/siteContent.ts.
 const HERO_LINES = ["Chăm cột sống", "theo lộ trình,", "không theo cảm tính."];
 
-const HERO_STATS = [
-  { value: "+10.000", label: "khách hàng Việt Nam" },
-  { value: "4.8/5", label: "1.186 đánh giá" },
-  { value: "14 ngày", label: "lộ trình cá nhân hoá" },
-];
 
 const PILLARS = [
   { href: "/san-pham", eyebrow: "Thiết bị", title: "TheraNECK+", body: "Bốn liệu pháp trong một thiết bị dùng tại nhà, mỗi buổi 15–20 phút.", cta: "Xem sản phẩm →" },
@@ -72,12 +69,6 @@ const PILLARS = [
   { href: null, eyebrow: "Đồng hành", title: "Đội ngũ hỗ trợ", body: "Hỗ trợ qua app và Zalo trong suốt lộ trình, không chỉ lúc mới mua.", cta: null },
 ];
 
-const RESULTS = [
-  { stat: "93%", body: "Người dùng cho biết đã giảm đau cổ ngay từ buổi đầu tiên." },
-  { stat: "91%", body: "Người dùng đã hoàn toàn hết đau cổ sau lộ trình 14 ngày do AI thiết lập, mỗi ngày chỉ 15–20 phút." },
-  { stat: "88%", body: "Người dùng đã cải thiện được các triệu chứng đi kèm như tê tay, châm chích, đau đầu." },
-  { stat: "79%", body: "Người dùng đã thoát khỏi vùng có nguy cơ phải phẫu thuật." },
-];
 
 const SERVICES = ["Hỗ trợ trọn đời", "Ship hàng nhanh chóng", "An toàn / Khoa học", "Thanh toán đảm bảo"];
 
@@ -89,7 +80,8 @@ function CheckIcon() {
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { stats_hero: HERO_STATS, stats_results: RESULTS } = await getSiteContent();
   return (
     <>
       {/* ------------------------------------------------------ brand hero */}

@@ -1,6 +1,7 @@
 // Về chúng tôi — port of "About.dc.html".
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { getSiteContent } from "@/lib/siteContent";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 
 export const metadata = {
@@ -22,17 +23,7 @@ const MISSION_POINTS = [
 
 const VALUES = ["Hiểu gốc – sửa gốc", "Đơn giản nhưng hiệu quả", "Cá nhân hoá cho từng cơ thể", "Ứng dụng công nghệ để nâng độ chính xác hằng ngày"];
 
-const CONTACT = [
-  { label: "Địa chỉ", value: "Tầng 11, toà RoxCenter, số 136 Hồ Tùng Mậu, Phú Diễn, Hà Nội" },
-  { label: "Điện thoại", value: "0364.263.552", href: "tel:+84364263552" },
-  { label: "Email", value: "support@therahomeai.com", href: "mailto:support@therahomeai.com" },
-  { label: "Ngày làm việc", value: "Thứ Hai – Thứ Sáu, 9:00 – 17:00" },
-];
 
-const SOCIAL = [
-  { href: "https://www.facebook.com/profile.php?id=61580995314862", label: "Facebook" },
-  { href: "https://www.youtube.com/@bacsilong1974", label: "YouTube" },
-];
 
 function Check() {
   return (
@@ -42,7 +33,19 @@ function Check() {
   );
 }
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const { contact, social } = await getSiteContent();
+  // Same four rows the page always showed, now built from the edited values.
+  const CONTACT = [
+    { label: "Địa chỉ", value: contact.address },
+    { label: "Điện thoại", value: contact.phone, href: contact.phoneHref },
+    { label: "Email", value: contact.email, href: `mailto:${contact.email}` },
+    { label: "Ngày làm việc", value: contact.hours },
+  ];
+  const SOCIAL = [
+    { href: social.facebook, label: "Facebook" },
+    { href: social.youtube, label: "YouTube" },
+  ];
   return (
     <>
       {/* ------------------------------------------------------ about hero */}

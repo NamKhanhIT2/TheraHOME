@@ -13,6 +13,7 @@ import { NotificationsAdminView } from "@/components/views/NotificationsAdminVie
 import { UpsaleNotificationsView } from "@/components/views/UpsaleNotificationsView";
 import { TheraAccountsView } from "@/components/views/TheraAccountsView";
 import { ReportsView } from "@/components/views/ReportsView";
+import { SiteContentView } from "@/components/views/SiteContentView";
 import { AppContentView } from "@/components/views/AppContentView";
 import { LegalContentView } from "@/components/views/LegalContentView";
 import { FaqContentView } from "@/components/views/FaqContentView";
@@ -29,6 +30,7 @@ export default function AdminPage() {
             {active === "exercises" && <RoutineView />}
             {active === "products" && <ProductsView />}
             {active === "activation" && <ActivationView />}
+            {active === "site-content" && <SiteContentView />}
             {active === "app-content" && <AppContentView />}
             {active === "faq-content" && <FaqContentView />}
             {active === "onboarding-content" && <OnboardingContentView />}

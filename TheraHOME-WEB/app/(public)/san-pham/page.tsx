@@ -1,6 +1,7 @@
 // TheraNECK+ — port of "Products.dc.html".
 import type { CSSProperties } from "react";
 import { LandingButton } from "@/components/landing/LandingButton";
+import { getSiteContent } from "@/lib/siteContent";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ProductScrollHero } from "@/components/landing/ProductScrollHero";
 
@@ -28,12 +29,6 @@ const THERAPIES = [
   { badge: "♨", title: "Massager nhịp nhàng", body: "Massager nhịp nhàng làm tăng cảm giác dễ chịu, thư giãn trong quá trình trị liệu. Đồng thời giảm cơ co cứng quanh vùng cổ vai gáy." },
 ];
 
-const RESULTS = [
-  { stat: "93%", body: "Người dùng cho biết đã giảm đau cổ ngay từ buổi đầu tiên." },
-  { stat: "91%", body: "Người dùng đã hoàn toàn hết đau cổ sau lộ trình 14 ngày do AI thiết lập, mỗi ngày chỉ 15–20 phút." },
-  { stat: "88%", body: "Người dùng đã cải thiện được các triệu chứng đi kèm như tê tay, châm chích, đau đầu." },
-  { stat: "79%", body: "Người dùng đã thoát khỏi vùng có nguy cơ phải phẫu thuật." },
-];
 
 const PHASES = [
   { days: "Ngày 1–3", title: "Làm quen và khởi động", body: "Vùng cổ vai gáy bắt đầu dễ chịu hơn, cảm giác căng cứng giảm bớt và cơ thể làm quen dần với một nhịp phục hồi rõ ràng hơn." },
@@ -53,16 +48,9 @@ const BUNDLE = [
 
 const ASSURANCES = ["Miễn phí lộ trình qua APP TheraAI hoặc Zalo", "Hoàn trả 14 ngày", "Bảo hành 12 tháng", "Giao 2–5 ngày, hỗ trợ COD"];
 
-const FAQ = [
-  { q: "Tôi không rành công nghệ, có dùng được không?", a: "Có. TheraNECK + TheraAI dễ dùng, trực quan, có hướng dẫn bằng video và đội ngũ chăm sóc khách hàng đồng hành suốt lộ trình." },
-  { q: "Tôi đau lâu năm rồi, có phù hợp không?", a: "Nhiều người đau kéo dài không thiếu cố gắng, mà thiếu một lộ trình rõ ràng và đúng hơn với cơ thể mình." },
-  { q: "Bao lâu thì tôi bắt đầu thấy khác đi?", a: "Mỗi người sẽ khác nhau. Có người thấy dễ chịu hơn từ những ngày đầu, có người cần thêm thời gian." },
-  { q: "Nếu không phù hợp thì sao?", a: "Bạn có 14 ngày trải nghiệm để tự cảm nhận mức độ phù hợp. Nếu không hài lòng, bạn có thể yêu cầu hoàn trả." },
-  { q: "Chống chỉ định với ai?", a: "Chống chỉ định với người đặt máy tim nhân tạo. Người mới phẫu thuật cột sống cổ cần tham khảo ý kiến bác sĩ trước khi dùng." },
-  { q: "TheraHome có bán ở Shopee hay TikTok không?", a: "Chúng tôi tạm thời không kinh doanh ở TikTok và Shopee vì phí sàn 30% quá cao. Chúng tôi dành phần đó cho sản phẩm và dịch vụ chăm sóc." },
-];
 
-export default function ProductsPage() {
+export default async function ProductsPage() {
+  const { stats_results: RESULTS, faq: FAQ, pricing } = await getSiteContent();
   return (
     <>
       {/* product sub-nav, pinned under the site nav */}
@@ -141,14 +129,14 @@ export default function ProductsPage() {
           <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.72)" }}>
               <span aria-hidden="true" style={{ color: "#FFD23F", letterSpacing: "0.08em" }}>★★★★★</span>
-              4.8/5 — 1.186 đánh giá
+              {pricing.ratingLine}
             </span>
             <h2 style={{ ...h2, fontSize: "clamp(28px, 3vw, 42px)" }}>Bộ giải pháp Trị Liệu Cổ</h2>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 14 }}>
-              <span style={{ fontSize: "clamp(30px, 3.2vw, 44px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>990.000₫</span>
-              <s style={{ fontSize: 18, color: "rgba(255,255,255,0.45)" }}>1.690.000₫</s>
+              <span style={{ fontSize: "clamp(30px, 3.2vw, 44px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>{pricing.current}</span>
+              <s style={{ fontSize: 18, color: "rgba(255,255,255,0.45)" }}>{pricing.original}</s>
               <span style={{ fontSize: 13, fontWeight: 600, padding: "6px 12px", borderRadius: 999, background: "rgba(255,182,72,0.16)", border: "1px solid rgba(255,182,72,0.4)", color: "#FFB648" }}>
-                Giảm 41% cho người mới
+                {pricing.note}
               </span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14, paddingTop: 4 }}>
