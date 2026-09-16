@@ -11,7 +11,7 @@
 // Where you land afterwards is never decided here: resolvePostSignInRoute asks
 // current_web_roles(), so an admin gets /admin, CSKH gets /care and a customer
 // gets the public site. One door, three destinations.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -91,17 +91,26 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   // from Google and just saw the login form again. onAuthStateChange is the
   // half that catches the session once the exchange finishes; /verify has
   // always subscribed to it, and this screen has to as well.
+  const navigating = useRef(false);
+  /** Set by the effect below; onSubmit reuses it so there is one navigation path. */
+  const goToDestinationRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     let cancelled = false;
-    async function goToDestination() {
-      if (cancelled) return;
-      router.replace(await resolvePostSignInRoute());
+    function goToDestination() {
+      // Both this listener and onSubmit can reach here for the same sign-in.
+      // First one wins; the second must not fire a competing navigation.
+      if (cancelled || navigating.current) return;
+      navigating.current = true;
+      void (async () => {
+        router.replace(await resolvePostSignInRoute());
+      })();
     }
 
     void supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       if (data.session) {
-        void goToDestination();
+        goToDestination();
         return;
       }
       // No session and the provider sent us back with a complaint — say so
@@ -113,8 +122,20 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       if (reason) setError(`Đăng nhập không thành công: ${reason}`);
     });
 
+    goToDestinationRef.current = goToDestination;
+
+    // The callback MUST return immediately and MUST NOT be async.
+    //
+    // supabase-js holds the auth lock (navigator.locks) for the whole of
+    // setSession(), and dispatches SIGNED_IN from inside it. Awaiting another
+    // supabase call here — resolvePostSignInRoute() does an rpc, which needs
+    // the session and therefore the same lock — deadlocks the pair: the
+    // callback waits for the lock, setSession waits for the callback, and the
+    // sign-in button sits on "Đang xử lý..." for ever with no error, because
+    // nothing actually failed. Handing the work to setTimeout lets the
+    // callback return, the lock release, and the rpc run normally.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) void goToDestination();
+      if (session) setTimeout(goToDestination, 0);
     });
     return () => {
       cancelled = true;
@@ -135,7 +156,9 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
     try {
       if (!signup) {
         await signInWithTheraAccount(email, password);
-        router.push(await resolvePostSignInRoute());
+        // setSession above already fired SIGNED_IN, so the listener may have
+        // started navigating; the ref makes whichever arrives second a no-op.
+        goToDestinationRef.current?.();
         return;
       }
 
@@ -181,7 +204,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           /* not a customer yet, or already claimed — either is fine */
         }
       }
-      router.push(await resolvePostSignInRoute());
+      goToDestinationRef.current?.();
     } catch (err) {
       console.error(signup ? "Sign-up failed" : "Sign-in failed", err);
       setError(authErrorMessage(err, mode));

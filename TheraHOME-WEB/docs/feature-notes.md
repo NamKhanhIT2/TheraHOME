@@ -1585,3 +1585,39 @@ Kiểm chứng: `/dang-nhap?error=access_denied&error_description=…` hiện đ
 báo lỗi và form vẫn dùng được; tải sạch không báo lỗi giả. Phép thử cuối —
 bấm Google/Apple thật — cần chủ dự án chạy, tôi không gõ mật khẩu vào trình
 duyệt được.
+
+### Treo ở "Đang xử lý..." — do chính bản sửa OAuth phía trên (2026-09-16)
+
+Chủ dự án gửi ảnh: đăng nhập bằng **email/mật khẩu** (tài khoản admin) đứng im
+ở nút "Đang xử lý...", không báo lỗi, không đi đâu. Không phải Google/Apple.
+
+Đây là **hồi quy do tôi gây ra ngay trong lần sửa trước**. Đường mật khẩu vốn
+chạy tốt suốt phiên; thứ duy nhất đổi trên màn này là cái
+`onAuthStateChange` tôi vừa thêm.
+
+Cơ chế: supabase-js giữ khoá auth (`navigator.locks`) trong suốt `setSession()`
+và phát sự kiện `SIGNED_IN` **từ bên trong** khoá đó. Callback của tôi là
+`async` và `await` một lời gọi supabase khác (`resolvePostSignInRoute()` gọi
+rpc `current_web_roles`, mà rpc cần phiên nên cần đúng khoá ấy). Thành vòng
+chờ: callback đợi khoá, `setSession` đợi callback, khoá không bao giờ nhả. Nút
+đứng mãi ở "Đang xử lý..." mà không có lỗi nào — vì thật sự không có gì hỏng,
+chỉ là hai bên chờ nhau.
+
+Đã loại trừ trước khi kết luận: Edge Function `auth-sign-in` trả 401 trong
+1,9s với CORS đúng (thử bằng thông tin bịa, không dùng mật khẩu của chủ dự án);
+`INITIAL_SESSION` không gây kẹt (thử ngay trong trình duyệt, có
+`navigator.locks`). Không dựng được phiên thật để tái hiện đúng nhánh
+`SIGNED_IN` vì đăng nhập ẩn danh đang tắt và tôi không gõ mật khẩu khách vào
+trình duyệt — nên phần này dựa vào ràng buộc Supabase đã ghi rõ cộng bằng chứng
+trước/sau.
+
+Sửa hai lớp:
+
+1. Callback **không async**, chỉ `setTimeout(..., 0)` giao việc ra ngoài để
+   trả quyền điều khiển và nhả khoá ngay. Thêm chốt `navigating` vì cả listener
+   lẫn `onSubmit` cùng dẫn tới một chỗ — ai tới trước thì đi, người sau thành
+   vô hiệu.
+2. `resolvePostSignInRoute()` có **timeout 6 giây** cho việc tra vai trò. Đây
+   không phải đệm phòng thân: màn hình vừa treo vô hạn vì không có gì để rơi
+   về. Quá hạn thì coi như khách thường và về "/" — nhân viên gặp timeout vẫn
+   vào được trang chủ rồi thử lại, tốt hơn hẳn một vòng xoay bất tận.
