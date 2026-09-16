@@ -1424,3 +1424,18 @@ hai khung dùng đúng tỉ lệ đó với `object-fit: contain` — không c�
 
 Năm ảnh `app/*.png` cũ đã xoá. `ChatMock` (191 dòng) cũng xoá — chết từ lúc
 carousel đổi sang panel thật.
+
+### Kiểm chứng đồng bộ hai chiều web → app (2026-09-16)
+
+Chủ dự án tự chạy phép thử cuối, thứ tôi không làm thay được (không gõ mật
+khẩu khách vào trình duyệt): đăng nhập tài khoản thật trên web, mở một ngày,
+xem video — **mở app trên điện thoại thì ngày đó hiện đã xem**.
+
+Đây là bằng chứng end-to-end cho toàn bộ kiến trúc dùng chung database: web
+gọi `mark_day_watched` ghi thẳng vào `user_program_days` mà app đang đọc, RLS
+khoá theo `auth.uid()` nên cùng tài khoản là cùng dữ liệu bất kể trình duyệt
+hay điện thoại. Không có bản sao, không có đồng bộ nền, không có gì để lệch.
+
+Lưu ý còn đúng: `user_program_days` **không** nằm trong publication
+`supabase_realtime`, nên app cập nhật ở lần refetch/mở lại kế tiếp chứ không
+tức thì — đúng như quan sát khi thử.
