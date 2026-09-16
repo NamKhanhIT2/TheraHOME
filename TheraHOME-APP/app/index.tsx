@@ -23,6 +23,12 @@ export default function AppEntryScreen() {
 
   if (!session) return <Redirect href="/login" />;
 
+  // A failed profile fetch is NOT a signed-out user — redirecting to /login
+  // here logged people out of a valid session whenever the request failed
+  // (offline cold start). RootNavigator renders the retry screen for exactly
+  // this state, so stay out of its way instead of navigating anywhere.
+  if (profileQuery.isError) return null;
+
   const profile = profileQuery.data;
   if (!profile) return <Redirect href="/login" />;
 

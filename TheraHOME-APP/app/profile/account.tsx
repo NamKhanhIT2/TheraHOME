@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
@@ -10,6 +10,7 @@ import { Icon } from '@/components/icons/Icon';
 import type { LegalDocKey } from '@/lib/legalContent';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
+import { AuthError, authErrorKey, requestPasswordReset } from '@/lib/authAccount';
 
 const LEGAL_ROWS: { key: LegalDocKey; icon: string; labelKey: TranslationKey }[] = [
   { key: 'terms', icon: 'file-text', labelKey: 'terms' },
@@ -46,17 +47,62 @@ export default function AccountSettingsScreen() {
 
   const shareData = profile?.dataSharingEnabled ?? false;
 
+  // What the account actually signs in with. Supabase records the provider on
+  // the user; 'email' means a password account (TheraHOME-issued or
+  // self-registered), the others are OAuth and have no password to change.
+  const signInProvider = (session?.user.app_metadata?.provider ?? 'email') as string;
+  const accountEmail = profile?.email ?? session?.user.email ?? null;
+  const [sendingReset, setSendingReset] = useState(false);
+
+  // Reuses the same recovery mail the sign-in screen sends, so there is one
+  // password-reset path in the app rather than two that can drift.
+  async function changePassword() {
+    if (!accountEmail || sendingReset) return;
+    setSendingReset(true);
+    try {
+      await requestPasswordReset(accountEmail);
+      Alert.alert(t('authForgotTitle'), t('authCodeSubtitle', { email: accountEmail }));
+    } catch (cause) {
+      const code = cause instanceof AuthError ? cause.code : 'unknown';
+      Alert.alert(t('errGeneric'), t(authErrorKey(code)));
+    } finally {
+      setSendingReset(false);
+    }
+  }
+
   return (
     <ScreenContainer>
       <BackBar onBack={() => router.back()} title={t('accountSettings')} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, marginBottom: 20 }]}>
-          {/* Sign-in is Google-only in this app (no password), so "Đổi mật khẩu"
-              from the reference is replaced with a label-only row. */}
+          {/* Was a hardcoded "Quản lý tài khoản Google" label, written when
+              Google was the only way in. The app now also signs in with email
+              + password and with Apple, so that row told most users something
+              untrue and left password accounts with no way to change their
+              password anywhere in the app. */}
           <View style={[styles.row, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}>
-            <Icon name="lock" size={20} color={theme.colors.primary} />
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{t('googleAccount')}</Text>
+            <Icon name={signInProvider === 'google' ? 'user' : signInProvider === 'apple' ? 'user' : 'mail'} size={20} color={theme.colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>
+                {signInProvider === 'google' ? t('signInWithGoogle') : signInProvider === 'apple' ? t('signInWithApple') : t('authEmail')}
+              </Text>
+              {accountEmail ? (
+                <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{accountEmail}</Text>
+              ) : null}
+            </View>
           </View>
+          {signInProvider === 'email' && accountEmail ? (
+            <Pressable
+              onPress={changePassword}
+              disabled={sendingReset}
+              style={[styles.row, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}
+              accessibilityRole="button"
+            >
+              <Icon name="lock" size={20} color={theme.colors.primary} />
+              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{t('authNewPasswordTitle')}</Text>
+              <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+            </Pressable>
+          ) : null}
 
           <View style={[styles.langBlock, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}>
             <View style={styles.langHeader}>

@@ -5,6 +5,7 @@ import { useTheme } from '@/theme';
 import { landingPage, websiteDomain } from '@/lib/mockData';
 import { useStoreCategories } from '@/hooks/useStore';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
 import { ExternalLinkModal } from '@/components/ExternalLinkModal';
 import { useI18n } from '@/lib/i18n';
@@ -45,7 +46,8 @@ export default function StoreScreen() {
   const { t } = useI18n();
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ title: string; url: string | null } | null>(null);
-  const { data: categories, isPending } = useStoreCategories();
+  const storeQuery = useStoreCategories();
+  const { data: categories, isPending } = storeQuery;
   const focusFadeStyle = useTabFocusFade();
 
   let cardIndex = -1;
@@ -66,6 +68,27 @@ export default function StoreScreen() {
             <StoreSkeleton bg={theme.colors.bgCard} bgAlt={theme.colors.bgCardAlt} radius={theme.radius} cardPadding={theme.cardPadding} shadow={theme.shadows.card} />
             <StoreSkeleton bg={theme.colors.bgCard} bgAlt={theme.colors.bgCardAlt} radius={theme.radius} cardPadding={theme.cardPadding} shadow={theme.shadows.card} />
           </Reanimated.View>
+        ) : storeQuery.isError ? (
+          // `(categories ?? [])` alone rendered a failed fetch exactly like an
+          // empty catalog: a header, a link, and nothing to explain or retry.
+          <View style={styles.errorBox}>
+            <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('homeLoadErrorTitle')}</Text>
+            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
+              {t('checkNetworkRetry')}
+            </Text>
+            <Button style={{ marginTop: 16, minWidth: 132 }} loading={storeQuery.isFetching} onPress={() => { void storeQuery.refetch(); }}>
+              {t('retry')}
+            </Button>
+          </View>
+        ) : (categories ?? []).length === 0 ? (
+          // A market whose catalog rows an admin has not seeded yet — the
+          // store query filters by market with no Vietnamese fallback.
+          <View style={styles.errorBox}>
+            <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('homeNoProductsTitle')}</Text>
+            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
+              {t('homeNoCatalog')}
+            </Text>
+          </View>
         ) : (
           <Reanimated.View key="content" entering={FadeIn.duration(200)}>
           {(categories ?? []).map((cat) => (
@@ -144,6 +167,12 @@ export default function StoreScreen() {
 }
 
 const styles = StyleSheet.create({
+  errorBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+  },
   scrollBody: {
     paddingHorizontal: 20,
     paddingBottom: 140,

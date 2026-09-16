@@ -19,6 +19,7 @@ import { Icon } from '@/components/icons/Icon';
 import { ExternalLinkModal } from '@/components/ExternalLinkModal';
 import { useI18n } from '@/lib/i18n';
 import { youtubePlayerLangParams } from '@/lib/youtubePlayerLang';
+import { IAP_ENABLED } from '@/lib/features';
 
 export default function DayDetailScreen() {
   const theme = useTheme();
@@ -74,7 +75,11 @@ export default function DayDetailScreen() {
   const isReviewAccount = useProfile(userId).data?.accountType === 'review';
   const lockDataReady = !d || phaseIds.length === 0 || (lockRequirementsQuery.isFetched && (!userId || purchasesQuery.isFetched));
   const lockRequirement = d ? lockRequirementsQuery.data?.get(d.phaseId) : undefined;
-  const phaseLocked = !!d && !isReviewAccount && lockDataReady && !!lockRequirement && !purchasesQuery.data?.has(d.phaseId);
+  // `IAP_ENABLED` has to be honoured here exactly as Roadmap honours it
+  // (roadmap.tsx). Without it, the first phase given a store product id would
+  // show as open on the Roadmap and bounce to the paywall here — the user
+  // taps a day and the screen throws them straight back out.
+  const phaseLocked = IAP_ENABLED && !!d && !isReviewAccount && lockDataReady && !!lockRequirement && !purchasesQuery.data?.has(d.phaseId);
   // Unpublished roadmap (Admin switch): its days are not content yet.
   const productUnpublished = !!program && program.product.roadmapPublished === false;
   useEffect(() => {
@@ -126,11 +131,17 @@ export default function DayDetailScreen() {
         program_day_id: programDayId,
         score: value,
       });
-      if (!error) queryClient.invalidateQueries({ queryKey: ['pain_logs', userProgramId] });
-    } finally {
-      setCheckInSubmitting(false);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['pain_logs', userProgramId] });
+      // Only a SAVED score counts as answered. This used to run in `finally`,
+      // so a failed insert still closed the modal and latched `checkInDone` —
+      // the reading was gone and the screen never asked again.
       setCheckInDone(true);
       setCheckInVisible(false);
+    } catch {
+      Alert.alert(t('sendFailTitle'), t('checkNetworkRetry'));
+    } finally {
+      setCheckInSubmitting(false);
     }
   }
 
@@ -144,7 +155,34 @@ export default function DayDetailScreen() {
       </ScreenContainer>
     );
   }
-  if (!d) return null;
+  // A failed day/program fetch used to `return null` — a completely blank
+  // screen with no way back, on the very screen a "time to train" push opens.
+  // Give it the same back bar and retry the rest of the app uses.
+  if (!d) {
+    const loadFailed = programsQuery.isError || daysQuery.isError;
+    return (
+      <ScreenContainer>
+        <BackBar onBack={() => router.back()} title={`${t('day')} ${dayId}`} />
+        <View style={styles.loadingBox}>
+          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, textAlign: 'center' }]}>
+            {loadFailed ? t('homeLoadErrorTitle') : t('noToolsTitle')}
+          </Text>
+          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
+            {loadFailed ? t('checkNetworkRetry') : t('roadmapComingSoonBody')}
+          </Text>
+          {loadFailed ? (
+            <Pressable
+              onPress={() => { void programsQuery.refetch(); void daysQuery.refetch(); }}
+              style={{ marginTop: 16 }}
+              accessibilityRole="button"
+            >
+              <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('retry')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </ScreenContainer>
+    );
+  }
   if (!lockDataReady || phaseLocked || productUnpublished) {
     return (
       <ScreenContainer>

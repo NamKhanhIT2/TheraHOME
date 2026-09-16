@@ -180,7 +180,17 @@ export default function NotificationInboxScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
-          {sections.length === 0 ? <View style={styles.emptyState}>
+          {/* A failed fetch used to fall into `?? []` and render the "no
+              notifications" empty state, so a network error was indis-
+              tinguishable from a genuinely empty inbox. */}
+          {notificationsQuery.isError ? <View style={styles.emptyState}>
+            <View style={[styles.emptyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="bell" size={25} color={theme.colors.primary} /></View>
+            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginTop: 12, textAlign: 'center' }]}>{t('homeLoadErrorTitle')}</Text>
+            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 6, textAlign: 'center' }]}>{t('checkNetworkRetry')}</Text>
+            <Pressable onPress={() => { void notificationsQuery.refetch(); }} style={{ marginTop: 14 }} accessibilityRole="button">
+              <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('retry')}</Text>
+            </Pressable>
+          </View> : sections.length === 0 ? <View style={styles.emptyState}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="bell" size={25} color={theme.colors.primary} /></View>
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginTop: 12 }]}>{t('noNotifications')}</Text>
           </View> : null}

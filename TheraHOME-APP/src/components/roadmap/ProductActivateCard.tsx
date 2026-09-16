@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
+import { useMarket } from '@/hooks/useMarket';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
 import { useI18n } from '@/lib/i18n';
@@ -15,9 +16,24 @@ import { errorMessage } from '@/lib/errorMessage';
  * activate_product_by_contact. The screen-level KeyboardAvoidingView in
  * roadmap.tsx keeps the input above the keyboard. The /activate screen
  * still handles the account's FIRST activation (global gate). */
+/** The dialling code each market's phone numbers belong to — the same table
+ * `app/activate.tsx` builds its picker from. This card has no picker (it is a
+ * single inline field by design), so the user's own market decides. */
+const DIALLING_CODE_BY_MARKET: Record<string, string> = { US: '1', VN: '84', MALAY: '60' };
+
+/** Same composition as `app/activate.tsx`'s `toE164`: strip separators, drop
+ * the domestic trunk zero, prefix the dialling code. Without it this card sent
+ * the raw digits and the server assumed Vietnam for everyone, so a US or
+ * Malaysian number silently became a +84 number and matched no order. */
+function toE164(diallingCode: string, typed: string): string {
+  const digits = typed.replace(/[^0-9]/g, '').replace(/^0+/, '');
+  return digits ? `+${diallingCode}${digits}` : '';
+}
+
 export function ProductActivateCard({ productId }: { productId: string }) {
   const theme = useTheme();
   const { t } = useI18n();
+  const market = useMarket();
   const queryClient = useQueryClient();
   const { session } = useSession();
   const userId = session?.user.id;
@@ -31,9 +47,13 @@ export function ProductActivateCard({ productId }: { productId: string }) {
     setSubmitting(true);
     setError('');
     try {
+      const typed = contact.trim();
+      const submittedContact = typed.includes('@')
+        ? typed
+        : toE164(DIALLING_CODE_BY_MARKET[market] ?? '84', typed) || typed;
       const { error: rpcError } = await supabase.rpc('activate_product_by_contact', {
         p_product_id: productId,
-        p_contact: contact.trim(),
+        p_contact: submittedContact,
       });
       if (rpcError) throw rpcError;
       // The refetched user_programs row makes roadmap.tsx swap this card

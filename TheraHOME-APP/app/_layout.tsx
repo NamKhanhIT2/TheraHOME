@@ -61,6 +61,13 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const profileQuery = useProfile(userId);
   const profile = profileQuery.data;
   const profileLoading = !!userId && profileQuery.isPending;
+  // A signed-in session whose profile could NOT be fetched is not a signed-out
+  // user. Without this the query's error left `profile` undefined, `authed`
+  // false, and the whole patient stack unregistered — so `app/index.tsx` sent
+  // the user to /login. A cold start with no network silently logged people
+  // out of a perfectly valid session (audit 2026-09-16). Hold them on a retry
+  // screen instead; the session is untouched and one tap resumes.
+  const profileUnavailable = !!userId && profileQuery.isError;
   const updateProfile = useUpdateProfile(userId);
   const language = useAppStore((state) => state.language);
   const setLanguage = useAppStore((state) => state.setLanguage);
@@ -354,6 +361,32 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     return <AppSplashScreen />;
   }
 
+  if (profileUnavailable) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.bgApp, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 }}>
+        <StatusBar style={theme.dark ? 'light' : 'dark'} />
+        <NavigationBar style={theme.dark ? 'light' : 'dark'} />
+        <Text style={{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 24 }}>
+          {translate(language, 'homeLoadErrorTitle')}
+        </Text>
+        <Text style={{ color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+          {translate(language, 'checkNetworkRetry')}
+        </Text>
+        <Button loading={profileQuery.isFetching} onPress={() => { void profileQuery.refetch(); }}>
+          {translate(language, 'retry')}
+        </Button>
+        {/* An escape hatch, so a profile row that can never load (a deleted or
+            corrupted account) is not a permanent lock-in. */}
+        <Text
+          onPress={() => { void supabase.auth.signOut(); }}
+          style={{ color: theme.colors.textMuted, fontSize: 14, paddingVertical: 8 }}
+        >
+          {translate(language, 'signOut')}
+        </Text>
+      </View>
+    );
+  }
+
   if (blockedReason) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.bgApp, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 20 }}>
@@ -403,7 +436,6 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="profile/help" />
           <Stack.Screen name="profile/delete-account" options={{ presentation: 'modal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'default' }} />
           <Stack.Screen name="notifications" />
-          <Stack.Screen name="community/[postId]" />
           <Stack.Screen name="community/profile/[userId]" />
           <Stack.Screen name="community/article/[articleId]" />
           <Stack.Screen name="community/create" options={{ presentation: 'modal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'default' }} />
@@ -417,6 +449,12 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         <Stack.Protected guard={inApp}>
           <Stack.Screen name="chat/admin-conversations" />
           <Stack.Screen name="chat/admin-thread/[threadId]" />
+          {/* Shared, not patient-only: the staff moderation queue links
+              straight to the reported post ((staff)/community.tsx). While
+              this sat in the patient block, `isStaffAccount` unregistered it
+              and "Xem nội dung bị báo cáo" navigated nowhere — the queue's
+              only route to the content it is asking staff to judge. */}
+          <Stack.Screen name="community/[postId]" />
         </Stack.Protected>
         {/* Purely-staff TheraHOME accounts (admin/cskh, no patient program)
             — a dedicated 3-tab shell (Chat/Cộng đồng/Thông báo), not the
