@@ -1439,3 +1439,40 @@ hay điện thoại. Không có bản sao, không có đồng bộ nền, không
 Lưu ý còn đúng: `user_program_days` **không** nằm trong publication
 `supabase_realtime`, nên app cập nhật ở lần refetch/mở lại kế tiếp chứ không
 tức thì — đúng như quan sát khi thử.
+
+### Màn kích hoạt cho web, chép từ app (2026-09-16)
+
+Chủ dự án: *"tham khảo giao diện bắt nhập mã nếu chưa kích hoạt ở trên mobile
+rồi làm tương tự cho web"*. Trước đó khách đăng nhập web mà chưa kích hoạt gặp
+ngõ cụt — một khối chữ bảo "hãy kích hoạt trong ứng dụng". Giờ là chính màn
+của app: `ActivationPanel.tsx`, port từ `TheraHOME-APP/app/activate.tsx`.
+
+Giống app từng chi tiết: icon khiên, tiêu đề "Xác nhận thông tin đặt hàng",
+hai dòng lợi ích, ô nhập kèm chọn mã vùng (+1 / +84 / +60 / +44 đúng thứ tự
+app liệt kê), dòng khoá "Không cần mã kích hoạt thiết bị · Thông tin của bạn
+được bảo mật". Gõ có `@` thì ô mã vùng biến mất — đúng phép thử `isEmail` của
+app. Mã vùng mặc định lấy từ `profiles.market`, chỉ là chọn sẵn vì 'US' trải
+cả +1 lẫn +44.
+
+**Chỉ port chế độ claim lần đầu** (`claim_user_access_contact`). App còn chế độ
+thứ hai `activate_product_by_contact`, vào từ thẻ thiết bị bị khoá ở Lộ trình,
+để chuộc thiết bị thứ hai mua bằng số khác. Web chưa có danh sách thiết bị nên
+không có đường bấm tới, đừng gắn thêm vào panel này khi chưa có thẻ cấp
+`productId`.
+
+`toE164` **chép nguyên văn**, kể cả tật gõ mã vùng vào ô số thì bị nhân đôi
+(`+8484…`) mà chủ dự án đã xem ngày 2026-09-13 và quyết định không sửa. Điểm
+mấu chốt là hai bên sai giống hệt nhau, nên số nào kích hoạt được trên điện
+thoại thì kích hoạt được trên web. "Sửa cho tốt hơn" ở một bên mới là lỗi thật.
+
+Bảy câu báo lỗi cũng chép nguyên văn từ `i18n.ts` — khách chụp màn hình gửi
+CSKH thì ra đúng câu CSKH đã quen.
+
+Kiểm chứng: test đối chiếu rút **chính hàm `toE164` của hai file** rồi chạy
+song song 52 tổ hợp mã vùng × chuỗi nhập (có số 0 đầu, có khoảng trắng, có
+người gõ sẵn +84, chuỗi rỗng, chữ cái) — **0 lệch**; và soát 7 nhánh lỗi so
+với `i18n.ts` — **0 khác**. Giao diện chụp thật trên dev: ô mã vùng hiện với
+số, mất với email, đủ 4 mã đúng thứ tự.
+
+Kích hoạt xong gọi `refresh()` của trang, refetch rồi hiện thẳng lộ trình —
+không phải tải lại trang.

@@ -18,6 +18,7 @@ import { LandingButton } from "@/components/landing/LandingButton";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { StoreTab } from "@/components/landing/StoreTab";
 import { CommunityTab } from "@/components/landing/CommunityTab";
+import { ActivationPanel } from "@/components/landing/ActivationPanel";
 import { YouTubeLesson } from "@/components/landing/YouTubeLesson";
 import {
   canOpenDay,
@@ -344,20 +345,16 @@ export default function TrainingPage() {
           </div>
         ) : null}
 
+        {/* No programme yet — the same activation screen the app shows, not a
+            dead end pointing at the app. `refresh` refetches, so a successful
+            claim lands straight on the roadmap. */}
         {tab === "lo-trinh" && userId !== null && !program ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 18, minHeight: "38vh", justifyContent: "center" }}>
-            <span style={eyebrow}>Luyện tập</span>
-            <h1 style={{ margin: 0, fontSize: "clamp(28px, 3.4vw, 44px)", fontWeight: 600, letterSpacing: "-0.02em", color: "#fff" }}>
-              Chưa có lộ trình nào được kích hoạt
-            </h1>
-            <p style={{ margin: 0, maxWidth: 560, fontSize: 16.5, lineHeight: 1.65, color: "rgba(255,255,255,0.66)" }}>
-              Lộ trình mở khi số điện thoại hoặc email bạn đặt hàng được kích hoạt. Nếu bạn vừa mua, hãy kích hoạt trong ứng dụng hoặc nhắn cho đội ngũ hỗ trợ.
-            </p>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-              <LandingButton href="/san-pham">Xem sản phẩm</LandingButton>
-              <LandingButton href="/ung-dung" variant="secondary">Tải ứng dụng</LandingButton>
+          <>
+            <ActivationPanel market={me.market} onActivated={refresh} />
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
+              <LandingButton href="/san-pham" variant="secondary">Chưa có thiết bị? Xem sản phẩm</LandingButton>
             </div>
-          </div>
+          </>
         ) : null}
 
         {tab === "lo-trinh" && program ? (
