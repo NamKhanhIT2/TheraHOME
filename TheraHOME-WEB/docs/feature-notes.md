@@ -1660,3 +1660,35 @@ vào máy cá nhân. Chưa ai dính vì 50 tài khoản đều đã xác nhận 
 **Bài học cho lần sau:** thêm một route auth mới trên web thì phải thêm URL đó
 vào Redirect URLs — không có gì trong repo báo cho bạn biết, và triệu chứng
 (quay về trang trắng / lỗi scheme) trông y hệt lỗi code.
+
+### Avatar trong chip tài khoản + tab Luyện tập thành sidebar (2026-09-16)
+
+**Avatar.** Chip tài khoản chỉ vẽ chữ cái đầu. Dữ liệu vốn đã có:
+`profiles.avatar_url` được điền cho **cả 22 tài khoản Google** — phần lớn là
+link CDN của Google, 5 trường hợp là ảnh tự tải lên bucket `avatars` (bucket
+này `public = true`). Kiểm tra thẳng ảnh của chủ dự án: HTTP 200, 70 KB,
+`image/jpeg`. Vậy lỗi chỉ là không ai đọc cột đó.
+
+Đã cho `useLandingSession` đọc `avatar_url`, và fallback sang ảnh provider gửi
+kèm (`user_metadata.avatar_url` / `picture`) cho tài khoản Google chưa từng đặt
+ảnh trong app. Chữ cái đầu vẫn nằm dưới nên ảnh hỏng hay đang tải thì chip vẫn
+trọn vẹn; dùng `SafeImg` vì nó bắt được cả trường hợp ảnh lỗi **trước** khi
+hydrate, thứ `onError` thường bỏ sót.
+
+**Tên thì giữ nguyên `profiles.full_name`, cố ý.** Tài khoản chủ dự án có
+`full_name = "Khanh"` còn tên Google là "Nguyễn Trần Nam Khánh" — hai thứ khác
+nhau thật. App hiển thị `full_name` ở mọi nơi, nên lấy tên Google riêng cho web
+sẽ làm cùng một người đọc ra hai tên khác nhau giữa điện thoại và trình duyệt.
+Muốn đổi thì sửa ở hồ sơ trong app hoặc tab User của Admin, và cả hai bên đổi
+theo. (3/22 tài khoản Google có `full_name` khác tên Google — đều là đã sửa tay.)
+
+**Sidebar.** Ba tab chuyển thành rail dọc bên trái, `position: sticky` nên vẫn
+thấy khi cuộn lưới ngày. Dưới 900px `landing.css` cho nó nằm ngang trở lại
+thành đúng hàng pill cũ — cột trái cố định trên điện thoại sẽ bóp nội dung còn
+lại không đọc được. Kiểm ở 375px: rail nằm ngang, nội dung đủ 335px, trang
+không tràn ngang.
+
+**Tiện tay sửa một mầm lỗi cùng loại với vụ "Đang xử lý...":**
+`useLandingSession` cũng `await` lời gọi supabase ngay trong
+`onAuthStateChange`. Nav này có mặt trên mọi trang công khai, nên đã hoãn bằng
+`setTimeout` như `AuthPanel`.

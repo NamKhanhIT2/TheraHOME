@@ -54,31 +54,38 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; 
 
 type TabId = "lo-trinh" | "cua-hang" | "cong-dong";
 
+/** Icons are drawn here rather than imported: the rail needs three shapes and
+ * the admin Icon set lives on the light console side, with its own stroke
+ * conventions. */
+const TAB_ICON: Record<TabId, string> = {
+  "lo-trinh": "M5 19c0-6 3-9 7-9s7-3 7-9|M9 10h.01|M15 19h.01",
+  "cua-hang": "M4 8h16l-1.2 11.2a1 1 0 0 1-1 .8H6.2a1 1 0 0 1-1-.8L4 8z|M9 8V6a3 3 0 0 1 6 0v2",
+  "cong-dong": "M16 18v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 16.5V18|M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M20 18v-1.5a3.5 3.5 0 0 0-2.6-3.4|M15.5 4.2a3 3 0 0 1 0 5.6",
+};
+
 const TABS: { id: TabId; label: string }[] = [
   { id: "lo-trinh", label: "Lộ trình" },
   { id: "cua-hang", label: "Cửa hàng" },
   { id: "cong-dong", label: "Cộng đồng" },
 ];
 
-function TabBar({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
+/** The tab navigation, as a left rail. Below 900px landing.css lays it back
+ * down into the horizontal row it used to be — see the note there. */
+function TabRail({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
   return (
-    <div role="tablist" style={{ display: "flex", gap: 8, padding: 6, borderRadius: 999, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", alignSelf: "flex-start", maxWidth: "100%", overflowX: "auto" }}>
+    <nav role="tablist" aria-label="Khu vực luyện tập" className="training-rail">
       {TABS.map((t) => {
         const on = active === t.id;
         return (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={on}
-            onClick={() => onChange(t.id)}
-            style={{ flex: "0 0 auto", padding: "10px 22px", borderRadius: 999, border: "none", fontFamily: "inherit", fontSize: 14.5, fontWeight: 600, cursor: "pointer", color: on ? "#fff" : "rgba(255,255,255,0.66)", background: on ? "var(--color-primary)" : "transparent" }}
-          >
+          <button key={t.id} type="button" role="tab" aria-selected={on} onClick={() => onChange(t.id)} className="training-rail-item">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: "0 0 auto" }}>
+              {TAB_ICON[t.id].split("|").map((d, i) => <path key={i} d={d} />)}
+            </svg>
             {t.label}
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
@@ -325,8 +332,10 @@ export default function TrainingPage() {
 
   return (
     <>
-      <div style={{ ...shell, display: "flex", flexDirection: "column", gap: "clamp(20px, 3vh, 32px)" }}>
-        <TabBar active={tab} onChange={setTab} />
+      <div style={shell}>
+        <div className="training-layout">
+          <TabRail active={tab} onChange={setTab} />
+          <div className="training-main">
 
         {/* The store catalog is world-readable, so it renders signed out too. */}
         {tab === "cua-hang" ? <StoreTab market={me.market} /> : null}
@@ -459,7 +468,9 @@ export default function TrainingPage() {
               <Link href="/ung-dung" style={{ fontSize: 14, color: "#7FBFFF" }}>Tải ứng dụng để tập trên điện thoại →</Link>
             </div>
           </div>
-        ) : null}
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {gateDay ? (

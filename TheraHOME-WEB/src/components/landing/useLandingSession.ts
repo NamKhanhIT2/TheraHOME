@@ -19,35 +19,56 @@ export interface LandingSession {
   signedIn: boolean | null;
   name: string;
   email: string;
+  /** profiles.avatar_url — the picture the customer set in the app, or the one
+   * Google supplied at sign-up. Empty when they have neither. */
+  avatarUrl: string;
   roles: WebAccessRole[];
 }
 
 export function useLandingSession(): LandingSession & { signOut: () => Promise<void> } {
-  const [state, setState] = useState<LandingSession>({ signedIn: null, name: "", email: "", roles: [] });
+  const [state, setState] = useState<LandingSession>({ signedIn: null, name: "", email: "", avatarUrl: "", roles: [] });
 
   useEffect(() => {
     let cancelled = false;
 
     async function load(session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]) {
       if (!session) {
-        if (!cancelled) setState({ signedIn: false, name: "", email: "", roles: [] });
+        if (!cancelled) setState({ signedIn: false, name: "", email: "", avatarUrl: "", roles: [] });
         return;
       }
       const email = session.user.email ?? "";
       // full_name is what the app shows everywhere else; fall back to the
       // address rather than rendering an empty chip.
-      const [{ data: profile }, roles] = await Promise.all([
-        supabase.from("profiles").select("full_name").eq("id", session.user.id).maybeSingle(),
+      const [{ data: profile, error }, roles] = await Promise.all([
+        supabase.from("profiles").select("full_name, avatar_url").eq("id", session.user.id).maybeSingle(),
         getCurrentWebRoles().catch(() => [] as WebAccessRole[]),
       ]);
+      if (error) console.error("Unable to read the profile row for the nav", error);
       if (cancelled) return;
-      setState({ signedIn: true, name: profile?.full_name || email, email, roles });
+      // The name is profiles.full_name on purpose, NOT the Google display
+      // name: the app shows full_name everywhere, so taking Google's here
+      // would make the same person read differently on phone and web. Someone
+      // who renamed themselves in the app means it.
+      // The avatar falls back to what the provider supplied, for an account
+      // that signed in with Google and never set a picture in the app.
+      const meta = session.user.user_metadata ?? {};
+      const providerAvatar = typeof meta.avatar_url === "string" ? meta.avatar_url : typeof meta.picture === "string" ? meta.picture : "";
+      setState({
+        signedIn: true,
+        name: profile?.full_name || email,
+        email,
+        avatarUrl: profile?.avatar_url || providerAvatar || "",
+        roles,
+      });
     }
 
     supabase.auth.getSession().then(({ data }) => void load(data.session));
 
+    // Deferred, and the callback is deliberately not async: supabase-js holds
+    // the auth lock while dispatching this, and load() calls supabase again —
+    // awaiting here can deadlock the pair (see AuthPanel for the long version).
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      void load(session);
+      setTimeout(() => void load(session), 0);
     });
 
     return () => {

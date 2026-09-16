@@ -421,3 +421,90 @@ body:has(.landing-root) {
     display: none !important;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Luyện tập: điều hướng dạng sidebar                                   */
+/*                                                                      */
+/* The tabs used to be a pill row above the content. As a sidebar they  */
+/* stay visible while the day grid scrolls, which is the point — but a  */
+/* fixed left column on a phone would squeeze the content to nothing,   */
+/* so below 900px the rail lies back down into the horizontal row it    */
+/* used to be. Same markup, same state, one media query.                */
+.landing-root .training-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(20px, 3vw, 40px);
+}
+
+.landing-root .training-rail {
+  position: sticky;
+  top: 96px;
+  flex: 0 0 196px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.landing-root .training-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 3vh, 32px);
+}
+
+.landing-root .training-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.66);
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease-out, color 160ms ease-out;
+}
+
+.landing-root .training-rail-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.landing-root .training-rail-item[aria-selected="true"] {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(0, 127, 217, 0.3);
+}
+
+@media (max-width: 900px) {
+  .landing-root .training-layout {
+    flex-direction: column;
+  }
+  .landing-root .training-rail {
+    position: static;
+    flex: 0 0 auto;
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-radius: 999px;
+  }
+  .landing-root .training-rail-item {
+    width: auto;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .landing-root .training-main {
+    width: 100%;
+  }
+}

@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { initials, type LandingSession } from "@/components/landing/useLandingSession";
+import { SafeImg } from "@/components/landing/SafeImg";
 
 export function AccountChip({
   session,
@@ -53,8 +54,18 @@ export function AccountChip({
       onPointerLeave={() => setOpen(false)}
       style={{ position: "relative", display: "flex", alignItems: "center", gap: 9, padding: "5px 6px 5px 5px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.16)", cursor: "pointer" }}
     >
-      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 999, background: "linear-gradient(160deg,#1E90FF,#0059B3)", color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", flex: "0 0 auto" }}>
+      <span style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 999, background: "linear-gradient(160deg,#1E90FF,#0059B3)", color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", flex: "0 0 auto", overflow: "hidden" }}>
+        {/* Initials sit underneath, so a picture that 404s or is still loading
+            leaves the chip looking finished rather than blank. SafeImg removes
+            itself on error and also catches an image that failed before
+            hydration, which a plain onError misses. */}
         {initials(session.name)}
+        {session.avatarUrl ? (
+          <SafeImg
+            src={session.avatarUrl}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        ) : null}
       </span>
       <span style={{ fontSize: 13, color: "rgba(255,255,255,0.88)", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {session.name || "Tài khoản"}
