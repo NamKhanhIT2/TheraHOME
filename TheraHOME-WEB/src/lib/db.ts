@@ -90,11 +90,20 @@ export interface DashboardStats {
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
-  const [{ count: totalUsers }, { data: programs }, { count: communityPostsCount }] = await Promise.all([
+  // Every one of these used to ignore `error`, so a failed or RLS-blocked query
+  // produced `count: undefined → 0` and the admin home screen showed
+  // "0 người dùng, 0 bài viết" and a flat week as if those were real figures.
+  const [users, programsRes, posts] = await Promise.all([
     supabase.from("user_access_contacts").select("id", { count: "exact", head: true }),
     supabase.from("user_programs").select("id, adherence_pct"),
     supabase.from("community_posts").select("id", { count: "exact", head: true }),
   ]);
+  if (users.error) throw users.error;
+  if (programsRes.error) throw programsRes.error;
+  if (posts.error) throw posts.error;
+  const totalUsers = users.count;
+  const programs = programsRes.data;
+  const communityPostsCount = posts.count;
 
   const adherenceValues = (programs ?? []).map((p) => Number(p.adherence_pct)).filter((n) => Number.isFinite(n));
   const avgAdherence = adherenceValues.length ? Math.round(adherenceValues.reduce((a, b) => a + b, 0) / adherenceValues.length) : null;

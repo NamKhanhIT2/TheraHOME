@@ -31,6 +31,10 @@
 //     activated_at THEN id, for determinism) as the fallback.
 import { supabase } from "./supabase";
 
+/** Mirrors TheraHOME-APP's src/lib/features.ts IAP_ENABLED. Both app flags are
+ * false, so no phase is locked anywhere; flip this only alongside them. */
+const PHASE_LOCK_ENABLED = false;
+
 export type DayStatus = "done" | "current" | "missed" | "upcoming" | "locked";
 
 export interface TrainingDay {
@@ -63,8 +67,11 @@ export interface TrainingProgram {
   /** Days the customer can actually reach: a paid, unpurchased phase's days
    * are excluded, the same rule the app's useAccessibleProgress applies. */
   totalDays: number;
-  /** 1-based, capped at totalDays. */
+  /** Real elapsed day, 1-based and UNCAPPED — what day statuses derive from,
+   * matching the app. Capping it made the final day read "Hôm nay" forever. */
   todayDay: number;
+  /** todayDay clamped to totalDays — the number shown as "Ngày N / X". */
+  displayDay: number;
   days: TrainingDay[];
   /** account_type === 'review'. App Review accounts bypass every day lock —
    * the app does this, and mark_day_watched has a matching server exemption. */
@@ -174,14 +181,22 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
     phaseIds.length
       ? supabase.from("phase_promos").select("phase_id, apple_product_id, google_product_id").in("phase_id", phaseIds)
       : Promise.resolve({ data: [] as { phase_id: string; apple_product_id: string | null; google_product_id: string | null }[] }),
-    supabase.from("phase_purchases").select("phase_id").eq("user_id", userId),
+    // `revoked_at is null` matters as much here as in the app: a refunded or
+    // revoked purchase must stop unlocking the phase.
+    supabase.from("phase_purchases").select("phase_id").eq("user_id", userId).is("revoked_at", null),
   ]);
   const paidPhases = new Set(
     (promos ?? []).filter((p) => p.apple_product_id !== null || p.google_product_id !== null).map((p) => p.phase_id),
   );
   const purchasedPhases = new Set((purchases ?? []).map((p) => p.phase_id));
+  // PHASE_LOCK_ENABLED is the web's half of the app's IAP_ENABLED kill switch.
+  // Without it the two clients disagreed the moment a phase got a product id:
+  // the app never locks anything while its flags are false, but the web locked
+  // immediately — so the same customer would see a different day count, a
+  // different percentage, and days present on the phone but missing here. Flip
+  // this only together with the app's flags.
   const phaseIsLocked = (phaseId: string | null) =>
-    !isReviewAccount && !!phaseId && paidPhases.has(phaseId) && !purchasedPhases.has(phaseId);
+    PHASE_LOCK_ENABLED && !isReviewAccount && !!phaseId && paidPhases.has(phaseId) && !purchasedPhases.has(phaseId);
 
   const statusByDay = new Map((mine ?? []).map((r) => [r.program_day_id, r]));
   const phaseById = new Map((phases ?? []).map((p) => [p.id, pickMarket(market, p.name, p.name_en, p.name_ms)]));
@@ -192,7 +207,11 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
   // "Ngày N / X", exactly as useAccessibleProgress computes it.
   const reachable = allDays.filter((d) => !phaseIsLocked(d.phase_id));
   const totalDays = reachable.length || product?.total_days || allDays.length || 14;
-  const todayDay = Math.min(daysSinceLocal(program.activated_at) + 1, totalDays);
+  // UNCAPPED, like the app: day status is derived from the real elapsed day,
+  // so once the programme is over the last day reads as finished/missed rather
+  // than sitting on "Hôm nay" forever. The capped number is only for display.
+  const todayDay = daysSinceLocal(program.activated_at) + 1;
+  const displayDay = Math.min(todayDay, totalDays);
 
   return {
     userProgramId: program.id,
@@ -202,6 +221,7 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
     activatedAt: program.activated_at,
     totalDays,
     todayDay,
+    displayDay,
     isReviewAccount,
     roadmapPublished: product?.roadmap_published !== false,
     days: allDays.map((d) => {
@@ -228,7 +248,15 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
 /** Can this day be opened? Mirrors useRequestDay: locked/upcoming are closed,
  * a paid-unpurchased phase is closed, and an App Review account opens anything
  * (the server's mark_day_watched carries the same exemption). */
+export function isRestDay(day: TrainingDay): boolean {
+  return day.dayType === "rest";
+}
+
 export function canOpenDay(day: TrainingDay, isReviewAccount: boolean): boolean {
+  // A rest day has no session to open — the app renders it as a non-tappable
+  // "Ngày nghỉ" row. The web fetched day_type and then ignored it, so a rest
+  // day looked and behaved like an ordinary workout.
+  if (isRestDay(day)) return false;
   if (isReviewAccount) return true;
   if (day.phaseLocked) return false;
   return day.status !== "locked" && day.status !== "upcoming";

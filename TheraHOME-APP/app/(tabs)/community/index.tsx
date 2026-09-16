@@ -258,16 +258,23 @@ export default function CommunityScreen() {
   function congratulate(post: CommunityPostRow) {
     const current = myReactions.get(post.id) ?? null;
     if (current) return;
-    setPostReaction.mutate({ postId: post.id, current, reaction: 'celebrate' });
-    showToast(t('congratulated'));
+    // The toast used to fire regardless of the result. The hook rolls the
+    // reaction back on failure, so a failed congratulation left the post
+    // unchanged while the user had just been told it worked.
+    setPostReaction.mutate(
+      { postId: post.id, current, reaction: 'celebrate' },
+      { onSuccess: () => showToast(t('congratulated')), onError: () => showToast(t('cannotUpdateReaction')) },
+    );
   }
 
   function handleMenuAction(post: CommunityPostRow, action: 'save' | 'hide' | 'report' | 'block' | 'delete') {
     setMenuTarget(null);
     if (action === 'save') {
       const saved = savedSet.has(post.id);
-      toggleSave.mutate({ postId: post.id, saved });
-      showToast(saved ? t('postUnsaved') : t('postSaved'));
+      toggleSave.mutate(
+        { postId: post.id, saved },
+        { onSuccess: () => showToast(saved ? t('postUnsaved') : t('postSaved')), onError: () => showToast(t('errGeneric')) },
+      );
     } else if (action === 'report') {
       setReportTarget(post);
     } else if (action === 'hide') {

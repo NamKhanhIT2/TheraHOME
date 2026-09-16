@@ -12,6 +12,7 @@ import { Icon } from '@/components/icons/Icon';
 import { isVideoUri } from '@/lib/mediaKind';
 import { useVideoPlaybackStore } from '@/store/useVideoPlaybackStore';
 import { RemoteImage } from '@/components/ui/RemoteImage';
+import { StatusBar } from 'expo-status-bar';
 
 const IMMERSIVE_VIDEO_ID = 'immersive-video';
 
@@ -55,6 +56,8 @@ export function CommunityMediaViewer({ uris, initialIndex, onClose }: CommunityM
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    {/* Always-black lightbox — see ChatMediaViewer for why this override. */}
+    <StatusBar style="light" />
     <View style={styles.backdrop}>
       <FlatList
         ref={listRef}

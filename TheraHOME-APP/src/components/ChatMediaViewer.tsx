@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Icon } from '@/components/icons/Icon';
 import { RemoteImage } from '@/components/ui/RemoteImage';
+import { StatusBar } from 'expo-status-bar';
 
 export interface ChatMediaViewerProps {
   uri: string;
@@ -22,6 +23,10 @@ function VideoViewer({ uri }: { uri: string }) {
 export function ChatMediaViewer({ uri, kind, onClose }: ChatMediaViewerProps) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      {/* The lightbox is always black, so the clock and battery must always be
+          light. Without this the global StatusBar stayed `dark` in light mode
+          and they were dark-on-black — unreadable. */}
+      <StatusBar style="light" />
       <View style={styles.backdrop}>
         {kind === 'video' ? <VideoViewer uri={uri} /> : <RemoteImage uri={uri} cacheKey={uri.split('?')[0]} contentFit="contain" priority="high" style={styles.media} />}
         <Pressable onPress={onClose} style={styles.close} hitSlop={10}>

@@ -479,9 +479,22 @@ export function TheraAccountsView() {
   const [deleting, setDeleting] = useState<TheraAccount | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("ALL");
+  const [loadFailed, setLoadFailed] = useState(false);
 
   function reload() {
-    fetchTheraAccounts().then(setAccounts).catch(() => setAccounts([]));
+    // `.catch(() => setAccounts([]))` rendered a failed load as an EMPTY
+    // account table — an admin could conclude the privileged accounts were
+    // gone and start re-creating them (audit 2026-09-16).
+    fetchTheraAccounts()
+      .then((rows) => {
+        setLoadFailed(false);
+        setAccounts(rows);
+      })
+      .catch(() => {
+        setLoadFailed(true);
+        setAccounts([]);
+        pushToast("Không tải được danh sách tài khoản");
+      });
   }
   useEffect(reload, []);
 
@@ -572,6 +585,17 @@ export function TheraAccountsView() {
   }
 
   if (!accounts) return <div style={{ color: "var(--text-secondary)", padding: 20 }}>Đang tải...</div>;
+
+  // An empty list after a FAILED load is not "there are no accounts".
+  if (loadFailed) {
+    return (
+      <div style={{ color: "var(--text-secondary)", padding: 20, display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>Không tải được danh sách tài khoản</div>
+        <div style={{ fontSize: 13.5 }}>Danh sách bên dưới đang trống vì chưa đọc được dữ liệu, không phải vì các tài khoản đã bị xoá.</div>
+        <GhostBtn onClick={reload}>Thử lại</GhostBtn>
+      </div>
+    );
+  }
 
   const visibleAccounts = accounts.filter((a) => marketFilter === "ALL" || a.country === marketFilter);
 

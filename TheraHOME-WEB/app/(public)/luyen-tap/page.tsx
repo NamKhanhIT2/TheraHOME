@@ -23,6 +23,7 @@ import { YouTubeLesson } from "@/components/landing/YouTubeLesson";
 import {
   canOpenDay,
   canRecordWatch,
+  isRestDay,
   fetchPainTrend,
   fetchPhaseSurveys,
   fetchSurveySuggestion,
@@ -54,6 +55,9 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; 
   // a store product id yet — but it must not leak when Giai đoạn 3 ships, and
   // the web has no way to sell it, so it points at the app.
   phaseLocked: { bg: "rgba(255,182,72,0.1)", border: "rgba(255,182,72,0.32)", color: "#FFC978", label: "Cần mở khoá" },
+  // day_type === 'rest'. The app shows these as a non-tappable "Ngày nghỉ" row;
+  // the web used to render them as ordinary, openable workout tiles.
+  rest: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.62)", label: "Ngày nghỉ" },
 };
 
 type TabId = "lo-trinh" | "cua-hang" | "cong-dong";
@@ -217,6 +221,10 @@ export default function TrainingPage() {
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
   // undefined = not fetched yet, null = fetched and this account has no program
   const [program, setProgram] = useState<TrainingProgram | null | undefined>(undefined);
+  // A failed fetch used to be indistinguishable from "this account has no
+  // programme": the page showed the activation form, so a network blip read as
+  // "you haven't bought yet", right next to a box asking for a phone number.
+  const [programError, setProgramError] = useState(false);
   const [pain, setPain] = useState<{ score: number; loggedAt: string }[]>([]);
   const [water, setWater] = useState(0);
   const [openDay, setOpenDay] = useState<TrainingDay | null>(null);
@@ -265,20 +273,22 @@ export default function TrainingPage() {
       const [p, tr, w] = await Promise.all([
         fetchTrainingProgram(userId).catch((error) => {
           console.error("Unable to load the training programme", error);
-          return null;
+          return "error" as const;
         }),
         fetchPainTrend(userId).catch(() => []),
         fetchWaterToday(userId).catch(() => 0),
       ]);
       if (cancelled) return;
-      setProgram(p);
+      setProgramError(p === "error");
+      const loaded = p === "error" ? null : p;
+      setProgram(loaded);
       setPain(tr);
       setWater(w);
       // Surveys need the day list, so they follow rather than join the batch.
       // A failure here must not blank the roadmap: no surveys simply means no
       // survey section, the same as a programme whose phases have no questions.
-      if (p) {
-        const list = await fetchPhaseSurveys(userId, p.days, p.market).catch((error) => {
+      if (loaded) {
+        const list = await fetchPhaseSurveys(userId, loaded.days, loaded.market).catch((error) => {
           console.error("Unable to load the phase surveys", error);
           return [] as PhaseSurvey[];
         });
@@ -387,7 +397,9 @@ export default function TrainingPage() {
 
   const doneCount = program ? program.days.filter((d) => d.status === "done").length : 0;
   const pct = program ? Math.round((doneCount / Math.max(1, program.totalDays)) * 100) : 0;
-  const today = program?.days.find((d) => d.dayNumber === program.todayDay);
+  // The capped number: past the end of the programme the hero anchors on the
+  // last day rather than on a day number that no longer exists.
+  const today = program?.days.find((d) => d.dayNumber === program.displayDay);
 
   return (
     <>
@@ -419,7 +431,17 @@ export default function TrainingPage() {
         {/* No programme yet — the same activation screen the app shows, not a
             dead end pointing at the app. `refresh` refetches, so a successful
             claim lands straight on the roadmap. */}
-        {tab === "lo-trinh" && userId !== null && !program ? (
+        {tab === "lo-trinh" && userId !== null && !program && programError ? (
+          <div style={{ ...card, alignItems: "flex-start", gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600, color: "#fff" }}>Chưa tải được lộ trình</h2>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.65)" }}>
+              Kết nối đang có vấn đề nên chúng tôi chưa đọc được lộ trình của bạn. Đây không phải là bạn chưa có thiết bị.
+            </p>
+            <LandingButton onClick={refresh} style={{ height: 44 }}>Thử lại</LandingButton>
+          </div>
+        ) : null}
+
+        {tab === "lo-trinh" && userId !== null && !program && !programError ? (
           <>
             <ActivationPanel market={me.market} onActivated={refresh} />
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
@@ -434,7 +456,7 @@ export default function TrainingPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <span style={eyebrow}>{program.productName}</span>
                 <h1 style={{ margin: 0, fontSize: "clamp(28px, 3.4vw, 44px)", fontWeight: 600, letterSpacing: "-0.02em", color: "#fff" }}>
-                  Ngày {program.todayDay} / {program.totalDays}
+                  Ngày {program.displayDay} / {program.totalDays}
                 </h1>
                 <span style={{ fontSize: 14, color: "rgba(255,255,255,0.62)" }}>{today?.phaseName ?? ""}</span>
               </div>
@@ -497,7 +519,8 @@ export default function TrainingPage() {
               <h2 style={{ margin: 0, fontSize: "clamp(20px, 2.2vw, 28px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.015em" }}>Lộ trình</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
                 {program.days.map((d) => {
-                  const st = d.phaseLocked ? STATUS_STYLE.phaseLocked : STATUS_STYLE[d.status];
+                  const rest = isRestDay(d);
+                  const st = d.phaseLocked ? STATUS_STYLE.phaseLocked : rest ? STATUS_STYLE.rest : STATUS_STYLE[d.status];
                   const openable = canOpenDay(d, program.isReviewAccount);
                   return (
                     <button

@@ -78,6 +78,36 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // "Quên mật khẩu?" used to be a <Link href="/welcome"> — the STAFF console
+  // entrance, which has no reset at all, so a customer who forgot their
+  // password was dead-ended on an internal login screen (audit 2026-09-16).
+  const [resetting, setResetting] = useState(false);
+
+  async function sendReset() {
+    const field = document.querySelector<HTMLInputElement>('input[name="email"]');
+    const address = field?.value.trim() ?? "";
+    if (!address) {
+      setError("Nhập email của bạn ở ô phía trên rồi bấm lại.");
+      return;
+    }
+    if (resetting) return;
+    setResetting(true);
+    setError("");
+    setNotice("");
+    try {
+      // Always reports the same thing, whether or not the address has an
+      // account — telling them apart would turn this into a way to check who
+      // is registered. Same rule as the app's requestPasswordReset.
+      await supabase.auth.resetPasswordForEmail(address, {
+        redirectTo: `${window.location.origin}/dat-lai-mat-khau`,
+      });
+      setNotice(`Nếu ${address} có tài khoản, chúng tôi vừa gửi liên kết đặt lại mật khẩu. Kiểm tra cả hộp thư spam nhé.`);
+    } catch {
+      setError("Chưa gửi được liên kết đặt lại. Vui lòng thử lại sau ít phút.");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   // Already signed in? Nothing on this screen applies — send them where they
   // belong. Also catches the OAuth return, which lands back here with a live
@@ -354,7 +384,14 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
                   {/* The design also has "Ghi nhớ đăng nhập". Supabase already
                       persists the session in localStorage and refreshes it, so
                       a checkbox that changes nothing would be a lie. */}
-                  <Link href="/welcome" style={{ fontSize: 13.5, fontWeight: 600, color: "#4FB0F5" }}>Quên mật khẩu?</Link>
+                  <button
+                    type="button"
+                    onClick={() => void sendReset()}
+                    disabled={resetting}
+                    style={{ background: "none", border: "none", padding: 0, fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, color: "#4FB0F5", cursor: resetting ? "default" : "pointer" }}
+                  >
+                    {resetting ? "Đang gửi..." : "Quên mật khẩu?"}
+                  </button>
                 </div>
               )}
 
