@@ -72,6 +72,10 @@ export function TableShell({
             ) : null}
           </div>
         ) : null}
+        {/* The card sets `overflow: hidden` for its rounded corners, which also
+            CLIPPED any table wider than the card — at a narrow window the last
+            column simply vanished, with no way to reach it. Scroll it instead. */}
+        <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
           <thead>
             <tr style={{ textAlign: "left", color: "var(--text-muted)", fontSize: 12, textTransform: "uppercase" }}>
@@ -82,6 +86,7 @@ export function TableShell({
           </thead>
           <tbody>{children}</tbody>
         </table>
+        </div>
       </div>
       {modals}
     </div>
