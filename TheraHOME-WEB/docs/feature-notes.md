@@ -1476,3 +1476,31 @@ số, mất với email, đủ 4 mã đúng thứ tự.
 
 Kích hoạt xong gọi `refresh()` của trang, refetch rồi hiện thẳng lộ trình —
 không phải tải lại trang.
+
+### Lỗi: web đọc `profiles.market`, cột đó không tồn tại (2026-09-16)
+
+Phát hiện khi soát câu hỏi "có cần trang quản trị riêng cho app và web không".
+Trang web đọc `profiles.market`; cột thật tên là **`country`** (và đã chứa
+đúng mã `VN`/`US`/`MALAY` — xem `useMarket.ts` của app). PostgREST gặp cột
+không tồn tại thì **hỏng cả dòng**, mà cả hai chỗ gọi đều bỏ qua `error` nên
+không ai thấy gì.
+
+Hậu quả, im lặng, đã lên production:
+
+1. **Mọi khách đều bị coi là thị trường VN** — video, tên giai đoạn, link dụng
+   cụ, catalog Cửa hàng, và mã vùng mặc định của màn kích hoạt tôi vừa làm
+   hôm nay. 14 tài khoản US và 2 Malaysia đang xem nội dung VN.
+2. **`isReviewAccount` luôn false** — tài khoản App Review mất quyền bỏ qua
+   khoá ngày trên web. Đây là thứ phải đúng ở *mọi* cổng, và nó đã hỏng ngay
+   từ lúc tab Luyện tập lên sóng. 7 tài khoản review bị ảnh hưởng.
+
+Sửa: đọc `country`, và **log `error` thay vì nuốt** ở cả hai chỗ. Chính việc
+nuốt lỗi mới là nguyên nhân — sai tên cột chỉ là cái cớ.
+
+Soát cả lớp lỗi chứ không chỉ chỗ đã biết: rút **mọi** cặp `.from("bảng")
+.select("cột")` trong toàn bộ web (200+ cặp, 38 bảng) rồi đối chiếu với
+`information_schema` trên production — sau khi sửa còn **0 cột không tồn tại**.
+`profiles.market` là trường hợp duy nhất.
+
+Ghi chú cho người sau: `store_categories` và `store_items` **thật sự có** cột
+`market` — đừng đổi nhầm chúng sang `country`.

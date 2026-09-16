@@ -118,7 +118,20 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
       // effectively random per fetch for a customer with two devices.
       .order("activated_at", { ascending: true })
       .order("id", { ascending: true }),
-    supabase.from("profiles").select("market, account_type").eq("id", userId).maybeSingle(),
+    // `country`, not `market`. The column is named country and already holds
+    // the market code ('VN' | 'US' | 'MALAY') — see the app's useMarket().
+    // Selecting a column that does not exist makes PostgREST fail the whole
+    // row, which silently cost every customer their market AND every App
+    // Review account its bypass, so the error is logged rather than dropped.
+    supabase
+      .from("profiles")
+      .select("country, account_type")
+      .eq("id", userId)
+      .maybeSingle()
+      .then((r) => {
+        if (r.error) console.error("Unable to read the profile row", r.error);
+        return r;
+      }),
     // Which roadmap they actually bought. claim_user_access_contact grants the
     // whole catalog, so user_programs alone cannot tell — same RPC the app uses.
     supabase.rpc("get_default_product_for_contact").then((r) => ({ data: r.data as string | null })),
@@ -127,7 +140,7 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
   if (!programs?.length) return null;
   const program = programs.find((p) => p.product_id === defaultProductId) ?? programs[0];
 
-  const market = (profile as { market?: string } | null)?.market ?? null;
+  const market = (profile as { country?: string } | null)?.country ?? null;
   const isReviewAccount = (profile as { account_type?: string } | null)?.account_type === "review";
 
   const [{ data: product }, { data: days, error: dErr }, { data: mine }, { data: phases }, { data: pains }] =

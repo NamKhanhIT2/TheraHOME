@@ -224,13 +224,16 @@ export default function TrainingPage() {
       const session = data.session;
       setUserId(session?.user.id ?? null);
       if (!session) return;
-      // Name for the composer avatar, market for which store catalog to show.
-      const { data: profile } = await supabase
+      // Name for the composer avatar, country for which store catalog to show
+      // and which dialling code the activation panel preselects. The column is
+      // `country` and already holds the market code — see the app's useMarket.
+      const { data: profile, error } = await supabase
         .from("profiles")
-        .select("full_name, market")
+        .select("full_name, country")
         .eq("id", session.user.id)
         .maybeSingle();
-      setMe({ name: profile?.full_name || session.user.email || "", market: profile?.market ?? null });
+      if (error) console.error("Unable to read the profile row", error);
+      setMe({ name: profile?.full_name || session.user.email || "", market: profile?.country ?? null });
     })();
   }, []);
 
