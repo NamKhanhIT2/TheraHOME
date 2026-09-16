@@ -4236,6 +4236,20 @@ kể cả trong câu xác nhận. Các chuỗi này là KHOÁ ỔN ĐỊNH (`map
 nguyên, chỉ nhãn hiển thị được dịch. Thêm `countryOptionUS` thay vì dùng
 `countryNameUS`, vì lựa chọn này gồm cả EU và Anh chứ không riêng Hoa Kỳ.
 
-Còn để lại có chủ ý: tên giai đoạn, tên sản phẩm và nhãn "nội dung thêm" vẫn
-âm thầm lùi về tiếng Việt khi quản trị chưa dịch. Sửa đúng nghĩa là hiện dấu
-hiệu "chưa có bản dịch" trong WEB Admin, không phải đổi phía app.
+**WEB Admin giờ chỉ ra chỗ chưa dịch.** Trước đó không gì phân biệt "đã dịch"
+với "vẫn đang lùi về tiếng Việt", nên khoảng trống nằm im không ai thấy. Thêm
+`MissingTranslationNote` + `countMissing` vào `ui/primitives.tsx`, gắn vào
+"Nội dung ứng dụng" (kèm dòng tổng "Còn N ô chưa dịch") và danh sách thử thách.
+
+Câu chú thích cũ ở "Nội dung ứng dụng" ghi "để trống = dùng bản VN" **đã sai**
+sau khi đổi thứ tự ưu tiên: để trống giờ nghĩa là app dùng bản dịch sẵn có,
+chỉ khi không có mới lùi về VN. Đã sửa lại cho đúng.
+
+Đo trước khi sửa nên tránh được hai việc thừa: 13/14 ngày "thiếu nhãn nội dung
+thêm tiếng Anh" thực ra là **chưa bật** tính năng đó cho thị trường UK/ML (0/14
+ngày có link), và màn đó đã hiện "Đang ẩn" theo từng thị trường rồi. Hai chiến
+dịch upsell thiếu bản dịch là bản thử từ 03/09, đã gửi xong, và màn đó nay tự
+dịch nháp EN/MS khi tạo.
+
+Còn để lại có chủ ý: tên giai đoạn, tên sản phẩm vẫn lùi về tiếng Việt khi
+chưa dịch — hiện cả hai bảng đều đã dịch đủ (0 thiếu), nên chưa cần chỉ báo.

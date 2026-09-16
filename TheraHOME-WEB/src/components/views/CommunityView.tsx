@@ -27,7 +27,7 @@ import {
   type PostMarketContent,
   type PostModerationStatus,
 } from "@/lib/db";
-import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, Avatar, PillTabs, MarketSelect } from "@/components/ui/primitives";
+import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, Avatar, PillTabs, MarketSelect, MissingTranslationNote } from "@/components/ui/primitives";
 import { translateDrafts } from "@/lib/translate";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -125,7 +125,7 @@ function ChallengesAdminView() {
   }
   useEffect(reload, []);
 
-  async function handleCreate(input: { title: string; description: string; icon: string; targetStreakDays: number }) {
+  async function handleCreate(input: { title: string; titleEn: string; titleMs: string; description: string; descriptionEn: string; descriptionMs: string; icon: string; targetStreakDays: number }) {
     try {
       await createChallenge(input);
       setCreating(false);
@@ -150,7 +150,7 @@ function ChallengesAdminView() {
 
   return (
     <TableShell
-      subtitle="Thử thách xuất hiện dưới dạng banner đầu feed Cộng đồng khi đang hoạt động."
+      subtitle="Thử thách xuất hiện dưới dạng banner đầu feed Cộng đồng khi đang hoạt động. Thị trường nào chưa có bản dịch sẽ thấy bản tiếng Việt."
       action={<PrimaryBtn icon="plus" onClick={() => setCreating(true)}>Tạo thử thách</PrimaryBtn>}
       columns={["Thử thách", "Mục tiêu", "Trạng thái", "Người tham gia", "Hoàn thành", "Thao tác"]}
       modals={creating ? <NewChallengeModal onClose={() => setCreating(false)} onSave={handleCreate} /> : null}
@@ -161,7 +161,13 @@ function ChallengesAdminView() {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 18 }}>{c.icon}</span>
               <div>
-                <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{c.title}</div>
+                <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                  {c.title}
+                  {/* The banner falls back to Vietnamese for any market whose
+                      column is empty, which is invisible from here otherwise. */}
+                  {!c.titleEn?.trim() ? <MissingTranslationNote language="en" /> : null}
+                  {!c.titleMs?.trim() ? <MissingTranslationNote language="ms" /> : null}
+                </div>
                 {c.description ? <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{c.description}</div> : null}
               </div>
             </div>

@@ -113,6 +113,45 @@ export function FieldLabel({ children }: { children: ReactNode }) {
   return <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 6 }}>{children}</div>;
 }
 
+/** Marks a per-language field the admin has left empty.
+ *
+ * Every localized surface falls back silently when a translation is missing,
+ * which is correct behaviour but invisible from Admin: nothing distinguished
+ * "translated" from "still Vietnamese underneath", so gaps sat unnoticed (at
+ * the 2026-09-16 audit: 13 of 14 support-tools labels had no English, and 4 of
+ * 6 app_config rows had neither English nor Malay).
+ *
+ * Deliberately a quiet amber note, not an error: an empty field is a valid
+ * state, just one worth seeing.
+ */
+export function MissingTranslationNote({ language }: { language: "en" | "ms" }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        marginLeft: 8,
+        padding: "1px 7px",
+        borderRadius: 999,
+        background: "var(--warning-tint)",
+        color: "#9a5b12",
+        fontSize: 11,
+        fontWeight: 700,
+        verticalAlign: "middle",
+      }}
+    >
+      Chưa dịch {language === "en" ? "UK" : "ML"}
+    </span>
+  );
+}
+
+/** How many of `values` are blank — for a "còn N mục chưa dịch" summary above
+ * a list, so the admin sees the gap without opening every row. */
+export function countMissing(values: Array<string | null | undefined>): number {
+  return values.filter((v) => !v || !v.trim()).length;
+}
+
 /** Small pill-button tab switcher — the same visual convention already
  * used ad hoc throughout Admin/Care (product switcher, subTab rows, market
  * tabs), pulled out as one shared piece for the new per-market/per-language

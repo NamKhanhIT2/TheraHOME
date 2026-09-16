@@ -6,7 +6,7 @@
 // every install within a few minutes (mobile caches for 5 minutes; see
 // TheraHOME-APP/src/hooks/useAppConfig.ts), no new build required.
 import { useEffect, useState, type CSSProperties } from "react";
-import { SectionCard, PrimaryBtn, FieldLabel, inputStyle } from "@/components/ui/primitives";
+import { SectionCard, PrimaryBtn, FieldLabel, inputStyle, MissingTranslationNote, countMissing } from "@/components/ui/primitives";
 import { pushToast } from "@/components/ui/Toast";
 import { fetchAppConfig, saveAppConfig, type AppConfigRow } from "@/lib/db";
 
@@ -76,6 +76,10 @@ export function AppContentView() {
 
   if (!rows) return <div style={{ color: "var(--text-secondary)", padding: 20 }}>Đang tải...</div>;
 
+  const missingCount = countMissing(
+    rows.flatMap((r) => (FIELD_META[r.key]?.localized === false ? [] : [r.valueEn, r.valueMs])),
+  );
+
   return (
     <SectionCard
       title="Nội dung ứng dụng"
@@ -88,6 +92,15 @@ export function AppContentView() {
       <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
         Các nội dung hiển thị trong app mobile mà trước đây phải sửa code + phát hành lại mới đổi được.
         Sửa ở đây là app cập nhật ngay, không cần bản build mới.
+        <div style={{ marginTop: 6 }}>
+          Ô UK/ML để trống thì app dùng bản dịch sẵn có trong app; chỉ khi không có bản dịch nào
+          app mới lùi về bản VN. Điền vào đây là đè lên bản dịch sẵn.
+        </div>
+        {missingCount > 0 ? (
+          <div style={{ marginTop: 8, color: "#9a5b12", fontWeight: 600 }}>
+            Còn {missingCount} ô chưa dịch.
+          </div>
+        ) : null}
       </div>
       {rows.map((row) => {
         const meta = FIELD_META[row.key];
@@ -118,12 +131,24 @@ export function AppContentView() {
             {renderField(row.valueVi, (v) => update(row.key, { valueVi: v }), meta?.placeholder, { marginBottom: meta?.localized ? 10 : 0 })}
             {meta?.localized !== false ? (
               <div style={{ display: "flex", gap: 10 }}>
+                {/* The old caption promised "để trống = dùng bản VN". That is
+                    no longer what the app does: as of the 2026-09-16 fix an
+                    empty column falls back to the app's own translated string
+                    FIRST and only reaches the Vietnamese row if no translation
+                    is bundled for that key. Saying otherwise made admins think
+                    a blank field was a deliberate Vietnamese choice. */}
                 <div style={{ flex: 1 }}>
-                  <FieldLabel>Bản UK (để trống = dùng bản VN)</FieldLabel>
+                  <FieldLabel>
+                    Bản UK
+                    {!row.valueEn.trim() ? <MissingTranslationNote language="en" /> : null}
+                  </FieldLabel>
                   {renderField(row.valueEn, (v) => update(row.key, { valueEn: v }), row.valueVi)}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <FieldLabel>Bản ML (để trống = dùng bản VN)</FieldLabel>
+                  <FieldLabel>
+                    Bản ML
+                    {!row.valueMs.trim() ? <MissingTranslationNote language="ms" /> : null}
+                  </FieldLabel>
                   {renderField(row.valueMs, (v) => update(row.key, { valueMs: v }), row.valueVi)}
                 </div>
               </div>
