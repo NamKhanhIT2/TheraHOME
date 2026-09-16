@@ -1554,3 +1554,34 @@ Kiểm chứng:
   vẫn "đúng". Đã trả giá về `990.000₫` sau khi thử.
 - Trình soạn thảo nạp đúng giá trị thật từ DB (29 ô nhập, 10 ô văn bản).
 - RLS: `anon` SELECT được 7 dòng, `anon` UPSERT bị chặn `42501`.
+
+### Lỗi: đăng nhập Google/Apple ở màn mới không vào được (2026-09-16)
+
+Chủ dự án báo "chưa đăng nhập bằng apple/google được".
+
+Không phải lỗi cấu hình. Kiểm chứng trước khi sửa: gọi thẳng
+`/auth/v1/authorize` của Supabase với cả hai đường về (`/verify` cũ và
+`/dang-nhap` mới) × hai provider — **cả bốn đều 302 sang provider**, nghĩa là
+danh sách redirect cho phép cả hai. Đi tiếp một bước nữa: Google trả về trang
+đăng nhập thật (client_id hợp lệ, `redirect_uri` là callback của Supabase đã
+đăng ký), Apple trả trang 131 KB có form thật chứ không phải `invalid_client`.
+Vậy phía Google/Apple lành.
+
+Lỗi nằm trong `AuthPanel.tsx` của tôi: nó chỉ gọi `getSession()` **một lần lúc
+mount**. Khi trình duyệt quay về `/dang-nhap?code=…`, supabase-js mới *bắt đầu*
+đổi code lấy phiên, bất đồng bộ. Đọc phiên ngay khoảnh khắc đó ra null, effect
+kết thúc, và **không có gì chạy lại nữa** — khách đi Google về rồi lại nhìn thấy
+đúng cái form đăng nhập. Không có thông báo lỗi nào vì thật sự không có lỗi nào
+xảy ra; chỉ là không ai đợi.
+
+Màn `/verify` xưa nay vẫn `onAuthStateChange` — tôi port màn mới mà bỏ mất nửa
+đó. Đã thêm: `getSession()` cho trường hợp đã đăng nhập sẵn, `onAuthStateChange`
+cho trường hợp vừa đổi code xong.
+
+Thêm luôn: nếu provider trả về kèm `error`/`error_description` (khách bấm Huỷ,
+Apple từ chối…) thì hiện hẳn câu đó thay vì lặng lẽ vẽ lại form trống.
+
+Kiểm chứng: `/dang-nhap?error=access_denied&error_description=…` hiện đúng câu
+báo lỗi và form vẫn dùng được; tải sạch không báo lỗi giả. Phép thử cuối —
+bấm Google/Apple thật — cần chủ dự án chạy, tôi không gõ mật khẩu vào trình
+duyệt được.

@@ -82,15 +82,43 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   // Already signed in? Nothing on this screen applies — send them where they
   // belong. Also catches the OAuth return, which lands back here with a live
   // session rather than on a separate callback route.
+  // Already signed in, or just came back from Google/Apple.
+  //
+  // getSession() alone is NOT enough, and that is what broke OAuth here: when
+  // the browser lands back on /dang-nhap?code=…, supabase-js starts exchanging
+  // that code asynchronously. Reading the session at that instant returns null,
+  // the effect ends, and nothing ever runs again — so the customer came back
+  // from Google and just saw the login form again. onAuthStateChange is the
+  // half that catches the session once the exchange finishes; /verify has
+  // always subscribed to it, and this screen has to as well.
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session || cancelled) return;
+    async function goToDestination() {
+      if (cancelled) return;
       router.replace(await resolvePostSignInRoute());
-    })();
+    }
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session) {
+        void goToDestination();
+        return;
+      }
+      // No session and the provider sent us back with a complaint — say so
+      // rather than silently re-showing an empty form. Supabase puts it in the
+      // query string, or in the hash for the implicit flow.
+      const params = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const reason = params.get("error_description") ?? params.get("error") ?? hash.get("error_description") ?? hash.get("error");
+      if (reason) setError(`Đăng nhập không thành công: ${reason}`);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) void goToDestination();
+    });
     return () => {
       cancelled = true;
+      sub.subscription.unsubscribe();
     };
   }, [router]);
 
