@@ -62,9 +62,19 @@ export function useAppConfig() {
   const get = (key: AppConfigKey, fallback?: string): string => {
     const row = query.data?.find((r) => r.key === key);
     const localized = language === 'en' ? row?.value_en : language === 'ms' ? row?.value_ms : null;
-    // EN/MS override → VN → caller's localized fallback (e.g. an i18n string
-    // for a key the admin has not seeded) → the flat built-in default.
-    return (localized?.trim() || row?.value_vi?.trim() || fallback?.trim() || DEFAULTS[key]) as string;
+    // Vietnamese readers: the admin's VN row IS the content, so it outranks
+    // the bundled string — editing it in WEB Admin has to take effect.
+    if (language === 'vi') {
+      return (row?.value_vi?.trim() || fallback?.trim() || DEFAULTS[key]) as string;
+    }
+    // English/Malay readers: their own row first, then the caller's already
+    // translated `t()` fallback, and only then the Vietnamese row. The old
+    // order put value_vi ahead of the fallback, so a row the admin had seeded
+    // in Vietnamese only actively overrode perfectly good bundled English —
+    // an English UI showing Vietnamese copy (audit 2026-09-16). VN stays last
+    // rather than being dropped: for a key with no bundled fallback at all,
+    // Vietnamese text still beats an empty field.
+    return (localized?.trim() || fallback?.trim() || row?.value_vi?.trim() || DEFAULTS[key]) as string;
   };
 
   return { get, isLoading: query.isLoading };

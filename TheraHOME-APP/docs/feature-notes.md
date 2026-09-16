@@ -4201,3 +4201,41 @@ bóng của chính mình cũng rơi xuống dưới mép.
 `useSendChatMessage.onMutate` chèn bong bóng vào cache ngay lập tức,
 `onError` hoàn tác, `onSettled` invalidate. Cảm giác gửi tức thì đã đúng
 chuẩn từ trước; chỉ nửa nhận là hỏng.
+
+## 2026-09-16 — Ba thị trường: nội dung quản trị thôi rơi về tiếng Việt
+
+Bốn chỗ khiến người dùng EN/MS đọc tiếng Việt, tìm ra trong đợt rà soát trước
+phát hành.
+
+**Thứ tự ưu tiên của `useAppConfig.get()` bị ngược.** Cũ:
+`value_{lang} → value_vi → fallback → DEFAULTS`. Cột tiếng Việt trong database
+đứng TRƯỚC chuỗi `t()` mà nơi gọi đã dịch sẵn, nên một dòng quản trị chỉ điền
+tiếng Việt lại đè lên bản tiếng Anh có sẵn trong bundle. Bốn dòng `app_config`
+đang thiếu `value_en` tại thời điểm rà soát, tức lỗi đang xảy ra thật.
+
+Giờ tách theo ngôn ngữ: người đọc tiếng Việt vẫn lấy `value_vi` trước (sửa
+trong WEB Admin phải có tác dụng), người đọc EN/MS lấy
+`value_{lang} → fallback → value_vi → DEFAULTS`. Giữ `value_vi` ở cuối chứ
+không bỏ: với khoá không có chuỗi dịch sẵn nào, tiếng Việt vẫn hơn ô trống.
+
+**`challenges` không có chiều ngôn ngữ nào** — một cột `title`, một cột
+`description`, nên banner thử thách hiện đúng chuỗi quản trị gõ vào cho mọi
+thị trường, và không thể viết logic dự phòng vì không có biến thể để chọn.
+Migration `202609161200` thêm `title_en/title_ms/description_en/description_ms`
+(cho phép rỗng, thuần bổ sung, bản iOS 21 đang chờ duyệt không đọc tới).
+`useActiveChallenge` chọn theo ngôn ngữ rồi lùi về tiếng Việt, cùng quy tắc
+với bài viết chính thức. Form tạo thử thách trong WEB Admin có thêm ô EN/MS,
+bỏ trống thì dùng lại bản tiếng Việt.
+
+**Trục biểu đồ đau ghi `N1 N2 N3`** — `N` là "Ngày", cứng trong mã. Thêm khoá
+`dayAbbrev` (N/D/H).
+
+**Màn chọn quốc gia hiện thô `US/EU`, `VIET NAM`, `MALAY`** ở cả ba ngôn ngữ,
+kể cả trong câu xác nhận. Các chuỗi này là KHOÁ ỔN ĐỊNH (`mapSelection`,
+`marketForCountryOption`, và `profiles.country` suy ra từ chúng) nên giữ
+nguyên, chỉ nhãn hiển thị được dịch. Thêm `countryOptionUS` thay vì dùng
+`countryNameUS`, vì lựa chọn này gồm cả EU và Anh chứ không riêng Hoa Kỳ.
+
+Còn để lại có chủ ý: tên giai đoạn, tên sản phẩm và nhãn "nội dung thêm" vẫn
+âm thầm lùi về tiếng Việt khi quản trị chưa dịch. Sửa đúng nghĩa là hiện dấu
+hiệu "chưa có bản dịch" trong WEB Admin, không phải đổi phía app.

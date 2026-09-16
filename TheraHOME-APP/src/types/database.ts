@@ -181,36 +181,48 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          description_en: string | null
+          description_ms: string | null
           end_date: string | null
           icon: string
           id: string
           start_date: string
           target_streak_days: number
           title: string
+          title_en: string | null
+          title_ms: string | null
         }
         Insert: {
           active?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
+          description_en?: string | null
+          description_ms?: string | null
           end_date?: string | null
           icon?: string
           id?: string
           start_date?: string
           target_streak_days?: number
           title: string
+          title_en?: string | null
+          title_ms?: string | null
         }
         Update: {
           active?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
+          description_en?: string | null
+          description_ms?: string | null
           end_date?: string | null
           icon?: string
           id?: string
           start_date?: string
           target_streak_days?: number
           title?: string
+          title_en?: string | null
+          title_ms?: string | null
         }
         Relationships: []
       }
@@ -1179,6 +1191,8 @@ export type Database = {
       }
       product_activation_contacts: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           claimed_at: string | null
           claimed_by_user_id: string | null
           contact_type: string
@@ -1189,8 +1203,11 @@ export type Database = {
           normalized_value: string
           note: string | null
           product_id: string
+          source_order_id: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           claimed_at?: string | null
           claimed_by_user_id?: string | null
           contact_type: string
@@ -1201,8 +1218,11 @@ export type Database = {
           normalized_value: string
           note?: string | null
           product_id: string
+          source_order_id?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           claimed_at?: string | null
           claimed_by_user_id?: string | null
           contact_type?: string
@@ -1213,6 +1233,7 @@ export type Database = {
           normalized_value?: string
           note?: string | null
           product_id?: string
+          source_order_id?: string | null
         }
         Relationships: [
           {
@@ -1220,6 +1241,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_activation_contacts_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1539,6 +1567,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      site_content: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
       }
       store_categories: {
         Row: {
@@ -2067,6 +2113,10 @@ export type Database = {
       }
       current_web_roles: { Args: never; Returns: string[] }
       delete_account: { Args: never; Returns: undefined }
+      enqueue_order_activation_contacts: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
       format_community_notification: {
         Args: {
           p_actor_name: string

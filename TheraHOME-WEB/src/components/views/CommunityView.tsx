@@ -55,9 +55,13 @@ const AUTHOR_TABS: Array<[AuthorTab, string]> = [
   ["users", "Khác"],
 ];
 
-function NewChallengeModal({ onClose, onSave }: { onClose: () => void; onSave: (input: { title: string; description: string; icon: string; targetStreakDays: number }) => Promise<void> }) {
+function NewChallengeModal({ onClose, onSave }: { onClose: () => void; onSave: (input: { title: string; titleEn: string; titleMs: string; description: string; descriptionEn: string; descriptionMs: string; icon: string; targetStreakDays: number }) => Promise<void> }) {
   const [title, setTitle] = useState("");
+  const [titleEn, setTitleEn] = useState("");
+  const [titleMs, setTitleMs] = useState("");
   const [description, setDescription] = useState("");
+  const [descriptionEn, setDescriptionEn] = useState("");
+  const [descriptionMs, setDescriptionMs] = useState("");
   const [icon, setIcon] = useState("🔥");
   const [targetStreakDays, setTargetStreakDays] = useState(7);
 
@@ -66,7 +70,7 @@ function NewChallengeModal({ onClose, onSave }: { onClose: () => void; onSave: (
     if (!title.trim() || submitting) return;
     setSubmitting(true);
     try {
-      await onSave({ title: title.trim(), description: description.trim(), icon: icon.trim() || "🔥", targetStreakDays });
+      await onSave({ title: title.trim(), titleEn: titleEn.trim(), titleMs: titleMs.trim(), description: description.trim(), descriptionEn: descriptionEn.trim(), descriptionMs: descriptionMs.trim(), icon: icon.trim() || "🔥", targetStreakDays });
     } finally {
       setSubmitting(false);
     }
@@ -84,10 +88,20 @@ function NewChallengeModal({ onClose, onSave }: { onClose: () => void; onSave: (
         </Fragment>
       }
     >
-      <FieldLabel>Tiêu đề</FieldLabel>
+      <FieldLabel>Tiêu đề (Tiếng Việt)</FieldLabel>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ví dụ: Thử thách 7 ngày – Cổ nhẹ hơn mỗi ngày" style={{ ...inputStyle, marginBottom: 14 }} />
-      <FieldLabel>Mô tả (tùy chọn)</FieldLabel>
+      <FieldLabel>Mô tả (Tiếng Việt, tùy chọn)</FieldLabel>
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical", marginBottom: 14 }} />
+      {/* Bỏ trống thì thị trường đó dùng lại bản tiếng Việt ở trên, đúng như
+          cách bài viết chính thức đang làm. */}
+      <FieldLabel>Tiêu đề (English, tùy chọn)</FieldLabel>
+      <input value={titleEn} onChange={(e) => setTitleEn(e.target.value)} placeholder="7-day challenge" style={{ ...inputStyle, marginBottom: 14 }} />
+      <FieldLabel>Mô tả (English, tùy chọn)</FieldLabel>
+      <textarea value={descriptionEn} onChange={(e) => setDescriptionEn(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical", marginBottom: 14 }} />
+      <FieldLabel>Tiêu đề (Bahasa Melayu, tùy chọn)</FieldLabel>
+      <input value={titleMs} onChange={(e) => setTitleMs(e.target.value)} placeholder="Cabaran 7 hari" style={{ ...inputStyle, marginBottom: 14 }} />
+      <FieldLabel>Mô tả (Bahasa Melayu, tùy chọn)</FieldLabel>
+      <textarea value={descriptionMs} onChange={(e) => setDescriptionMs(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical", marginBottom: 14 }} />
       <div style={{ display: "flex", gap: 14 }}>
         <div style={{ flex: 1 }}>
           <FieldLabel>Emoji</FieldLabel>

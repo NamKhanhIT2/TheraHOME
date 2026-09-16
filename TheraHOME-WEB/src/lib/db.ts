@@ -1575,7 +1575,11 @@ export function theraAccountDeleteMessage(error: unknown): string {
 export interface Challenge {
   id: string;
   title: string;
+  titleEn: string | null;
+  titleMs: string | null;
   description: string | null;
+  descriptionEn: string | null;
+  descriptionMs: string | null;
   icon: string;
   targetStreakDays: number;
   active: boolean;
@@ -1586,7 +1590,7 @@ export interface Challenge {
 
 export async function fetchChallenges(): Promise<Challenge[]> {
   const [{ data: challenges, error: cErr }, { data: participants, error: pErr }] = await Promise.all([
-    supabase.from("challenges").select("id, title, description, icon, target_streak_days, active, created_at").order("created_at", { ascending: false }),
+    supabase.from("challenges").select("id, title, title_en, title_ms, description, description_en, description_ms, icon, target_streak_days, active, created_at").order("created_at", { ascending: false }),
     supabase.from("challenge_participants").select("challenge_id, completed_at"),
   ]);
   if (cErr) throw cErr;
@@ -1597,7 +1601,11 @@ export async function fetchChallenges(): Promise<Challenge[]> {
     return {
       id: c.id,
       title: c.title,
+      titleEn: c.title_en,
+      titleMs: c.title_ms,
       description: c.description,
+      descriptionEn: c.description_en,
+      descriptionMs: c.description_ms,
       icon: c.icon,
       targetStreakDays: c.target_streak_days,
       active: c.active,
@@ -1608,10 +1616,26 @@ export async function fetchChallenges(): Promise<Challenge[]> {
   });
 }
 
-export async function createChallenge(input: { title: string; description: string; icon: string; targetStreakDays: number }) {
+// The EN/MS fields are optional: an empty one falls back to the Vietnamese
+// original in the app (migration 202609161200). Leaving them out entirely was
+// the old behaviour, which shipped Vietnamese banners to every market.
+export async function createChallenge(input: {
+  title: string;
+  titleEn?: string;
+  titleMs?: string;
+  description: string;
+  descriptionEn?: string;
+  descriptionMs?: string;
+  icon: string;
+  targetStreakDays: number;
+}) {
   const { error } = await supabase.from("challenges").insert({
     title: input.title,
+    title_en: input.titleEn?.trim() || null,
+    title_ms: input.titleMs?.trim() || null,
     description: input.description || null,
+    description_en: input.descriptionEn?.trim() || null,
+    description_ms: input.descriptionMs?.trim() || null,
     icon: input.icon || "🔥",
     target_streak_days: input.targetStreakDays,
   });

@@ -91,7 +91,9 @@ export function PainChart({ data }: PainChartProps) {
   const start = total - windowSize;
   const windowData = data.slice(start).map((p) => p.score);
   const isEmpty = windowData.length === 0;
-  const labels = data.slice(start).map((p) => `N${p.day}`);
+  // 'N' is Vietnamese for Ngày. Hardcoding it put N1 N2 N3 on the chart for
+  // English and Malay readers too; the dictionary carries D/H for them.
+  const labels = data.slice(start).map((p) => `${t('dayAbbrev')}${p.day}`);
   const scrollable = windowSize > 7;
 
   const H = 130;

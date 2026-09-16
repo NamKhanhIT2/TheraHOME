@@ -9,7 +9,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { OptionCard } from '@/components/ui/OptionCard';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, type TranslationKey } from '@/lib/i18n';
 import { marketForCountryOption } from '@/hooks/useMarket';
 
 /** Gated by RootNavigator's countryPending (app/_layout.tsx) — shown once,
@@ -21,6 +21,17 @@ import { marketForCountryOption } from '@/hooks/useMarket';
  * or re-shown incorrectly across devices. Two steps — pick, then a
  * dedicated confirm step — since region/language is hard to change
  * correctly later and the user explicitly asked for a second confirmation. */
+/** The option strings are STABLE KEYS — `mapSelection` and
+ * `marketForCountryOption` both switch on them, and `profiles.country` is
+ * derived from them — so they stay raw and only the on-screen label is
+ * translated. Before this, every language rendered the raw 'US/EU',
+ * 'VIET NAM', 'MALAY' tokens, including in the confirmation sentence. */
+const OPTION_LABEL_KEY: Record<string, TranslationKey> = {
+  'US/EU': 'countryOptionUS',
+  'VIET NAM': 'countryNameVN',
+  MALAY: 'countryNameMY',
+};
+
 export default function CountryScreen() {
   const theme = useTheme();
   const { t, language } = useI18n();
@@ -30,6 +41,10 @@ export default function CountryScreen() {
   const setLanguage = useAppStore((s) => s.setLanguage);
   const question = countryQuestion[language];
   const [selected, setSelected] = useState<string | null>(null);
+  const optionLabel = (option: string) => {
+    const key = OPTION_LABEL_KEY[option];
+    return key ? t(key) : option;
+  };
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -68,7 +83,7 @@ export default function CountryScreen() {
             {t('countryConfirmTitle')}
           </Text>
           <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
-            {t('countryConfirmBody', { value: selected })}
+            {t('countryConfirmBody', { value: optionLabel(selected) })}
           </Text>
         </View>
         <View style={styles.footer}>
@@ -92,7 +107,7 @@ export default function CountryScreen() {
         ) : null}
         <View style={styles.options}>
           {question.options.map((opt) => (
-            <OptionCard key={opt} label={opt} active={selected === opt} onPress={() => setSelected(opt)} />
+            <OptionCard key={opt} label={optionLabel(opt)} active={selected === opt} onPress={() => setSelected(opt)} />
           ))}
         </View>
       </View>

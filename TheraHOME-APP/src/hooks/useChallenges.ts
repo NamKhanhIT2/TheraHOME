@@ -5,6 +5,7 @@
 // trusted client-side.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { useAppStore } from '@/store/useAppStore';
 
 export interface ActiveChallenge {
   id: string;
@@ -15,22 +16,29 @@ export interface ActiveChallenge {
 }
 
 export function useActiveChallenge() {
+  // The banner used to render the admin's Vietnamese string to every reader,
+  // because the table had no language columns at all. Same fallback rule as
+  // official community posts: the reader's own column, else the Vietnamese
+  // original (migration 202609161200).
+  const language = useAppStore((state) => state.language);
   return useQuery({
-    queryKey: ['active_challenge'],
+    queryKey: ['active_challenge', language],
     queryFn: async (): Promise<ActiveChallenge | null> => {
       const { data, error } = await supabase
         .from('challenges')
-        .select('id, title, description, icon, target_streak_days')
+        .select('id, title, title_en, title_ms, description, description_en, description_ms, icon, target_streak_days')
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
+      const pick = (en: string | null, ms: string | null, vi: string | null) =>
+        (language === 'en' ? en?.trim() : language === 'ms' ? ms?.trim() : null) || vi;
       return {
         id: data.id,
-        title: data.title,
-        description: data.description,
+        title: pick(data.title_en, data.title_ms, data.title) ?? data.title,
+        description: pick(data.description_en, data.description_ms, data.description),
         icon: data.icon,
         targetStreakDays: data.target_streak_days,
       };
