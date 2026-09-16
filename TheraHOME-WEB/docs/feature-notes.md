@@ -1621,3 +1621,42 @@ Sửa hai lớp:
    không phải đệm phòng thân: màn hình vừa treo vô hạn vì không có gì để rơi
    về. Quá hạn thì coi như khách thường và về "/" — nhân viên gặp timeout vẫn
    vào được trang chủ rồi thử lại, tốt hơn hẳn một vòng xoay bất tận.
+
+### Đăng nhập Google/Apple trên web: lỗi cấu hình, không phải code (2026-09-16)
+
+Console của chủ dự án cho câu trả lời dứt khoát:
+
+```
+Failed to launch 'exp://192.168.88.170:8081#access_token=eyJhbGciOi…'
+because the scheme does not have a registered handler.
+```
+
+Token đã được cấp thành công — chỉ là bị ném sang một địa chỉ không tồn tại.
+
+Dò bằng `/auth/v1/verify?token=bogus&type=signup&redirect_to=…` (trả về đúng
+`redirect_to` khi được phép, rơi về Site URL khi không) — **không cần thông tin
+đăng nhập nào**. Kết quả trước khi sửa:
+
+| Đường về | |
+|---|---|
+| `therahome://auth/callback` | ✅ |
+| `https://ad.therahomeai.com/dang-nhap` | ❌ rơi về `exp://192.168.88.170:8081` |
+| `https://ad.therahomeai.com/verify` | ❌ như trên |
+| (không truyền) → Site URL | `exp://192.168.88.170:8081` |
+
+Tức **đăng nhập Google/Apple trên web chưa bao giờ chạy** — kể cả màn `/welcome`
+cũ, không riêng màn mới. Site URL trỏ vào máy chạy Expo trong LAN, di tích của
+một phiên dev nào đó.
+
+Chủ dự án đã sửa trong dashboard (Authentication → URL Configuration): thêm
+`https://ad.therahomeai.com/**` vào Redirect URLs và đổi Site URL thành
+`https://ad.therahomeai.com`. Dò lại: cả bốn đường đều ALLOWED, app mobile
+không suy suyển vì nó luôn gửi kèm `redirect_to` của riêng nó.
+
+Việc đổi Site URL còn sửa một chỗ hỏng âm thầm: mọi email Supabase gửi (xác
+nhận tài khoản, đặt lại mật khẩu) lấy Site URL làm link, nên trước đó chúng trỏ
+vào máy cá nhân. Chưa ai dính vì 50 tài khoản đều đã xác nhận sẵn.
+
+**Bài học cho lần sau:** thêm một route auth mới trên web thì phải thêm URL đó
+vào Redirect URLs — không có gì trong repo báo cho bạn biết, và triệu chứng
+(quay về trang trắng / lỗi scheme) trông y hệt lỗi code.
