@@ -1692,3 +1692,28 @@ không tràn ngang.
 `useLandingSession` cũng `await` lời gọi supabase ngay trong
 `onAuthStateChange`. Nav này có mặt trên mọi trang công khai, nên đã hoãn bằng
 `setTimeout` như `AuthPanel`.
+
+### Google không hiện màn "Chọn tài khoản" (2026-09-16)
+
+Chủ dự án bấm Google thì vào thẳng, không thấy màn chọn tài khoản. Google bỏ
+qua bước đó khi trình duyệt chỉ có đúng một phiên — hành vi mặc định, không
+phải lỗi.
+
+Đã thêm `queryParams: { prompt: "select_account" }` cho **cả hai cửa web**:
+`AuthPanel` (`/dang-nhap`, `/dang-ky`) và `signInWithGoogle()` (`/welcome`,
+cửa nội bộ). Ở cửa nội bộ nó còn quan trọng hơn: chuyên viên CSKH dùng máy
+chung phải chọn được tài khoản.
+
+**Apple không thêm**, vì Sign in with Apple không có tham số tương đương — nó
+tự quản màn chọn của mình. Đoán bừa một tham số lạ cho Apple chỉ tổ sinh lỗi.
+
+Kiểm chứng ở tầng thật, không chỉ đọc code: gọi `/auth/v1/authorize` hai lần và
+so URL Google trả về — không truyền thì `prompt` vắng mặt, truyền thì
+`prompt=select_account` có trong URL sang `accounts.google.com`.
+
+**Kèm một điểm cần ghi để khỏi tưởng là lỗi:** đăng nhập Google bằng
+`hoankenny2002@gmail.com` rơi về trang chủ là **đúng**. Tài khoản Google đó
+hiện `web_access_contacts.roles = []`, tức không còn là nhân viên; quyền admin
+nằm ở tài khoản TheraHOME `hoankenny@therahomeai.com` (`account_type='admin'`),
+đăng nhập bằng email + mật khẩu. CLAUDE.md vẫn ghi hai địa chỉ Gmail là
+"provisioned admins" — mô tả đó đã cũ so với dữ liệu thật.

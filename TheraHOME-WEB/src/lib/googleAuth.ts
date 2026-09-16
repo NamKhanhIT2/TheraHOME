@@ -9,7 +9,13 @@ import { supabase } from "./supabase";
 export async function signInWithGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${window.location.origin}/verify` },
+    options: {
+      redirectTo: `${window.location.origin}/verify`,
+      // prompt=select_account so the chooser always appears — see the same
+      // note in AuthPanel.tsx. It matters more here: this is the staff door,
+      // and a specialist on a shared machine must be able to pick.
+      queryParams: { prompt: "select_account" },
+    },
   });
   if (error) throw error;
   // On success the browser navigates away to Google immediately — nothing

@@ -130,9 +130,14 @@ here still applies.)
      client RLS access** — looked up only through a `SECURITY DEFINER` RPC
      callable by `authenticated`, so a client can't `select *` the whole
      contact list.
-   - **Provisioned admins**: `khanha1k59@gmail.com` / `0395581037` and
-     `hoankenny2002@gmail.com` / `0328552894`. Migration preserves any
-     existing roles on these rows and ensures `admin` is present.
+   - **Provisioned admins**: originally `khanha1k59@gmail.com` /
+     `0395581037` and `hoankenny2002@gmail.com` / `0328552894`. **Both rows
+     now carry `roles = []`** (checked against production 2026-09-16), so
+     signing in with either Google account lands on the public site as an
+     ordinary customer — that is correct, not a bug. Admin today is the
+     TheraHOME account `hoankenny@therahomeai.com`
+     (`profiles.account_type = 'admin'`), which `current_web_roles()` resolves
+     from the account type rather than from a contact row.
    - No match → access-denied state. No self-serve path — rows are added
      manually for this phase (an actual signup/provisioning flow is public
      Web App scope, not this one).

@@ -222,7 +222,16 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       // one-door model instead of a second callback page.
       const { error: e } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: `${window.location.origin}/dang-nhap` },
+        options: {
+          redirectTo: `${window.location.origin}/dang-nhap`,
+          // Always let the person pick which Google account. Without this,
+          // Google silently reuses the one session it already has and the
+          // press appears to do nothing but navigate — which is wrong on a
+          // shared computer, and wrong for anyone with a work and a personal
+          // address. Apple has no equivalent parameter; it manages its own
+          // chooser, so the option is Google-only rather than guessed at.
+          ...(provider === "google" ? { queryParams: { prompt: "select_account" } } : {}),
+        },
       });
       if (e) throw e;
       // The browser navigates away on success; nothing more happens here.
