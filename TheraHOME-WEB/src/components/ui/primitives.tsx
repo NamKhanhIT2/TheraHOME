@@ -131,7 +131,6 @@ export function MissingTranslationNote({ language }: { language: "en" | "ms" }) 
         display: "inline-flex",
         alignItems: "center",
         gap: 4,
-        marginLeft: 8,
         padding: "1px 7px",
         borderRadius: 999,
         background: "var(--warning-tint)",
@@ -139,6 +138,9 @@ export function MissingTranslationNote({ language }: { language: "en" | "ms" }) 
         fontSize: 11,
         fontWeight: 700,
         verticalAlign: "middle",
+        // Without this the two words break one per line inside a narrow table
+        // cell and stretch the whole row (seen on the challenges list).
+        whiteSpace: "nowrap",
       }}
     >
       Chưa dịch {language === "en" ? "UK" : "ML"}

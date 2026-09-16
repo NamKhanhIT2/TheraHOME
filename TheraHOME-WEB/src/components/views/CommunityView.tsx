@@ -161,13 +161,17 @@ function ChallengesAdminView() {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 18 }}>{c.icon}</span>
               <div>
-                <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                  {c.title}
-                  {/* The banner falls back to Vietnamese for any market whose
-                      column is empty, which is invisible from here otherwise. */}
-                  {!c.titleEn?.trim() ? <MissingTranslationNote language="en" /> : null}
-                  {!c.titleMs?.trim() ? <MissingTranslationNote language="ms" /> : null}
-                </div>
+                <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{c.title}</div>
+                {/* The banner falls back to Vietnamese for any market whose
+                    column is empty, which is invisible from here otherwise.
+                    On their own line: inline after the title they widened this
+                    cell enough to squeeze every other column of the table. */}
+                {!c.titleEn?.trim() || !c.titleMs?.trim() ? (
+                  <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                    {!c.titleEn?.trim() ? <MissingTranslationNote language="en" /> : null}
+                    {!c.titleMs?.trim() ? <MissingTranslationNote language="ms" /> : null}
+                  </div>
+                ) : null}
                 {c.description ? <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{c.description}</div> : null}
               </div>
             </div>

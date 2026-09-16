@@ -139,15 +139,19 @@ export function AppContentView() {
                     a blank field was a deliberate Vietnamese choice. */}
                 <div style={{ flex: 1 }}>
                   <FieldLabel>
-                    Bản UK
-                    {!row.valueEn.trim() ? <MissingTranslationNote language="en" /> : null}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      Bản UK
+                      {!row.valueEn.trim() ? <MissingTranslationNote language="en" /> : null}
+                    </span>
                   </FieldLabel>
                   {renderField(row.valueEn, (v) => update(row.key, { valueEn: v }), row.valueVi)}
                 </div>
                 <div style={{ flex: 1 }}>
                   <FieldLabel>
-                    Bản ML
-                    {!row.valueMs.trim() ? <MissingTranslationNote language="ms" /> : null}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      Bản ML
+                      {!row.valueMs.trim() ? <MissingTranslationNote language="ms" /> : null}
+                    </span>
                   </FieldLabel>
                   {renderField(row.valueMs, (v) => update(row.key, { valueMs: v }), row.valueVi)}
                 </div>
