@@ -141,7 +141,7 @@ export function AppContentView() {
                   <FieldLabel>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                       Bản UK
-                      {!row.valueEn.trim() ? <MissingTranslationNote language="en" /> : null}
+                      {!row.valueEn.trim() ? <MissingTranslationNote languages={["en"]} /> : null}
                     </span>
                   </FieldLabel>
                   {renderField(row.valueEn, (v) => update(row.key, { valueEn: v }), row.valueVi)}
@@ -150,7 +150,7 @@ export function AppContentView() {
                   <FieldLabel>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                       Bản ML
-                      {!row.valueMs.trim() ? <MissingTranslationNote language="ms" /> : null}
+                      {!row.valueMs.trim() ? <MissingTranslationNote languages={["ms"]} /> : null}
                     </span>
                   </FieldLabel>
                   {renderField(row.valueMs, (v) => update(row.key, { valueMs: v }), row.valueVi)}

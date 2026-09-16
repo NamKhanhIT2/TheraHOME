@@ -113,7 +113,9 @@ export function FieldLabel({ children }: { children: ReactNode }) {
   return <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 6 }}>{children}</div>;
 }
 
-/** Marks a per-language field the admin has left empty.
+/** Marks the languages an admin has left empty, as ONE pill ("Chưa dịch
+ * UK · ML") rather than one pill per language — two side by side widened the
+ * challenges table's first column enough to push its last column out of view.
  *
  * Every localized surface falls back silently when a translation is missing,
  * which is correct behaviour but invisible from Admin: nothing distinguished
@@ -124,7 +126,8 @@ export function FieldLabel({ children }: { children: ReactNode }) {
  * Deliberately a quiet amber note, not an error: an empty field is a valid
  * state, just one worth seeing.
  */
-export function MissingTranslationNote({ language }: { language: "en" | "ms" }) {
+export function MissingTranslationNote({ languages }: { languages: Array<"en" | "ms"> }) {
+  if (languages.length === 0) return null;
   return (
     <span
       style={{
@@ -143,7 +146,7 @@ export function MissingTranslationNote({ language }: { language: "en" | "ms" }) 
         whiteSpace: "nowrap",
       }}
     >
-      Chưa dịch {language === "en" ? "UK" : "ML"}
+      Chưa dịch {languages.map((l) => (l === "en" ? "UK" : "ML")).join(" · ")}
     </span>
   );
 }
