@@ -1,30 +1,15 @@
-// Home — "Hero Section.dc.html".
+// Home.
 //
-// The hero art is the design's own two-layer treatment of one image: a blurred,
-// over-scaled copy fills the frame so the edges never show, and a contained
-// copy sits on top, feathered on all four sides by two crossed mask gradients.
-// Note the three.js hero experiments in the same design project
-// (hero-scene.js, hero-object3d.js, hero-anatomy.js) are NOT wired into this
-// page — the shipped hero is this image pair.
+// The opening is "Home Cinematic.dc.html" — a scroll-driven camera journey
+// through the TheraHOME house (src/components/landing/CinematicHero.tsx). It
+// replaced the "Hero Section.dc.html" image hero on 2026-09-17 at the owner's
+// request. The sections below it are still Hero Section's.
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { LandingButton } from "@/components/landing/LandingButton";
-import { SafeImg } from "@/components/landing/SafeImg";
+import { CinematicHero } from "@/components/landing/CinematicHero";
 import { getSiteContent } from "@/lib/siteContent";
 import { LandingFooter } from "@/components/landing/LandingFooter";
-
-const HERO_BG = "/landing/hero-bg.png";
-
-/** Feather all four edges of the contained hero image. Two gradients crossed
- * with mask-composite, exactly as the design specifies. */
-const heroMask: CSSProperties = {
-  WebkitMaskImage:
-    "linear-gradient(90deg, transparent 0, #000 3.5%, #000 96.5%, transparent 100%), linear-gradient(180deg, transparent 0, #000 3.5%, #000 96.5%, transparent 100%)",
-  WebkitMaskComposite: "source-in",
-  maskImage:
-    "linear-gradient(90deg, transparent 0, #000 3.5%, #000 96.5%, transparent 100%), linear-gradient(180deg, transparent 0, #000 3.5%, #000 96.5%, transparent 100%)",
-  maskComposite: "intersect",
-};
 
 const section: CSSProperties = {
   position: "relative",
@@ -59,8 +44,7 @@ const h2: CSSProperties = {
   textWrap: "pretty",
 };
 
-// HERO_STATS and RESULTS now come from site_content — see src/lib/siteContent.ts.
-const HERO_LINES = ["Chăm cột sống", "theo lộ trình,", "không theo cảm tính."];
+// HERO_STATS and RESULTS come from site_content — see src/lib/siteContent.ts.
 
 
 const PILLARS = [
@@ -84,45 +68,21 @@ export default async function HomePage() {
   const { stats_hero: HERO_STATS, stats_results: RESULTS } = await getSiteContent();
   return (
     <>
-      {/* ------------------------------------------------------ brand hero */}
-      <section style={{ position: "relative", overflow: "hidden", isolation: "isolate", boxSizing: "border-box", width: "100%", maxWidth: "100%", minHeight: "calc(100svh - var(--nav-h, 84px))", display: "flex", alignItems: "center", padding: "clamp(24px, 4vh, 56px) clamp(20px, 4vw, 64px)" }}>
-        <SafeImg src={HERO_BG} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "68% 50%", filter: "blur(38px) saturate(1.04)", transform: "scale(1.12)" }} />
-        <SafeImg src={HERO_BG} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", objectPosition: "50% 50%", ...heroMask }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, rgba(2,3,11,0.93) 0%, rgba(2,3,11,0.84) 30%, rgba(2,3,11,0.5) 56%, rgba(2,3,11,0.1) 100%)" }} />
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 55% 55% at 74% 45%, rgba(0,127,217,0.16), rgba(0,0,0,0) 70%)", pointerEvents: "none" }} />
+      {/* ------------------------------------------- cinematic opening */}
+      <CinematicHero />
 
-        <div style={{ position: "relative", maxWidth: 1240, margin: "0 auto", width: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "clamp(36px, 5vw, 80px)" }}>
-          <div style={{ flex: "1 1 420px", maxWidth: "min(620px, 56%)", minWidth: 0, display: "flex", flexDirection: "column", gap: "clamp(20px, 2.2vh, 30px)" }}>
-            <span style={{ fontSize: "clamp(12.5px, 1.05vw, 15px)", fontWeight: 600, letterSpacing: "0.13em", textTransform: "uppercase", color: "#8FCBFF", animation: "landingFade 1s cubic-bezier(0.16,1,0.3,1) .2s both" }}>
-              Bộ giải pháp chủ động ngay tại nhà
-            </span>
-
-            <h1 style={{ margin: 0, fontSize: "clamp(32px, 3.9vw, 58px)", fontWeight: 600, lineHeight: 1.06, letterSpacing: "-0.034em", color: "#fff", maxWidth: "15ch", textWrap: "pretty" }}>
-              {HERO_LINES.map((line, i) => (
-                <span key={line} style={{ display: "block", overflow: "hidden", paddingBottom: "0.06em" }}>
-                  <span style={{ display: "block", animation: `landingLine 1.1s cubic-bezier(0.16,1,0.3,1) ${0.35 + i * 0.13}s both` }}>{line}</span>
-                </span>
-              ))}
-            </h1>
-
-            <p style={{ margin: 0, maxWidth: 470, fontSize: "clamp(16px, 1.25vw, 18px)", lineHeight: 1.6, letterSpacing: "-0.006em", color: "rgba(255,255,255,0.7)", animation: "landingFade 1s cubic-bezier(0.16,1,0.3,1) .9s both" }}>
-              TheraHome kết hợp thiết bị trị liệu, ứng dụng TheraAI và đội ngũ đồng hành, để việc phục hồi tại nhà có hướng đi rõ ràng thay vì làm theo cảm tính.
-            </p>
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, animation: "landingFade 1s cubic-bezier(0.16,1,0.3,1) 1.1s both" }}>
-              <LandingButton href="/san-pham">Xem sản phẩm</LandingButton>
-              <LandingButton href="/ung-dung" variant="secondary">Ứng dụng TheraAI</LandingButton>
+      {/* The three headline numbers used to sit inside the hero. The cinematic
+          opening has no room for them and the design drops them, but they are
+          admin-edited (Nội dung website) and the owner's, so they keep a band
+          of their own right after the journey. */}
+      <section style={{ ...section, paddingTop: "clamp(40px, 6vh, 64px)", paddingBottom: "clamp(40px, 6vh, 64px)" }}>
+        <div style={{ maxWidth: 1240, margin: "0 auto", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "clamp(32px, 6vw, 96px)" }}>
+          {HERO_STATS.map((s) => (
+            <div key={s.value} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, textAlign: "center" }}>
+              <span style={{ fontSize: "clamp(26px, 2.4vw, 34px)", fontWeight: 600, letterSpacing: "-0.022em", color: "#fff" }}>{s.value}</span>
+              <span style={{ fontSize: 13.5, color: "rgba(255,255,255,0.68)" }}>{s.label}</span>
             </div>
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 32, paddingTop: 8, animation: "landingFade 1s cubic-bezier(0.16,1,0.3,1) 1.3s both" }}>
-              {HERO_STATS.map((s) => (
-                <div key={s.value} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ fontSize: "clamp(22px, 1.9vw, 27px)", fontWeight: 600, letterSpacing: "-0.022em", color: "#fff" }}>{s.value}</span>
-                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.68)" }}>{s.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 

@@ -519,3 +519,64 @@ body:has(.landing-root) {
     width: 100%;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Home: cinematic opening (Home Cinematic.dc.html)                     */
+/* Static rules only — the scroll choreography is                       */
+/* public/landing/cinematic-scroll.js, which writes inline styles.      */
+.landing-root .cine-cta {
+  transition: background 200ms ease-out, transform 200ms ease-out;
+}
+.landing-root .cine-cta:hover {
+  background: #0069b3 !important;
+  color: #fff;
+}
+.landing-root .cine-cta:active {
+  transform: scale(0.97);
+}
+.landing-root .cine-cta-ghost {
+  transition: border-color 200ms ease-out, background 200ms ease-out;
+}
+.landing-root .cine-cta-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff;
+}
+.landing-root [data-cine-step] > span:first-child {
+  transition: background 300ms ease-out, box-shadow 300ms ease-out, border-color 300ms ease-out;
+}
+.landing-root [data-cine-step][data-active="true"] > span:first-child {
+  background: #007fd9;
+  border-color: #007fd9;
+  box-shadow: 0 0 0 4px rgba(0, 127, 217, 0.22), 0 0 18px rgba(0, 127, 217, 0.85);
+}
+.landing-root [data-cine-step][data-done="true"] > span:first-child {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: transparent;
+}
+.landing-root [data-cine-copy] > * {
+  will-change: opacity, transform;
+}
+/* The opening lines arrive on their own before any scroll happens. */
+@keyframes cineIntro {
+  from { opacity: 0; transform: translateY(24px); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.landing-root [data-cine-copy="1"] > * {
+  animation: cineIntro 950ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.landing-root [data-cine-copy="1"] > *:nth-child(1) { animation-delay: 250ms; }
+.landing-root [data-cine-copy="1"] > *:nth-child(2) { animation-delay: 390ms; }
+.landing-root [data-cine-copy="1"] > *:nth-child(3) { animation-delay: 530ms; }
+.landing-root [data-cine-copy="1"] > *:nth-child(4) { animation-delay: 670ms; }
+/* The shared nav goes transparent over the opening frame; ease the change. */
+.landing-root [data-cine-nav] {
+  transition: background 320ms ease-out, border-color 320ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-root [data-cine-copy="1"] > * { animation: none; }
+}
+@media (max-width: 759px) {
+  .landing-root .cine-rail { left: 14px !important; }
+  .landing-root .cine-copy { left: 44px !important; right: 20px !important; max-width: none !important; }
+}

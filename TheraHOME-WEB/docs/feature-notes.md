@@ -1765,3 +1765,50 @@ trỏ vào hằng `AFTER_SIGN_OUT`.
 **Không đổi chỗ thứ ba**: người vào thẳng `/admin` mà chưa có phiên vẫn bị đẩy
 sang `/welcome`. Người đó đang muốn *vào*, họ cần màn đăng nhập chứ không phải
 trang giới thiệu. Chỉ lối *ra* mới đổi.
+
+### Trang chủ: mở đầu cinematic (2026-09-17)
+
+Chủ dự án: *"trang Home tôi muốn thay đổi phần đầu tạo cảm giác cinematic"*,
+kèm file mới trong design project — `Home Cinematic.dc.html`.
+
+Port thành `CinematicHero.tsx` + `public/landing/cinematic-scroll.js`. Một
+đường cuộn 640vh (420vh trên điện thoại) với sân khấu dính 100vh: cuộn tới
+đâu, "máy quay" đi tới đó qua bốn khung — ngoại cảnh hoàng hôn → cửa kính mở →
+sảnh → phòng tập — sáu khối chữ hiện rồi tan theo một thanh tiến độ bên trái.
+Khung hình cũ (`Hero Section.dc.html`, ảnh + mặt nạ hai lớp) bị thay; các
+section bên dưới vẫn là của Hero Section.
+
+**Bốn khung là ảnh của chủ dự án**, không phải của design: ảnh trong design
+project vượt mức 256 KiB của DesignSync như mọi ảnh khác. Tìm thấy trong
+`~/Downloads` bốn file `ChatGPT Image 16_40_29/40/50/58` sinh liên tiếp đúng
+thứ tự máy quay — lần này dùng `find` theo đúng bài học hôm trước, không `ls`.
+
+**Script chép gần nguyên văn** (lý do như `hero-scroll.js`: choreography dày,
+diễn giải lại là lệch). Hai chỗ khác, đánh dấu `NEXT` trong file:
+
+- Design vẽ nav của riêng nó bằng màu cố định. Ở đây nav dùng chung cho mọi
+  trang công khai và đã có kính mờ sẵn, nên script chỉ làm nó **trong suốt khi
+  ở đầu trang** rồi *trả lại* đúng inline style cũ khi cuộn xuống — và trả lại
+  cả khi element unmount, vì trong Next nav sống lâu hơn trang.
+- Nhánh video giữ nguyên nhưng không dùng: design mô tả footage
+  `approach.mp4` mà HTML không hề chứa.
+
+`fill.png` của design (nền sau các khung `object-fit: contain`, che dải đen
+khi viewport không phải 16:9) không kéo được → dùng chính khung ngoại cảnh, làm
+mờ và tối bằng CSS, đúng cách hero cũ làm nền.
+
+Ba con số ở đầu trang chủ (admin sửa được ở Nội dung website) không có chỗ
+trong đoạn cinematic và design bỏ hẳn; tôi giữ chúng thành một dải riêng ngay
+sau hành trình, vì đó là số của chủ dự án và có người đang sửa.
+
+`LandingNav` để lại một spacer 84px dưới thanh cố định — mọi trang khác cần,
+trang này thì không: track được kéo lên `margin-top: -84px` để khung đầu chạy
+dưới nav trong suốt, đúng như design.
+
+Kiểm chứng trên dev: element được đăng ký, track = 6,4 × viewport, sân khấu
+dính ở `top: 0`, bốn plate tải xong; cuộn tới 62% → scene 4, plate sảnh
+opacity 1, khối chữ 4 hiện, mốc 4 sáng; ở đầu trang: scene 1, nav inline
+`transparent`. **Không chụp được ảnh giữa hành trình**: Browser pane đang ẩn
+(`document.visibilityState === "hidden"`), transition CSS đứng ở t=0 và
+screenshot trả về khung đen — giới hạn của môi trường xem, không phải lỗi.
+Ảnh đầu trang chụp được và đúng.

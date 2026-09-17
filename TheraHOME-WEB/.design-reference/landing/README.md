@@ -26,6 +26,7 @@ Pull and diff against the live project rather than trusting a local copy.
 | `Dashboard.dc.html` | ported → `app/(public)/luyen-tap/`, wired to real Supabase data, all three tabs (Lộ trình / Cửa hàng / Cộng đồng) |
 | `Auth.dc.html` | ported → `app/(auth-screen)/dang-nhap/` + `/dang-ky/` (`AuthPanel.tsx`), wired to real Supabase auth; role routing after sign-in stays in `src/lib/postSignInRoute.ts` |
 | `Product Reveal.dc.html` | not started |
+| `Home Cinematic.dc.html` | ported → `src/components/landing/CinematicHero.tsx` + `public/landing/cinematic-scroll.js`; replaces the Hero Section opening on `/` (2026-09-17) |
 
 ## Scripts
 
@@ -66,3 +67,12 @@ because each needed to talk to real state the design only mocked.
 - The design's "Họ và tên" field writes `full_name`, **not** `username`:
   `handle_new_user` validates `username` against a shape rule that rejects
   spaces, so a Vietnamese full name would have been refused at the trigger.
+- `cinematic-scroll.js` is the second script copied near-verbatim (after
+  `hero-scroll.js`), for the same reason: dense scroll choreography. Its two
+  departures are marked `NEXT` in the file — the shared site nav is made
+  transparent at the top and *given back* its own glass afterwards, instead of
+  being painted with the design's fixed colours; and it restores the nav when
+  the element unmounts, because in Next the nav outlives the page.
+- `Home Cinematic.dc.html` imports `image-slot.js` and `support.js` but uses
+  neither (`<image-slot>` never appears; `support.js` is the design host's own
+  runtime). Not ported.
