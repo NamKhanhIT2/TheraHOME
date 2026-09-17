@@ -1717,3 +1717,37 @@ hiện `web_access_contacts.roles = []`, tức không còn là nhân viên; quy�
 nằm ở tài khoản TheraHOME `hoankenny@therahomeai.com` (`account_type='admin'`),
 đăng nhập bằng email + mật khẩu. CLAUDE.md vẫn ghi hai địa chỉ Gmail là
 "provisioned admins" — mô tả đó đã cũ so với dữ liệu thật.
+
+## 2026-09-17 — Tương phản: khai báo nền tối, rồi nâng chữ mờ
+
+Web **không có chế độ tối theo máy**: chỉ một bộ token sáng ở `:root`, khu
+Admin/CSKH dùng nó, còn trang công khai tự tô nền gần đen bằng màu viết cứng
+trong `landing.css`. Hai thế giới **không dùng chung thành phần nào** (đã
+kiểm: không file nào trong `app/(public)`, `app/(auth)`, `components/landing`
+import từ `components/ui`, `components/views`, `components/shell`), nên không
+hề có chuyện màu sáng lọt vào nền tối. `ToastHost` cũng chỉ được gắn trong
+`AppShell`, tức chỉ có ở Admin/CSKH.
+
+**Không nơi nào khai báo `color-scheme`**, nên trình duyệt vẽ chrome kiểu nền
+sáng trên mọi trang tối: thanh cuộn, viền focus, popup `<select>`, autofill,
+và tệ nhất là màu `::placeholder` mặc định. Quy tắc placeholder duy nhất lại
+bó hẹp trong `.auth-field`, chỉ phủ form đăng nhập — ô số điện thoại/email của
+`ActivationPanel` và ô soạn bình luận đều rơi về mặc định trình duyệt. Đã thêm
+`color-scheme: dark` cho `body:has(.landing-root)`, mở rộng quy tắc placeholder
+cho mọi `input`/`textarea` trong `.landing-root`, và thêm lớp `.dark-surface`
+trong `globals.css` cho ba màn auth nằm ngoài wrapper (`welcome`,
+`thera-login`, `dat-lai-mat-khau`) kèm `body:has(.dark-surface)` để overscroll
+không lòi dải sáng.
+
+**Chữ mờ trên nền tối** (trắng alpha thấp, dưới 4.5:1, nay khoảng 7:1): nhãn
+"Chưa mở" trên ô ngày khoá (0.38 → 0.62, chữ mờ nhất trên trang khách hay dùng
+nhất), trạng thái khoá của dòng khảo sát, dòng trấn an dưới ô kích hoạt, mốc
+thời gian bình luận, giá gốc gạch ngang. Viền thẻ 0.06–0.08 → 0.12–0.14.
+
+**Khu quản trị nền sáng cũng có lỗi, từ token chứ không phải literal.**
+`--text-muted` #a0a8b4 chỉ đạt 2.4:1 trên nền trắng mà lại gánh nội dung thật
+(tiêu đề cột mọi bảng, câu giải thích trạng thái rỗng, vai trò dưới email đang
+đăng nhập). Hạ cả hai token một bậc — `--text-secondary` #6b7480 → #59616d,
+`--text-muted` #a0a8b4 → #6e7683 — để muted qua 4.5:1 mà vẫn nhạt hơn
+secondary. Cả bốn nhãn `StatusPill` nằm trong khoảng 2.7–3.8:1 trên chính nền
+tint 12% của nó; giữ nguyên tint, chỉ làm đậm nhãn.
