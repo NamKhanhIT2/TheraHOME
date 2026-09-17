@@ -48,11 +48,15 @@ export function Badge({ children, color, bg }: { children: ReactNode; color: str
   );
 }
 
+// Each pill pairs a colour with a 12% tint OF ITSELF, which left every label
+// between 2.7:1 and 3.8:1 on its own background — all four failed AA at
+// 11.5px bold. The tints are unchanged (the pills look the same at a glance);
+// only the label colours are darkened until they clear 4.5:1 (2026-09-17).
 const STATUS_PILL_MAP = {
-  active: ["Hoạt động", "#1E9E5E", "rgba(30,158,94,0.12)"],
-  paused: ["Tạm dừng", "#B9860B", "rgba(185,134,11,0.12)"],
-  inactive: ["Ngừng", "#8A93A3", "rgba(138,147,163,0.12)"],
-  unactivated: ["Chưa kích hoạt", "#6B7A99", "rgba(107,122,153,0.12)"],
+  active: ["Hoạt động", "#127240", "rgba(30,158,94,0.12)"],
+  paused: ["Tạm dừng", "#7A5807", "rgba(185,134,11,0.12)"],
+  inactive: ["Ngừng", "#5A6371", "rgba(138,147,163,0.12)"],
+  unactivated: ["Chưa kích hoạt", "#48546E", "rgba(107,122,153,0.12)"],
 } as const;
 
 export function StatusPill({ status }: { status: keyof typeof STATUS_PILL_MAP }) {

@@ -134,7 +134,7 @@ export default async function ProductsPage() {
             <h2 style={{ ...h2, fontSize: "clamp(28px, 3vw, 42px)" }}>Bộ giải pháp Trị Liệu Cổ</h2>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 14 }}>
               <span style={{ fontSize: "clamp(30px, 3.2vw, 44px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>{pricing.current}</span>
-              <s style={{ fontSize: 18, color: "rgba(255,255,255,0.45)" }}>{pricing.original}</s>
+              <s style={{ fontSize: 18, color: "rgba(255,255,255,0.62)" }}>{pricing.original}</s>
               <span style={{ fontSize: 13, fontWeight: 600, padding: "6px 12px", borderRadius: 999, background: "rgba(255,182,72,0.16)", border: "1px solid rgba(255,182,72,0.4)", color: "#FFB648" }}>
                 {pricing.note}
               </span>

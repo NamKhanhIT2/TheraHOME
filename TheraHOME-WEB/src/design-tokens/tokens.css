@@ -27,8 +27,13 @@
   --bg-card-alt: #f6f8fc;
   --bg-dark-nav: #007fd9;
   --text-primary: #16213a;
-  --text-secondary: #6b7480;
-  --text-muted: #a0a8b4;
+  /* Darkened 2026-09-17. The ported values were #6b7480 (4.7:1 on white) and
+     #a0a8b4 (2.4:1) — muted failed AA badly, and it carries real content in
+     the console: every table's column headers, empty-state explanations, the
+     role under the signed-in email. Both moved down a step so muted clears
+     4.5:1 while staying visibly lighter than secondary. */
+  --text-secondary: #59616d;
+  --text-muted: #6e7683;
   --text-on-primary: #ffffff;
   --accent-orange: #ffb648;
   --accent-orange-tint: #fff1dc;

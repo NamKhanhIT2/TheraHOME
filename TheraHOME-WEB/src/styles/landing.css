@@ -12,6 +12,12 @@
 body:has(.landing-root) {
   background: #02030b;
   color: #fff;
+  /* Tells the browser this page is dark, so it draws its OWN chrome to match:
+     scrollbars, focus rings, <select> popups, autofill, and — the one that
+     actually bit us — the default ::placeholder colour. Without it every dark
+     page got light-mode chrome, and a placeholder the browser picked for a
+     white field sat on a near-black one (audit 2026-09-17). */
+  color-scheme: dark;
 }
 
 .landing-root {
@@ -367,7 +373,12 @@ body:has(.landing-root) {
   font: inherit;
   font-size: 15px;
 }
-.landing-root .auth-field input::placeholder {
+/* Was scoped to `.auth-field` alone, which covered the sign-in form and
+   nothing else — the activation gate's phone/email field and the community
+   composer both fell through to the browser default. Every input and textarea
+   on a dark page now gets the same readable placeholder. */
+.landing-root input::placeholder,
+.landing-root textarea::placeholder {
   color: rgba(255, 255, 255, 0.62);
 }
 

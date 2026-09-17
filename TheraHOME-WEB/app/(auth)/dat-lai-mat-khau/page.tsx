@@ -91,7 +91,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <main style={shell}>
+    <main className="dark-surface" style={shell}>
       <div style={cardStyle}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Đặt mật khẩu mới</h1>
 

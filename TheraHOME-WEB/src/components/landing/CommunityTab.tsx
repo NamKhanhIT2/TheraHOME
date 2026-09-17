@@ -119,7 +119,7 @@ function Comments({ postId, canWrite, onAdded }: { postId: string; canWrite: boo
             <Avatar name={c.authorName} />
             <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
               <span style={{ fontSize: 13.5, fontWeight: 600, color: "#fff" }}>
-                {c.authorName} <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.45)" }}>· {timeAgo(c.createdAt)}</span>
+                {c.authorName} <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.62)" }}>· {timeAgo(c.createdAt)}</span>
               </span>
               <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.74)", wordBreak: "break-word" }}>{c.text}</p>
             </div>

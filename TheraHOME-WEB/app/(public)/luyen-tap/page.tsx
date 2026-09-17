@@ -42,22 +42,25 @@ import {
 const WATER_GOAL = 8;
 
 const shell: CSSProperties = { maxWidth: 1240, margin: "0 auto", padding: "clamp(28px, 5vh, 56px) clamp(20px, 4vw, 64px)" };
-const card: CSSProperties = { display: "flex", flexDirection: "column", gap: 14, padding: "clamp(20px, 2.2vw, 28px)", borderRadius: "var(--radius-lg, 24px)", background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)" };
+const card: CSSProperties = { display: "flex", flexDirection: "column", gap: 14, padding: "clamp(20px, 2.2vw, 28px)", borderRadius: "var(--radius-lg, 24px)", background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.12)" };
 const eyebrow: CSSProperties = { fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--color-primary)" };
 
 const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; label: string }> = {
   done: { bg: "rgba(52,199,89,0.16)", border: "rgba(52,199,89,0.45)", color: "#7BE39B", label: "Đã xong" },
   current: { bg: "rgba(0,127,217,0.2)", border: "rgba(0,127,217,0.6)", color: "#8FCBFF", label: "Hôm nay" },
   missed: { bg: "rgba(255,182,72,0.14)", border: "rgba(255,182,72,0.4)", color: "#FFC978", label: "Bỏ lỡ" },
-  upcoming: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", label: "Sắp tới" },
-  locked: { bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", label: "Chưa mở" },
+  upcoming: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.68)", label: "Sắp tới" },
+  // 0.38 white on this ground was ~3.1:1 — the faintest text on the page
+  // customers use daily. 0.62 clears the 4.5:1 bar with room to spare, and the
+  // tile still reads as inactive through its fill, not through unreadable text.
+  locked: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.62)", label: "Chưa mở" },
   // A paid phase the customer has not unlocked. Inert today — no phase carries
   // a store product id yet — but it must not leak when Giai đoạn 3 ships, and
   // the web has no way to sell it, so it points at the app.
   phaseLocked: { bg: "rgba(255,182,72,0.1)", border: "rgba(255,182,72,0.32)", color: "#FFC978", label: "Cần mở khoá" },
   // day_type === 'rest'. The app shows these as a non-tappable "Ngày nghỉ" row;
   // the web used to render them as ordinary, openable workout tiles.
-  rest: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.62)", label: "Ngày nghỉ" },
+  rest: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.68)", label: "Ngày nghỉ" },
 };
 
 type TabId = "lo-trinh" | "cua-hang" | "cong-dong";
@@ -572,8 +575,8 @@ export default function TrainingPage() {
                           textAlign: "left",
                           fontFamily: "inherit",
                           cursor: ready ? "pointer" : "default",
-                          background: sv.answered ? "rgba(46,182,125,0.12)" : ready ? "rgba(79,176,245,0.14)" : "rgba(255,255,255,0.04)",
-                          border: `1px solid ${sv.answered ? "rgba(46,182,125,0.45)" : ready ? "rgba(79,176,245,0.45)" : "rgba(255,255,255,0.10)"}`,
+                          background: sv.answered ? "rgba(46,182,125,0.12)" : ready ? "rgba(79,176,245,0.14)" : "rgba(255,255,255,0.05)",
+                          border: `1px solid ${sv.answered ? "rgba(46,182,125,0.45)" : ready ? "rgba(79,176,245,0.45)" : "rgba(255,255,255,0.14)"}`,
                           color: "#fff",
                         }}
                       >
@@ -587,7 +590,7 @@ export default function TrainingPage() {
                                 : `Hoàn thành Ngày ${sv.lastDayNumber} để mở khoá`}
                           </span>
                         </span>
-                        <span style={{ fontSize: 13.5, fontWeight: 600, color: sv.answered ? "#6FD9A6" : ready ? "#7FBFFF" : "rgba(255,255,255,0.4)" }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 600, color: sv.answered ? "#6FD9A6" : ready ? "#7FBFFF" : "rgba(255,255,255,0.62)" }}>
                           {sv.answered ? "Đã xong" : ready ? "Làm khảo sát" : "Chưa mở"}
                         </span>
                       </button>

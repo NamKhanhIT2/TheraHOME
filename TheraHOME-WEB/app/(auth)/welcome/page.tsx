@@ -43,6 +43,7 @@ export default function WelcomePage() {
 
   return (
     <div
+      className="dark-surface"
       style={{
         minHeight: "100vh",
         display: "flex",

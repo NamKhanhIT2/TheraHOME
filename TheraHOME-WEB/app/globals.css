@@ -25,3 +25,22 @@ a {
 a:hover {
   color: var(--color-primary-dark);
 }
+
+/* Auth screens that paint their OWN dark ground and sit outside the landing
+   wrapper (welcome, thera-login, dat-lai-mat-khau). Without color-scheme the
+   browser drew light-mode chrome on them — scrollbars, focus rings, select
+   popups and, worst, the default ::placeholder colour picked for a white
+   field. The body rule also stops overscroll revealing a light band above and
+   below the dark screen (audit 2026-09-17). */
+.dark-surface {
+  color-scheme: dark;
+}
+
+body:has(.dark-surface) {
+  background: #0c1526;
+}
+
+.dark-surface input::placeholder,
+.dark-surface textarea::placeholder {
+  color: rgba(255, 255, 255, 0.62);
+}

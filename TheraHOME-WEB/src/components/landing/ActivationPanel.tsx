@@ -212,7 +212,7 @@ export function ActivationPanel({ market, onActivated }: { market: string | null
         </button>
       </form>
 
-      <p style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, margin: "6px 0 0", fontSize: 12.5, color: "rgba(255,255,255,0.4)" }}>
+      <p style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, margin: "6px 0 0", fontSize: 12.5, color: "rgba(255,255,255,0.62)" }}>
         <Icon d={LOCK} size={13} />
         Không cần mã kích hoạt thiết bị · Thông tin của bạn được bảo mật
       </p>
