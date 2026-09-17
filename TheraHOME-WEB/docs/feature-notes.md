@@ -1751,3 +1751,17 @@ thời gian bình luận, giá gốc gạch ngang. Viền thẻ 0.06–0.08 → 
 `--text-muted` #a0a8b4 → #6e7683 — để muted qua 4.5:1 mà vẫn nhạt hơn
 secondary. Cả bốn nhãn `StatusPill` nằm trong khoảng 2.7–3.8:1 trên chính nền
 tint 12% của nó; giữ nguyên tint, chỉ làm đậm nhãn.
+
+### Đăng xuất khỏi console về trang chủ, không về màn đăng nhập (2026-09-17)
+
+Chủ dự án: đăng xuất xong nó nhảy về `/welcome` — màn đăng nhập nội bộ cũ.
+Đọc như "bạn vừa đăng xuất, mời đăng nhập lại", và người rời console không có
+đường nào khác để đi. Giờ về `/` — đúng chỗ mà menu tài khoản của trang công
+khai vẫn đưa tới, nên hai bên khớp nhau.
+
+Đổi ở `AccessGate.tsx`, hai chỗ: nhánh `SIGNED_OUT` và hàm `signOut()`, cùng
+trỏ vào hằng `AFTER_SIGN_OUT`.
+
+**Không đổi chỗ thứ ba**: người vào thẳng `/admin` mà chưa có phiên vẫn bị đẩy
+sang `/welcome`. Người đó đang muốn *vào*, họ cần màn đăng nhập chứ không phải
+trang giới thiệu. Chỉ lối *ra* mới đổi.

@@ -13,6 +13,20 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getCurrentWebRoles, storeRoles, clearStoredRoles, type WebAccessRole } from "@/lib/webAccess";
 
+/** Where signing out of the console lands.
+ *
+ * It used to be /welcome, the staff login screen — which read as "you are
+ * signed out, now sign in again" and gave someone leaving the console nowhere
+ * else to go. The site has a public home page now, so signing out drops you on
+ * it, the same place the public site's own account menu goes. The staff login
+ * is still one click away from there.
+ *
+ * Note this is only for LEAVING. Arriving at /admin with no session still goes
+ * to /welcome further down: that person is trying to get in, and wants a login
+ * screen, not the marketing page. */
+const AFTER_SIGN_OUT = "/";
+
+
 interface WebAccessContextValue {
   roles: WebAccessRole[];
   email: string;
@@ -89,7 +103,7 @@ export function AccessGate({
     const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
         clearStoredRoles();
-        router.replace("/welcome");
+        router.replace(AFTER_SIGN_OUT);
       }
     });
     return () => subscription.subscription.unsubscribe();
@@ -98,7 +112,7 @@ export function AccessGate({
   async function signOut() {
     await supabase.auth.signOut();
     clearStoredRoles();
-    router.replace("/welcome");
+    router.replace(AFTER_SIGN_OUT);
   }
 
   if (!ready) {
