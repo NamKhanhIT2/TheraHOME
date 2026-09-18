@@ -19,13 +19,14 @@ import { createElement, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import Script from "next/script";
 
-/** The design's source footage is 1248x704; the stage carries that aspect so
- * `object-fit: cover` fills it without cropping, which is why this revision
- * needs no letterbox fill behind the plates. */
+/** The stage carries the footage aspect so `object-fit: cover` fills it, which
+ * is why this revision needs no letterbox fill. Clip 00 is 1920x1084 and clip
+ * 03 is 1248x704 — 1.7712 and 1.7727, a 0.08% difference, so one ratio serves
+ * both and the crop it implies is invisible. */
 const SOURCE_ASPECT = "1248 / 704";
 
 /** First frame of clip 00, shown under the loading card so the opening shot is
- * on screen while 2.7 MB of video downloads. The design leaves that card flat
+ * on screen while 2.3 MB of video downloads. The design leaves that card flat
  * dark; on a slow connection that is several seconds of nothing at the top of
  * the home page, and since this is frame 0 of the very clip being fetched,
  * there is no jump when the video takes over. */
@@ -130,19 +131,42 @@ export function CinematicHero() {
             </span>
           </div>
 
-          {/* Corner tag. Not decoration: the footage carries a generator
-              watermark in this exact corner, and the gradient covers it.
-              Because the stage carries the source aspect, the video's own
-              bottom-right corner is this one. */}
-          <div
+          {/* Corner badge.
+              The footage carries a "Dola AI" watermark, and this covers it —
+              so its size is measured, not chosen by eye. Sampling the darkest
+              value of every pixel across 30 frames (static overlay stays
+              bright, moving scene goes dark) puts the mark at the SAME
+              relative box in both clips: left edge 87.8% of the width, top
+              edge 92.4% of the height, 2.31% clear of the right edge and 3.97%
+              of the bottom. So the badge is sized in PERCENT of the stage —
+              the stage carries the footage aspect, so a stage percent is a
+              frame percent — and given the margin below it always covers that
+              box, at any viewport, on either clip.
+                right 1.6% ≤ 2.31%          bottom 2.6% ≤ 3.97%
+                min-width 13% ≥ 10.63%      height 6.4% ≥ 4.97%
+              Sizing it in pixels would have failed on a wide monitor, where
+              the watermark grows with the video but a px badge does not.
+
+              It is a real link rather than a label: the design draws an arrow
+              on it, and an arrow that does nothing is a lie. */}
+          <Link
+            href="/san-pham"
             data-cine-tag
-            aria-hidden="true"
-            style={{ position: "absolute", right: 0, bottom: 0, zIndex: 3, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 11, minWidth: "clamp(230px, 20vw, 340px)", height: "clamp(74px, 7vh, 96px)", padding: "0 clamp(18px, 2vw, 34px)", background: "linear-gradient(118deg, rgba(4,12,22,0) 0%, rgba(4,12,22,0.5) 34%, rgba(4,12,22,0.88) 72%, rgba(4,12,22,0.94) 100%)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}
+            className="cine-enter"
+            aria-label="Bước vào TheraHOME — xem sản phẩm"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- a 20px mark inside a decorative overlay; next/image would add a wrapper for nothing */}
-            <img src="/landing/logo.png" alt="" style={{ width: 20, height: 20, display: "block", opacity: 0.9 }} />
-            <span style={{ fontSize: 12, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.86)", whiteSpace: "nowrap" }}>Sunset House</span>
-          </div>
+            <span className="cine-enter-icon" aria-hidden="true">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-4" />
+                <path d="M10 8l4 4-4 4" />
+                <path d="M14 12H4" />
+              </svg>
+            </span>
+            <span className="cine-enter-text">Bước vào TheraHOME</span>
+            <svg className="cine-enter-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12h13M12 5l7 7-7 7" />
+            </svg>
+          </Link>
 
           <div data-cine-grade aria-hidden="true" style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(6,17,28,0.72) 0%, rgba(6,17,28,0.38) 42%, rgba(6,17,28,0) 70%), linear-gradient(180deg, rgba(6,17,28,0.35) 0%, rgba(6,17,28,0) 22%, rgba(6,17,28,0) 75%, rgba(6,17,28,0.45) 100%)", opacity: 0.34, pointerEvents: "none" }} />
 

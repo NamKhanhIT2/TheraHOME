@@ -1975,3 +1975,41 @@ Resource Timing trên dev: clip 2 bắt đầu **sau** khi clip 1 kết thúc 4m
 - `hero-bg.png` (605 KB) đúng là không còn trang nào render, nhưng không trang
   nào *yêu cầu* nó nên không tốn băng thông của khách; README đã ghi rõ giữ lại
   vì đó là bản gốc của design.
+
+### Video mở đầu nét hơn + khối "Bước vào TheraHOME" che watermark (2026-09-18, tối)
+
+Chủ dự án gửi bản quay lại nét hơn và một ảnh mẫu cho góc dưới phải, yêu cầu
+"che vừa đẹp Dola AI, không quá to hay quá nhỏ".
+
+**Video mới:** 2552×1440, H.264 sẵn, 4,9s, 15,7 MB. Xuất ra **1920×1084 CRF 30**
+— 2,30 MB, SSIM 0,951. Chọn 1920 vì đó là độ phân giải đa số màn hình desktop
+hiển thị 1:1; bản 1248 cũ **bị phóng to trên gần như mọi máy**, đó chính là cái
+"chưa nét" mà chủ dự án thấy. Clip 2 vẫn là nguồn 1248 nên đoạn giữa hành trình
+mềm hơn đoạn đầu — chưa có bản nét hơn của cảnh đó.
+
+**Khối che: đo chứ không ước lượng.** Lấy giá trị tối nhất của từng điểm ảnh
+qua 30 khung (lớp phủ tĩnh thì luôn sáng, cảnh động thì về tối) → watermark nằm
+ở **đúng cùng ô tương đối trên cả hai clip**: mép trái 87,8% chiều rộng, mép
+trên 92,4% chiều cao, cách lề phải 2,31%, cách đáy 3,97%.
+
+**Hai lần sai trước khi đúng, cả hai đều do đo mới lộ ra:**
+
+1. Lần đầu tôi tính theo % chiều cao khung. Nhưng khung bị `max-height` giới
+   hạn theo viewport, nên `cover` cắt trên–dưới và watermark **trôi xuống** khỏi
+   vùng che — ảnh chụp cho thấy "Dola AI" lòi ra ngay dưới khối. Sửa: neo video
+   theo đáy (`object-position: center bottom`), phần cắt dồn hết lên trời, vị
+   trí watermark thành cố định và quy được về **đơn vị chiều rộng (vw)**.
+2. Lần hai khối đã đúng chỗ nhưng nền `rgba(...,0.58)` quá trong — chữ trắng
+   của watermark **ánh xuyên qua lớp kính**. Một lớp che trong suốt thì không
+   phải là lớp che. Nâng lên 0,9, vẫn ra chất kính nhờ blur và viền sáng.
+
+Kiểm chứng bằng đại số thay vì mắt (pane trình duyệt đang ẩn nên `getBoundingClientRect`
+trả 0): dựng lại hộp khối che và hộp watermark từ chính các quy tắc CSS, quét
+**8 chiều rộng × 5 chiều cao** màn hình — **0 cấu hình hở**. Dư ra ít nhất
+9–21px mỗi phía ở các độ phân giải phổ biến.
+
+Trên mobile khung cắt theo chiều ngang nên watermark ra hẳn ngoài khung hình;
+ở đó khối chỉ còn là cái nút, thu nhỏ theo nội dung.
+
+**Khối là link thật** (`/san-pham`), không phải nhãn trang trí: mẫu thiết kế vẽ
+mũi tên, mà mũi tên không bấm được là nói dối người dùng.
