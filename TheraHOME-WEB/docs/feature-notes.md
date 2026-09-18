@@ -1896,3 +1896,44 @@ chữ nằm trọn trong khung, không tràn ngang.
 được. Trên 4G Việt Nam là vài giây. Thẻ loading đã có ảnh khung đầu thật (kéo
 bằng `qlmanage`) nên không còn màn hình đen chờ, nhưng nếu muốn nhẹ hơn thì
 phải nén lại footage — nói tôi nếu cần.
+
+### Nén footage cinematic — và một lỗi tương thích tìm ra khi nén (2026-09-18)
+
+Chủ dự án bảo nén cho nhẹ. Cài `ffmpeg` rồi soi nguồn thì phát hiện thứ quan
+trọng hơn dung lượng: **hai clip gốc là HEVC (H.265)**.
+
+HEVC trong MP4 chỉ phát được khi máy có giải mã phần cứng — Safari thì được,
+còn Chrome trên nhiều máy Windows/Linux/Android thì **không**. Nghĩa là phần mở
+đầu trang chủ có thể đang đen thui với một phần khách truy cập. Máy này giải mã
+được nên lúc kiểm tra hôm qua tôi không thấy gì bất thường; đó đúng là kiểu lỗi
+chỉ lộ ra khi đo bằng công cụ thay vì nhìn màn hình.
+
+Điều thứ hai: **clip gốc gần như không có keyframe** — `00.mp4` có 2 cái cho
+8 giây, `03.mp4` có đúng **1 cái** cho cả clip. Khi cuộn ngược, trình duyệt phải
+giải mã lại từ keyframe gần nhất, tức gần như từ đầu clip. Đây chính là thứ làm
+việc tua giật, và cũng là thứ chủ dự án gọi là "chưa mượt".
+
+Đã chuyển sang **H.264 Main, CRF 30, preset veryslow, tune film**, và quan
+trọng nhất: `keyint=12:min-keyint=12:scenecut=0` — keyframe mỗi 0,47 giây (17
+và 11 cái thay vì 2 và 1). Bỏ audio, `+faststart`.
+
+Cân nhắc mức nén bằng số, không bằng cảm tính:
+
+| | 00+03 | SSIM |
+|---|---|---|
+| gốc (HEVC) | 3,99 MB | — |
+| CRF 28 | 3,43 MB | 0,969 |
+| CRF 29 veryslow | 2,96 MB | 0,964 |
+| **CRF 30 veryslow** | **2,65 MB** | **0,960** |
+| CRF 31 | 2,46 MB | 0,957 |
+
+Lưu ý ngược đời: H.264 ở CRF 26 **nặng hơn** bản HEVC gốc (4,29 MB) — H.264 kém
+hiệu quả hơn HEVC, nên phải chấp nhận CRF cao hơn để vừa nhẹ vừa chạy được mọi
+nơi. Chọn CRF 30: nhẹ hơn gốc 34%, và soi crop 1:1 vùng tán lá + đèn (chỗ H.264
+vỡ trước tiên) thì không thấy vỡ khối.
+
+Kiểm chứng trong trình duyệt: cả hai clip `readyState 4`, **seek lùi trung bình
+6,3ms** (7 lần nhảy ngược qua cả clip), tua `setProgress` tới 0.30/0.60/0.95 ra
+đúng khối chữ và ảnh kết.
+
+Tổng thư mục `cine/` giờ **3,1 MB** (gồm cả ảnh kết và poster), trước là 4,6 MB.
