@@ -2013,3 +2013,11 @@ Trên mobile khung cắt theo chiều ngang nên watermark ra hẳn ngoài khung
 
 **Khối là link thật** (`/san-pham`), không phải nhãn trang trí: mẫu thiết kế vẽ
 mũi tên, mà mũi tên không bấm được là nói dối người dùng.
+
+**Sửa tiếp sau khi deploy:** ảnh chụp production (pane trình duyệt ẩn nên render
+ở khung ~250px) lộ ra một lỗ hổng tôi bỏ sót — luật mobile chỉ xét **chiều
+rộng**, nên **điện thoại xoay ngang** (667×375: hẹp hơn 760px nhưng khung vẫn
+rộng hơn 16:9) rơi vào chế độ "nút nhỏ" trong khi watermark **không** bị cắt.
+Điều kiện đúng không phải "cửa sổ hẹp" mà là "khung cao hơn tỉ lệ phim", nên đã
+đổi sang `@media (max-width: 759px) and (max-aspect-ratio: 3/4)`. Quét lại 14
+cấu hình từ 320×568 tới 3440×1440: **0 chỗ hở**.

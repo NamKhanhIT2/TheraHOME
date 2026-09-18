@@ -662,9 +662,15 @@ body:has(.landing-root) {
   transform: translateX(3px);
 }
 
-@media (max-width: 759px) {
-  /* Portrait crops the frame horizontally instead, which takes the watermark
-     out of view entirely, so here the badge is only a button. */
+/* The roomier button styling is safe ONLY where the frame is cropped
+   horizontally, which is what takes the watermark out of view — and that
+   happens when the stage is TALLER than the footage, not merely when the
+   window is narrow. Keying it on width alone left a real gap: a phone held
+   sideways (667x375) is under 760px but still wider than 16:9, so it kept
+   showing the mark beside a badge that had shrunk to fit its text. The
+   aspect-ratio condition is the honest test; everywhere else the vw badge and
+   its coverage guarantee stay in force. */
+@media (max-width: 759px) and (max-aspect-ratio: 3 / 4) {
   .landing-root .cine-enter {
     min-width: 0;
     height: auto;
