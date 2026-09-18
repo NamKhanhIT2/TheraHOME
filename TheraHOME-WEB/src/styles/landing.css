@@ -569,9 +569,24 @@ body:has(.landing-root) {
 .landing-root [data-cine-copy="1"] > *:nth-child(2) { animation-delay: 390ms; }
 .landing-root [data-cine-copy="1"] > *:nth-child(3) { animation-delay: 530ms; }
 .landing-root [data-cine-copy="1"] > *:nth-child(4) { animation-delay: 670ms; }
-/* The shared nav goes transparent over the opening frame; ease the change. */
-.landing-root [data-cine-nav] {
-  transition: background 320ms ease-out, border-color 320ms ease-out;
+/* Local scrim behind each copy column: the footage stays bright, the text
+   stays legible. The script fades it with the copy it belongs to. */
+.landing-root [data-cine-scrim] {
+  position: absolute;
+  left: -15vw;
+  top: -14vh;
+  width: calc(100% + 30vw);
+  height: calc(100% + 28vh);
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(
+    46% 44% at 42% 50%,
+    rgba(4, 12, 22, 0.9) 0%,
+    rgba(4, 12, 22, 0.66) 46%,
+    rgba(4, 12, 22, 0.22) 74%,
+    rgba(4, 12, 22, 0) 100%
+  );
 }
 @media (prefers-reduced-motion: reduce) {
   .landing-root [data-cine-copy="1"] > * { animation: none; }
@@ -579,4 +594,17 @@ body:has(.landing-root) {
 @media (max-width: 759px) {
   .landing-root .cine-rail { left: 14px !important; }
   .landing-root .cine-copy { left: 44px !important; right: 20px !important; max-width: none !important; }
+
+  /* The design's stage carries the 1248x704 footage aspect, which on a phone
+     is a 211px-tall letterbox band — the headline spills straight out of it
+     and the rest of the screen is black. On a narrow viewport the stage fills
+     the height instead and `object-fit: cover` crops the sides. That crop also
+     removes the footage watermark entirely (it sits at the source's
+     bottom-right, ~35% of the width is cut from each side), so the corner tag
+     is brand dressing here rather than a cover. */
+  .landing-root [data-cine-stage] {
+    aspect-ratio: auto !important;
+    height: calc(100svh - var(--nav-h, 84px));
+    max-height: none !important;
+  }
 }

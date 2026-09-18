@@ -141,7 +141,7 @@ export function LandingNav() {
 
   return (
     <>
-      <nav data-cine-nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, padding: "22px clamp(20px, 4vw, 64px)", background: "rgba(2,3,11,0.72)", backdropFilter: "blur(14px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, padding: "22px clamp(20px, 4vw, 64px)", background: "rgba(2,3,11,0.72)", backdropFilter: "blur(14px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <Link className="nav-logo" href="/" aria-label="TheraHome — về trang chủ" style={{ display: "inline-flex", alignItems: "center", gap: 11, color: "#fff" }}>
           <BrandMark size={30} glow />
           <span style={{ display: "inline-flex", alignItems: "baseline", fontSize: 19, lineHeight: 1, fontWeight: 600, letterSpacing: "-0.005em", color: "#8FC7E8" }}>TheraHome</span>

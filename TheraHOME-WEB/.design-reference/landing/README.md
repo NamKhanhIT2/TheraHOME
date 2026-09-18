@@ -26,7 +26,7 @@ Pull and diff against the live project rather than trusting a local copy.
 | `Dashboard.dc.html` | ported → `app/(public)/luyen-tap/`, wired to real Supabase data, all three tabs (Lộ trình / Cửa hàng / Cộng đồng) |
 | `Auth.dc.html` | ported → `app/(auth-screen)/dang-nhap/` + `/dang-ky/` (`AuthPanel.tsx`), wired to real Supabase auth; role routing after sign-in stays in `src/lib/postSignInRoute.ts` |
 | `Product Reveal.dc.html` | not started |
-| `Home Cinematic.dc.html` | ported → `src/components/landing/CinematicHero.tsx` + `public/landing/cinematic-scroll.js`; replaces the Hero Section opening on `/` (2026-09-17) |
+| `Home Cinematic.dc.html` | ported → `src/components/landing/CinematicHero.tsx` + `public/landing/cinematic-scroll.js`; replaces the Hero Section opening on `/`. Re-ported 2026-09-18 when the design was rewritten from four cross-dissolved stills to scrubbed video (`cinematic-config.js` + a new `cinematic-scroll.js`) |
 
 ## Scripts
 
@@ -76,3 +76,14 @@ because each needed to talk to real state the design only mocked.
 - `Home Cinematic.dc.html` imports `image-slot.js` and `support.js` but uses
   neither (`<image-slot>` never appears; `support.js` is the design host's own
   runtime). Not ported.
+- The 2026-09-18 rewrite ships the config as its own file
+  (`cinematic-config.js` → `window.CINEMATIC_CONFIG`) read by `cinematic-scroll.js`
+  at load time. The two are **merged into one file** here: a split would make
+  the hero depend on Next loading two `<Script>` tags in the right order, and
+  one file cannot get that wrong.
+- `CinematicNav` in that rewrite is an empty class — the design's nav is solid
+  from the first pixel now, so the transparent-nav handling the first port
+  needed is gone, along with the `data-cine-nav` hook on `LandingNav`.
+- The `data-cine-tag` corner block is **not decoration**: the footage carries a
+  generator watermark in that exact corner and the gradient covers it. Verified
+  by hiding the tag and watching "Dola AI" appear.

@@ -1836,3 +1836,63 @@ Kiểm chứng: dựng route tạm để soi (console có AccessGate, tôi khôn
 hoá trắng, nút trắng trên trắng. Đó là lỗi của cái giá đỡ thử, không phải của
 nút: đặt lại đúng ngữ cảnh console thì màu ra `#59616d`, **đúng bằng màu icon
 chuông**, cùng kích thước 38×38. Đã xoá route tạm.
+
+### Cinematic bản 2: footage thật thay cho bốn ảnh tĩnh (2026-09-18)
+
+Chủ dự án: *"làm lại phần cinematic cho mượt mà, dùng ảnh đính kèm để làm phần
+kết thay thế ảnh hiện tại trên design vì ảnh cũ trên ti vi có người bị tật"*.
+
+Design đã được viết lại hẳn: thêm `cinematic-config.js`, `cinematic-scroll.js`
+thay mới hoàn toàn. Bản cũ hoà tan bốn ảnh tĩnh; bản này **tua video thật theo
+cuộn** — hai clip đi xuyên nhà, cảnh kết là ảnh tĩnh (ghi chú của design: chuyển
+động người trong footage sinh ra trông giả).
+
+Độ mượt đến từ chính script mới, không phải tôi chỉnh tay: `smoothing 0.07`,
+`maxStep` chặn mỗi tick không nhảy quá ~2 khung nguồn, và khi tua tới thì cho
+decoder **chạy đuổi bằng `playbackRate`** thay vì seek liên tục — seek chỉ dùng
+khi lùi hoặc nhảy xa.
+
+Tài nguyên (đều là của chủ dự án):
+
+| | |
+|---|---|
+| `00.mp4` | `Cinematic Architectural Video.mp4` — 8,04s, cảnh tiến vào và cửa mở |
+| `03.mp4` | `3.mp4` — 5,04s, cảnh đi trong sảnh |
+| `gym-final.jpg` | ảnh mới 16:23 hôm nay, **thay ảnh của design** vì người trên TV bị lỗi |
+
+Cả hai clip đúng 1248×704 — khớp `sourceAspect` trong config, xác nhận đây đúng
+là nguồn design dùng. Copy nguyên bản, không nén lại: script tua theo từng
+khung, nén lại là mất độ chính xác.
+
+Bốn ảnh tĩnh của bản hôm qua đã xoá (khung giờ `cover` nên không còn viền đen,
+`fill` cũng không cần).
+
+**Ba chỗ tôi làm khác design, đều có lý do:**
+
+1. **Gộp config vào một file.** Design tách `cinematic-config.js` rồi
+   `cinematic-scroll.js` đọc `window.CINEMATIC_CONFIG` **ngay lúc load**. Tách
+   đôi nghĩa là đặt cược phần mở đầu trang chủ vào thứ tự nạp hai thẻ
+   `<Script>` của Next. Một file thì không thể sai.
+2. **Dọn dẹp khi rời trang.** Design chưa bao giờ unmount; Next thì unmount mỗi
+   lần chuyển trang. Đã thêm `destroy()`: dừng video, thu hồi blob URL, gỡ
+   listener và huỷ rAF — nếu không, video vẫn giải mã ngầm sau lưng trang kế.
+3. **Mobile: khung lấp đầy màn hình.** Khung của design giữ tỉ lệ 1248×704, ở
+   375px chỉ cao **211px** — tiêu đề tràn hẳn ra ngoài, còn lại là nền đen. Đã
+   kiểm thật và thấy vỡ. Dưới 760px khung cao bằng viewport, `cover` cắt hai
+   bên; phần cắt đó cũng **xoá luôn watermark** của footage nên tag góc trên
+   mobile chỉ còn là nhãn thương hiệu.
+
+**Tag góc không phải trang trí:** footage có watermark "Dola AI" ở đúng góc
+dưới phải, khối gradient đó để che. Kiểm bằng cách ẩn tag đi — watermark hiện
+ra ngay.
+
+Kiểm chứng trên dev: hai clip nạp xong (`readyState 4`, blob), tua
+`setProgress(0.55)` → clip 2 tại 1,92s, khối chữ 3, mốc 3; `setProgress(0.90)`
+→ ảnh kết `gym-final.jpg`, `scale(1.0277)`, khối chữ 5, mốc 5; scrim sau chữ
+lên `opacity 1` đúng lúc. Mobile 375px: khung cao 728px = đúng viewport trừ nav,
+chữ nằm trọn trong khung, không tràn ngang.
+
+**Cần biết:** phần mở đầu giờ nặng **4,2 MB video**, tải hết trước khi tua
+được. Trên 4G Việt Nam là vài giây. Thẻ loading đã có ảnh khung đầu thật (kéo
+bằng `qlmanage`) nên không còn màn hình đen chờ, nhưng nếu muốn nhẹ hơn thì
+phải nén lại footage — nói tôi nếu cần.
