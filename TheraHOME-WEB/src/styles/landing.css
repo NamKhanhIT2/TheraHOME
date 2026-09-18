@@ -569,65 +569,34 @@ body:has(.landing-root) {
 .landing-root [data-cine-copy="1"] > *:nth-child(2) { animation-delay: 390ms; }
 .landing-root [data-cine-copy="1"] > *:nth-child(3) { animation-delay: 530ms; }
 .landing-root [data-cine-copy="1"] > *:nth-child(4) { animation-delay: 670ms; }
-/* Anchor the footage to the BOTTOM of the stage.
-   The stage is capped at the viewport height, so on most windows it is wider
-   than 16:9 and `cover` crops vertically. With the default centred position
-   that crop is split top and bottom, which slides the watermark — and any
-   overlay meant to hide it — by an amount that changes with every viewport.
-   Anchored to the bottom, the crop is taken entirely off the top and the
-   watermark sits at a FIXED distance above the stage floor, expressible in vw
-   (the stage is full-bleed, so 1vw = 1% of its width). That is what makes the
-   badge below provably sufficient rather than tuned by eye. It also trims sky
-   rather than the lit path in the foreground, which is the better half to keep. */
-.landing-root [data-cine-videos] video,
-.landing-root [data-cine-videos] img {
-  object-position: center bottom;
-}
-
-/* Corner badge, over the footage watermark.
-   Measured, not eyeballed: sampling the darkest value of every pixel across 30
-   frames (a static overlay stays bright, the moving scene goes dark) puts the
-   "Dola AI" mark at the same relative box in both clips — left edge 87.8% of
-   the frame width, top edge 92.4% of its height, 2.31% clear of the right edge
-   and 3.97% of the bottom.
-
-   With the bottom anchoring above, `cover` is driven by width, so the rendered
-   frame height is always W/1.7727 and the mark sits, in units of stage width:
-       bottom edge 2.23vw above the floor      top edge 4.27vw above it
-       left edge 87.77vw                       right edge 97.69vw
-   Hence right/bottom insets of 1.5vw (both under their limits) and a box at
-   least 3.6vw tall and 12vw wide. Everything scales with vw because the
-   watermark does too — a badge in px would come up short on a wide monitor. */
+/* Corner badge, from the owner's mock.
+   Sized for looks alone: the watermark it used to cover is gone from the
+   clips themselves, so there is no geometry to satisfy and no reason to keep
+   the footage bottom-anchored either — the design's centred framing is back. */
 .landing-root .cine-enter {
   position: absolute;
-  right: 1.5vw;
-  bottom: 1.5vw;
+  right: clamp(16px, 2vw, 34px);
+  bottom: clamp(16px, 2.4vh, 34px);
   z-index: 3;
   display: inline-flex;
   align-items: center;
-  gap: clamp(8px, 0.7vw, 14px);
-  min-width: 12vw;
-  height: 3.6vw;
-  min-height: 42px;
-  padding: 0 clamp(13px, 1.15vw, 22px);
-  border-radius: clamp(10px, 0.7vw, 16px);
-  /* Opaque enough to actually hide what is under it. At 0.58 the watermark's
-     white letters read straight through the glass — a translucent cover over
-     bright text is not a cover. 0.9 still reads as glass against the footage
-     because of the blur and the light border. */
-  background: rgba(7, 16, 28, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 10px 30px rgba(2, 8, 18, 0.4);
-  backdrop-filter: blur(16px) saturate(1.1);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  gap: clamp(9px, 0.8vw, 14px);
+  height: clamp(44px, 3.4vw, 58px);
+  padding: 0 clamp(16px, 1.3vw, 24px);
+  border-radius: clamp(12px, 0.8vw, 16px);
+  background: rgba(7, 16, 28, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  box-shadow: 0 12px 34px rgba(2, 8, 18, 0.42);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
   color: #fff;
   white-space: nowrap;
   transition: background 200ms ease-out, border-color 200ms ease-out, transform 200ms ease-out;
 }
 
 .landing-root .cine-enter:hover {
-  background: rgba(10, 24, 40, 0.94);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(10, 24, 40, 0.8);
+  border-color: rgba(255, 255, 255, 0.34);
   color: #fff;
 }
 
@@ -644,40 +613,20 @@ body:has(.landing-root) {
 }
 
 .landing-root .cine-enter-text {
-  flex: 1 1 auto;
-  font-size: clamp(11px, 0.8vw, 17px);
+  font-size: clamp(12px, 0.82vw, 16px);
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  text-align: left;
 }
 
-.landing-root .cine-enter-arrow {
-  flex: 0 0 auto;
-  opacity: 0.85;
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.landing-root .cine-enter:hover .cine-enter-arrow {
-  transform: translateX(3px);
-}
-
-/* The roomier button styling is safe ONLY where the frame is cropped
-   horizontally, which is what takes the watermark out of view — and that
-   happens when the stage is TALLER than the footage, not merely when the
-   window is narrow. Keying it on width alone left a real gap: a phone held
-   sideways (667x375) is under 760px but still wider than 16:9, so it kept
-   showing the mark beside a badge that had shrunk to fit its text. The
-   aspect-ratio condition is the honest test; everywhere else the vw badge and
-   its coverage guarantee stay in force. */
-@media (max-width: 759px) and (max-aspect-ratio: 3 / 4) {
+@media (max-width: 759px) {
   .landing-root .cine-enter {
-    min-width: 0;
-    height: auto;
-    padding: 11px 15px;
     right: 14px;
     bottom: 16px;
+    height: auto;
+    padding: 11px 15px;
   }
+  .landing-root .cine-enter-text { font-size: 12px; }
 }
 
 /* Local scrim behind each copy column: the footage stays bright, the text

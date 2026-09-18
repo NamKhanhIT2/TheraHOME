@@ -131,30 +131,17 @@ export function CinematicHero() {
             </span>
           </div>
 
-          {/* Corner badge.
-              The footage carries a "Dola AI" watermark, and this covers it —
-              so its size is measured, not chosen by eye. Sampling the darkest
-              value of every pixel across 30 frames (static overlay stays
-              bright, moving scene goes dark) puts the mark at the SAME
-              relative box in both clips: left edge 87.8% of the width, top
-              edge 92.4% of the height, 2.31% clear of the right edge and 3.97%
-              of the bottom. So the badge is sized in PERCENT of the stage —
-              the stage carries the footage aspect, so a stage percent is a
-              frame percent — and given the margin below it always covers that
-              box, at any viewport, on either clip.
-                right 1.6% ≤ 2.31%          bottom 2.6% ≤ 3.97%
-                min-width 13% ≥ 10.63%      height 6.4% ≥ 4.97%
-              Sizing it in pixels would have failed on a wide monitor, where
-              the watermark grows with the video but a px badge does not.
+          {/* Corner badge, from the owner's mock.
+              It is no longer a cover. The footage carried a "Dola AI"
+              watermark in this corner and three attempts to hide it behind an
+              overlay all leaked — the crop moves with the viewport, and a
+              translucent panel does not hide white text anyway. The mark is
+              now erased from the clips themselves (ffmpeg delogo; see
+              public/landing/README.md), so this is free to be sized for looks.
 
-              It is a real link rather than a label: the design draws an arrow
-              on it, and an arrow that does nothing is a lie. */}
-          <Link
-            href="/san-pham"
-            data-cine-tag
-            className="cine-enter"
-            aria-label="Bước vào TheraHOME — xem sản phẩm"
-          >
+              It is a real link rather than a label: a badge that reads
+              "step into TheraHOME" and does nothing would be a lie. */}
+          <Link href="/san-pham" data-cine-tag className="cine-enter">
             <span className="cine-enter-icon" aria-hidden="true">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-4" />
@@ -163,9 +150,6 @@ export function CinematicHero() {
               </svg>
             </span>
             <span className="cine-enter-text">Bước vào TheraHOME</span>
-            <svg className="cine-enter-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M5 12h13M12 5l7 7-7 7" />
-            </svg>
           </Link>
 
           <div data-cine-grade aria-hidden="true" style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(6,17,28,0.72) 0%, rgba(6,17,28,0.38) 42%, rgba(6,17,28,0) 70%), linear-gradient(180deg, rgba(6,17,28,0.35) 0%, rgba(6,17,28,0) 22%, rgba(6,17,28,0) 75%, rgba(6,17,28,0.45) 100%)", opacity: 0.34, pointerEvents: "none" }} />

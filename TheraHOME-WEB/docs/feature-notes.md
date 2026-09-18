@@ -2021,3 +2021,36 @@ rộng hơn 16:9) rơi vào chế độ "nút nhỏ" trong khi watermark **khôn
 Điều kiện đúng không phải "cửa sổ hẹp" mà là "khung cao hơn tỉ lệ phim", nên đã
 đổi sang `@media (max-width: 759px) and (max-aspect-ratio: 3/4)`. Quét lại 14
 cấu hình từ 320×568 tới 3440×1440: **0 chỗ hở**.
+
+### Xoá hẳn watermark khỏi video, bỏ mũi tên (2026-09-18, khuya)
+
+Chủ dự án gửi ảnh phóng to: "vẫn thấy mờ mờ chữ Dola AI ở phía sau, bỏ mũi tên
+ở cuối đi".
+
+**Tôi dừng việc vá bằng CSS.** Ba lần sửa lớp che đều hở theo một kiểu khác
+nhau — % chiều cao sai vì khung bị cắt, nền trong thì chữ trắng ánh qua, luật
+mobile sai vì chỉ xét chiều rộng. Vấn đề gốc là watermark **ở trong video**, mà
+vị trí hiển thị của nó lại phụ thuộc vào cách `cover` cắt khung theo từng
+viewport. Che một thứ di động bằng một lớp tĩnh là cuộc chiến không thắng được.
+
+Đã dùng `ffmpeg delogo` nội suy từ viền quanh ô watermark để **xoá nó khỏi
+chính hai clip**:
+- clip 00: `x=2228:y=1320:w=280:h=76` (nguồn 2552×1440)
+- clip 03: `x=1088:y=644:w=140:h=40` (nguồn 1248×704)
+
+Kiểm chứng bằng **chính bộ dò đã tìm ra watermark**: quét 30 khung mỗi clip,
+trước đây ra hàng nghìn điểm tĩnh-sáng, giờ ra **0 điểm** ở cả hai ngưỡng. Vùng
+được vá là tán lá tối, ngoài nét — nhìn không ra vết.
+
+Hệ quả dây chuyền, đều là dọn bớt chứ không thêm:
+- Khối góc **không còn nhiệm vụ che** nên bỏ hết phần tính toán hình học theo
+  `vw`, quay về kích thước `clamp()` bình thường, nền nhẹ lại còn 0,62 cho ra
+  chất kính.
+- **Bỏ `object-position: center bottom`** — nó chỉ tồn tại để khoá vị trí
+  watermark. Khung hình trở lại căn giữa đúng như design.
+- **Bỏ luật `max-aspect-ratio`** cho mobile, cũng chỉ phục vụ việc che.
+- **Bỏ mũi tên** cuối khối theo yêu cầu.
+
+Bài học ghi lại: khi một thứ cần che nằm trong nội dung động, sửa nội dung rẻ
+hơn nhiều so với đuổi theo nó bằng layout. Nếu sau này thay footage mới thì
+phải chạy lại `delogo` — ô toạ độ đã ghi trong `public/landing/README.md`.
