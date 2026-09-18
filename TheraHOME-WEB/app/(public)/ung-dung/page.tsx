@@ -180,8 +180,13 @@ export default async function AppPage() {
             Tải ứng dụng TheraAI, chấm vị trí đau và nhận lộ trình cá nhân hoá trong 5 giây.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16 }}>
-            <LandingButton href={app_links.appStore}>Tải trên App Store</LandingButton>
-            <LandingButton href={app_links.playStore} variant="secondary">Tải trên Google Play</LandingButton>
+            {/* A store button only appears once that store actually has the
+                app. Leaving the field empty in Admin -> Nội dung website hides
+                it, which is what a closed-testing Android build needs: the
+                Play URL is correct but the listing is not public, so the
+                button used to hand visitors a 404. */}
+            {app_links.appStore ? <LandingButton href={app_links.appStore}>Tải trên App Store</LandingButton> : null}
+            {app_links.playStore ? <LandingButton href={app_links.playStore} variant="secondary">Tải trên Google Play</LandingButton> : null}
           </div>
         </div>
       </section>

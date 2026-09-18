@@ -180,7 +180,7 @@ export function SiteContentView() {
           </div>
           <div>
             <FieldLabel>YouTube</FieldLabel>
-            <input style={inputStyle} value={c.social.youtube} onChange={(e) => set("social", { ...c.social, youtube: e.target.value })} />
+            <input style={inputStyle} value={c.social.youtube} onChange={(e) => set("social", { ...c.social, youtube: e.target.value })} placeholder="https://www.youtube.com/@therahomeai" />
           </div>
           <div>
             <FieldLabel>Link App Store</FieldLabel>
@@ -192,8 +192,9 @@ export function SiteContentView() {
           </div>
         </div>
         <p style={hint}>
-          Link App Store hiện mới là trang chủ apps.apple.com, chưa trỏ tới ứng dụng — điền link thật khi app
-          lên store để nút &quot;Tải trên App Store&quot; dẫn đúng chỗ.
+          <strong>Để trống một link tải app thì nút đó sẽ ẩn hẳn trên trang Ứng dụng.</strong> Google Play đang
+          để trống vì bản Android còn ở closed testing, link chưa công khai nên bấm vào ra trang 404 — khi app
+          lên store chính thức, dán lại link là nút hiện lại ngay.
         </p>
       </SectionCard>
 

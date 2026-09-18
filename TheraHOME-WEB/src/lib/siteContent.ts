@@ -62,8 +62,15 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     email: "support@therahomeai.com",
     hours: "Thứ Hai – Thứ Sáu, 9:00 – 17:00",
   },
-  social: { facebook: "https://www.facebook.com/profile.php?id=61580995314862", youtube: "https://www.youtube.com/@bacsilong1974" },
-  app_links: { appStore: "https://apps.apple.com/", playStore: "https://play.google.com/store/apps/details?id=ai.therahome" },
+  // @bacsilong1974 was dead (YouTube 404, checked 2026-09-18). The live channel
+  // is @therahomeai — identified from the channel that hosts the very videos
+  // program_days serves to the app, not guessed.
+  social: { facebook: "https://www.facebook.com/profile.php?id=61580995314862", youtube: "https://www.youtube.com/@therahomeai" },
+  // An empty string means "this store does not have the app yet" and hides the
+  // button — see app/(public)/ung-dung/page.tsx. Android is in closed testing,
+  // so its listing 404s; the URL itself is correct and goes back in the moment
+  // the app is public.
+  app_links: { appStore: "https://apps.apple.com/vn/app/therahome/id6803739232", playStore: "" },
 };
 
 /** Merge a stored row over its default. A key the admin has never saved, or a

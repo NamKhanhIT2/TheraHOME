@@ -12,6 +12,8 @@
 //
 // Only the asset paths differ from the design (./assets/cine/… → /landing/cine/…,
 // and the closing still is .jpg here — see public/landing/README.md).
+/* eslint-disable @typescript-eslint/no-unused-expressions -- `a && a()` short-circuit
+   calls are the design's own idiom; this file is kept diffable against it. */
 (() => {
   if (customElements.get('cinematic-scroll')) return;
 
@@ -74,10 +76,24 @@
           if (i === 0) this.firstReady();
           this.pending && this.pending();
         }, { once: true });
-        fetch(s.src).then((r) => r.blob()).then((b) => { v.src = URL.createObjectURL(b); }).catch(() => { v.src = s.src; });
+        // NEXT: the design fires every fetch at once. The opening frame is
+        // what the visitor is waiting for, and a second clip racing it takes
+        // half the bandwidth for footage not needed until 44% of the scroll —
+        // so clip 0 downloads alone and the rest queue behind it.
+        S.load = () => fetch(s.src)
+          .then((r) => r.blob())
+          .then((b) => { v.src = URL.createObjectURL(b); })
+          .catch(() => { v.src = s.src; });
         return S;
       });
       this.frame();
+      this.loadInOrder();
+    }
+    /** Clip 0 first, then the rest in timeline order. */
+    loadInOrder() {
+      const queue = this.segs.filter((S) => S.load);
+      const next = () => { const S = queue.shift(); if (S) S.load().finally(next); };
+      next();
     }
     // framing is re-applied on every resize: never latched to the width at boot
     frame() {

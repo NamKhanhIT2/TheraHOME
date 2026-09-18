@@ -1937,3 +1937,41 @@ Kiểm chứng trong trình duyệt: cả hai clip `readyState 4`, **seek lùi t
 đúng khối chữ và ảnh kết.
 
 Tổng thư mục `cine/` giờ **3,1 MB** (gồm cả ảnh kết và poster), trước là 4,6 MB.
+
+### Soát tồn đọng sau khi xong cinematic (2026-09-18)
+
+Chủ dự án bảo còn gì cần sửa thì làm nốt. Soát console, link, tài nguyên thừa,
+lint trên toàn bộ trang công khai. Bốn thứ đáng sửa, ba thứ không:
+
+**1. Nút "Tải trên App Store" dẫn vào trang chủ Apple.** App iOS **đã lên store
+thật** — tra `itunes.apple.com/lookup?bundleId=ai.therahome` ra
+`id6803739232`. Đã cập nhật link thật vào `site_content`.
+
+**2. Nút "Tải trên Google Play" dẫn vào trang 404.** Package name đúng
+(`ai.therahome`) nhưng listing chưa công khai — bản Android đang ở closed
+testing. Kiểm đối chứng: cùng user-agent, Spotify trả 200 còn app ta trả 404,
+nên không phải bot bị chặn. Đã thêm luật **để trống link = ẩn nút**, và để
+trống ô Play. Khi app lên store chính thức, dán link lại là nút hiện lại.
+
+**3. Link YouTube ở chân trang là 404.** `@bacsilong1974` không tồn tại (kiểm
+bằng trình duyệt thật, không chỉ curl). Kênh đúng là **`@therahomeai`** — tìm
+ra bằng cách đọc `ownerChannelName`/`canonicalBaseUrl` của chính những video mà
+`program_days` đang phát cho app, nên chắc chắn là kênh của TheraHOME chứ không
+phải đoán. Đã sửa giá trị mặc định trong code; **bản ghi trong DB vẫn còn link
+cũ** — lệnh ghi bị chính sách chặn, cần chủ dự án dán vào Admin → Nội dung
+website → YouTube (đã để sẵn placeholder).
+
+**4. Hai clip tải song song.** Design bắn cả hai `fetch` cùng lúc, nghĩa là
+clip 2 (0,92 MB, chưa cần đến 44% hành trình) giành băng thông với khung hình
+đầu tiên mà khách đang chờ. Đã xếp hàng: clip 1 xong mới tới clip 2. Đo bằng
+Resource Timing trên dev: clip 2 bắt đầu **sau** khi clip 1 kết thúc 4ms.
+
+**Không sửa, có lý do:**
+- Link Facebook trả 400 với curl nhưng **sống bình thường** trên trình duyệt
+  (đúng trang "Hiểu đúng về cột sống - TheraHome", 2K người theo dõi) — chỉ là
+  Facebook chặn bot.
+- `public/landing/app/*.jpg` bị công cụ báo "không dùng" nhưng thực ra dùng qua
+  template literal `` `/landing/app/${n}.jpg` `` — dương tính giả.
+- `hero-bg.png` (605 KB) đúng là không còn trang nào render, nhưng không trang
+  nào *yêu cầu* nó nên không tốn băng thông của khách; README đã ghi rõ giữ lại
+  vì đó là bản gốc của design.
