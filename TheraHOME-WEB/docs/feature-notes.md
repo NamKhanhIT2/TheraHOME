@@ -1812,3 +1812,27 @@ opacity 1, khối chữ 4 hiện, mốc 4 sáng; ở đầu trang: scene 1, nav 
 (`document.visibilityState === "hidden"`), transition CSS đứng ở t=0 và
 screenshot trả về khung đen — giới hạn của môi trường xem, không phải lỗi.
 Ảnh đầu trang chụp được và đúng.
+
+### Nút về trang chủ trong console Admin/CSKH (2026-09-18)
+
+Chủ dự án: admin và CSKH đăng nhập là vào thẳng dashboard (đúng, đó là
+`resolvePostSignInRoute`: admin → `/admin`, cskh → `/care`, cả ba cửa
+`/dang-nhap`, `/thera-login`, `/welcome`→`/verify` đều thế) — nên cần một icon
+ngôi nhà để từ dashboard bấm ra trang giới thiệu.
+
+Thêm vào thanh trên cùng của `AppShell`, ngay cạnh ô tìm kiếm và chuông, dùng
+icon `home` sẵn có. Trước đó console là căn phòng không cửa: lối ra duy nhất là
+đăng xuất — mà từ 2026-09-17 đăng xuất cũng về trang chủ, nên hai đường giờ
+khớp nhau, chỉ khác là nút này không mất phiên.
+
+**Vì sao là class `.shell-icon-btn` chứ không phải inline style:** quy tắc
+toàn cục `a { color: var(--color-primary) }` sẽ tô xanh cái icon; muốn chặn thì
+phải đặt `color` inline, mà inline lại **chặn luôn mọi đổi màu khi hover** —
+rule trong stylesheet thì `:hover` ghi đè được, inline thì không. Nên toàn bộ
+kiểu dáng nằm trong `app/globals.css`.
+
+Kiểm chứng: dựng route tạm để soi (console có AccessGate, tôi không đăng nhập
+được). Lần đầu đặt nhầm vào nhóm `(auth-screen)` — nền tối, `--text-secondary`
+hoá trắng, nút trắng trên trắng. Đó là lỗi của cái giá đỡ thử, không phải của
+nút: đặt lại đúng ngữ cảnh console thì màu ra `#59616d`, **đúng bằng màu icon
+chuông**, cùng kích thước 38×38. Đã xoá route tạm.

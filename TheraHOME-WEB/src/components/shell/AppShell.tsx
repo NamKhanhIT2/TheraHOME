@@ -8,6 +8,7 @@
 // both roles, via useWebAccess()) into the existing sidebar footer instead
 // of a separate bar, since the source only ever designed one logout area.
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useWebAccess } from "@/components/AccessGate";
 import { pushToast, ToastHost } from "@/components/ui/Toast";
 import { Icon } from "@/components/ui/Icon";
@@ -126,6 +127,18 @@ export function AppShell({
               <Icon name="search" size={15} color="var(--text-muted)" />
               <input placeholder="Tìm kiếm..." style={{ border: "none", outline: "none", flex: 1, fontFamily: "var(--font-family)", fontSize: 13 }} />
             </div>
+            {/* Way back to the public site. Staff land here straight after
+                signing in (resolvePostSignInRoute sends admin to /admin and
+                cskh to /care), so without this the console is a room with no
+                door: the only exit was signing out. */}
+            <Link
+              href="/"
+              title="Về trang chủ TheraHOME"
+              aria-label="Về trang chủ TheraHOME"
+              className="shell-icon-btn"
+            >
+              <Icon name="home" size={16} color="currentColor" />
+            </Link>
             <div style={{ width: 38, height: 38, borderRadius: 10, background: "#fff", border: "1px solid var(--border-input)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name="bell" size={16} color="var(--text-secondary)" />
             </div>

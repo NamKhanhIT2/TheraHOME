@@ -44,3 +44,27 @@ body:has(.dark-surface) {
 .dark-surface textarea::placeholder {
   color: rgba(255, 255, 255, 0.62);
 }
+
+/* Console topbar icon buttons (the "về trang chủ" house). A class rather than
+   inline styles because the global `a { color: var(--color-primary) }` would
+   otherwise tint the glyph, and an inline `color` to beat it would also block
+   any hover change — a stylesheet rule can be overridden on :hover, an inline
+   one cannot. */
+.shell-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--border-input);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
+}
+
+.shell-icon-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint-10);
+}
