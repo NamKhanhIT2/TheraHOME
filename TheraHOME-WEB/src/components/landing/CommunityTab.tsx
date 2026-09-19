@@ -36,6 +36,7 @@ import {
 } from "@/lib/appTabs";
 import { SafeImg } from "@/components/landing/SafeImg";
 import { LandingButton } from "@/components/landing/LandingButton";
+import { errorMessage } from "@/lib/errorMessage";
 
 const card: CSSProperties = {
   display: "flex",
@@ -52,7 +53,7 @@ function initials(name: string): string {
 }
 
 function postErrorMessage(error: unknown): string {
-  const m = error instanceof Error ? error.message.toLowerCase() : "";
+  const m = errorMessage(error).toLowerCase();
   if (m.includes("rate") || m.includes("too many") || m.includes("limit")) {
     return "Bạn vừa đăng xong — chờ một lát rồi đăng tiếp nhé.";
   }

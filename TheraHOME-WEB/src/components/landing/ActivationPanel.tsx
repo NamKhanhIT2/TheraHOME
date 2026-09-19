@@ -23,6 +23,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { supabase } from "@/lib/supabase";
+import { errorMessage } from "@/lib/errorMessage";
 
 /** The dialling code each of onboarding's country options maps to. Copied from
  * the app's DIALLING_CODE_BY_MARKET. */
@@ -127,7 +128,7 @@ export function ActivationPanel({ market, onActivated }: { market: string | null
       }
       onActivated();
     } catch (e) {
-      setError(messageForError(e instanceof Error ? e.message : String(e)));
+      setError(messageForError(errorMessage(e)));
       console.error("claim_user_access_contact failed", e);
     } finally {
       setSubmitting(false);

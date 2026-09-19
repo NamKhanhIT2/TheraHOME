@@ -27,13 +27,34 @@ import { SectionCard, PrimaryBtn, GhostBtn, Badge, inputStyle } from "@/componen
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
+import { errorCode, errorMessage } from "@/lib/errorMessage";
 
 function addErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  // errorMessage(), not `error instanceof Error`: a PostgREST insert error is
+  // a plain object, so the old guard read an empty string and every failure —
+  // including "already listed" — fell through to "Vui lòng thử lại", a retry
+  // that could never succeed. See src/lib/errorMessage.ts.
+  const message = errorMessage(error).toLowerCase();
   if (message.includes("invalid_contact")) return "Số điện thoại/email không đúng định dạng.";
-  if (message.includes("duplicate") || message.includes("unique")) return "Số điện thoại/email này đã có trong danh sách của sản phẩm.";
+  if (errorCode(error) === "23505" || message.includes("duplicate") || message.includes("unique")) {
+    return "Số điện thoại/email này đã có trong danh sách của sản phẩm.";
+  }
   if (message.includes("row-level security") || message.includes("permission")) return "Tài khoản hiện tại không có quyền quản lý kích hoạt.";
   return "Không thể thêm. Vui lòng thử lại.";
+}
+
+/** When an add is refused as a duplicate, say WHERE the existing entry is.
+ * "Already listed" alone left the owner hunting: the row had come in from a
+ * Shopify order days earlier and sat far below the fold. This names its
+ * source and state, and the caller filters the list down to it. */
+function duplicateMessage(existing: ContactGroup): string {
+  const source = existing.note ? existing.note : "thêm tay";
+  const state = existing.claimedByUserId
+    ? `khách${existing.claimedByName ? ` ${existing.claimedByName}` : ""} đã kích hoạt`
+    : existing.pending
+      ? "đang chờ duyệt"
+      : "đã duyệt, khách chưa kích hoạt";
+  return `Số này đã có sẵn trong danh sách (${source} — ${state}). Không cần thêm lại.`;
 }
 
 /**
@@ -228,7 +249,18 @@ export function ActivationView() {
       reload();
     } catch (error) {
       console.error("Unable to add activation contact", error);
-      setAddErrors((cur) => ({ ...cur, [productId]: addErrorMessage(error) }));
+      // A duplicate is not a failure to fix, it is a row to find: point at it.
+      const stored = toStoredContact(codes[productId] ?? "84", draft);
+      const existing = errorCode(error) === "23505"
+        ? allGroups.find((g) => g.productId === productId && g.rows.some((r) => r.contactValue === stored))
+        : undefined;
+      if (existing) {
+        setAddErrors((cur) => ({ ...cur, [productId]: duplicateMessage(existing) }));
+        setFilter(stored);
+        if (existing.pending) setQueueOpen(true);
+      } else {
+        setAddErrors((cur) => ({ ...cur, [productId]: addErrorMessage(error) }));
+      }
     } finally {
       setAddingFor(null);
     }

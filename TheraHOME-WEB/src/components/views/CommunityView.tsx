@@ -34,6 +34,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { TableShell } from "@/components/ui/TableShell";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
+import { errorMessage } from "@/lib/errorMessage";
 
 type PinnedPost = CommunityPost & {
   pinned: boolean;
@@ -645,7 +646,7 @@ export function CommunityView() {
       setModal(null);
       reload();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
+      const message = errorMessage(error);
       pushToast(
         message === "image_too_large" ? "Ảnh quá lớn (tối đa 15 MB)"
         : message === "invalid_image_type" ? "Định dạng ảnh không hợp lệ (JPG, PNG, WebP)"

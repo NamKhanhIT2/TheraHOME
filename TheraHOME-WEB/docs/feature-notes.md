@@ -2054,3 +2054,45 @@ Hệ quả dây chuyền, đều là dọn bớt chứ không thêm:
 Bài học ghi lại: khi một thứ cần che nằm trong nội dung động, sửa nội dung rẻ
 hơn nhiều so với đuổi theo nó bằng layout. Nếu sau này thay footage mới thì
 phải chạy lại `delogo` — ô toạ độ đã ghi trong `public/landing/README.md`.
+
+### "Không thể thêm" khi số đã có sẵn — và cùng lỗi ở 4 chỗ khác (2026-09-19)
+
+Chủ dự án thêm `0903873639` vào TheraNECK+ và nhận "Không thể thêm. Vui lòng
+thử lại."
+
+**Số đó đã có sẵn**: vào từ đơn Shopify **TH-2128** ngày 16/09, **đã duyệt**,
+khách chưa kích hoạt. Ràng buộc `(product_id, normalized_value)` từ chối bản
+thứ hai — đúng. Sai là câu báo: bảo "thử lại" cho một việc thử bao nhiêu lần
+cũng không được.
+
+**Nguyên nhân gốc — và nó không chỉ ở chỗ này.** Code đã có sẵn nhánh báo trùng,
+nhưng đọc lỗi bằng `error instanceof Error ? error.message : ""`. Lỗi của
+PostgREST **không phải `Error`** — kiểm trên chính supabase-js 2.112.3 của dự
+án: constructor là `Object`. Nên chuỗi đọc ra rỗng, mọi nhánh đều trượt.
+
+App mobile **đã tìm ra đúng cái bẫy này từ trước** và có `errorMessage()` trong
+`TheraHOME-APP/src/lib/errorMessage.ts` kèm chú thích. Web chưa từng được port.
+Grep ra **6 chỗ** cùng kiểu viết:
+
+| Chỗ | Nhận lỗi từ | Có bị |
+|---|---|---|
+| Admin → Kích hoạt | insert | **có** (lỗi được báo) |
+| Màn kích hoạt cho khách | RPC | **có** — số chưa đăng ký chỉ thấy "Có lỗi xảy ra" |
+| Cộng đồng trên web | insert | **có** — mất báo giới hạn/lọc nội dung |
+| Cộng đồng CSKH | update | **có** — mất báo ảnh quá lớn/sai định dạng |
+| Tài khoản TheraHOME ×2 | Edge Function (Error thật) | không, đổi cho đồng nhất |
+
+Đã port nguyên văn thành `src/lib/errorMessage.ts`, thêm `errorCode()` đọc
+SQLSTATE (`23505` đáng tin hơn so khớp chữ trong message), và áp cho cả sáu.
+
+**Riêng ca trùng, không dừng ở câu báo đúng.** Lý do chủ dự án không thấy dòng
+cũ là nó nằm tít dưới danh sách. Giờ khi trùng: nói rõ nguồn và trạng thái
+("Số này đã có sẵn trong danh sách (Đơn Shopify TH-2128 · 16/09/2026 — đã
+duyệt, khách chưa kích hoạt). Không cần thêm lại."), và **tự lọc danh sách về
+đúng số đó**; nếu dòng đang chờ duyệt thì mở luôn khu chờ duyệt.
+
+Kiểm chứng từng mắt xích bằng dữ liệu thật (không đăng nhập admin được):
+lỗi PostgREST thật — cách cũ đọc ra `""`, cách mới ra đúng message và mã;
+đối tượng lỗi 23505 được nhận ra; `0903873639` với mã +84 chuẩn hoá đúng thành
+`+84903873639` như trong DB, nên tra dòng cũ khớp; bộ lọc áp cho cả dòng đã
+duyệt nên TH-2128 hiện ra.

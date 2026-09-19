@@ -34,6 +34,7 @@ import { TableShell } from "@/components/ui/TableShell";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 import { useWebAccess } from "@/components/AccessGate";
+import { errorMessage } from "@/lib/errorMessage";
 
 // 'admin' excluded — there is exactly one admin account (seeded directly by
 // a migration, see current_web_roles()'s account_type fallback), not
@@ -505,7 +506,7 @@ export function TheraAccountsView() {
   // half of this fix) — surfaced with its own message + a sign-out instead
   // of the generic failure toast, since "try again" alone won't help.
   function handleAdminManageAccountError(e: unknown, genericMessage: string) {
-    const message = e instanceof Error ? e.message : "";
+    const message = errorMessage(e);
     if (message === "Missing Authorization header") {
       pushToast("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
       void signOut();

@@ -11,6 +11,7 @@ import { supabase } from "./supabase";
 import { translateDrafts } from "./translate";
 import type { Product, ProgramPhase, ProgramDay, MarketContent, StoreCategory, StoreItem, CommunityPost, CommunityComment, NotificationItem } from "./mockData";
 import { fetchSiteContent, type SiteContent } from "./siteContent";
+import { errorMessage } from "./errorMessage";
 import type {
   SampleUser,
   SampleUserRole,
@@ -1581,7 +1582,7 @@ export async function deleteTheraAccount(userId: string) {
 
 /** Maps the Edge Function's delete refusals to Vietnamese. */
 export function theraAccountDeleteMessage(error: unknown): string {
-  const code = error instanceof Error ? error.message : "";
+  const code = errorMessage(error);
   if (code === "cannot_delete_root_admin") return "Không thể xoá tài khoản quản trị gốc.";
   if (code === "cannot_delete_self") return "Không thể tự xoá tài khoản bạn đang đăng nhập.";
   if (code === "not_a_thera_account") return "Đây là tài khoản khách, không xoá ở đây được.";
