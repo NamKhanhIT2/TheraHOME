@@ -1,0 +1,93 @@
+.track { position: relative; height: 560svh; background: #02030b; }
+.stage { position: sticky; top: 0; height: 100svh; min-height: 640px; overflow: hidden; isolation: isolate; background: #06101d; color: #fff; }
+.ambient, .usageScene, .bundleScene, .appScene, .closingScene { position: absolute; inset: 0; }
+.ambient { z-index: -4; background: radial-gradient(circle at calc(74% + var(--mx) * 2%) calc(48% + var(--my) * 2%), rgba(60,193,255,.3), transparent 29%), radial-gradient(circle at 15% 20%, rgba(31,112,255,.2), transparent 34%), linear-gradient(135deg,#06101d 0%,#071827 50%,#03060c 100%); }
+.ambient::after { content: ""; position: absolute; inset: 0; opacity: .38; background-image: radial-gradient(rgba(255,255,255,.22) .6px,transparent .7px); background-size: 7px 7px; mask-image: linear-gradient(90deg,transparent,#000 35%,#000); }
+.introCopy, .sceneCopy, .closingCopy { position: absolute; z-index: 4; left: clamp(24px,6vw,96px); width: min(500px,39vw); }
+.introCopy { top: 50%; display: flex; flex-direction: column; gap: 20px; opacity: calc(1 - var(--intro-out)); transform: translate3d(0,calc(-50% - var(--intro-out) * 40px),0); filter: blur(calc(var(--intro-out) * 8px)); pointer-events: none; }
+.kicker, .step { color: #55c6ff; font-size: 11px; font-weight: 650; letter-spacing: .19em; text-transform: uppercase; }
+.introCopy h1 { margin: 0; font-size: clamp(58px,7.7vw,126px); line-height: .82; letter-spacing: -.07em; }
+.introCopy h1 span { color: #31b8ff; }
+.introCopy > p, .sceneCopy p, .closingCopy p { margin: 0; max-width: 460px; color: rgba(255,255,255,.67); font-size: clamp(15px,1.25vw,18px); line-height: 1.62; }
+.therapyList { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 0; padding: 0; list-style: none; }
+.therapyList li { padding: 8px 12px; border: 1px solid rgba(102,200,255,.24); border-radius: 999px; background: rgba(25,113,175,.13); color: rgba(255,255,255,.76); font-size: 12px; backdrop-filter: blur(12px); }
+.heroDevice { position: absolute; z-index: 3; top: 50%; left: 72%; width: min(58vw,880px); aspect-ratio: 1024/788; opacity: calc(1 - var(--handoff)); transform: translate3d(calc(-50% + var(--place) * 2vw + var(--mx) * 8px),calc(-50% + var(--place) * 22vh + var(--my) * 6px),0) scale(calc(1 - var(--place) * .69)) rotate(calc(-3deg + var(--place) * 7deg)); transform-origin: 50% 55%; will-change: transform,opacity; }
+.deviceImage { position: relative; z-index: 2; display: block; width: 100%; height: auto; filter: drop-shadow(0 42px 44px rgba(0,0,0,.38)); }
+.deviceHalo { position: absolute; z-index: 0; inset: 4% -8% -2%; border-radius: 50%; background: radial-gradient(ellipse,rgba(41,191,255,.36),transparent 67%); filter: blur(14px); transform: scale(calc(1 + var(--place) * .7)); }
+.deviceShadow { position: absolute; z-index: 1; left: 18%; right: 8%; bottom: 2%; height: 8%; border-radius: 50%; background: rgba(0,0,0,.55); filter: blur(18px); transform: scaleX(calc(1 - var(--place) * .5)); }
+.usageScene { z-index: -2; opacity: calc(var(--place) * (1 - var(--use-out))); clip-path: circle(calc(7% + var(--place) * 112%) at 74% 66%); transform: scale(calc(1.06 - var(--place) * .06)); will-change: opacity,clip-path,transform; }
+.usageImage { object-fit: cover; object-position: center 50%; }
+.usageShade { position: absolute; inset: 0; background: linear-gradient(90deg,rgba(3,9,16,.94) 0%,rgba(3,9,16,.66) 31%,transparent 63%),linear-gradient(0deg,rgba(3,8,14,.38),transparent 34%); }
+.sceneCopy { top: 50%; display: flex; flex-direction: column; gap: 16px; pointer-events: none; }
+.sceneCopy h2, .closingCopy h2 { margin: 0; max-width: 520px; font-size: clamp(30px,4vw,64px); font-weight: 600; line-height: 1.02; letter-spacing: -.045em; text-wrap: balance; }
+.useCopy { opacity: calc(var(--use-copy) * (1 - var(--use-out))); transform: translate3d(0,calc(-40% + (1 - var(--use-copy)) * 36px - var(--use-out) * 30px),0); filter: blur(calc((1 - var(--use-copy)) * 7px)); }
+.bundleScene { z-index: -1; opacity: calc(var(--bundle) * (1 - var(--bundle-out))); background: linear-gradient(135deg,#061523,#03060b 74%); pointer-events: none; }
+.bundleGlow { position: absolute; right: 3%; top: 9%; width: 69%; height: 78%; border-radius: 50%; background: radial-gradient(ellipse,rgba(0,181,255,.23),transparent 67%); filter: blur(24px); }
+.bundleMain { position: absolute; top: 50%; right: 3vw; width: min(64vw,980px); aspect-ratio: 3/2; overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: clamp(24px,3vw,46px); background: #020508; box-shadow: 0 40px 100px rgba(0,0,0,.55); transform: translate3d(calc((1 - var(--bundle)) * 11vw),-50%,0) scale(calc(.9 + var(--bundle) * .1)); }
+.bundleMain img { object-fit: cover; }
+.patchCard { position: absolute; z-index: 2; right: clamp(20px,5.5vw,94px); bottom: 8vh; width: min(15vw,210px); aspect-ratio: 1127/1396; filter: drop-shadow(0 30px 34px rgba(0,0,0,.5)); transform: translate3d(0,calc((1 - var(--bundle)) * 70px),0) rotate(calc(5deg - var(--bundle) * 9deg)); }
+.patchCard img { object-fit: contain; }
+.bundleCopy { z-index: 3; width: min(420px,34vw); opacity: calc(var(--bundle) * (1 - var(--bundle-out))); transform: translate3d(0,calc(-50% + (1 - var(--bundle)) * 40px),0); }
+.appScene { z-index: 0; opacity: calc(var(--app) * (1 - var(--app-out))); background: radial-gradient(circle at 70% 44%,rgba(0,176,255,.26),transparent 31%),linear-gradient(135deg,#04101e,#02040a 74%); pointer-events: none; }
+.phoneGlow { position: absolute; top: 13%; right: 11%; width: 34vw; height: 72vh; border-radius: 50%; background: rgba(16,172,255,.18); filter: blur(70px); }
+.phoneCard { position: absolute; z-index: 1; top: 51%; right: clamp(8vw,15vw,260px); width: min(24vw,335px); aspect-ratio: 853/1844; overflow: hidden; border: 1px solid rgba(255,255,255,.2); border-radius: clamp(22px,2.2vw,36px); box-shadow: 0 50px 100px rgba(0,0,0,.58),0 0 60px rgba(20,173,255,.14); transform: translate3d(calc((1 - var(--app)) * 14vw),calc(-50% + (1 - var(--app)) * 60px),0) rotate(calc(7deg - var(--app) * 10deg)); }
+.phoneCard img { object-fit: cover; }
+.dayPill { position: absolute; z-index: 2; right: clamp(3vw,8vw,130px); top: 20%; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 18px; background: rgba(7,23,40,.72); box-shadow: 0 16px 40px rgba(0,0,0,.28); backdrop-filter: blur(18px); transform: translateY(calc((1 - var(--app)) * -30px)); }
+.dayPill strong { color: #45c4ff; font-size: 28px; }
+.dayPill span { max-width: 72px; color: rgba(255,255,255,.74); font-size: 11px; line-height: 1.25; }
+.appCopy { opacity: calc(var(--app) * (1 - var(--app-out))); transform: translate3d(0,calc(-50% + (1 - var(--app)) * 40px),0); }
+.closingScene { z-index: 5; opacity: var(--close); background: radial-gradient(circle at 76% 48%,rgba(0,167,255,.28),transparent 32%),linear-gradient(125deg,#06192a,#02030a 72%); pointer-events: none; }
+.closingProduct { position: absolute; top: 50%; right: 3vw; width: min(46vw,720px); transform: translate3d(calc((1 - var(--close)) * 11vw),-50%,0) rotate(calc((1 - var(--close)) * 5deg)); filter: drop-shadow(0 42px 52px rgba(0,0,0,.45)); }
+.closingProduct img { display: block; width: 100%; height: auto; }
+.closingCopy { top: 50%; display: flex; flex-direction: column; gap: 18px; transform: translate3d(0,calc(-50% + (1 - var(--close)) * 40px),0); pointer-events: auto; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 8px; }
+.progressRail { position: absolute; z-index: 10; top: 50%; right: 24px; display: flex; flex-direction: column; gap: 15px; margin: 0; padding: 0; list-style: none; transform: translateY(-50%); }
+.progressRail li { display: flex; flex-direction: row-reverse; align-items: center; gap: 9px; color: rgba(255,255,255,.42); }
+.progressRail span { width: 7px; height: 7px; border-radius: 99px; background: currentColor; transition: transform 280ms ease,color 280ms ease; }
+.progressRail em { opacity: 0; font-size: 10px; font-style: normal; letter-spacing: .08em; text-transform: uppercase; transition: opacity 220ms ease; }
+.progressRail li:hover em { opacity: 1; }
+.track[data-scene="0"] .progressRail li[data-index="0"], .track[data-scene="1"] .progressRail li[data-index="1"], .track[data-scene="2"] .progressRail li[data-index="2"], .track[data-scene="3"] .progressRail li[data-index="3"], .track[data-scene="4"] .progressRail li[data-index="4"] { color: #47c6ff; }
+.track[data-scene="0"] .progressRail li[data-index="0"] span, .track[data-scene="1"] .progressRail li[data-index="1"] span, .track[data-scene="2"] .progressRail li[data-index="2"] span, .track[data-scene="3"] .progressRail li[data-index="3"] span, .track[data-scene="4"] .progressRail li[data-index="4"] span { transform: scale(1.8); box-shadow: 0 0 14px rgba(71,198,255,.8); }
+.scrollHint { position: absolute; z-index: 9; left: 50%; bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 9px; color: rgba(255,255,255,.44); font-size: 10px; letter-spacing: .15em; text-transform: uppercase; opacity: calc(1 - var(--intro-out)); transform: translateX(-50%); }
+.scrollHint i { position: relative; width: 1px; height: 28px; overflow: hidden; background: rgba(255,255,255,.2); }
+.scrollHint i::after { content: ""; position: absolute; inset: 0; background: #55c6ff; animation: scrollPulse 1.7s ease-in-out infinite; }
+@keyframes scrollPulse { from { transform: translateY(-100%); } to { transform: translateY(100%); } }
+
+@media (max-width: 760px) {
+  .track { height: 500svh; }
+  .stage { min-height: 560px; }
+  .introCopy, .sceneCopy, .closingCopy { left: 20px; width: calc(100vw - 40px); }
+  .introCopy { top: 24%; gap: 14px; transform: translate3d(0,calc(-50% - var(--intro-out) * 25px),0); }
+  .introCopy h1 { font-size: clamp(52px,15vw,72px); }
+  .introCopy > p { max-width: 94%; font-size: 14px; }
+  .therapyList { max-width: 95%; gap: 6px; }
+  .therapyList li { padding: 6px 9px; font-size: 10px; }
+  .heroDevice { top: 64%; left: 51%; width: 94vw; transform: translate3d(calc(-50% + var(--place) * 20vw),calc(-50% + var(--place) * 7vh),0) scale(calc(1 - var(--place) * .65)) rotate(calc(-3deg + var(--place) * 7deg)); }
+  .usageImage { object-position: 62% center; }
+  .usageShade { background: linear-gradient(0deg,rgba(3,9,16,.94) 0%,rgba(3,9,16,.62) 40%,transparent 67%); }
+  .usageScene { clip-path: circle(calc(7% + var(--place) * 120%) at 72% 68%); }
+  .sceneCopy { top: auto; bottom: 8vh; gap: 11px; }
+  .sceneCopy h2, .closingCopy h2 { max-width: 92%; font-size: clamp(28px,8.7vw,42px); }
+  .sceneCopy p, .closingCopy p { max-width: 94%; font-size: 14px; line-height: 1.48; }
+  .useCopy { transform: translate3d(0,calc((1 - var(--use-copy)) * 28px - var(--use-out) * 25px),0); }
+  .bundleMain { top: 35%; right: 4vw; width: 92vw; transform: translate3d(calc((1 - var(--bundle)) * 14vw),-50%,0) scale(calc(.9 + var(--bundle) * .1)); }
+  .patchCard { right: 8vw; bottom: 36%; width: 25vw; }
+  .bundleCopy { width: calc(100vw - 40px); transform: translate3d(0,calc((1 - var(--bundle)) * 34px),0); }
+  .phoneCard { top: 39%; right: 18vw; width: min(51vw,260px); }
+  .phoneGlow { top: 8%; right: 5%; width: 90vw; height: 62vh; }
+  .dayPill { top: 15%; right: 7vw; }
+  .appCopy { transform: translate3d(0,calc((1 - var(--app)) * 34px),0); }
+  .closingProduct { top: 34%; right: 5vw; width: 86vw; }
+  .closingCopy { top: auto; bottom: max(7vh,58px); transform: translate3d(0,calc((1 - var(--close)) * 30px),0); }
+  .actions { gap: 8px; }
+  .progressRail { right: 10px; gap: 12px; }
+  .progressRail em { display: none; }
+  .scrollHint { bottom: 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track { height: 100svh; }
+  .introCopy { opacity: 1; filter: none; transform: translateY(-50%); }
+  .heroDevice { opacity: 1; transform: translate3d(-50%,-50%,0); }
+  .usageScene, .sceneCopy, .bundleScene, .appScene, .closingScene, .progressRail, .scrollHint { display: none; }
+}
