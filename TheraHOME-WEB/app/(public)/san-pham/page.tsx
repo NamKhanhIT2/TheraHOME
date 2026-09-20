@@ -4,6 +4,7 @@ import { LandingButton } from "@/components/landing/LandingButton";
 import { getSiteContent } from "@/lib/siteContent";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ProductScrollHero } from "@/components/landing/ProductScrollHero";
+import { Product360 } from "@/components/landing/Product360";
 
 export const metadata = {
   title: "TheraNECK+ · TheraHome",
@@ -16,9 +17,9 @@ const h2: CSSProperties = { margin: 0, fontSize: "clamp(26px, 2.8vw, 40px)", fon
 const card: CSSProperties = { display: "flex", flexDirection: "column", gap: 14, padding: "clamp(24px, 2.4vw, 32px)", borderRadius: "var(--radius-lg, 24px)", background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)" };
 
 const SUBNAV = [
+  { href: "#mua-hang", label: "Giá & bộ quà tặng" },
   { href: "#lieu-phap-4", label: "4 liệu pháp" },
   { href: "#lo-trinh", label: "Lộ trình 14 ngày" },
-  { href: "#mua-hang", label: "Giá & bộ quà tặng" },
 ];
 
 const THERAPIES = [
@@ -63,6 +64,66 @@ export default async function ProductsPage() {
       </div>
 
       <ProductScrollHero />
+
+      {/* ------------------------------------------------- sản phẩm & giá */}
+      {/* Moved above the supporting sections on 2026-09-20. The product, its
+          price and the way to buy it used to sit below four screens of
+          argument; a shop shows you the thing first and makes the case after. */}
+      <section id="mua-hang" style={{ ...sectionPad, paddingTop: "clamp(48px, 7vh, 88px)" }}>
+        <div className="reveal-scope" style={{ maxWidth: 1240, margin: "0 auto", display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "clamp(32px, 4.5vw, 64px)" }}>
+
+          <div style={{ flex: "1 1 380px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+            <Product360 label="Máy trị liệu cổ TheraNECK+" />
+            <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.48)", textAlign: "center" }}>
+              Ảnh dựng 360° từ sản phẩm thật
+            </p>
+          </div>
+
+          <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
+            <span style={eyebrow}>Máy trị liệu cổ</span>
+            <h2 style={{ ...h2, fontSize: "clamp(28px, 3vw, 42px)" }}>Bộ giải pháp Trị Liệu Cổ</h2>
+            <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.72)" }}>
+              <span aria-hidden="true" style={{ color: "#FFD23F", letterSpacing: "0.08em" }}>★★★★★</span>
+              {pricing.ratingLine}
+            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 14 }}>
+              <span style={{ fontSize: "clamp(30px, 3.2vw, 44px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>{pricing.current}</span>
+              <s style={{ fontSize: 18, color: "rgba(255,255,255,0.62)" }}>{pricing.original}</s>
+              <span style={{ fontSize: 13, fontWeight: 600, padding: "6px 12px", borderRadius: 999, background: "rgba(255,182,72,0.16)", border: "1px solid rgba(255,182,72,0.4)", color: "#FFB648" }}>
+                {pricing.note}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, paddingTop: 4 }}>
+              <LandingButton href="https://therahomeai.com">Thêm vào giỏ hàng</LandingButton>
+              <LandingButton href="/ung-dung" variant="secondary">Tìm hiểu ứng dụng</LandingButton>
+            </div>
+
+            <div style={{ ...card, gap: 0, padding: "clamp(18px, 1.8vw, 24px)", marginTop: 4 }}>
+              <h3 style={{ margin: "0 0 4px", fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Trọn bộ giải pháp sẽ bao gồm</h3>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {BUNDLE.map((b, i) => (
+                  <li key={b} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.07)", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>
+                    <span aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, flex: "0 0 auto", borderRadius: 999, background: "rgba(0,127,217,0.18)", color: "#7FBFFF", fontSize: 12, fontWeight: 700 }}>{i + 1}</span>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "10px 20px" }}>
+              {ASSURANCES.map((a) => (
+                <li key={a} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4FB0F5" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: "0 0 auto" }}>
+                    <path d="M5 12.5 10 17l9-10" />
+                  </svg>
+                  {a}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
 
       {/* ----------------------------------------------------- 4 liệu pháp */}
       <section id="lieu-phap-4" style={sectionPad}>
@@ -120,52 +181,6 @@ export default async function ProductsPage() {
               </li>
             ))}
           </ol>
-        </div>
-      </section>
-
-      {/* --------------------------------------------------- bộ giải pháp */}
-      <section id="mua-hang" style={sectionPad}>
-        <div className="reveal-scope" style={{ maxWidth: 1240, margin: "0 auto", display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "clamp(32px, 5vw, 72px)" }}>
-          <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.72)" }}>
-              <span aria-hidden="true" style={{ color: "#FFD23F", letterSpacing: "0.08em" }}>★★★★★</span>
-              {pricing.ratingLine}
-            </span>
-            <h2 style={{ ...h2, fontSize: "clamp(28px, 3vw, 42px)" }}>Bộ giải pháp Trị Liệu Cổ</h2>
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 14 }}>
-              <span style={{ fontSize: "clamp(30px, 3.2vw, 44px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>{pricing.current}</span>
-              <s style={{ fontSize: 18, color: "rgba(255,255,255,0.62)" }}>{pricing.original}</s>
-              <span style={{ fontSize: 13, fontWeight: 600, padding: "6px 12px", borderRadius: 999, background: "rgba(255,182,72,0.16)", border: "1px solid rgba(255,182,72,0.4)", color: "#FFB648" }}>
-                {pricing.note}
-              </span>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, paddingTop: 4 }}>
-              <LandingButton href="https://therahomeai.com">Thêm vào giỏ hàng</LandingButton>
-              <LandingButton href="/ung-dung" variant="secondary">Tìm hiểu ứng dụng</LandingButton>
-            </div>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10, paddingTop: 8 }}>
-              {ASSURANCES.map((a) => (
-                <li key={a} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "rgba(255,255,255,0.7)" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4FB0F5" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: "0 0 auto" }}>
-                    <path d="M5 12.5 10 17l9-10" />
-                  </svg>
-                  {a}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div style={{ flex: "1 1 320px", minWidth: 0, ...card }}>
-            <h3 style={{ margin: 0, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Trọn bộ giải pháp sẽ bao gồm</h3>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 0 }}>
-              {BUNDLE.map((b, i) => (
-                <li key={b} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.07)", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>
-                  <span aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, flex: "0 0 auto", borderRadius: 999, background: "rgba(0,127,217,0.18)", color: "#7FBFFF", fontSize: 12, fontWeight: 700 }}>{i + 1}</span>
-                  {b}
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </section>
 

@@ -2096,3 +2096,42 @@ lỗi PostgREST thật — cách cũ đọc ra `""`, cách mới ra đúng messa
 đối tượng lỗi 23505 được nhận ra; `0903873639` với mã +84 chuẩn hoá đúng thành
 `+84903873639` như trong DB, nên tra dòng cũ khớp; bộ lọc áp cho cả dòng đã
 duyệt nên TH-2128 hiện ra.
+
+### Trang Sản phẩm: bộ xoay 360 và dựng lại thứ tự bán hàng (2026-09-20)
+
+Chủ dự án gửi ảnh 3D sản phẩm (`TheraNECK_1.glb`) và video 360 (`TheraNECK_360_5.mp4`),
+yêu cầu trình bày trang TheraNECK+ chuyên nghiệp và thu hút hơn.
+
+**Chọn video 360, không dùng GLB — và lý do là một giới hạn thật, không phải
+chê file.** 3D thật cần runtime WebGL cộng một component từ CDN, và diện mạo
+phụ thuộc vào ánh sáng mà mình phải tự dựng. Pane trình duyệt trong môi trường
+này **không vẽ WebGL** — tôi dựng thử `model-viewer` và chỉ nhận về khung đen.
+Ship một thứ trưng bày mà chính mình chưa từng nhìn thấy là rủi ro lớn hơn.
+Video turntable thì tôi đã xem từng khung bằng ffmpeg, nhẹ 0,36 MB, chạy không
+cần WebGL. File GLB vẫn nằm trong `~/Downloads` nếu sau này muốn làm 3D/AR.
+
+**Mã hoá all-intra, đây là điểm mấu chốt.** Bản gốc có **đúng 1 keyframe cho
+cả 96 khung** — mỗi lần kéo ngược, trình duyệt phải giải mã lại từ đầu clip.
+Xuất lại 900×900 CRF 30 với `keyint=1` → **96/96 keyframe**, mọi khung tua tức
+thì hai chiều, 0,36 MB, SSIM 0,993.
+
+**Dựng lại thứ tự trang.** Trước đây giá và nút mua nằm sau bốn màn hình lý lẽ.
+Giờ: hero → **sản phẩm & giá** → 4 liệu pháp → kết quả → lộ trình → FAQ. Cửa
+hàng thì cho xem món hàng trước, thuyết phục sau. Khối mua hàng gom lại quanh
+bộ xoay: ảnh 360 bên trái, tên/đánh giá/giá/nút mua/bộ quà tặng/cam kết bên phải
+— không nhân đôi giá ở hai nơi.
+
+**Một lỗi tìm ra nhờ đo, không nhờ nhìn — và nó sẽ dính khách thật.** Kéo chuột
+không xoay, trong khi phím mũi tên lại xoay được. Hoá ra `loadedmetadata` bắn
+**trước khi React kịp gắn listener** (video nạp xong từ cache trước lúc
+hydrate), nên cờ `ready` không bao giờ bật; nhánh kéo chuột kiểm `ready` nên bị
+chặn ngay dòng đầu, còn nhánh bàn phím không kiểm nên vẫn chạy. Đã đổi sang hỏi
+thẳng `video.readyState` lúc mount rồi mới nghe sự kiện — đúng khuôn `SafeImg`
+đã dùng cho ảnh hỏng trước khi hydrate.
+
+Kiểm chứng: kéo ¼ chiều rộng ra **đúng 24 khung** (¼ vòng), cả hai chiều; bàn
+phím xoay đúng; desktop panel 468×468 vuông, mobile 375px xếp dọc 335×335,
+không tràn ngang, `touch-action: pan-y` nên vuốt dọc vẫn cuộn trang.
+
+**Chưa tự nhìn được:** pane ẩn không repaint phần dưới màn hình đầu, nên tôi
+chỉ xác minh được bố cục bằng số đo chứ chưa thấy khối sản phẩm bằng mắt.
