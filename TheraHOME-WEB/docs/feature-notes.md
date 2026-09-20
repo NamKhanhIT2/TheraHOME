@@ -2174,3 +2174,46 @@ iOS Quick Look cần file `.usdz` mà ta chưa có, nên nút đơn giản khôn
 Kiểm chứng: model `loaded`, render sống trên trang (chụp lại từ canvas, xem
 bằng mắt); desktop khung 468×468, mobile 335×335 xếp dọc, không tràn ngang,
 `touch-action: pan-y` nên vuốt dọc vẫn cuộn trang.
+
+### Trang Sản phẩm: đối chiếu với Shopify, thêm card và CTA mua hàng (2026-09-20, khuya)
+
+Chủ dự án yêu cầu đối chiếu `/san-pham` với trang bán thật
+`therahomeai.com/products/maytrilieuco` và bổ sung các card cùng CTA mua hàng,
+dùng chung cổng thanh toán.
+
+**Lỗ hổng lớn nhất không phải thiếu card — là web chỉ bán được một nửa.** Shopify
+bán **hai** gói: bộ giải pháp 990.000đ và **Combo Phục hồi toàn diện
+1.490.000đ** (thêm gối công thái học cho đốt sống C4–C7). Web chưa hề có gói
+combo, tức khách muốn mua gói đắt hơn thì không có đường. Nay hộp mua hàng có
+cả hai, mỗi gói một nút riêng.
+
+**Về link thanh toán — tôi không dùng đúng link bạn gửi, và đây là lý do.** Link
+đó (`/checkouts/cn/hWNH2j3E…?cart_link_id=lXg5sLKD`) **302 sang một mã checkout
+khác ở mỗi lần gọi** — nó là link chia sẻ giỏ hàng, gắn với một giỏ tạo ra tại
+một thời điểm, không phải địa chỉ cố định. Thay bằng **cart permalink** của
+Shopify: `/cart/<variant>:1`. Kiểm chứng cả hai đều 302 vào **đúng cổng
+`/checkouts/cn/…`** của cửa hàng, nhưng permalink tự mô tả mua gì, số lượng bao
+nhiêu, và luôn tạo giỏ mới nên không hết hạn.
+
+Mã biến thể đọc từ `products/maytrilieuco.js` và đối chiếu `products.json`:
+`47368656257260` = Bộ giải pháp Trị Liệu Cổ, `47600674111724` = Combo Phục Hồi
+Toàn Diện (1.490.000đ). Cả hai link **đều để admin sửa được** ở Nội dung website,
+kèm ghi chú đừng dán link dạng `/checkouts/cn/…`.
+
+**Ba section mới, bê từ trang Shopify:**
+- **"Khác gì máy massage cổ thông thường?"** — bảng so sánh 5 tiêu chí. Đây là
+  lập luận bán hàng mạnh nhất của trang gốc mà web thiếu hẳn.
+- **"Sản phẩm rõ nguồn gốc. Chính sách rõ ràng sau khi mua."** — 3 card chứng từ
+  (hóa đơn VAT, hồ sơ sản phẩm, chứng nhận hợp quy của gối) + 4 badge chính sách.
+- **"Khách hàng nói gì sau khi dùng"** — 3 đánh giá thật kèm tên sản phẩm, đóng
+  bằng cặp CTA mua hàng. Đây là **ảnh chụp tại 2026-09-20**, không phải feed:
+  bên này không có API đánh giá, nên khi trang gốc đổi thì phải cập nhật tay.
+
+Giá combo cũng nằm trong Nội dung website. Không cần migration: `mergeRow` ghép
+giá trị lưu lên mặc định **theo từng khoá**, nên khoá mới trong code chạy được
+ngay cả khi dòng trong DB chưa có.
+
+Kiểm chứng: 6 section đúng thứ tự, 4 nút mua đều trỏ vào permalink thật (đã thử
+cả hai, đều 302 vào cổng thanh toán), bảng so sánh 6 dòng, 3 card chứng từ + 4
+badge, 3 đánh giá; không còn link placeholder `https://therahomeai.com`; mobile
+375px không có phần tử nào rộng quá màn hình.

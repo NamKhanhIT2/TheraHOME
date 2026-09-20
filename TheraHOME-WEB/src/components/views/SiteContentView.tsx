@@ -85,6 +85,48 @@ export function SiteContentView() {
         <p style={hint}>Gõ cả ký tự ₫ và dấu chấm hàng nghìn — trang hiển thị đúng như bạn nhập.</p>
       </SectionCard>
 
+      <SectionCard title="Gói combo (trang Sản phẩm)">
+        <div style={grid2}>
+          <div>
+            <FieldLabel>Tên gói</FieldLabel>
+            <input style={inputStyle} value={c.pricing.comboName} onChange={(e) => set("pricing", { ...c.pricing, comboName: e.target.value })} />
+          </div>
+          <div>
+            <FieldLabel>Giá đang bán</FieldLabel>
+            <input style={inputStyle} value={c.pricing.comboCurrent} onChange={(e) => set("pricing", { ...c.pricing, comboCurrent: e.target.value })} />
+          </div>
+          <div>
+            <FieldLabel>Giá gạch ngang</FieldLabel>
+            <input style={inputStyle} value={c.pricing.comboOriginal} onChange={(e) => set("pricing", { ...c.pricing, comboOriginal: e.target.value })} />
+          </div>
+          <div>
+            <FieldLabel>Nhãn ưu đãi</FieldLabel>
+            <input style={inputStyle} value={c.pricing.comboNote} onChange={(e) => set("pricing", { ...c.pricing, comboNote: e.target.value })} />
+          </div>
+        </div>
+        <div>
+          <FieldLabel>Mô tả thêm so với gói cơ bản</FieldLabel>
+          <input style={inputStyle} value={c.pricing.comboDesc} onChange={(e) => set("pricing", { ...c.pricing, comboDesc: e.target.value })} />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Link thanh toán (nút Mua ngay)">
+        <div>
+          <FieldLabel>Gói cơ bản</FieldLabel>
+          <input style={inputStyle} value={c.buy.solo} onChange={(e) => set("buy", { ...c.buy, solo: e.target.value })} />
+        </div>
+        <div>
+          <FieldLabel>Gói combo</FieldLabel>
+          <input style={inputStyle} value={c.buy.combo} onChange={(e) => set("buy", { ...c.buy, combo: e.target.value })} />
+        </div>
+        <p style={hint}>
+          Đây là <strong>link giỏ hàng Shopify</strong> dạng <code>/cart/&lt;mã biến thể&gt;:&lt;số lượng&gt;</code>. Nó dẫn thẳng vào
+          đúng cổng thanh toán của cửa hàng nhưng luôn tạo giỏ mới, nên không hết hạn. Đừng dán link dạng
+          <code> /checkouts/cn/…</code> — đó là phiên thanh toán của một giỏ cụ thể, mỗi lần mở lại sinh mã khác.
+          Đổi sản phẩm thì lấy mã biến thể mới tại <code>therahomeai.com/products/&lt;tên&gt;.js</code>.
+        </p>
+      </SectionCard>
+
       <SectionCard title="Ba con số ở đầu Trang chủ">
         {c.stats_hero.map((s, i) => (
           <div key={i} style={{ ...grid2, marginBottom: 10 }}>

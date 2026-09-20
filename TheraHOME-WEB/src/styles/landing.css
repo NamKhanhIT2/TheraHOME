@@ -798,3 +798,38 @@ body:has(.landing-root) {
   -webkit-backdrop-filter: blur(10px);
   pointer-events: none;
 }
+
+/* Sản phẩm: bảng so sánh với máy thường */
+.landing-root .cmp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 118px 118px;
+  align-items: center;
+  gap: 16px;
+  padding: 15px clamp(18px, 2vw, 26px);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 15px;
+}
+.landing-root .cmp-row:first-child {
+  border-top: none;
+}
+.landing-root .cmp-head {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.03);
+}
+.landing-root .cmp-row > span:nth-child(2),
+.landing-root .cmp-row > span:nth-child(3) {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+@media (max-width: 599px) {
+  .landing-root .cmp-row {
+    grid-template-columns: minmax(0, 1fr) 72px 72px;
+    gap: 10px;
+    padding: 13px 14px;
+    font-size: 14px;
+  }
+}

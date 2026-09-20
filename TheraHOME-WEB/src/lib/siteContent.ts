@@ -16,7 +16,29 @@
 import { cache } from "react";
 import { supabase } from "./supabase";
 
-export interface Pricing { current: string; original: string; note: string; ratingLine: string }
+export interface Pricing {
+  current: string;
+  original: string;
+  note: string;
+  ratingLine: string;
+  /** The second offer on the Shopify page — the same device plus the C4–C7
+   * pillow. It had no equivalent here, so the site could only sell the
+   * cheaper of the two things the shop actually sells. */
+  comboName: string;
+  comboDesc: string;
+  comboCurrent: string;
+  comboOriginal: string;
+  comboNote: string;
+}
+
+/** Where the buy buttons go.
+ *
+ * Shopify cart permalinks, not the checkout-session link the owner sent. That
+ * one redirects to a FRESH /checkouts/cn/<token> on every visit — it is a
+ * share-a-cart link tied to one cart made at one moment. These reach the very
+ * same checkout (verified: both 302 into /checkouts/cn/…) while saying which
+ * product and quantity they mean, so they cannot go stale. */
+export interface BuyLinks { solo: string; combo: string }
 export interface HeroStat { value: string; label: string }
 export interface ResultStat { stat: string; body: string }
 export interface FaqItem { q: string; a: string }
@@ -26,6 +48,7 @@ export interface AppLinks { appStore: string; playStore: string }
 
 export interface SiteContent {
   pricing: Pricing;
+  buy: BuyLinks;
   stats_hero: HeroStat[];
   stats_results: ResultStat[];
   faq: FaqItem[];
@@ -35,7 +58,23 @@ export interface SiteContent {
 }
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
-  pricing: { current: "990.000₫", original: "1.690.000₫", note: "Giảm 41% cho người mới", ratingLine: "4.8/5 — 1.186 đánh giá" },
+  pricing: {
+    current: "990.000₫",
+    original: "1.690.000₫",
+    note: "Giảm 41% cho người mới",
+    ratingLine: "4.8/5 — 1.186 đánh giá",
+    comboName: "Combo Phục hồi toàn diện",
+    comboDesc: "Tất cả ở trên + gối công thái học thiết kế cho đốt sống C4–C7",
+    comboCurrent: "1.490.000₫",
+    comboOriginal: "2.490.000₫",
+    comboNote: "Miễn phí giao hàng toàn quốc",
+  },
+  // Variant ids read from therahomeai.com/products/maytrilieuco.js on
+  // 2026-09-20: 47368656257260 is the solution bundle, 47600674111724 the combo.
+  buy: {
+    solo: "https://therahomeai.com/cart/47368656257260:1",
+    combo: "https://therahomeai.com/cart/47600674111724:1",
+  },
   stats_hero: [
     { value: "+10.000", label: "khách hàng Việt Nam" },
     { value: "4.8/5", label: "1.186 đánh giá" },

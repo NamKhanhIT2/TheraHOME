@@ -19,7 +19,9 @@ const card: CSSProperties = { display: "flex", flexDirection: "column", gap: 14,
 const SUBNAV = [
   { href: "#mua-hang", label: "Giá & bộ quà tặng" },
   { href: "#lieu-phap-4", label: "4 liệu pháp" },
+  { href: "#khac-biet", label: "Khác gì máy thường" },
   { href: "#lo-trinh", label: "Lộ trình 14 ngày" },
+  { href: "#danh-gia", label: "Đánh giá" },
 ];
 
 const THERAPIES = [
@@ -47,11 +49,43 @@ const BUNDLE = [
   "Gel xung điện",
 ];
 
+// The comparison table from the shop page. Kept as data so the two columns
+// can never drift out of step in the markup.
+const COMPARE: { criterion: string; ours: string | true; theirs: string | false }[] = [
+  { criterion: "4 cơ chế trị liệu trong 1 máy", ours: true, theirs: "1–2 cơ chế" },
+  { criterion: "Lộ trình 14 ngày theo tình trạng của bạn", ours: true, theirs: "Tự đoán" },
+  { criterion: "App TheraAI hướng dẫn mỗi ngày", ours: true, theirs: false },
+  { criterion: "Đội ngũ theo dõi qua Zalo sau mua", ours: true, theirs: false },
+  { criterion: "Đổi trả 14 ngày miễn phí", ours: true, theirs: "Tuỳ nơi" },
+];
+
+const TRUST = [
+  { title: "Đầy đủ hóa đơn VAT", body: "Sản phẩm được cung cấp kèm hóa đơn VAT theo quy định." },
+  { title: "Hồ sơ sản phẩm minh bạch", body: "Thông tin và chứng từ liên quan được công bố rõ ràng để khách hàng dễ kiểm tra." },
+  { title: "Gối công thái học có chứng nhận hợp quy", body: "Hồ sơ chứng nhận được cung cấp để khách hàng có thể kiểm tra khi cần." },
+];
+
+const TRUST_BADGES = [
+  { value: "14 ngày", label: "Chính sách đổi trả" },
+  { value: "12 tháng", label: "Bảo hành" },
+  { value: "COD", label: "Thanh toán khi nhận hàng" },
+  { value: "Toàn quốc", label: "Giao hàng" },
+];
+
+/** Reviews carried over from the shop page on 2026-09-20. A snapshot, not a
+ * feed: there is no review API on this side, so refresh them by hand when the
+ * shop's page moves on. */
+const REVIEWS = [
+  { name: "Thao Tran", when: "3 ngày trước", product: "Combo Phục hồi toàn diện", text: "Mọi thứ dễ dùng, gối êm ngủ thử 1 đêm thấy ổn. Sẽ giới thiệu người thân trải nghiệm." },
+  { name: "Hoanluong98", when: "5 ngày trước", product: "Bộ giải pháp Trị Liệu Cổ", text: "Xung điện dùng thích, không quá giật mình nhưng sâu, cảm giác như đi vật lý trị liệu tại gia." },
+  { name: "Kiên Trann", when: "1 tuần trước", product: "Bộ giải pháp Trị Liệu Cổ", text: "Mới dùng nên chưa quen thao tác, còn hơi khó; dùng thêm mấy ngày chắc sẽ quen." },
+];
+
 const ASSURANCES = ["Miễn phí lộ trình qua APP TheraAI hoặc Zalo", "Hoàn trả 14 ngày", "Bảo hành 12 tháng", "Giao 2–5 ngày, hỗ trợ COD"];
 
 
 export default async function ProductsPage() {
-  const { stats_results: RESULTS, faq: FAQ, pricing } = await getSiteContent();
+  const { stats_results: RESULTS, faq: FAQ, pricing, buy } = await getSiteContent();
   return (
     <>
       {/* product sub-nav, pinned under the site nav */}
@@ -86,29 +120,41 @@ export default async function ProductsPage() {
               <span aria-hidden="true" style={{ color: "#FFD23F", letterSpacing: "0.08em" }}>★★★★★</span>
               {pricing.ratingLine}
             </span>
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 14 }}>
-              <span style={{ fontSize: "clamp(30px, 3.2vw, 44px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>{pricing.current}</span>
-              <s style={{ fontSize: 18, color: "rgba(255,255,255,0.62)" }}>{pricing.original}</s>
-              <span style={{ fontSize: 13, fontWeight: 600, padding: "6px 12px", borderRadius: 999, background: "rgba(255,182,72,0.16)", border: "1px solid rgba(255,182,72,0.4)", color: "#FFB648" }}>
-                {pricing.note}
-              </span>
-            </div>
+            {/* Two offers, because the shop sells two. The site listed only the
+                cheaper one, so the combo — the device plus the C4–C7 pillow —
+                had no way to be bought here at all. Both buttons go to the
+                store's own checkout. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 2 }}>
+              <div style={{ ...card, gap: 12, padding: "clamp(18px, 1.8vw, 24px)", borderColor: "rgba(0,127,217,0.45)", background: "rgba(0,127,217,0.07)" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12 }}>
+                  <span style={{ fontSize: "clamp(27px, 2.9vw, 38px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>{pricing.current}</span>
+                  <s style={{ fontSize: 17, color: "rgba(255,255,255,0.62)" }}>{pricing.original}</s>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, padding: "5px 11px", borderRadius: 999, background: "rgba(255,182,72,0.16)", border: "1px solid rgba(255,182,72,0.4)", color: "#FFB648" }}>{pricing.note}</span>
+                </div>
+                <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                  {BUNDLE.map((b, i) => (
+                    <li key={b} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 0", borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.08)", fontSize: 14.5, color: "rgba(255,255,255,0.86)" }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4FB0F5" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: "0 0 auto" }}><path d="M5 12.5 10 17l9-10" /></svg>
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+                <LandingButton href={buy.solo}>Mua bộ giải pháp — {pricing.current}</LandingButton>
+              </div>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, paddingTop: 4 }}>
-              <LandingButton href="https://therahomeai.com">Thêm vào giỏ hàng</LandingButton>
-              <LandingButton href="/ung-dung" variant="secondary">Tìm hiểu ứng dụng</LandingButton>
-            </div>
-
-            <div style={{ ...card, gap: 0, padding: "clamp(18px, 1.8vw, 24px)", marginTop: 4 }}>
-              <h3 style={{ margin: "0 0 4px", fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Trọn bộ giải pháp sẽ bao gồm</h3>
-              <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-                {BUNDLE.map((b, i) => (
-                  <li key={b} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.07)", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>
-                    <span aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, flex: "0 0 auto", borderRadius: 999, background: "rgba(0,127,217,0.18)", color: "#7FBFFF", fontSize: 12, fontWeight: 700 }}>{i + 1}</span>
-                    {b}
-                  </li>
-                ))}
-              </ul>
+              <div style={{ ...card, gap: 12, padding: "clamp(18px, 1.8vw, 24px)" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#fff" }}>{pricing.comboName}</h3>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", padding: "5px 10px", borderRadius: 999, background: "rgba(0,127,217,0.2)", border: "1px solid rgba(0,127,217,0.45)", color: "#7FBFFF" }}>Chuyên gia khuyên dùng</span>
+                </div>
+                <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: "rgba(255,255,255,0.74)" }}>{pricing.comboDesc}</p>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12 }}>
+                  <span style={{ fontSize: "clamp(24px, 2.5vw, 32px)", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>{pricing.comboCurrent}</span>
+                  <s style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>{pricing.comboOriginal}</s>
+                  <span style={{ fontSize: 12.5, color: "#7BE39B" }}>{pricing.comboNote}</span>
+                </div>
+                <LandingButton href={buy.combo} variant="secondary">Mua combo — {pricing.comboCurrent}</LandingButton>
+              </div>
             </div>
 
             <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "10px 20px" }}>
@@ -163,6 +209,40 @@ export default async function ProductsPage() {
         </div>
       </section>
 
+      {/* ------------------------------------------- khác gì máy thường */}
+      <section id="khac-biet" style={sectionPad}>
+        <div className="reveal-scope" style={{ maxWidth: 1000, margin: "0 auto", display: "flex", flexDirection: "column", gap: 22 }}>
+          <span style={eyebrow}>So sánh</span>
+          <h2 style={h2}>Khác gì máy massage cổ thông thường?</h2>
+          <p style={{ margin: 0, maxWidth: 620, fontSize: 16.5, lineHeight: 1.65, color: "rgba(255,255,255,0.66)" }}>
+            Máy chỉ là điểm bắt đầu. Khác biệt nằm ở những gì đi cùng chiếc máy.
+          </p>
+
+          <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+            <div className="cmp-row cmp-head">
+              <span>Tiêu chí</span>
+              <span style={{ color: "#7FBFFF" }}>TheraNECK+</span>
+              <span>Máy thường</span>
+            </div>
+            {COMPARE.map((r) => (
+              <div key={r.criterion} className="cmp-row">
+                <span style={{ color: "rgba(255,255,255,0.88)" }}>{r.criterion}</span>
+                <span style={{ color: "#7BE39B" }}>
+                  {r.ours === true ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-label="Có"><path d="M5 12.5 10 17l9-10" /></svg>
+                  ) : r.ours}
+                </span>
+                <span style={{ color: "rgba(255,255,255,0.5)" }}>
+                  {r.theirs === false ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-label="Không"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                  ) : r.theirs}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ------------------------------------------------- lộ trình 14 ngày */}
       <section id="lo-trinh" style={sectionPad}>
         <div className="reveal-scope" style={{ maxWidth: 1240, margin: "0 auto", display: "flex", flexDirection: "column", gap: "clamp(36px, 5vh, 56px)" }}>
@@ -181,6 +261,74 @@ export default async function ProductsPage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      {/* ------------------------------------------ nguồn gốc & chính sách */}
+      <section id="cam-ket" style={sectionPad}>
+        <div className="reveal-scope" style={{ maxWidth: 1240, margin: "0 auto", display: "flex", flexDirection: "column", gap: 26 }}>
+          <span style={eyebrow}>An tâm khi mua tại TheraHOME</span>
+          <h2 style={h2}>Sản phẩm rõ nguồn gốc.<br />Chính sách rõ ràng sau khi mua.</h2>
+          <p style={{ margin: 0, maxWidth: 640, fontSize: 16.5, lineHeight: 1.65, color: "rgba(255,255,255,0.66)" }}>
+            TheraHOME minh bạch từ chứng từ sản phẩm đến chính sách hậu mãi, để bạn có thể kiểm tra trước khi quyết định.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
+            {TRUST.map((t) => (
+              <article key={t.title} style={card}>
+                <span aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 12, background: "rgba(0,127,217,0.16)", color: "#7FBFFF" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></svg>
+                </span>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "#fff" }}>{t.title}</h3>
+                <p style={{ margin: 0, fontSize: 15, lineHeight: 1.65, color: "rgba(255,255,255,0.68)" }}>{t.body}</p>
+              </article>
+            ))}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 18, paddingTop: 4 }}>
+            {TRUST_BADGES.map((b) => (
+              <div key={b.label} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "18px 20px", borderRadius: "var(--radius-lg, 24px)", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <span style={{ fontSize: 20, fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>{b.value}</span>
+                <span style={{ fontSize: 13.5, color: "rgba(255,255,255,0.6)" }}>{b.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------ khách hàng nói gì */}
+      <section id="danh-gia" style={sectionPad}>
+        <div className="reveal-scope" style={{ maxWidth: 1240, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+          <span style={eyebrow}>Đánh giá</span>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 18 }}>
+            <h2 style={h2}>Khách hàng nói gì sau khi dùng</h2>
+            <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15, color: "rgba(255,255,255,0.72)" }}>
+              <span aria-hidden="true" style={{ color: "#FFD23F", letterSpacing: "0.08em" }}>★★★★★</span>
+              {pricing.ratingLine}
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 18 }}>
+            {REVIEWS.map((r) => (
+              <article key={r.name} style={{ ...card, gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, flex: "0 0 auto", borderRadius: 999, background: "linear-gradient(160deg,#1E90FF,#0059B3)", color: "#fff", fontSize: 15, fontWeight: 700 }}>{r.name[0]}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>{r.name}</div>
+                    <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.52)" }}>Đã mua hàng · {r.when}</div>
+                  </div>
+                </div>
+                <span aria-hidden="true" style={{ color: "#FFD23F", fontSize: 13, letterSpacing: "0.12em" }}>★★★★★</span>
+                <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: "rgba(255,255,255,0.8)" }}>{r.text}</p>
+                <span style={{ fontSize: 12.5, color: "rgba(255,255,255,0.5)" }}>Sản phẩm: {r.product}</span>
+              </article>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, paddingTop: 4 }}>
+            <LandingButton href={buy.solo}>Mua bộ giải pháp — {pricing.current}</LandingButton>
+            <LandingButton href={buy.combo} variant="secondary">Mua combo — {pricing.comboCurrent}</LandingButton>
+          </div>
         </div>
       </section>
 
