@@ -4,7 +4,7 @@ import { LandingButton } from "@/components/landing/LandingButton";
 import { getSiteContent } from "@/lib/siteContent";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ProductScrollHero } from "@/components/landing/ProductScrollHero";
-import { Product360 } from "@/components/landing/Product360";
+import { Product3D } from "@/components/landing/Product3D";
 
 export const metadata = {
   title: "TheraNECK+ · TheraHome",
@@ -73,9 +73,9 @@ export default async function ProductsPage() {
         <div className="reveal-scope" style={{ maxWidth: 1240, margin: "0 auto", display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "clamp(32px, 4.5vw, 64px)" }}>
 
           <div style={{ flex: "1 1 380px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>
-            <Product360 label="Máy trị liệu cổ TheraNECK+" />
+            <Product3D label="Máy trị liệu cổ TheraNECK+" />
             <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.48)", textAlign: "center" }}>
-              Ảnh dựng 360° từ sản phẩm thật
+              Mô hình 3D dựng từ sản phẩm thật
             </p>
           </div>
 

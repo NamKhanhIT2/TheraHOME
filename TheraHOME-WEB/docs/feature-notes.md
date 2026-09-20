@@ -2135,3 +2135,42 @@ không tràn ngang, `touch-action: pan-y` nên vuốt dọc vẫn cuộn trang.
 
 **Chưa tự nhìn được:** pane ẩn không repaint phần dưới màn hình đầu, nên tôi
 chỉ xác minh được bố cục bằng số đo chứ chưa thấy khối sản phẩm bằng mắt.
+
+### 3D thật cho trang Sản phẩm — và một kết luận sai của tôi hôm qua (2026-09-20, tối)
+
+Chủ dự án: *"tôi mới thấy xoay 360 chưa có 3D"*. Đúng — và lý do tôi bỏ qua GLB
+hôm qua là **một kết luận sai**.
+
+Tôi đã viết rằng "pane trình duyệt ở đây không vẽ WebGL" sau khi dựng thử
+`model-viewer` và chỉ nhận về **ảnh chụp đen**. Kiểm lại cho tử tế: tạo canvas,
+lấy context WebGL, xoá màu rồi `readPixels` — **WebGL 2.0 chạy hoàn hảo**, pixel
+đọc ngược ra đúng. Thứ hỏng chỉ là *ảnh chụp màn hình* của pane ẩn, không phải
+việc render. Tôi đã suy từ một công cụ hỏng ra một kết luận về nền tảng.
+
+Có đường nhìn khác: **đọc thẳng canvas** bằng `toDataURL()`. Và để ảnh ra được
+file mà không qua context (chép base64 tay đã làm hỏng một lần), dựng tạm một
+route POST ghi thẳng ra đĩa. Từ đó mới thật sự *nhìn* được model.
+
+**Ánh sáng chọn bằng đối chứng, không bằng cảm tính.** Render bốn cấu hình
+environment/exposure/tone, ghép trên đúng nền `#02030B` của trang rồi so:
+`legacy` và `agx` bạc màu và bệt; `neutral` ở exposure 1.15 giữ được màu xanh
+ngọc và chi tiết. Đó là cấu hình ship.
+
+**Nền trong suốt là điểm ăn tiền.** GLB render nền trong suốt nên sản phẩm nằm
+thẳng trên nền tối của trang — không cần "bục sáng" như video turntable (nền
+xám sáng của nó buộc phải bọc trong một panel). Thêm một vũng sáng mờ dưới đáy
+thay cho cái bóng đổ mà không có sàn.
+
+**Giữ bộ xoay 360 làm dự phòng, không phải đồ thừa.** WebGL có thể bị thiếu
+hoặc bị chặn, CDN của model-viewer có thể không vào được ở vài mạng — khách gặp
+vậy sẽ không thấy gì cả. Video 0,36 MB đứng thay trong những ca đó. Đã kiểm
+thật: chặn `getContext('webgl')` rồi ép component mount lại → `model-viewer`
+biến mất, bộ xoay hiện ra.
+
+Android có thêm nút **"xem trong phòng"** (AR qua scene-viewer, dùng thẳng GLB).
+iOS Quick Look cần file `.usdz` mà ta chưa có, nên nút đơn giản không hiện ở đó
+— thà không có còn hơn có mà hỏng.
+
+Kiểm chứng: model `loaded`, render sống trên trang (chụp lại từ canvas, xem
+bằng mắt); desktop khung 468×468, mobile 335×335 xếp dọc, không tràn ngang,
+`touch-action: pan-y` nên vuốt dọc vẫn cuộn trang.
