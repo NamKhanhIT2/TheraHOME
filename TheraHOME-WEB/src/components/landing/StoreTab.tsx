@@ -91,14 +91,23 @@ export function StoreTab({ market }: { market: string | null }) {
                     Dùng thử
                   </a>
                 ) : null}
-                <a
-                  href={item.externalLink ?? "https://therahomeai.com"}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 150, height: 50, padding: "0 24px", borderRadius: 999, background: "var(--color-primary)", color: "#fff", fontSize: 15, fontWeight: 600, boxShadow: "0 12px 28px rgba(0,127,217,0.28)" }}
-                >
-                  Mua ngay
-                </a>
+                {/* Only when the item actually has somewhere to buy it. The
+                    fallback used to be the shop's front page, which is not a
+                    purchase — a button labelled "Mua ngay" that lands you on a
+                    homepage is a dead end wearing a CTA's clothes. The links
+                    themselves are Shopify cart permalinks now (Admin → Sản
+                    Phẩm), so this goes to the same checkout as everywhere
+                    else. */}
+                {item.externalLink ? (
+                  <a
+                    href={item.externalLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 150, height: 50, padding: "0 24px", borderRadius: 999, background: "var(--color-primary)", color: "#fff", fontSize: 15, fontWeight: 600, boxShadow: "0 12px 28px rgba(0,127,217,0.28)" }}
+                  >
+                    Mua ngay
+                  </a>
+                ) : null}
               </div>
             </article>
           ))}

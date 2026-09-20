@@ -2217,3 +2217,39 @@ Kiểm chứng: 6 section đúng thứ tự, 4 nút mua đều trỏ vào permal
 cả hai, đều 302 vào cổng thanh toán), bảng so sánh 6 dòng, 3 card chứng từ + 4
 badge, 3 đánh giá; không còn link placeholder `https://therahomeai.com`; mobile
 375px không có phần tử nào rộng quá màn hình.
+
+### Dùng chung cổng thanh toán Shopify trên toàn web (2026-09-20, tiếp)
+
+Chủ dự án xác nhận muốn mọi nút mua đều đi vào cổng thanh toán Shopify của
+`therahomeai.com`. Trang `/san-pham` đã làm xong ở lượt trước; soát tiếp toàn
+bộ web thì còn **một chỗ sót và một link sai**.
+
+**Tab Cửa hàng** (trong khu Luyện tập, và **cùng dữ liệu với app mobile**) có nút
+"Mua ngay" trỏ tới `store_items.external_link` — tất cả đều là **trang sản
+phẩm**, không phải cổng thanh toán. Riêng dòng **"Combo TheraNECK+" còn trỏ
+nhầm sang trang của bộ cơ bản**, tức khách bấm mua combo lại ra sản phẩm khác.
+
+Đã đổi ba dòng VN sang cart permalink, lấy mã biến thể từ `products.json`:
+
+| Món | Variant | |
+|---|---|---|
+| TheraNECK+ | `47368656257260` | 990.000đ |
+| Combo TheraNECK+ | `47600674111724` | 1.490.000đ |
+| Gối công thái học | `47381647753452` | Shopify bán **490.000đ** |
+
+Kiểm cả ba: đều 302 vào `/checkouts/cn/…`.
+
+**Không đụng hai dòng US và MALAY.** Cửa hàng Shopify tính bằng VND; đẩy khách
+Mỹ/Malaysia vào một giỏ VND là sai. Hai dòng đó giữ nguyên link trang sản phẩm.
+
+**Đây là dữ liệu dùng chung với app mobile** — nút "Mua ngay" trong app cũng đổi
+theo, giờ vào thẳng thanh toán thay vì trang sản phẩm. Đúng nghĩa "Mua ngay",
+và revert được trong Admin → Sản Phẩm nếu chủ dự án không muốn.
+
+Sửa thêm: nút "Mua ngay" trong Cửa hàng trước đây rơi về **trang chủ shop** khi
+món hàng không có link. Một nút ghi "Mua ngay" mà dẫn ra trang chủ là ngõ cụt
+đội lốt CTA — nay không có link thì không hiện nút.
+
+**Một sai lệch giá cần chủ dự án quyết, tôi không tự sửa:** gối công thái học
+ghi **590.000đ** trong `store_items` nhưng Shopify bán **490.000đ**. Khách thấy
+giá này rồi bấm sang thanh toán lại ra giá khác. Sửa ở Admin → Sản Phẩm.
