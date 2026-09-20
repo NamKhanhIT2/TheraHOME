@@ -2253,3 +2253,37 @@ món hàng không có link. Một nút ghi "Mua ngay" mà dẫn ra trang chủ l
 **Một sai lệch giá cần chủ dự án quyết, tôi không tự sửa:** gối công thái học
 ghi **590.000đ** trong `store_items` nhưng Shopify bán **490.000đ**. Khách thấy
 giá này rồi bấm sang thanh toán lại ra giá khác. Sửa ở Admin → Sản Phẩm.
+
+### Quay về sau thanh toán, và gối 590k thật sự nằm ở đâu (2026-09-20, khuya)
+
+**1. "Thanh toán xong quay lại thì ra therahomeai.com".** Đúng, và đây là lý do.
+
+Nút mua trỏ sang cổng thanh toán Shopify — nằm trên `therahomeai.com`. Trang
+cảm ơn sau khi đặt hàng **do Shopify dựng**, nút "tiếp tục mua sắm" của nó trả
+khách về cửa hàng của chính nó. Không phải lỗi cấu hình bên mình.
+
+Đã thử ép từ phía link: `?return_to=...`, `?checkout[return_to]=...` — **Shopify
+bỏ qua hết**, cả bốn biến thể đều ra cùng một cổng thanh toán. Tra tiếp qua
+Admin API: cửa hàng gói **Basic** (không có `checkout.liquid`) và
+`typOspPagesActive = true`, tức **trang cảm ơn đã chuyển sang checkout
+extensibility** nên ô "Additional scripts" cũ cũng không còn. Nghĩa là không có
+đường chèn chuyển hướng.
+
+**Thứ sửa được nằm ở phía mình:** `LandingButton` render `<a>` trần, nên bấm
+mua là **thay thế trang của mình** bằng Shopify. Thanh toán xong, khách mắc kẹt
+bên đó, muốn về phải gõ lại địa chỉ. Nay link ra ngoài mở **tab mới**
+(`target="_blank" rel="noopener noreferrer"`), trang của mình vẫn nằm dưới —
+đóng tab thanh toán là về. Link nội bộ giữ nguyên cùng tab.
+
+Hai việc còn lại **thuộc Shopify admin, chủ dự án làm**, tôi không tự đụng:
+- **Email xác nhận đơn hàng** (Settings → Notifications) — sửa được ở mọi gói.
+  Đây là chỗ tốt nhất để dặn khách tải app và kích hoạt lộ trình, vì mọi người
+  mua đều nhận.
+- **Giao diện therahomeai.com** — thêm một đường dẫn sang `ad.therahomeai.com`,
+  vì đó là nơi khách đáp xuống sau khi mua.
+
+**2. Gối công thái học 590.000đ có trên web, không chỉ trong app.** Nó nằm ở
+`ad.therahomeai.com/luyen-tap` → tab **Cửa hàng** → mục "Sản phẩm đi kèm" (mở
+thật và đọc ra đúng ba món). Tab Cửa hàng trên web đọc **cùng bảng
+`store_items`** với app, nên sai lệch giá 590.000đ (web) so với 490.000đ
+(Shopify) hiển thị ở cả hai nơi.

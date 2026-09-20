@@ -81,8 +81,22 @@ export function LandingButton({
   };
 
   if (href) {
+    // An off-site link opens in its own tab, and the buy buttons are the
+    // reason. They hand the customer to Shopify's checkout, which lives on
+    // therahomeai.com; Shopify owns the thank-you page and sends "continue
+    // shopping" back to its own store, so replacing this tab stranded the
+    // customer there with no way back but typing the address. Keeping our page
+    // open behind the checkout means closing that tab returns them.
+    // (`return_to` on the cart permalink does not help — Shopify ignores it,
+    // checked 2026-09-20.)
+    const external = /^https?:\/\//i.test(href);
     return (
-      <a href={href} style={merged} {...press}>
+      <a
+        href={href}
+        style={merged}
+        {...(external ? { target: "_blank", rel: "noopener noreferrer" } : null)}
+        {...press}
+      >
         {children}
       </a>
     );
