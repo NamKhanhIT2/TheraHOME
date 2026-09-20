@@ -18,6 +18,7 @@ const card: CSSProperties = { display: "flex", flexDirection: "column", gap: 14,
 
 const SUBNAV = [
   { href: "#mua-hang", label: "Giá & bộ quà tặng" },
+  { href: "/san-pham/combo", label: "Combo phục hồi" },
   { href: "#lieu-phap-4", label: "4 liệu pháp" },
   { href: "#khac-biet", label: "Khác gì máy thường" },
   { href: "#lo-trinh", label: "Lộ trình 14 ngày" },

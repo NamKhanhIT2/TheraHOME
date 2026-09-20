@@ -833,3 +833,312 @@ body:has(.landing-root) {
     font-size: 14px;
   }
 }
+
+/* ------------------------------------- Combo: sân khấu bốn món, đổi nền màu */
+/* Styles for ComboCarousel. Read that component's header first — it records
+   what was kept from the owner's reference prompt and what had to change
+   because this is Next + landing.css rather than Vite + Tailwind. */
+
+.landing-root .cmb {
+  /* The two numbers that decide the composition. A phone gets one object on
+     screen and a hint of the next; a desktop gets three. */
+  --cmb-step: min(33vw, 430px);
+  --cmb-box-w: min(600px, 58vw);
+  --cmb-box-h: min(44vh, 400px);
+  --cmb-gutter: clamp(18px, 4vw, 62px);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* svh, not vh: on iOS the address bar makes 100vh taller than the visible
+     page, which would push the buy link under the chrome. */
+  min-height: calc(100svh - var(--nav-h, 84px));
+  overflow: hidden;
+  isolation: isolate;
+  transition: background-color 650ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.landing-root .cmb-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.landing-root .cmb-brand {
+  position: absolute;
+  z-index: 20;
+  top: clamp(16px, 3vh, 28px);
+  left: var(--cmb-gutter);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.landing-root .cmb-stage {
+  position: relative;
+  z-index: 3;
+  flex: 1 1 auto;
+  min-height: min(52vh, 460px);
+  /* Vertical scrolling stays with the page; the horizontal swipe is ours. */
+  touch-action: pan-y;
+}
+
+/* ---- the giant word behind the object */
+
+.landing-root .cmb-ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.landing-root .cmb-ghost-word {
+  grid-area: 1 / 1;
+  /* Overridden per word by ghostSize() in the component — this is only what a
+     word without an inline size would get. */
+  font-size: clamp(60px, 18vw, 250px);
+  /* Not 1: Vietnamese caps carry marks above (Ồ, Ị) that a line-height of 1
+     clips off at this size. */
+  line-height: 1.14;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.09);
+  opacity: 0;
+  transform: scale(1.04);
+  transition:
+    opacity 650ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 650ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.landing-root .cmb-ghost-word.cmb-on {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---- the objects */
+
+.landing-root .cmb-item {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--cmb-box-w);
+  height: var(--cmb-box-h);
+  z-index: var(--z, 1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: var(--o);
+  /* A fixed box with object-fit: contain, so the wide device and the tall
+     phone carry the same visual weight instead of being sized by their own
+     very different aspect ratios. */
+  transform: translate(-50%, -50%) translateX(calc(var(--off) * var(--cmb-step))) scale(var(--s));
+  transition:
+    transform 650ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 650ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.landing-root .cmb-item[aria-hidden="true"] {
+  pointer-events: none;
+}
+.landing-root .cmb-item:hover {
+  transform: translate(-50%, -50%) translateX(calc(var(--off) * var(--cmb-step)))
+    scale(calc(var(--s) * 1.05));
+}
+.landing-root .cmb-item:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 6px;
+  border-radius: 18px;
+}
+
+.landing-root .cmb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 28px 46px rgba(0, 0, 0, 0.45));
+}
+
+/* ---- copy, dots, buy link */
+
+.landing-root .cmb-foot {
+  position: relative;
+  z-index: 6;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(18px, 3vw, 48px);
+  padding: 0 var(--cmb-gutter) clamp(26px, 5vh, 52px);
+}
+
+.landing-root .cmb-copy {
+  max-width: min(540px, 52vw);
+  min-width: 0;
+}
+
+.landing-root .cmb-index {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.62);
+  font-variant-numeric: tabular-nums;
+}
+.landing-root .cmb-index i {
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.34);
+}
+
+/* All four blocks are stacked in one grid cell, so the deck is as tall as the
+   longest of them and the buy link never moves as the carousel turns. */
+.landing-root .cmb-deck {
+  display: grid;
+}
+.landing-root .cmb-one {
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition:
+    opacity 450ms ease-out,
+    transform 450ms ease-out,
+    visibility 0s linear 450ms;
+}
+.landing-root .cmb-one.cmb-on {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+.landing-root .cmb-one h2 {
+  margin: 0 0 6px;
+  font-size: clamp(20px, 2.4vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.16;
+  color: #fff;
+}
+.landing-root .cmb-one p {
+  margin: 0 0 13px;
+  font-size: clamp(14px, 1.3vw, 16px);
+  color: rgba(255, 255, 255, 0.74);
+}
+.landing-root .cmb-one ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.landing-root .cmb-one li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: clamp(13px, 1.15vw, 14.5px);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.64);
+}
+.landing-root .cmb-one li svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.landing-root .cmb-side {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 18px;
+}
+
+.landing-root .cmb-dots {
+  display: flex;
+  gap: 10px;
+}
+.landing-root .cmb-dot {
+  width: 30px;
+  height: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+  transition:
+    background 300ms ease-out,
+    width 300ms ease-out;
+}
+.landing-root .cmb-dot.cmb-on {
+  width: 48px;
+  background: #fff;
+}
+
+.landing-root .cmb-link {
+  font-size: clamp(22px, 2.6vw, 38px);
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+  padding-bottom: 5px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.32);
+  transition:
+    color 220ms ease-out,
+    border-color 220ms ease-out;
+}
+.landing-root .cmb-link:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+@media (max-width: 767px) {
+  .landing-root .cmb {
+    /* The step is deliberately smaller than the box: it leaves the next item
+       peeking in at the edge, which is the only thing telling a thumb that
+       the stage can be swiped. At step = box they sat exactly off-screen. */
+    --cmb-step: 60vw;
+    --cmb-box-w: 72vw;
+    --cmb-box-h: min(38vh, 330px);
+  }
+  .landing-root .cmb-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 22px;
+  }
+  .landing-root .cmb-copy {
+    max-width: none;
+  }
+  .landing-root .cmb-side {
+    align-items: stretch;
+  }
+  .landing-root .cmb-dots {
+    justify-content: center;
+  }
+  .landing-root .cmb-link {
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .cmb,
+  .landing-root .cmb-item,
+  .landing-root .cmb-ghost-word,
+  .landing-root .cmb-one,
+  .landing-root .cmb-dot {
+    transition-duration: 1ms;
+  }
+}

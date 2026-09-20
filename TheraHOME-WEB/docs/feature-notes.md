@@ -2287,3 +2287,60 @@ Hai việc còn lại **thuộc Shopify admin, chủ dự án làm**, tôi khôn
 thật và đọc ra đúng ba món). Tab Cửa hàng trên web đọc **cùng bảng
 `store_items`** với app, nên sai lệch giá 590.000đ (web) so với 490.000đ
 (Shopify) hiển thị ở cả hai nơi.
+
+### Trang combo với hiệu ứng carousel (2026-09-20)
+
+Chủ dự án đưa một prompt tham khảo cho hiệu ứng — một carousel figurine tên
+"TOONHUB", viết cho **React + Vite + Tailwind + lucide-react** — và yêu cầu
+"sửa text cho phù hợp", thêm **một trang trong tab sản phẩm** dùng hiệu ứng đó
+để mô tả combo: máy massage, gối công thái học, app, miếng dán Vinh Gia.
+
+Trang mới: **`/san-pham/combo`** (`app/(public)/san-pham/combo/page.tsx`), vào
+được từ sub-nav của `/san-pham` và từ dropdown "Sản phẩm" trên nav.
+
+**Giữ nguyên hiệu ứng** — nền đổi màu theo món đang chọn ở 650ms
+cubic-bezier(.4,0,.2,1), lớp grain fractalNoise 200px, chữ khổng lồ nằm sau sản
+phẩm, nhãn góc trên trái, link display góc dưới phải. **Năm chỗ phải dịch sang
+host này** (chép nguyên sẽ hỏng, lý do ghi trong header của
+`src/components/landing/ComboCarousel.tsx`):
+
+1. Không có Tailwind. Toàn bộ class nằm trong `src/styles/landing.css` dưới
+   `.landing-root`, giống `p3d`/`p360`/`cine` sẵn có.
+2. **Bỏ state `isMobile`.** Prompt rẽ nhánh layout theo `window.innerWidth`;
+   trang này SSR nên lần vẽ đầu sẽ là layout desktop rồi mới nhảy sau
+   hydration. Hai con số thật sự khác nhau (`--cmb-step`, `--cmb-box-w`) thành
+   CSS custom property sau media query.
+3. **Bỏ `height: 100vh` cứng.** Phần chữ tiếng Việt dưới sân khấu dài ngắn khác
+   nhau; chiều cao cứng cộng `overflow: hidden` sẽ cắt mất món dài nhất trên
+   laptop màn thấp. Thay bằng flex column + `min-height: calc(100svh - nav)`.
+4. **Bỏ vòng preload `new Image()`.** next/image viết lại src thành
+   `/_next/image?url=…`, preload file gốc là tải hai lần. Cả bốn `<Image>` đã
+   nằm sẵn trong DOM (món không được chọn chỉ bị transform + mờ đi).
+5. Chữ khổng lồ để trắng ~9% thay vì `opacity: 1`. Nền của prompt là màu pastel,
+   nền ở đây tối.
+
+**Hai thứ phải tự tính, không có trong prompt:**
+
+- **Cỡ chữ khổng lồ theo độ dài từ** (`ghostSize()`). Một `clamp()` cố định thì
+  hoặc cắt mất "ĐỒNG HÀNH" trên điện thoại, hoặc để "LÀM DỊU" bé tẹo. Anton có
+  advance chữ hoa trung bình ~0.45em nên từ n ký tự rộng ~0.45n em; muốn phủ
+  ~88vw thì cỡ chữ là `195/n` vw. Đo lại trên máy thật: bốn từ phủ 68–90% bề
+  ngang, không từ nào tràn.
+- **Trên điện thoại `--cmb-step` (60vw) nhỏ hơn `--cmb-box-w` (72vw)** để món kế
+  tiếp ló ra ở mép — đó là thứ duy nhất báo cho ngón tay biết có thể vuốt. Để
+  bằng nhau thì chúng nằm vừa đúng ngoài màn hình (đo được: ló 37px mỗi bên).
+
+**Chữ tiếng Việt:** font display là **Anton** — có subset `vietnamese` (kiểm
+qua Google Fonts CSS API trước khi dùng), nên "TRỊ LIỆU"/"ĐỒNG HÀNH" giữ được
+dấu thay vì rơi sang font dự phòng giữa từ. `line-height` để 1.14 chứ không
+phải 1: dấu trên chữ hoa (Ồ, Ị) bị cắt ở cỡ đó.
+
+**Ảnh:** chủ dự án gửi bốn ảnh; ba ảnh đã sẵn nền trong suốt, riêng ảnh app là
+panel App Store có nền xanh — chủ dự án nhắn thêm "bỏ background đi, để mỗi cái
+điện thoại thôi", nên chiếc điện thoại được cắt ra và bo góc vào kênh alpha.
+Chi tiết trong `public/landing/README.md`.
+
+**Đã kiểm trên máy thật** (dev, 1440x900 và 390x844): bấm món bên cạnh, bấm dấu
+chấm, phím mũi tên — chỉ số, màu nền và chữ khổng lồ đổi khớp nhau ở cả bốn
+món; tự chạy dừng hẳn sau tương tác đầu tiên (giữ nguyên 10,8s sau một cú bấm);
+không tràn ngang ở cả hai bề ngang.
