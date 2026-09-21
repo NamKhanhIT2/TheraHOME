@@ -2358,3 +2358,32 @@ Chi tiết trong `public/landing/README.md`.
 chấm, phím mũi tên — chỉ số, màu nền và chữ khổng lồ đổi khớp nhau ở cả bốn
 món; tự chạy dừng hẳn sau tương tác đầu tiên (giữ nguyên 10,8s sau một cú bấm);
 không tràn ngang ở cả hai bề ngang.
+
+#### Vòng sửa của chủ dự án sau khi xem thật (2026-09-21)
+
+Năm điểm, sửa hết:
+
+1. **Bỏ thanh điều hướng phụ dính của `/san-pham`** — cái thanh "Sản phẩm ·
+   TheraNECK+ · Giá & bộ quà tặng · 4 liệu pháp…" ghim ở `top: 84`. Nó đi kèm
+   trang từ đầu, nhưng khi trôi qua dải carousel có nền màu thì lớp kính mờ của
+   nó thành một vệt bẩn vắt ngang. Đã xoá cả thanh lẫn mảng dữ liệu `SUBNAV`.
+   Nút "Khám phá 4 liệu pháp" trong hero vẫn trỏ `#lieu-phap-4` như cũ.
+2. **Bỏ chữ khổng lồ phía sau.** Đây là phần trung tâm của prompt gốc và tôi đã
+   dựng nó tử tế — kể cả hàm `ghostSize()` tính cỡ chữ theo độ dài từ. Nhưng
+   trên một dải giữa trang nó đọc ra thành nhiễu sau sản phẩm chứ không ra chữ.
+   Xoá luôn cả `ghostSize()` và trường `ghost`.
+3. **Tốc độ tự xoay 4,6s → 3s.**
+4. **Ảnh app mới.** Lần này chủ dự án gửi nguyên chiếc điện thoại đã sẵn nền
+   trong suốt và đủ cả trên lẫn dưới, nên bỏ hẳn phần cắt-và-bo-góc thủ công
+   của bản trước.
+5. **Chia 3:7** — chữ ở cột 3, sân khấu ở cột 7. Kéo theo hai thay đổi:
+   - `--cmb-step`/`--cmb-box-w` phải tính theo **bề ngang sân khấu** (~7/10
+     màn hình) chứ không theo bề ngang màn hình. Ở 1440 là sân khấu ~900px:
+     vật thể 440px, bước 340px, vừa đủ để mép trong của món bên cạnh không đè
+     lên món đang chọn. Đo lại trên máy thật: cột chữ 384px, sân khấu 897px —
+     đúng 3:7.
+   - Dưới 900px thì 3/10 hẹp đến mức không đọc được, nên xếp chồng: **sân khấu
+     lên trên** (`order: -1`), chữ xuống dưới.
+
+`min-height` cũng hạ từ 860 xuống 720px: bỏ chữ khổng lồ đi thì dải không còn
+gì để lấp chiều cao đó.

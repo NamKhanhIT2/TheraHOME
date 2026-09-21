@@ -24,15 +24,6 @@ const eyebrow: CSSProperties = { fontSize: 11, letterSpacing: "0.2em", textTrans
 const h2: CSSProperties = { margin: 0, fontSize: "clamp(26px, 2.8vw, 40px)", fontWeight: 600, lineHeight: 1.08, letterSpacing: "-0.015em", color: "#fff", textWrap: "pretty" };
 const card: CSSProperties = { display: "flex", flexDirection: "column", gap: 14, padding: "clamp(24px, 2.4vw, 32px)", borderRadius: "var(--radius-lg, 24px)", background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)" };
 
-const SUBNAV = [
-  { href: "#mua-hang", label: "Giá & bộ quà tặng" },
-  { href: "#combo", label: "Trong combo có gì" },
-  { href: "#lieu-phap-4", label: "4 liệu pháp" },
-  { href: "#khac-biet", label: "Khác gì máy thường" },
-  { href: "#lo-trinh", label: "Lộ trình 14 ngày" },
-  { href: "#danh-gia", label: "Đánh giá" },
-];
-
 const THERAPIES = [
   { badge: "AI", title: "Tích hợp AI", body: "Thiết lập lộ trình nhanh chóng bằng Paid Map — đau đâu chấm đấy, AI đề xuất lộ trình phù hợp với tình trạng của bạn." },
   { badge: "26°", title: "Liệu pháp kéo giãn", body: "Kỹ thuật kéo giãn nhẹ nhàng ở góc 26° mà các chuyên gia vật lý trị liệu sử dụng để giải nén cột sống cổ — tạo khoảng cho các đốt sống." },
@@ -97,15 +88,6 @@ export default async function ProductsPage() {
   const { stats_results: RESULTS, faq: FAQ, pricing, buy } = await getSiteContent();
   return (
     <>
-      {/* product sub-nav, pinned under the site nav */}
-      <div style={{ position: "sticky", top: 84, zIndex: 15, display: "flex", alignItems: "center", gap: 28, padding: "14px clamp(20px, 4vw, 64px)", background: "rgba(2,3,11,0.82)", backdropFilter: "blur(14px)", borderBottom: "1px solid rgba(255,255,255,0.07)", fontSize: 13, letterSpacing: "0.04em", overflowX: "auto" }}>
-        <span style={{ color: "rgba(255,255,255,0.5)", flex: "0 0 auto" }}>Sản phẩm</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 999, background: "rgba(0,127,217,0.18)", border: "1px solid rgba(0,127,217,0.45)", color: "#fff", fontWeight: 500, flex: "0 0 auto" }}>TheraNECK+</span>
-        {SUBNAV.map((s) => (
-          <a key={s.href} href={s.href} style={{ color: "rgba(255,255,255,0.66)", flex: "0 0 auto" }}>{s.label}</a>
-        ))}
-      </div>
-
       <ProductScrollHero />
 
       {/* ------------------------------------------------- sản phẩm & giá */}

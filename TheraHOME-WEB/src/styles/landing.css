@@ -837,26 +837,32 @@ body:has(.landing-root) {
 /* ------------------------------------- Combo: sân khấu bốn món, đổi nền màu */
 /* Styles for ComboCarousel. Read that component's header first — it records
    what was kept from the owner's reference prompt and what had to change
-   because this is Next + landing.css rather than Vite + Tailwind. */
+   because this is Next + landing.css rather than Vite + Tailwind.
+
+   The owner's layout, set 2026-09-21: words in 3 of 10 columns, objects in the
+   other 7. The reference centred the carousel with a giant display word behind
+   it; that word is gone. */
 
 .landing-root .cmb {
-  /* The two numbers that decide the composition. A phone gets one object on
-     screen and a hint of the next; a desktop gets three. */
-  --cmb-step: min(33vw, 430px);
-  --cmb-box-w: min(600px, 58vw);
-  --cmb-box-h: min(44vh, 400px);
+  /* Tuned against the STAGE, which is ~7/10 of the viewport minus gutters —
+     not against the viewport. At 1440 that is a ~900px stage: a 440px object
+     with its neighbours 340px out, which puts a neighbour's inner edge just
+     clear of the one in focus. */
+  --cmb-step: min(340px, 26vw);
+  --cmb-box-w: min(440px, 38vw);
+  --cmb-box-h: min(52vh, 460px);
   --cmb-gutter: clamp(18px, 4vw, 62px);
 
   position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  /* A screenful, capped: svh rather than vh because on iOS the address bar
-     makes 100vh taller than the visible page, and capped because this sits in
-     the middle of the product page — on a tall desktop an uncapped screenful
-     turns the band into a wall. It still grows past the cap if the copy needs
-     the room. */
-  min-height: min(calc(100svh - var(--nav-h, 84px)), 860px);
+  display: grid;
+  grid-template-columns: 3fr 7fr;
+  align-items: center;
+  gap: clamp(20px, 3vw, 52px);
+  padding: clamp(40px, 7vh, 80px) var(--cmb-gutter);
+  /* A band in the middle of the product page, so it takes a screenful at most
+     and 720px at that — an uncapped screenful on a tall desktop turns into a
+     wall. It still grows past this if the copy needs the room. */
+  min-height: min(calc(100svh - var(--nav-h, 84px)), 720px);
   overflow: hidden;
   isolation: isolate;
   transition: background-color 650ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -872,14 +878,19 @@ body:has(.landing-root) {
   pointer-events: none;
 }
 
+/* ---- 3 of 10: the words */
+
+.landing-root .cmb-copy {
+  position: relative;
+  z-index: 6;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
 .landing-root .cmb-brand {
-  position: absolute;
-  z-index: 20;
-  /* Clear of the product page's sticky sub-nav (~48px tall, pinned under the
-     site nav): at the one scroll position where the band's top lines up with
-     that bar, a label any higher is simply hidden behind it. */
-  top: clamp(58px, 8vh, 78px);
-  left: var(--cmb-gutter);
   font-size: 11.5px;
   font-weight: 600;
   text-transform: uppercase;
@@ -887,51 +898,128 @@ body:has(.landing-root) {
   color: rgba(255, 255, 255, 0.78);
 }
 
+.landing-root .cmb-index {
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.62);
+  font-variant-numeric: tabular-nums;
+}
+.landing-root .cmb-index i {
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.34);
+}
+
+/* All four blocks are stacked in one grid cell, so the column is as tall as
+   the longest of them and the dots and buy link never move as it turns. */
+.landing-root .cmb-deck {
+  display: grid;
+  width: 100%;
+}
+.landing-root .cmb-one {
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition:
+    opacity 450ms ease-out,
+    transform 450ms ease-out,
+    visibility 0s linear 450ms;
+}
+.landing-root .cmb-one.cmb-on {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+.landing-root .cmb-one h2 {
+  margin: 0 0 7px;
+  font-size: clamp(21px, 2.1vw, 29px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.16;
+  color: #fff;
+  text-wrap: balance;
+}
+.landing-root .cmb-one p {
+  margin: 0 0 14px;
+  font-size: clamp(14px, 1.15vw, 16px);
+  color: rgba(255, 255, 255, 0.74);
+}
+.landing-root .cmb-one ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.landing-root .cmb-one li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: clamp(13px, 1vw, 14.5px);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.64);
+}
+.landing-root .cmb-one li svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.landing-root .cmb-dots {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.landing-root .cmb-dot {
+  width: 26px;
+  height: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+  transition:
+    background 300ms ease-out,
+    width 300ms ease-out;
+}
+.landing-root .cmb-dot.cmb-on {
+  width: 44px;
+  background: #fff;
+}
+
+.landing-root .cmb-link {
+  align-self: flex-start;
+  margin-top: 6px;
+  font-size: clamp(20px, 1.9vw, 28px);
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+  padding-bottom: 5px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.32);
+  transition:
+    color 220ms ease-out,
+    border-color 220ms ease-out;
+}
+.landing-root .cmb-link:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+/* ---- 7 of 10: the objects */
+
 .landing-root .cmb-stage {
   position: relative;
   z-index: 3;
-  flex: 1 1 auto;
-  min-height: min(52vh, 460px);
+  min-width: 0;
+  height: 100%;
+  min-height: var(--cmb-box-h);
   /* Vertical scrolling stays with the page; the horizontal swipe is ours. */
   touch-action: pan-y;
 }
-
-/* ---- the giant word behind the object */
-
-.landing-root .cmb-ghost {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  user-select: none;
-}
-
-.landing-root .cmb-ghost-word {
-  grid-area: 1 / 1;
-  /* Overridden per word by ghostSize() in the component — this is only what a
-     word without an inline size would get. */
-  font-size: clamp(60px, 18vw, 250px);
-  /* Not 1: Vietnamese caps carry marks above (Ồ, Ị) that a line-height of 1
-     clips off at this size. */
-  line-height: 1.14;
-  text-transform: uppercase;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-  color: rgba(255, 255, 255, 0.09);
-  opacity: 0;
-  transform: scale(1.04);
-  transition:
-    opacity 650ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 650ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-.landing-root .cmb-ghost-word.cmb-on {
-  opacity: 1;
-  transform: none;
-}
-
-/* ---- the objects */
 
 .landing-root .cmb-item {
   position: absolute;
@@ -978,140 +1066,9 @@ body:has(.landing-root) {
   filter: drop-shadow(0 28px 46px rgba(0, 0, 0, 0.45));
 }
 
-/* ---- copy, dots, buy link */
-
-.landing-root .cmb-foot {
-  position: relative;
-  z-index: 6;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: clamp(18px, 3vw, 48px);
-  padding: 0 var(--cmb-gutter) clamp(26px, 5vh, 52px);
-}
-
-.landing-root .cmb-copy {
-  max-width: min(540px, 52vw);
-  min-width: 0;
-}
-
-.landing-root .cmb-index {
-  display: block;
-  margin-bottom: 12px;
-  font-size: 12.5px;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.62);
-  font-variant-numeric: tabular-nums;
-}
-.landing-root .cmb-index i {
-  font-style: normal;
-  color: rgba(255, 255, 255, 0.34);
-}
-
-/* All four blocks are stacked in one grid cell, so the deck is as tall as the
-   longest of them and the buy link never moves as the carousel turns. */
-.landing-root .cmb-deck {
-  display: grid;
-}
-.landing-root .cmb-one {
-  grid-area: 1 / 1;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(10px);
-  transition:
-    opacity 450ms ease-out,
-    transform 450ms ease-out,
-    visibility 0s linear 450ms;
-}
-.landing-root .cmb-one.cmb-on {
-  opacity: 1;
-  visibility: visible;
-  transform: none;
-  transition-delay: 0s;
-}
-
-.landing-root .cmb-one h2 {
-  margin: 0 0 6px;
-  font-size: clamp(20px, 2.4vw, 30px);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.16;
-  color: #fff;
-}
-.landing-root .cmb-one p {
-  margin: 0 0 13px;
-  font-size: clamp(14px, 1.3vw, 16px);
-  color: rgba(255, 255, 255, 0.74);
-}
-.landing-root .cmb-one ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.landing-root .cmb-one li {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  font-size: clamp(13px, 1.15vw, 14.5px);
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.64);
-}
-.landing-root .cmb-one li svg {
-  flex: 0 0 auto;
-  margin-top: 3px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.landing-root .cmb-side {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 18px;
-}
-
-.landing-root .cmb-dots {
-  display: flex;
-  gap: 10px;
-}
-.landing-root .cmb-dot {
-  width: 30px;
-  height: 3px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.24);
-  cursor: pointer;
-  transition:
-    background 300ms ease-out,
-    width 300ms ease-out;
-}
-.landing-root .cmb-dot.cmb-on {
-  width: 48px;
-  background: #fff;
-}
-
-.landing-root .cmb-link {
-  font-size: clamp(22px, 2.6vw, 38px);
-  line-height: 1.1;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: #fff;
-  padding-bottom: 5px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.32);
-  transition:
-    color 220ms ease-out,
-    border-color 220ms ease-out;
-}
-.landing-root .cmb-link:hover {
-  color: #fff;
-  border-color: #fff;
-}
-
-@media (max-width: 767px) {
+/* Below this the 3/7 split leaves the words in a column too narrow to read, so
+   the band stacks — objects first, because they are what the section is for. */
+@media (max-width: 899px) {
   .landing-root .cmb {
     /* The step is deliberately smaller than the box: it leaves the next item
        peeking in at the edge, which is the only thing telling a thumb that
@@ -1119,30 +1076,26 @@ body:has(.landing-root) {
     --cmb-step: 60vw;
     --cmb-box-w: 72vw;
     --cmb-box-h: min(38vh, 330px);
+
+    grid-template-columns: 1fr;
+    gap: clamp(20px, 4vh, 36px);
   }
-  .landing-root .cmb-foot {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 22px;
-  }
-  .landing-root .cmb-copy {
-    max-width: none;
-  }
-  .landing-root .cmb-side {
-    align-items: stretch;
-  }
-  .landing-root .cmb-dots {
-    justify-content: center;
+  .landing-root .cmb-stage {
+    order: -1;
+    min-height: var(--cmb-box-h);
   }
   .landing-root .cmb-link {
+    align-self: stretch;
     text-align: center;
+  }
+  .landing-root .cmb-dots {
+    align-self: center;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .landing-root .cmb,
   .landing-root .cmb-item,
-  .landing-root .cmb-ghost-word,
   .landing-root .cmb-one,
   .landing-root .cmb-dot {
     transition-duration: 1ms;

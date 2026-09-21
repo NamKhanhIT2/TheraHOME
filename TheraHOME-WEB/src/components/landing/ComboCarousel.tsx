@@ -8,9 +8,8 @@
 // Built from a reference prompt the owner supplied (a figurine carousel called
 // "TOONHUB", written for React + Vite + Tailwind). The EFFECT is kept — the
 // per-item background cross-fade at 650ms cubic-bezier(.4,0,.2,1), the grain
-// overlay, the giant display word behind the product, the top-left label, the
-// bottom-right display link. Five things were translated rather than copied,
-// because this host is not that host:
+// overlay, the label, the display-face buy link. Five things were translated
+// rather than copied, because this host is not that host:
 //
 //   1. No Tailwind here. Every class below lives in src/styles/landing.css
 //      under .landing-root, like p3d/p360/cine already do.
@@ -29,9 +28,12 @@
 //      asset twice. All four <Image>s are in the DOM from the start (the
 //      inactive ones are merely transformed and faded), so the browser already
 //      fetches them; the first one carries `priority`.
-//   5. The display word is white at low alpha, not opacity 1. The reference's
-//      grounds are pastel, where solid white reads as a watermark; on this
-//      site's dark grounds the same intent is a ~9% white.
+//   5. The layout is the owner's, not the reference's: copy in a 3/10 column
+//      on the left, the stage in the 7/10 on the right. The reference centres
+//      the carousel and stacks a giant display word behind it; that word was
+//      built and then removed at the owner's call (2026-09-21) — on a band in
+//      the middle of a page it was reading as noise behind the product rather
+//      than as type.
 //
 // The carousel is circular: with four items, one is always on the left and one
 // on the right, and the fourth (|offset| = 2) sits off-stage at zero opacity.
@@ -45,9 +47,6 @@ interface ComboSlide {
   height: number;
   /** Page ground while this item is in focus. */
   bg: string;
-  /** The giant word behind it. Any length: ghostSize() sizes it to the
-   * viewport, so a long word shrinks rather than being cropped. */
-  ghost: string;
   name: string;
   tag: string;
   points: string[];
@@ -60,7 +59,6 @@ const SLIDES: ComboSlide[] = [
     width: 1000,
     height: 695,
     bg: "#07222E",
-    ghost: "TRỊ LIỆU",
     name: "Máy trị liệu cổ TheraNECK+",
     tag: "Bốn liệu pháp trong một thiết bị",
     points: [
@@ -75,7 +73,6 @@ const SLIDES: ComboSlide[] = [
     width: 1100,
     height: 574,
     bg: "#141C2B",
-    ghost: "NÂNG ĐỠ",
     name: "Gối công thái học TheraPillow",
     tag: "Giữ đúng tư thế cổ suốt đêm",
     points: [
@@ -87,10 +84,9 @@ const SLIDES: ComboSlide[] = [
   {
     key: "app",
     src: "/landing/combo/app.webp",
-    width: 567,
-    height: 1100,
+    width: 614,
+    height: 1200,
     bg: "#061C3E",
-    ghost: "ĐỒNG HÀNH",
     name: "Ứng dụng TheraAI",
     tag: "Lộ trình 14 ngày nằm trong túi bạn",
     points: [
@@ -105,7 +101,6 @@ const SLIDES: ComboSlide[] = [
     width: 783,
     height: 1100,
     bg: "#2A0D12",
-    ghost: "LÀM DỊU",
     name: "Miếng dán thảo dược Vinh Gia",
     tag: "Làm dịu tại chỗ giữa các buổi",
     points: [
@@ -125,17 +120,7 @@ const GRAIN =
  * enough that a deliberate second click still lands. The reference locks for
  * the full 650ms, which on a real pointer feels stuck. */
 const LOCK_MS = 420;
-const AUTO_MS = 4600;
-
-/** Type size for one ghost word, so every word spans about the same share of
- * the screen whatever its length — a fixed clamp() either cropped ĐỒNG HÀNH on
- * a phone or left LÀM DỊU looking undersized. Anton's uppercase advance
- * averages ~0.45em, so a word of n characters is about 0.45n ems wide; asking
- * for ~88vw of width gives 195/n vw of type. The cap is the desktop end, where
- * that formula would otherwise run past the design's largest size. */
-function ghostSize(word: string): string {
-  return `min(${(195 / word.length).toFixed(1)}vw, 250px)`;
-}
+const AUTO_MS = 3000;
 
 /** How far from focus an item sits, and how it is drawn there. The z keeps the
  * one in focus in front: a neighbour's box still overlaps it by ~30px at the
@@ -250,8 +235,59 @@ export function ComboCarousel({
     >
       <span aria-hidden="true" className="cmb-grain" style={{ backgroundImage: GRAIN }} />
 
-      <span className="cmb-brand">Combo phục hồi toàn diện</span>
+      {/* 3 of 10: everything that is words. */}
+      <div className="cmb-copy">
+        <span className="cmb-brand">Combo phục hồi toàn diện</span>
 
+        <span className="cmb-index">
+          {String(active + 1).padStart(2, "0")} <i>/ {String(SLIDES.length).padStart(2, "0")}</i>
+        </span>
+
+        {/* All four blocks stay mounted and cross-fade, so the column's height
+            never jumps between items whose copy differs in length. */}
+        <div className="cmb-deck">
+          {SLIDES.map((s) => (
+            <div
+              key={s.key}
+              className={"cmb-one" + (s.key === slide.key ? " cmb-on" : "")}
+              aria-hidden={s.key !== slide.key}
+            >
+              <h2>{s.name}</h2>
+              <p>{s.tag}</p>
+              <ul>
+                {s.points.map((pt) => (
+                  <li key={pt}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M5 12.5 10 17l9-10" />
+                    </svg>
+                    {pt}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="cmb-dots" role="tablist" aria-label="Chọn sản phẩm trong combo">
+          {SLIDES.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              role="tab"
+              aria-selected={i === active}
+              aria-label={s.name}
+              className={"cmb-dot" + (i === active ? " cmb-on" : "")}
+              onClick={() => go(i)}
+            />
+          ))}
+        </div>
+
+        <a className={`cmb-link ${displayClass}`} href={buyHref} target="_blank" rel="noopener noreferrer">
+          Mua combo · {priceLabel}
+        </a>
+      </div>
+
+      {/* 7 of 10: the objects. */}
       <div
         className="cmb-stage"
         onPointerDown={onPointerDown}
@@ -259,21 +295,6 @@ export function ComboCarousel({
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        {/* The giant word. aria-hidden because it is decoration — the item's
-            real name is in the copy block below, where a screen reader should
-            meet it once, not twice. */}
-        <span aria-hidden="true" className={`cmb-ghost ${displayClass}`}>
-          {SLIDES.map((s) => (
-            <span
-              key={s.key}
-              className={"cmb-ghost-word" + (s.key === slide.key ? " cmb-on" : "")}
-              style={{ fontSize: ghostSize(s.ghost) }}
-            >
-              {s.ghost}
-            </span>
-          ))}
-        </span>
-
         {SLIDES.map((s, i) => {
           let off = i - active;
           if (off > 2) off -= SLIDES.length;
@@ -305,63 +326,12 @@ export function ComboCarousel({
                 width={s.width}
                 height={s.height}
                 priority={i === 0}
-                sizes="(max-width: 767px) 74vw, 600px"
+                sizes="(max-width: 899px) 72vw, 440px"
                 className="cmb-img"
               />
             </button>
           );
         })}
-      </div>
-
-      <div className="cmb-foot">
-        <div className="cmb-copy">
-          <span className="cmb-index">
-            {String(active + 1).padStart(2, "0")} <i>/ {String(SLIDES.length).padStart(2, "0")}</i>
-          </span>
-          {/* All four blocks stay mounted and cross-fade, so the foot's height
-              never jumps between items whose copy differs in length. */}
-          <div className="cmb-deck">
-            {SLIDES.map((s) => (
-              <div
-                key={s.key}
-                className={"cmb-one" + (s.key === slide.key ? " cmb-on" : "")}
-                aria-hidden={s.key !== slide.key}
-              >
-                <h2>{s.name}</h2>
-                <p>{s.tag}</p>
-                <ul>
-                  {s.points.map((p) => (
-                    <li key={p}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M5 12.5 10 17l9-10" />
-                      </svg>
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="cmb-side">
-          <div className="cmb-dots" role="tablist" aria-label="Chọn sản phẩm trong combo">
-            {SLIDES.map((s, i) => (
-              <button
-                key={s.key}
-                type="button"
-                role="tab"
-                aria-selected={i === active}
-                aria-label={s.name}
-                className={"cmb-dot" + (i === active ? " cmb-on" : "")}
-                onClick={() => go(i)}
-              />
-            ))}
-          </div>
-          <a className={`cmb-link ${displayClass}`} href={buyHref} target="_blank" rel="noopener noreferrer">
-            Mua combo · {priceLabel}
-          </a>
-        </div>
       </div>
     </section>
   );
