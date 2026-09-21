@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { getLegalDoc, type LegalDocKey, type LegalLanguage } from "@/lib/appLegalContent";
 import { supabase } from "@/lib/supabase";
 import { LEGAL_LANGUAGES } from "@/lib/legalLanguage";
+import { LegalDocBody } from "@/components/LegalDocBody";
 
 /** Footer link wording per language. The documents themselves were already
  * translated; only this chrome was still Vietnamese-only, which is what made
@@ -41,21 +42,27 @@ export function LegalShell({
   title,
   language,
   children,
+  headingInBody = false,
 }: {
   title: string;
   language: LegalLanguage;
   children: ReactNode;
+  /** The legal documents open with their own centred masthead, so the shell
+   * must not print a second <h1> above it — which is exactly what the page
+   * did, showing the title twice. /account-deletion has no such masthead and
+   * keeps the default. */
+  headingInBody?: boolean;
 }) {
   const chrome = CHROME[language];
   return (
     <main
       lang={language}
       style={{
-        maxWidth: 760,
+        maxWidth: 820,
         margin: "0 auto",
-        padding: "48px 20px 80px",
+        padding: "32px 20px 64px",
         fontFamily: "var(--font-family, system-ui, sans-serif)",
-        color: "var(--text-primary, #1c2733)",
+        color: "var(--text-primary, #16213a)",
         lineHeight: 1.65,
       }}
     >
@@ -76,8 +83,23 @@ export function LegalShell({
         </nav>
       </div>
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 20 }}>{title}</h1>
-      {children}
+      {/* The document sits on a card, the way a printed policy sits on a
+          sheet: it gives the text a measure, an edge, and somewhere for the
+          page tint to show through. */}
+      <article
+        style={{
+          marginTop: 20,
+          padding: "clamp(24px, 5vw, 48px)",
+          background: "var(--bg-card, #ffffff)",
+          borderRadius: 20,
+          boxShadow: "0 1px 2px rgba(22,33,58,0.04), 0 12px 32px rgba(22,33,58,0.06)",
+        }}
+      >
+        {headingInBody ? null : (
+          <h1 style={{ margin: "0 0 20px", fontSize: 28, fontWeight: 800 }}>{title}</h1>
+        )}
+        {children}
+      </article>
 
       <footer
         style={{
@@ -135,8 +157,8 @@ async function resolveLegalDoc(docKey: LegalDocKey, language: LegalLanguage) {
 export async function LegalPage({ docKey, language }: { docKey: LegalDocKey; language: LegalLanguage }) {
   const doc = await resolveLegalDoc(docKey, language);
   return (
-    <LegalShell title={doc.title} language={language}>
-      <div style={{ whiteSpace: "pre-wrap", fontSize: 15, color: "var(--text-secondary, #3d4a58)" }}>{doc.text}</div>
+    <LegalShell title={doc.title} language={language} headingInBody>
+      <LegalDocBody text={doc.text} />
     </LegalShell>
   );
 }
