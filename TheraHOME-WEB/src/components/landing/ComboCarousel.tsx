@@ -1,7 +1,9 @@
 "use client";
 
 // The combo showcase: four objects on a coloured ground, one in focus at a
-// time, the ground changing colour with it.
+// time, the ground changing colour with it. It is a band INSIDE /san-pham,
+// directly under the two offers — the combo is a bundle of this product, not
+// a second product, so it does not get a page or a nav entry of its own.
 //
 // Built from a reference prompt the owner supplied (a figurine carousel called
 // "TOONHUB", written for React + Vite + Tailwind). The EFFECT is kept — the
@@ -146,10 +148,13 @@ function place(off: number) {
 }
 
 export function ComboCarousel({
+  id,
   displayClass,
   buyHref,
   priceLabel,
 }: {
+  /** Anchor for the product page's sub-nav. */
+  id?: string;
   /** Anton, loaded by the page with next/font. */
   displayClass: string;
   buyHref: string;
@@ -236,6 +241,7 @@ export function ComboCarousel({
   return (
     <section
       ref={rootRef}
+      id={id}
       className="cmb"
       style={{ background: slide.bg }}
       onKeyDown={onKeyDown}

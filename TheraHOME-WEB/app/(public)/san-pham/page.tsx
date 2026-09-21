@@ -5,6 +5,14 @@ import { getSiteContent } from "@/lib/siteContent";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ProductScrollHero } from "@/components/landing/ProductScrollHero";
 import { Product3D } from "@/components/landing/Product3D";
+import { ComboCarousel } from "@/components/landing/ComboCarousel";
+import { Anton } from "next/font/google";
+
+// Display face for the combo band's giant words. Anton carries a vietnamese
+// subset (checked against the Google Fonts CSS API), so TRỊ LIỆU and ĐỒNG HÀNH
+// keep their marks instead of falling back mid-word. One weight is all the
+// family has.
+const anton = Anton({ subsets: ["latin", "vietnamese"], weight: "400", display: "swap" });
 
 export const metadata = {
   title: "TheraNECK+ · TheraHome",
@@ -18,7 +26,7 @@ const card: CSSProperties = { display: "flex", flexDirection: "column", gap: 14,
 
 const SUBNAV = [
   { href: "#mua-hang", label: "Giá & bộ quà tặng" },
-  { href: "/san-pham/combo", label: "Combo phục hồi" },
+  { href: "#combo", label: "Trong combo có gì" },
   { href: "#lieu-phap-4", label: "4 liệu pháp" },
   { href: "#khac-biet", label: "Khác gì máy thường" },
   { href: "#lo-trinh", label: "Lộ trình 14 ngày" },
@@ -171,6 +179,11 @@ export default async function ProductsPage() {
           </div>
         </div>
       </section>
+
+      {/* ------------------------------------------------ combo: bốn món đồ */}
+      {/* Directly under the two offers, because the combo card immediately
+          above names a price without ever showing what is in the box. */}
+      <ComboCarousel id="combo" displayClass={anton.className} buyHref={buy.combo} priceLabel={pricing.comboCurrent} />
 
       {/* ----------------------------------------------------- 4 liệu pháp */}
       <section id="lieu-phap-4" style={sectionPad}>

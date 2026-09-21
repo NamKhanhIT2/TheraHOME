@@ -2295,8 +2295,22 @@ Chủ dự án đưa một prompt tham khảo cho hiệu ứng — một carouse
 "sửa text cho phù hợp", thêm **một trang trong tab sản phẩm** dùng hiệu ứng đó
 để mô tả combo: máy massage, gối công thái học, app, miếng dán Vinh Gia.
 
-Trang mới: **`/san-pham/combo`** (`app/(public)/san-pham/combo/page.tsx`), vào
-được từ sub-nav của `/san-pham` và từ dropdown "Sản phẩm" trên nav.
+Lần đầu tôi hiểu sai thành một **trang riêng** `/san-pham/combo` kèm mục trong
+dropdown "Sản phẩm". Chủ dự án sửa ngay: *"ý tôi ko phải thêm submenu combo, nó
+vẫn ở trong theraneck+, ý là thêm phần carousel so với hiện tại"*. Đúng — combo
+là một gói CỦA chính sản phẩm này, không phải sản phẩm thứ hai, nên nó không
+được có trang và mục nav riêng. Trang con và mục dropdown đã gỡ.
+
+Carousel giờ là **một dải nằm trong `/san-pham`**, đặt **ngay dưới khối hai gói
+giá** (`#mua-hang`): thẻ combo ở trên vừa nêu giá mà chưa hề cho thấy trong hộp
+có gì, dải này trả lời đúng câu đó. Neo `#combo`, có trong sub-nav của trang
+("Trong combo có gì") — đó là mục lục các phần của cùng một trang, không phải
+submenu.
+
+Hai điều chỉnh vì nó là dải giữa trang chứ không phải mở đầu trang:
+`min-height` bị chặn ở 860px (một màn hình không chặn thì trên desktop cao nó
+thành bức tường), và nhãn góc trên trái đẩy xuống `clamp(58px, 8vh, 78px)` cho
+khỏi nấp sau thanh sub-nav dính (~48px) của trang sản phẩm.
 
 **Giữ nguyên hiệu ứng** — nền đổi màu theo món đang chọn ở 650ms
 cubic-bezier(.4,0,.2,1), lớp grain fractalNoise 200px, chữ khổng lồ nằm sau sản

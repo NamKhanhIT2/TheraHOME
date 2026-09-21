@@ -54,10 +54,6 @@ function ProductsDropdown({ current }: { current: boolean }) {
             <span style={{ fontSize: 14, fontWeight: 600 }}>TheraNECK+</span>
             <span style={{ fontSize: 13, color: "rgba(255,255,255,0.68)" }}>Máy trị liệu cổ 4 trong 1</span>
           </Link>
-          <Link href="/san-pham/combo" style={{ display: "flex", flexDirection: "column", gap: 3, padding: "12px 14px", borderRadius: 12, color: "#fff" }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Combo Phục Hồi Toàn Diện</span>
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.68)" }}>Máy, gối, app và miếng dán</span>
-          </Link>
           <span style={{ padding: "10px 14px 4px", fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>
             Sắp có thêm sản phẩm
           </span>
