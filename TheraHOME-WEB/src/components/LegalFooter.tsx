@@ -36,7 +36,12 @@ const COPY: Record<LegalLanguage, { tagline: string; contact: string; terms: str
 const muted = "var(--text-muted, #6e7683)";
 const body = "var(--text-secondary, #59616d)";
 const ink = "var(--text-primary, #16213a)";
-const rule = "1px solid var(--border-light, #e7ecf3)";
+// The footer sits on the page tint (--bg-app #eef3fb), not on a white card.
+// Every border token is tuned for white — --border-light is #e7ecf3, all but
+// identical to the tint — so the rules vanished (owner report 2026-09-22).
+// Mixing the muted text colour gives a line that reads on the tint and stays
+// derived from the palette rather than a new hand-picked hex.
+const rule = "1px solid color-mix(in srgb, var(--text-muted, #6e7683) 35%, transparent)";
 
 function Row({ icon, children }: { icon: string; children: React.ReactNode }) {
   return (
