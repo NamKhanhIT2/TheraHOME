@@ -24,6 +24,10 @@ import { Illustration, type IlloKind } from "@/components/appLanding/Illustratio
 import { Flag } from "@/components/appLanding/Flag";
 import { Reveal } from "@/components/appLanding/Reveal";
 import { AppGallery } from "@/components/appLanding/AppGallery";
+import { LangMenuCloser } from "@/components/appLanding/LangMenuCloser";
+
+/** The store's "Về chúng tôi" page (Shopify), linked from the hero. */
+const ABOUT_URL = "https://therahomeai.com/pages/v%E1%BB%81-chung-toi";
 
 const STEP_ILLOS: IlloKind[] = ["signin", "activate", "daily", "survey"];
 const FEATURE_ILLOS: IlloKind[] = ["roadmap", "video", "ai", "reminder", "community", "support"];
@@ -79,7 +83,7 @@ interface Copy {
   reviewsTitle: string;
   starsLabel: string;
   trust: { title: string; body: string; href?: string }[];
-  signIn: string;
+  about: string;
   prompt: { title: string; body: string; featuresTitle: string; features: string[]; dontShow: string; close: string };
 }
 
@@ -147,7 +151,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { title: "Xoá tài khoản bất cứ lúc nào", body: "Ngay trong app, mục Hồ sơ.", href: "/account-deletion" },
       { title: "Ba ngôn ngữ", body: "Tiếng Việt, English và Bahasa Melayu." },
     ],
-    signIn: "Đăng nhập để tập trên web",
+    about: "Tìm hiểu về TheraHOME",
     ctaTitle: "Tải TheraHOME",
     ctaBody: "Kích hoạt thiết bị và tập buổi đầu tiên ngay hôm nay.",
     qrLabel: "Quét bằng camera điện thoại để tải",
@@ -224,7 +228,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { title: "Delete your account any time", body: "Right in the app, under Profile.", href: "/account-deletion" },
       { title: "Three languages", body: "Tiếng Việt, English and Bahasa Melayu." },
     ],
-    signIn: "Sign in to train on the web",
+    about: "About TheraHOME",
     ctaTitle: "Get TheraHOME",
     ctaBody: "Activate your device and do your first session today.",
     qrLabel: "Scan with your phone camera to download",
@@ -301,7 +305,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { title: "Padam akaun bila-bila masa", body: "Terus dalam aplikasi, di bahagian Profil.", href: "/account-deletion" },
       { title: "Tiga bahasa", body: "Tiếng Việt, English dan Bahasa Melayu." },
     ],
-    signIn: "Log masuk untuk berlatih di web",
+    about: "Tentang TheraHOME",
     ctaTitle: "Dapatkan TheraHOME",
     ctaBody: "Aktifkan peranti anda dan mulakan sesi pertama hari ini.",
     qrLabel: "Imbas dengan kamera telefon untuk muat turun",
@@ -405,8 +409,8 @@ export default async function AppLandingPage({
 
             <p className="al-start">{copy.startLabel}</p>
             <StoreBadges links={app_links} language={language} />
-            <a className="al-signin" href="/luyen-tap">
-              {copy.signIn}
+            <a className="al-signin" href={ABOUT_URL} target="_blank" rel="noopener">
+              {copy.about}
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
             </a>
 
@@ -617,6 +621,7 @@ export default async function AppLandingPage({
       </DownloadPrompt>
 
       <Reveal />
+      <LangMenuCloser />
 
       <div className="al-stickybar">
         <StoreBadges links={app_links} language={language} />
