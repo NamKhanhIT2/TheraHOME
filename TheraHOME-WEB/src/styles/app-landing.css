@@ -439,3 +439,21 @@ a.al-trust-card:hover { border-color: var(--s2); background: var(--color-primary
   .al-badge em { font-size: 10px; right: -4px; }
   .al-signin { font-size: 16px; padding: 0 22px; }
 }
+
+/* ------------------------------------------------------------ QR in CTA */
+.al-cta-body { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+.al-cta-body .al-badges { justify-content: center; }
+.al-qr { display: none; margin: 0; }
+@media (min-width: 900px) {
+  .al-cta { text-align: left; padding-left: clamp(40px, 6vw, 72px); padding-right: clamp(40px, 6vw, 72px); }
+  .al-cta-body { flex-direction: row; justify-content: space-between; }
+  .al-cta-body .al-badges { justify-content: flex-start; }
+  .al-cta p { margin-left: 0; }
+  .al-qr {
+    flex: none; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 14px 14px 12px; border-radius: 20px; background: var(--bg-card);
+    box-shadow: 0 16px 40px rgba(0, 30, 80, 0.25);
+  }
+  .al-qr img { display: block; width: 148px; height: 148px; image-rendering: pixelated; }
+  .al-qr figcaption { max-width: 150px; text-align: center; font-size: 12.5px; line-height: 1.4; color: var(--text-secondary); }
+}

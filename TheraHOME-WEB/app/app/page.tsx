@@ -57,6 +57,8 @@ interface Copy {
   faq: { q: string; a: string }[];
   ctaTitle: string;
   ctaBody: string;
+  qrLabel: string;
+  qrAlt: string;
   startLabel: string;
   nav: { how: string; features: string; faq: string };
   stats: { value: string; label: string }[];
@@ -137,6 +139,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     signIn: "Đăng nhập để tập trên web",
     ctaTitle: "Tải TheraHOME",
     ctaBody: "Kích hoạt thiết bị và tập buổi đầu tiên ngay hôm nay.",
+    qrLabel: "Quét bằng camera điện thoại để tải",
+    qrAlt: "Mã QR tải ứng dụng TheraHOME",
     prompt: {
       title: "Tải ứng dụng TheraHOME",
       body: "Tập theo lộ trình mỗi ngày, ngay trên điện thoại.",
@@ -209,6 +213,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     signIn: "Sign in to train on the web",
     ctaTitle: "Get TheraHOME",
     ctaBody: "Activate your device and do your first session today.",
+    qrLabel: "Scan with your phone camera to download",
+    qrAlt: "QR code to download the TheraHOME app",
     prompt: {
       title: "Get the TheraHOME app",
       body: "Follow your roadmap every day, right on your phone.",
@@ -281,6 +287,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     signIn: "Log masuk untuk berlatih di web",
     ctaTitle: "Dapatkan TheraHOME",
     ctaBody: "Aktifkan peranti anda dan mulakan sesi pertama hari ini.",
+    qrLabel: "Imbas dengan kamera telefon untuk muat turun",
+    qrAlt: "Kod QR untuk memuat turun aplikasi TheraHOME",
     prompt: {
       title: "Dapatkan aplikasi TheraHOME",
       body: "Ikuti pelan anda setiap hari, terus di telefon.",
@@ -536,9 +544,21 @@ export default async function AppLandingPage({
       <section className="al-section" id="tai-app">
         <div className="al-wrap">
           <div className="al-cta" data-reveal>
-            <h2>{copy.ctaTitle}</h2>
-            <p>{copy.ctaBody}</p>
-            <StoreBadges links={app_links} language={language} />
+            <div className="al-cta-body">
+              <div>
+                <h2>{copy.ctaTitle}</h2>
+                <p>{copy.ctaBody}</p>
+                <StoreBadges links={app_links} language={language} />
+              </div>
+              {/* Encodes /app/tai, which sends each scan to the right store —
+                  see app/app/tai/route.ts. Desktop only: on a phone the
+                  visitor is already holding the device the code would open. */}
+              <figure className="al-qr">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/landing/app-page/qr-tai-app.svg" alt={copy.qrAlt} width={148} height={148} loading="lazy" />
+                <figcaption>{copy.qrLabel}</figcaption>
+              </figure>
+            </div>
           </div>
           <LegalFooter language={language} />
         </div>
