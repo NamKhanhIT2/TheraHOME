@@ -5,6 +5,7 @@ import { LEGAL_LANGUAGES } from "@/lib/legalLanguage";
 import { LegalDocBody } from "@/components/LegalDocBody";
 import { LegalBackButton } from "@/components/LegalBackButton";
 import { LegalFooter } from "@/components/LegalFooter";
+import { brandFont } from "@/lib/brandFont";
 
 /** Shell wording per language (the footer carries its own, in LegalFooter).
  * The documents themselves were already translated; only this chrome was
@@ -53,11 +54,12 @@ export async function LegalShell({
   return (
     <main
       lang={language}
+      className={brandFont.variable}
       style={{
         maxWidth: 820,
         margin: "0 auto",
         padding: "32px 20px 64px",
-        fontFamily: "var(--font-family, system-ui, sans-serif)",
+        fontFamily: "var(--font-brand), system-ui, sans-serif",
         color: "var(--text-primary, #16213a)",
         lineHeight: 1.65,
       }}
@@ -92,7 +94,7 @@ export async function LegalShell({
         }}
       >
         {headingInBody ? null : (
-          <h1 style={{ margin: "0 0 20px", fontSize: 28, fontWeight: 800 }}>{title}</h1>
+          <h1 style={{ margin: "0 0 20px", fontSize: 28, fontWeight: 700 }}>{title}</h1>
         )}
         {children}
       </article>

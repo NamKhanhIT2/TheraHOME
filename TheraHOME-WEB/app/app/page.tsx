@@ -18,6 +18,7 @@ import { LEGAL_LANGUAGES, resolveLegalLanguage } from "@/lib/legalLanguage";
 import { getSiteContent } from "@/lib/siteContent";
 import { LegalFooter } from "@/components/LegalFooter";
 import { StoreBadges } from "@/components/appLanding/StoreBadges";
+import { brandFont } from "@/lib/brandFont";
 
 export const metadata: Metadata = {
   title: "Ứng dụng TheraHOME · TheraHOME app",
@@ -27,7 +28,7 @@ export const metadata: Metadata = {
 // Store links and contact details are edited in Admin; pick edits up within a minute.
 export const revalidate = 60;
 
-const FLAGS: Record<LegalLanguage, string> = { vi: "🇻🇳", en: "🇬🇧", ms: "🇲🇾" };
+const CODES: Record<LegalLanguage, string> = { vi: "VI", en: "EN", ms: "MS" };
 
 type Item = { title: string; body: string };
 
@@ -55,125 +56,125 @@ const COPY: Record<LegalLanguage, Copy> = {
   vi: {
     download: "Tải app",
     language: "Ngôn ngữ",
-    headlineLead: "Tập cổ vai gáy mỗi ngày, có lộ trình rõ ràng cùng",
+    headlineLead: "Tập cổ vai gáy mỗi ngày cùng",
     headlineBrand: "TheraHOME",
-    intro: "Ứng dụng đi kèm thiết bị TheraHOME: video hướng dẫn từng buổi, trợ lý AI và đội ngũ hỗ trợ, gọn trong điện thoại của bạn.",
+    intro: "Lộ trình theo ngày, video hướng dẫn và người hỗ trợ khi cần. Dùng kèm thiết bị TheraHOME.",
     highlights: [
-      { title: "Lộ trình theo từng ngày", body: "Mỗi ngày một buổi 15–20 phút, chia theo giai đoạn. Ngày mới tự mở lúc 0h, nên bạn luôn biết hôm nay tập gì." },
-      { title: "Trợ lý AI luôn sẵn sàng", body: "Hỏi về buổi tập, cách dùng thiết bị hay cường độ phù hợp và nhận gợi ý ngay trên điện thoại." },
-      { title: "Video hướng dẫn từng buổi", body: "Làm theo video ngay trong app hoặc phát lên TV. Xem xong, buổi tập được ghi nhận hoàn thành." },
+      { title: "Biết hôm nay tập gì", body: "Mỗi ngày một buổi 15–20 phút. Ngày mới mở lúc 0h." },
+      { title: "Hỏi AI bất cứ lúc nào", body: "Về buổi tập, cách dùng thiết bị, cường độ phù hợp." },
+      { title: "Tập theo video", body: "Xem trong app hoặc phát lên TV. Xem xong là ghi nhận." },
     ],
     phonesAlt: ["Màn hình chính ứng dụng TheraHOME", "Lộ trình tập trong ứng dụng TheraHOME"],
-    howTitle: "TheraHOME hoạt động thế nào",
-    howIntro: "Từ lúc mở hộp thiết bị đến buổi tập đầu tiên chỉ mất vài phút.",
+    howTitle: "Bắt đầu trong 4 bước",
+    howIntro: "",
     steps: [
-      { title: "Tạo tài khoản", body: "Đăng nhập bằng Google, Apple hoặc email." },
-      { title: "Kích hoạt thiết bị", body: "Nhập số điện thoại hoặc email đã dùng khi đặt hàng. Không cần mã kích hoạt." },
-      { title: "Tập theo lộ trình", body: "Mỗi ngày một video, kèm lời nhắc vào khung giờ bạn chọn." },
-      { title: "Tự đánh giá cuối giai đoạn", body: "Một khảo sát ngắn giúp TheraHOME đồng hành cùng bạn sát hơn." },
+      { title: "Đăng nhập", body: "Bằng Google, Apple hoặc email." },
+      { title: "Kích hoạt thiết bị", body: "Nhập số điện thoại hoặc email lúc đặt hàng. Không cần mã." },
+      { title: "Tập mỗi ngày", body: "Một video mỗi ngày, nhắc theo giờ bạn chọn." },
+      { title: "Đánh giá cuối giai đoạn", body: "Vài câu hỏi ngắn để TheraHOME theo sát bạn hơn." },
     ],
-    insideTitle: "Mọi thứ bạn cần để tập đều đặn",
-    insideIntro: "Thiết kế cho người bận rộn: mở app là biết hôm nay tập gì.",
+    insideTitle: "Trong ứng dụng có gì",
+    insideIntro: "",
     features: [
-      { title: "Lộ trình theo giai đoạn", body: "Các ngày tập được sắp theo từng giai đoạn, tiến độ lưu lại sau mỗi buổi." },
-      { title: "Video hướng dẫn", body: "Mỗi ngày có video riêng, xem trong app hoặc chiếu lên TV." },
-      { title: "Trợ lý AI TheraHOME", body: "Trả lời tức thì, mọi lúc, về buổi tập và cách dùng thiết bị." },
-      { title: "Nhắc tập hằng ngày", body: "Chọn giờ sáng hoặc tối, TheraHOME nhắc đúng giờ để bạn không bỏ lỡ." },
-      { title: "Cộng đồng", body: "Chia sẻ hành trình, đọc mẹo từ người đi trước và từ đội ngũ TheraHOME." },
-      { title: "Đội ngũ hỗ trợ", body: "Nhắn tin về tài khoản, lộ trình, thiết bị hay ứng dụng, có người trả lời." },
+      { title: "Lộ trình theo giai đoạn", body: "Tiến độ tự lưu sau mỗi buổi." },
+      { title: "Video hướng dẫn", body: "Mỗi ngày một video riêng." },
+      { title: "Trợ lý AI", body: "Trả lời ngay, mọi lúc." },
+      { title: "Nhắc giờ tập", body: "Chọn sáng hoặc tối, app nhắc đúng giờ." },
+      { title: "Cộng đồng", body: "Chia sẻ hành trình, học mẹo từ người đi trước." },
+      { title: "Hỗ trợ", body: "Nhắn tin là có người của TheraHOME trả lời." },
     ],
     faqTitle: "Câu hỏi thường gặp",
     faq: [
-      { q: "Ứng dụng có miễn phí không?", a: "Có. Bạn tải và dùng ứng dụng miễn phí; lộ trình mở ra sau khi kích hoạt bằng thông tin đặt hàng thiết bị TheraHOME." },
+      { q: "Ứng dụng có miễn phí không?", a: "Có. Lộ trình mở sau khi bạn kích hoạt bằng thông tin đặt hàng thiết bị TheraHOME." },
       { q: "Thiết bị TheraHOME là gì?", a: "TheraNECK/TheraBACK là dụng cụ hỗ trợ thư giãn cơ và tập luyện tại nhà, không phải thiết bị y tế. Thiết bị không đo lường chỉ số sức khỏe và không kết nối dữ liệu với ứng dụng; ứng dụng cung cấp video hướng dẫn tập luyện đi kèm thiết bị." },
       { q: "Ứng dụng có thay thế bác sĩ không?", a: "Không. TheraHOME hỗ trợ vận động, không thay thế chẩn đoán hay điều trị y khoa." },
       { q: "Làm sao để mở ngày tập tiếp theo?", a: "Các ngày trong lộ trình tự mở khoá theo thời gian: mỗi ngày mở một ngày mới vào 0h. Xem video bài tập để ghi nhận hoàn thành ngày hôm đó." },
-      { q: "Ứng dụng có trên những nền tảng nào?", a: "iPhone (App Store) và Android (Google Play). Một tài khoản dùng được trên cả hai, tiến độ tập luôn được đồng bộ." },
+      { q: "Dùng được trên những máy nào?", a: "iPhone và Android. Một tài khoản dùng trên cả hai, tiến độ luôn đồng bộ." },
     ],
-    ctaTitle: "Sẵn sàng cho buổi tập đầu tiên?",
-    ctaBody: "Tải TheraHOME, kích hoạt thiết bị và bắt đầu lộ trình của bạn ngay hôm nay.",
+    ctaTitle: "Tải TheraHOME",
+    ctaBody: "Kích hoạt thiết bị và tập buổi đầu tiên ngay hôm nay.",
   },
   en: {
     download: "Download",
     language: "Language",
-    headlineLead: "Train your neck and shoulders every day, with a clear roadmap from",
+    headlineLead: "Train your neck and shoulders daily with",
     headlineBrand: "TheraHOME",
-    intro: "The companion app for your TheraHOME device: a guided video for every session, an AI assistant and a support team, all on your phone.",
+    intro: "A day-by-day roadmap, guided videos and real people when you need them. Made for your TheraHOME device.",
     highlights: [
-      { title: "A roadmap, day by day", body: "One 15–20 minute session a day, grouped into phases. A new day opens at midnight, so you always know what to do today." },
-      { title: "An AI assistant, always ready", body: "Ask about your session, how to use the device or the right intensity, and get suggestions right on your phone." },
-      { title: "A video for every session", body: "Follow along in the app or cast it to your TV. Finish the video and the session is recorded as done." },
+      { title: "Know what to do today", body: "One 15–20 minute session a day. A new day opens at midnight." },
+      { title: "Ask the AI any time", body: "About your session, the device, or the right intensity." },
+      { title: "Follow the video", body: "In the app or on your TV. Finish it and the day is logged." },
     ],
     phonesAlt: ["The TheraHOME app home screen", "The training roadmap in the TheraHOME app"],
-    howTitle: "How TheraHOME works",
-    howIntro: "From opening the box to your first session takes only a few minutes.",
+    howTitle: "Get started in 4 steps",
+    howIntro: "",
     steps: [
-      { title: "Create an account", body: "Sign in with Google, Apple or email." },
-      { title: "Activate your device", body: "Enter the phone number or email you used to order. No activation code needed." },
-      { title: "Follow your roadmap", body: "One video a day, with a reminder at the time you choose." },
-      { title: "Check in after each phase", body: "A short survey helps TheraHOME support you more closely." },
+      { title: "Sign in", body: "With Google, Apple or email." },
+      { title: "Activate your device", body: "Enter the phone or email from your order. No code needed." },
+      { title: "Train daily", body: "One video a day, with a reminder when you choose." },
+      { title: "Check in after each phase", body: "A few short questions so TheraHOME can follow your progress." },
     ],
-    insideTitle: "Everything you need to keep training",
-    insideIntro: "Built for busy people: open the app and today's session is waiting.",
+    insideTitle: "What's in the app",
+    insideIntro: "",
     features: [
-      { title: "A phased roadmap", body: "Training days are arranged in phases, and your progress is saved after every session." },
-      { title: "Guided videos", body: "Each day has its own video, in the app or on your TV." },
-      { title: "TheraHOME AI Assistant", body: "Instant answers, any time, about your sessions and your device." },
-      { title: "Daily reminders", body: "Pick a morning or evening time and TheraHOME reminds you when it comes round." },
-      { title: "Community", body: "Share your journey and read tips from others and from the TheraHOME team." },
-      { title: "A real support team", body: "Message us about your account, roadmap, device or the app, and a person replies." },
+      { title: "Phased roadmap", body: "Progress saves after every session." },
+      { title: "Guided videos", body: "A new video each day." },
+      { title: "AI assistant", body: "Instant answers, any time." },
+      { title: "Reminders", body: "Pick morning or evening; the app reminds you." },
+      { title: "Community", body: "Share your journey and pick up tips." },
+      { title: "Support", body: "Message us and a TheraHOME person replies." },
     ],
-    faqTitle: "Frequently asked questions",
+    faqTitle: "Questions",
     faq: [
-      { q: "Is the app free?", a: "Yes. The app is free to download and use; your roadmap opens once you activate it with the order details of your TheraHOME device." },
+      { q: "Is the app free?", a: "Yes. Your roadmap opens once you activate it with your TheraHOME order details." },
       { q: "What is the TheraHOME device?", a: "TheraNECK/TheraBACK are home muscle-relaxation and training aids, not medical devices. They do not measure health metrics and do not sync data with the app; the app provides the workout videos that accompany the device." },
       { q: "Does the app replace a doctor?", a: "No. TheraHOME is a fitness and wellness app; it does not provide medical diagnosis or treatment." },
       { q: "How do I unlock the next day?", a: "Days unlock automatically over time: one new day opens at midnight. Watch the workout video to record that day as completed." },
-      { q: "Which platforms are supported?", a: "iPhone (App Store) and Android (Google Play). One account works on both, and your progress stays in sync." },
+      { q: "Which phones does it run on?", a: "iPhone and Android. One account works on both, and progress stays in sync." },
     ],
-    ctaTitle: "Ready for your first session?",
-    ctaBody: "Download TheraHOME, activate your device and start your roadmap today.",
+    ctaTitle: "Get TheraHOME",
+    ctaBody: "Activate your device and do your first session today.",
   },
   ms: {
     download: "Muat turun",
     language: "Bahasa",
-    headlineLead: "Latih leher dan bahu setiap hari, dengan pelan yang jelas bersama",
+    headlineLead: "Latih leher dan bahu setiap hari bersama",
     headlineBrand: "TheraHOME",
-    intro: "Aplikasi pengiring peranti TheraHOME anda: video berpandu untuk setiap sesi, pembantu AI dan pasukan sokongan, semuanya dalam telefon anda.",
+    intro: "Pelan harian, video berpandu dan pasukan sokongan bila perlu. Untuk peranti TheraHOME anda.",
     highlights: [
-      { title: "Pelan hari demi hari", body: "Satu sesi 15–20 minit sehari, disusun mengikut fasa. Hari baharu dibuka pada tengah malam, jadi anda sentiasa tahu latihan hari ini." },
-      { title: "Pembantu AI sentiasa sedia", body: "Tanya tentang sesi anda, cara menggunakan peranti atau intensiti yang sesuai, dan terima cadangan terus di telefon." },
-      { title: "Video untuk setiap sesi", body: "Ikuti dalam aplikasi atau paparkan ke TV. Selesai menonton, sesi itu direkodkan sebagai selesai." },
+      { title: "Tahu latihan hari ini", body: "Satu sesi 15–20 minit sehari. Hari baharu dibuka pada tengah malam." },
+      { title: "Tanya AI bila-bila masa", body: "Tentang sesi, peranti atau intensiti yang sesuai." },
+      { title: "Ikut video", body: "Dalam aplikasi atau di TV. Selesai menonton, hari itu direkodkan." },
     ],
     phonesAlt: ["Skrin utama aplikasi TheraHOME", "Pelan latihan dalam aplikasi TheraHOME"],
-    howTitle: "Cara TheraHOME berfungsi",
-    howIntro: "Dari membuka kotak peranti hingga sesi pertama hanya beberapa minit.",
+    howTitle: "Mula dalam 4 langkah",
+    howIntro: "",
     steps: [
-      { title: "Cipta akaun", body: "Log masuk dengan Google, Apple atau e-mel." },
-      { title: "Aktifkan peranti", body: "Masukkan nombor telefon atau e-mel yang digunakan semasa membuat pesanan. Tiada kod pengaktifan diperlukan." },
-      { title: "Ikuti pelan anda", body: "Satu video sehari, dengan peringatan pada waktu pilihan anda." },
-      { title: "Penilaian selepas setiap fasa", body: "Tinjauan ringkas membantu TheraHOME menyokong anda dengan lebih dekat." },
+      { title: "Log masuk", body: "Dengan Google, Apple atau e-mel." },
+      { title: "Aktifkan peranti", body: "Masukkan telefon atau e-mel pesanan anda. Tiada kod diperlukan." },
+      { title: "Berlatih setiap hari", body: "Satu video sehari, dengan peringatan pada waktu pilihan anda." },
+      { title: "Penilaian setiap fasa", body: "Beberapa soalan ringkas supaya TheraHOME dapat mengikuti kemajuan anda." },
     ],
-    insideTitle: "Semua yang anda perlukan untuk terus berlatih",
-    insideIntro: "Direka untuk orang sibuk: buka aplikasi dan sesi hari ini sudah menanti.",
+    insideTitle: "Apa ada dalam aplikasi",
+    insideIntro: "",
     features: [
-      { title: "Pelan mengikut fasa", body: "Hari latihan disusun mengikut fasa, dan kemajuan anda disimpan selepas setiap sesi." },
-      { title: "Video berpandu", body: "Setiap hari ada video tersendiri, dalam aplikasi atau di TV anda." },
-      { title: "Pembantu AI TheraHOME", body: "Jawapan segera, bila-bila masa, tentang sesi dan peranti anda." },
-      { title: "Peringatan harian", body: "Pilih waktu pagi atau malam dan TheraHOME akan mengingatkan anda tepat pada masanya." },
-      { title: "Komuniti", body: "Kongsi perjalanan anda dan baca petua daripada orang lain dan pasukan TheraHOME." },
-      { title: "Pasukan sokongan sebenar", body: "Hantar mesej tentang akaun, pelan, peranti atau aplikasi, dan seseorang akan membalas." },
+      { title: "Pelan mengikut fasa", body: "Kemajuan disimpan selepas setiap sesi." },
+      { title: "Video berpandu", body: "Video baharu setiap hari." },
+      { title: "Pembantu AI", body: "Jawapan segera, bila-bila masa." },
+      { title: "Peringatan", body: "Pilih pagi atau malam; aplikasi akan mengingatkan anda." },
+      { title: "Komuniti", body: "Kongsi perjalanan dan dapatkan petua." },
+      { title: "Sokongan", body: "Hantar mesej dan pasukan TheraHOME akan membalas." },
     ],
     faqTitle: "Soalan lazim",
     faq: [
-      { q: "Adakah aplikasi ini percuma?", a: "Ya. Aplikasi ini percuma untuk dimuat turun dan digunakan; pelan anda dibuka selepas diaktifkan dengan butiran pesanan peranti TheraHOME anda." },
+      { q: "Adakah aplikasi ini percuma?", a: "Ya. Pelan anda dibuka selepas diaktifkan dengan butiran pesanan TheraHOME anda." },
       { q: "Apakah peranti TheraHOME?", a: "TheraNECK/TheraBACK ialah alat bantu relaksasi otot dan latihan di rumah, bukan peranti perubatan. Ia tidak mengukur metrik kesihatan dan tidak menyegerakkan data dengan aplikasi; aplikasi menyediakan video latihan yang mengiringi peranti." },
       { q: "Adakah aplikasi ini menggantikan doktor?", a: "Tidak. TheraHOME ialah aplikasi kecergasan dan kesejahteraan; ia tidak menyediakan diagnosis atau rawatan perubatan." },
       { q: "Bagaimana saya membuka hari seterusnya?", a: "Hari dalam pelan dibuka secara automatik mengikut masa: satu hari baharu dibuka pada tengah malam. Tonton video latihan untuk merekodkan hari itu sebagai selesai." },
-      { q: "Platform apakah yang disokong?", a: "iPhone (App Store) dan Android (Google Play). Satu akaun boleh digunakan pada kedua-duanya, dan kemajuan anda sentiasa diselaraskan." },
+      { q: "Telefon apa yang disokong?", a: "iPhone dan Android. Satu akaun untuk kedua-duanya, kemajuan sentiasa diselaraskan." },
     ],
-    ctaTitle: "Sedia untuk sesi pertama anda?",
-    ctaBody: "Muat turun TheraHOME, aktifkan peranti anda dan mulakan pelan anda hari ini.",
+    ctaTitle: "Dapatkan TheraHOME",
+    ctaBody: "Aktifkan peranti anda dan mulakan sesi pertama hari ini.",
   },
 };
 
@@ -218,29 +219,29 @@ export default async function AppLandingPage({
   const featureIcons = [0, 2, 1, 3, 4, 5];
 
   return (
-    <div className="app-landing" lang={language}>
+    <div className={`app-landing ${brandFont.variable}`} lang={language}>
       <header className="al-header">
         <div className="al-wrap">
           <a className="al-brand" href={`/app?lang=${language}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/landing/logo.png" alt="" width={36} height={36} />
-            <span>TheraHOME</span>
+            <span className="al-wordmark">Thera<b>HOME</b></span>
           </a>
           <details className="al-lang">
             <summary aria-label={copy.language}>
-              <span aria-hidden="true">{FLAGS[language]}</span>
-              <span className="al-chev" aria-hidden="true">▼</span>
+              <span aria-hidden="true">{CODES[language]}</span>
+              <svg className="al-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
             </summary>
             <nav className="al-lang-menu" aria-label={copy.language}>
               {LEGAL_LANGUAGES.map((entry) =>
                 entry.code === language ? (
                   <span key={entry.code} aria-current="true">
-                    <span aria-hidden="true">{FLAGS[entry.code]}</span>
+                    <span className="al-code" aria-hidden="true">{CODES[entry.code]}</span>
                     {entry.label}
                   </span>
                 ) : (
                   <a key={entry.code} href={`?lang=${entry.code}`} hrefLang={entry.code}>
-                    <span aria-hidden="true">{FLAGS[entry.code]}</span>
+                    <span className="al-code" aria-hidden="true">{CODES[entry.code]}</span>
                     {entry.label}
                   </a>
                 ),
@@ -292,7 +293,7 @@ export default async function AppLandingPage({
         <div className="al-wrap">
           <div className="al-section-head">
             <h2>{copy.howTitle}</h2>
-            <p>{copy.howIntro}</p>
+            {copy.howIntro ? <p>{copy.howIntro}</p> : null}
           </div>
           <ol className="al-steps">
             {copy.steps.map((step) => (
@@ -309,7 +310,7 @@ export default async function AppLandingPage({
         <div className="al-wrap">
           <div className="al-section-head">
             <h2>{copy.insideTitle}</h2>
-            <p>{copy.insideIntro}</p>
+            {copy.insideIntro ? <p>{copy.insideIntro}</p> : null}
           </div>
           <div className="al-grid">
             {copy.features.map((item, i) => (

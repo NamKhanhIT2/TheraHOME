@@ -90,7 +90,7 @@ export function LegalDocBody({ text }: { text: string }): ReactNode {
         switch (block.kind) {
           case "title":
             return (
-              <h1 key={i} style={{ margin: 0, fontSize: "clamp(24px, 4vw, 30px)", fontWeight: 800, color: ink, textAlign: "center", letterSpacing: "-0.01em", lineHeight: 1.25 }}>
+              <h1 key={i} style={{ margin: 0, fontSize: "clamp(24px, 4vw, 30px)", fontWeight: 700, color: ink, textAlign: "center", letterSpacing: "-0.01em", lineHeight: 1.25 }}>
                 {block.text}
               </h1>
             );
