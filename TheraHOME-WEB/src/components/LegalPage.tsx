@@ -3,28 +3,24 @@ import { getLegalDoc, type LegalDocKey, type LegalLanguage } from "@/lib/appLega
 import { supabase } from "@/lib/supabase";
 import { LEGAL_LANGUAGES } from "@/lib/legalLanguage";
 import { LegalDocBody } from "@/components/LegalDocBody";
+import { LegalBackButton } from "@/components/LegalBackButton";
+import { LegalFooter } from "@/components/LegalFooter";
 
-/** Footer link wording per language. The documents themselves were already
- * translated; only this chrome was still Vietnamese-only, which is what made
- * an English reader land on an English policy wrapped in Vietnamese links. */
-const CHROME: Record<LegalLanguage, { terms: string; privacy: string; deletion: string; language: string }> = {
+/** Shell wording per language (the footer carries its own, in LegalFooter).
+ * The documents themselves were already translated; only this chrome was
+ * Vietnamese-only, which wrapped an English policy in Vietnamese labels. */
+const CHROME: Record<LegalLanguage, { language: string; back: string }> = {
   vi: {
-    terms: "Điều khoản sử dụng",
-    privacy: "Chính sách quyền riêng tư",
-    deletion: "Xoá tài khoản",
     language: "Ngôn ngữ",
+    back: "Quay lại",
   },
   en: {
-    terms: "Terms of Use",
-    privacy: "Privacy Policy",
-    deletion: "Delete account",
     language: "Language",
+    back: "Back",
   },
   ms: {
-    terms: "Terma Penggunaan",
-    privacy: "Dasar Privasi",
-    deletion: "Padam akaun",
     language: "Bahasa",
+    back: "Kembali",
   },
 };
 
@@ -38,7 +34,7 @@ const linkStyle = { color: "var(--color-primary, #007fd9)" } as const;
  * Malaysian and Vietnamese listings at once. Each choice is a real link with
  * `?lang=`, so it survives being copied or bookmarked, and it works with
  * JavaScript off — which is how a store reviewer's tooling often reads it. */
-export function LegalShell({
+export async function LegalShell({
   title,
   language,
   children,
@@ -66,8 +62,8 @@ export function LegalShell({
         lineHeight: 1.65,
       }}
     >
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "baseline", justifyContent: "space-between" }}>
-        <p style={{ fontWeight: 700, fontSize: 14, color: "var(--color-primary, #007fd9)", marginBottom: 6 }}>TheraHOME</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+        <LegalBackButton label={chrome.back} />
         <nav aria-label={chrome.language} style={{ fontSize: 13, display: "flex", gap: 10, flexWrap: "wrap" }}>
           {LEGAL_LANGUAGES.map((entry) =>
             entry.code === language ? (
@@ -101,19 +97,7 @@ export function LegalShell({
         {children}
       </article>
 
-      <footer
-        style={{
-          marginTop: 48,
-          paddingTop: 16,
-          borderTop: "1px solid var(--divider, #e3e9f0)",
-          fontSize: 13,
-          color: "var(--text-muted, #7b8794)",
-        }}
-      >
-        <a href={`/terms?lang=${language}`} style={{ ...linkStyle, marginRight: 16 }}>{chrome.terms}</a>
-        <a href={`/privacy?lang=${language}`} style={{ ...linkStyle, marginRight: 16 }}>{chrome.privacy}</a>
-        <a href={`/account-deletion?lang=${language}`} style={linkStyle}>{chrome.deletion}</a>
-      </footer>
+      <LegalFooter language={language} />
     </main>
   );
 }
