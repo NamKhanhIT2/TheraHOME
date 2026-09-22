@@ -72,11 +72,14 @@ export function AppGallery({
     };
   }, []);
 
-  // Start centred on the first panel.
+  // Open on the MIDDLE panel, so there are panels on both sides from the first
+  // frame. Opening on the first left the strip lopsided: an empty left half
+  // and three panels on the right (owner report 2026-09-22).
   useEffect(() => {
     const el = track.current;
-    const first = items()[0];
-    if (el && first) el.scrollLeft = first.offsetLeft - (el.clientWidth - first.offsetWidth) / 2;
+    const list = items();
+    const mid = list[Math.floor(list.length / 2)];
+    if (el && mid) el.scrollLeft = mid.offsetLeft - (el.clientWidth - mid.offsetWidth) / 2;
   }, []);
 
   // Autoplay.

@@ -597,3 +597,82 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
 @media (min-width: 980px) { .al-steps { gap: 28px; } }
 .al-trust-row { gap: 20px; }
 .al-faq { gap: 18px; }
+
+/* ============================================================ colour glow */
+/* After the owner's "Nice button" reference: a glossy pill with a gradient
+   rim and a soft coloured glow pooled underneath. The hues are the store
+   artwork's — brand blue into the cyan of "Wellness Journey" — with a touch
+   of violet as in the reference. Used on the primary actions and a few card
+   edges only, so it still reads as accent, not decoration everywhere. */
+.app-landing {
+  --glow-a: var(--color-primary);
+  --glow-b: #22c3f0;
+  --glow-c: var(--accent-purple);
+  --rim: linear-gradient(135deg, var(--glow-b), var(--glow-a) 45%, var(--glow-c));
+}
+
+/* Primary buttons: glossy body, gradient rim, coloured pool of light. */
+.al-signin, .al-download, .al-btn-primary {
+  position: relative; isolation: isolate;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%) padding-box,
+    linear-gradient(100deg, var(--color-primary-dark), var(--color-primary) 55%, var(--color-primary-light)) padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), var(--glow-b) 40%, var(--glow-c)) border-box;
+}
+.al-signin::after, .al-download::after, .al-btn-primary::after {
+  content: ""; position: absolute; z-index: -1; left: 12%; right: 12%; bottom: -14px; height: 60%;
+  border-radius: 999px; filter: blur(16px); opacity: 0.75;
+  background: linear-gradient(90deg, var(--glow-b), var(--glow-a), var(--glow-c));
+  transition: opacity 0.2s ease, bottom 0.2s ease;
+}
+.al-signin:hover::after, .al-download:hover::after, .al-btn-primary:hover::after { opacity: 1; bottom: -18px; }
+.al-signin:active::after, .al-download:active::after, .al-btn-primary:active::after { opacity: 0.45; bottom: -8px; }
+.al-download::after { bottom: -8px; filter: blur(10px); opacity: 0.55; }
+
+/* Round controls and the active dot: a thin gradient rim. */
+.al-nm-round {
+  border: 1.5px solid transparent;
+  background: linear-gradient(var(--nm-bg), var(--nm-bg)) padding-box, var(--rim) border-box;
+}
+.al-nm-round:hover { background: linear-gradient(var(--nm-bg), var(--nm-bg)) padding-box, var(--rim) border-box; }
+.al-cf-dots button.is-on { background: var(--rim); }
+
+/* Cards: the rim appears on the ones that matter and on hover elsewhere. */
+.al-stats-row, .al-step-card, .al-feature, .al-review {
+  border: 1.5px solid transparent;
+  background: linear-gradient(var(--nm-bg), var(--nm-bg)) padding-box,
+    linear-gradient(135deg, color-mix(in srgb, var(--glow-b) 35%, transparent), transparent 40%, transparent 60%, color-mix(in srgb, var(--glow-c) 30%, transparent)) border-box;
+}
+.al-feature:hover, .al-step-card:hover {
+  background: linear-gradient(var(--nm-bg), var(--nm-bg)) padding-box, var(--rim) border-box;
+}
+.al-step-card { transition: box-shadow 0.2s ease; }
+.al-step-card:hover { box-shadow: 12px 12px 24px var(--nm-dark), -10px -10px 22px var(--nm-light); }
+
+/* Step discs: numbers in the gradient, rimmed. */
+.al-step-num {
+  border: 1.5px solid transparent;
+  background: linear-gradient(var(--nm-bg), var(--nm-bg)) padding-box, var(--rim) border-box;
+}
+
+/* The closing panel gets the same pool of colour beneath it. */
+.al-cta { isolation: isolate; overflow: visible; }
+.al-cta::after {
+  content: ""; position: absolute; z-index: -1; left: 8%; right: 8%; bottom: -22px; height: 50%;
+  border-radius: 999px; filter: blur(28px); opacity: 0.55;
+  background: linear-gradient(90deg, var(--glow-b), var(--glow-a), var(--glow-c));
+}
+
+/* The centre panel of the carousel sits on a glow of its own. */
+.al-cf-item::after {
+  content: ""; position: absolute; z-index: -1; left: 10%; right: 10%; bottom: -10px; height: 30%;
+  border-radius: 999px; filter: blur(22px);
+  background: linear-gradient(90deg, var(--glow-b), var(--glow-a), var(--glow-c));
+  opacity: calc((var(--cf-fade, 1) - 0.55) * 1.6);
+}
+.al-cf-item { isolation: isolate; }
+
+@media (prefers-reduced-motion: reduce) {
+  .al-signin::after, .al-download::after, .al-btn-primary::after { transition: none; }
+}
