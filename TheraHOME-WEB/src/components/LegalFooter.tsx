@@ -68,7 +68,7 @@ export async function LegalFooter({ language }: { language: LegalLanguage }) {
     <footer style={{ marginTop: 48, paddingTop: 32, borderTop: rule, fontSize: 14, color: body }}>
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 28 }}>
         <div style={{ flex: "1 1 280px", maxWidth: 440, display: "flex", flexDirection: "column", gap: 10 }}>
-          <span style={{ fontSize: 19, fontWeight: 300, letterSpacing: "-0.01em", color: ink }}>Thera<b style={{ fontWeight: 700 }}>HOME</b></span>
+          <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.015em", color: ink }}>Thera<span style={{ color: "var(--color-primary, #007fd9)" }}>HOME</span></span>
           <span style={{ lineHeight: 1.6 }}>{copy.tagline}</span>
         </div>
 

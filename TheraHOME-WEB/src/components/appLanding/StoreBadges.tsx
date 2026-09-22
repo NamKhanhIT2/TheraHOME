@@ -1,10 +1,10 @@
 import type { AppLinks } from "@/lib/siteContent";
 import type { LegalLanguage } from "@/lib/appLegalContent";
 
-const COPY: Record<LegalLanguage, { appStoreTop: string; playTop: string; soonTop: string; soonTag: string }> = {
-  vi: { appStoreTop: "Tải về trên", playTop: "TẢI NỘI DUNG TRÊN", soonTop: "SẮP CÓ TRÊN", soonTag: "Sắp ra mắt" },
-  en: { appStoreTop: "Download on the", playTop: "GET IT ON", soonTop: "COMING SOON ON", soonTag: "Coming soon" },
-  ms: { appStoreTop: "Muat turun di", playTop: "DAPATKANNYA DI", soonTop: "AKAN DATANG DI", soonTag: "Akan datang" },
+const COPY: Record<LegalLanguage, { appStoreTop: string; playTop: string; soonTop: string }> = {
+  vi: { appStoreTop: "Tải về trên", playTop: "TẢI NỘI DUNG TRÊN", soonTop: "SẮP CÓ TRÊN" },
+  en: { appStoreTop: "Download on the", playTop: "GET IT ON", soonTop: "COMING SOON ON" },
+  ms: { appStoreTop: "Muat turun di", playTop: "DAPATKANNYA DI", soonTop: "AKAN DATANG DI" },
 };
 
 function AppleMark() {
@@ -46,7 +46,6 @@ export function StoreBadges({ links, language }: { links: AppLinks; language: Le
         <span className="al-badge is-soon" aria-disabled="true">
           <AppleMark />
           <span><small>{copy.soonTop}</small><strong>App Store</strong></span>
-          <em>{copy.soonTag}</em>
         </span>
       )}
       {links.playStore ? (
@@ -58,7 +57,6 @@ export function StoreBadges({ links, language }: { links: AppLinks; language: Le
         <span className="al-badge is-soon" aria-disabled="true">
           <PlayMark />
           <span><small>{copy.soonTop}</small><strong>Google Play</strong></span>
-          <em>{copy.soonTag}</em>
         </span>
       )}
     </div>

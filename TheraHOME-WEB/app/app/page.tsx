@@ -84,7 +84,7 @@ const COPY: Record<LegalLanguage, Copy> = {
   vi: {
     download: "Tải app",
     language: "Ngôn ngữ",
-    headlineLead: "Tập cổ vai gáy mỗi ngày cùng",
+    headlineLead: "Tập cổ\u00a0vai\u00a0gáy mỗi ngày cùng",
     headlineBrand: "TheraHOME",
     intro: "Lộ trình theo ngày, video hướng dẫn và người hỗ trợ khi cần. Dùng kèm thiết bị TheraHOME.",
     highlights: [
@@ -131,7 +131,7 @@ const COPY: Record<LegalLanguage, Copy> = {
     galleryTitle: "Xem trước ứng dụng",
     galleryIntro: "Vuốt để xem từng màn hình.",
     galleryAlts: ["Màn hình chính", "Lộ trình 14 ngày", "Buổi tập có video", "Cộng đồng", "Tập theo video", "Trợ lý AI", "Hỗ trợ từ TheraHOME"],
-    deviceTitle: "Đi cùng thiết bị TheraNECK+",
+    deviceTitle: "Đi cùng thiết\u00a0bị TheraNECK+",
     deviceBody: "Ứng dụng cung cấp video hướng dẫn tập luyện đi kèm thiết bị. TheraNECK+ là dụng cụ hỗ trợ thư giãn cơ và tập luyện tại nhà, không phải thiết bị y tế.",
     deviceLink: "Xem thiết bị",
     deviceAlt: "Thiết bị TheraNECK+",
@@ -160,7 +160,7 @@ const COPY: Record<LegalLanguage, Copy> = {
   en: {
     download: "Download",
     language: "Language",
-    headlineLead: "Train your neck and shoulders daily with",
+    headlineLead: "Train your neck and shoulders daily\u00a0with",
     headlineBrand: "TheraHOME",
     intro: "A day-by-day roadmap, guided videos and real people when you need them. Made for your TheraHOME device.",
     highlights: [

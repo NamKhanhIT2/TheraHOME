@@ -339,17 +339,12 @@ html:has(.app-landing) { scroll-behavior: smooth; scroll-padding-top: 84px; }
   .al-feature-text { padding-top: 12px; padding-bottom: 16px; }
 }
 
-/* "Coming soon" store badge — not a link until Admin has the URL. */
-.al-badge.is-soon { position: relative; background: #3a3f47; border-color: #3a3f47; cursor: default; }
+/* "Coming soon" store badge — not a link until Admin has the URL; its own
+   top line ("Sắp có trên") says so, no extra tag needed. */
+.al-badge.is-soon { background: #3a3f47; border-color: #3a3f47; cursor: default; }
 .al-badge.is-soon:hover { background: #3a3f47; }
 .al-badge.is-soon > svg { opacity: 0.75; }
-.al-badge em {
-  position: absolute; top: -9px; right: -8px; padding: 2px 8px; border-radius: 999px;
-  background: var(--color-primary-tint-10); color: var(--color-primary-dark);
-  font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
-  box-shadow: 0 0 0 2px var(--bg-card);
-}
-.al-cta .al-badge em { box-shadow: none; }
+.al-badge small, .al-badge strong { white-space: nowrap; }
 
 /* ----------------------------------------------------------------- stats */
 .al-stats { padding: 8px 0 clamp(40px, 5vw, 64px); }
@@ -436,7 +431,6 @@ a.al-trust-card:hover { border-color: var(--s2); background: var(--color-primary
   .al-badge svg { width: 22px; height: 22px; }
   .al-badge small { font-size: 9.5px; }
   .al-badge strong { font-size: 16px; }
-  .al-badge em { font-size: 10px; right: -4px; }
   .al-signin { font-size: 16px; padding: 0 22px; }
 }
 
@@ -473,3 +467,10 @@ a.al-trust-card:hover { border-color: var(--s2); background: var(--color-primary
 .al-avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--s1); color: var(--s4); font-weight: 700; }
 .al-review strong { display: block; font-size: 15px; font-weight: 600; }
 .al-review small { display: block; font-size: 13.5px; color: var(--text-muted); }
+
+/* Phones: the closing panel is narrower than the page, so let its two
+   store buttons stack instead of squeezing their labels. */
+@media (max-width: 480px) {
+  .al-cta { padding: 36px 18px; border-radius: 22px; }
+  .al-cta .al-badges { flex-wrap: wrap; }
+}
