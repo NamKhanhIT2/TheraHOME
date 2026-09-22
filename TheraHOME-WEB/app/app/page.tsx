@@ -20,6 +20,10 @@ import { LegalFooter } from "@/components/LegalFooter";
 import { StoreBadges } from "@/components/appLanding/StoreBadges";
 import { brandFont } from "@/lib/brandFont";
 import { DownloadPrompt } from "@/components/appLanding/DownloadPrompt";
+import { Illustration, type IlloKind } from "@/components/appLanding/Illustrations";
+
+const STEP_ILLOS: IlloKind[] = ["signin", "activate", "daily", "survey"];
+const FEATURE_ILLOS: IlloKind[] = ["roadmap", "video", "ai", "reminder", "community", "support"];
 
 export const metadata: Metadata = {
   title: "Ứng dụng TheraHOME · TheraHOME app",
@@ -212,14 +216,11 @@ const COPY: Record<LegalLanguage, Copy> = {
   },
 };
 
-// Line icons, one per highlight/feature, drawn on a 24-unit grid.
+// Line icons for the three hero points, drawn on a 24-unit grid.
 const ICONS: ReactNode[] = [
   <path key="roadmap" d="M4 6h10M4 12h16M4 18h7M17 4l3 2-3 2M14 16l3 2-3 2" />,
   <path key="ai" d="M5 5h14v10H9l-4 4V5zM9 10h.01M12 10h.01M15 10h.01" />,
   <path key="video" d="M4 6h11v12H4zM15 10l5-3v10l-5-3" />,
-  <path key="bell" d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2zM10 20a2 2 0 0 0 4 0" />,
-  <path key="people" d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 19c0-3 3-5 6-5s6 2 6 5M16 5a3 3 0 0 1 0 6M18 14c2 .6 3 2.4 3 5" />,
-  <path key="support" d="M4 13a8 8 0 0 1 16 0v4a2 2 0 0 1-2 2h-2v-6h4M4 13h4v6H6a2 2 0 0 1-2-2v-4z" />,
 ];
 
 function Icon({ index }: { index: number }) {
@@ -248,9 +249,6 @@ export default async function AppLandingPage({
   const language = await resolveLegalLanguage(searchParams);
   const copy = COPY[language];
   const { app_links } = await getSiteContent();
-  // Highlights reuse icons 0–2 (roadmap, AI, video); the feature grid maps
-  // roadmap, video, AI, bell, people, support.
-  const featureIcons = [0, 2, 1, 3, 4, 5];
 
   return (
     <div className={`app-landing ${brandFont.variable}`} lang={language}>
@@ -306,7 +304,7 @@ export default async function AppLandingPage({
 
             <ul className="al-points">
               {copy.highlights.map((item, i) => (
-                <li key={item.title} className={`tone-${i}`}>
+                <li key={item.title}>
                   <Icon index={i} />
                   <div>
                     <h3>{item.title}</h3>
@@ -338,9 +336,13 @@ export default async function AppLandingPage({
           </div>
           <ol className="al-steps">
             {copy.steps.map((step, i) => (
-              <li className={`al-step tone-${i}`} key={step.title}>
-                <h3>{step.title}</h3>
-                <p>{step.body}</p>
+              <li className="al-step" key={step.title}>
+                <span className="al-step-num" aria-hidden="true">{i + 1}</span>
+                <div className="al-step-card">
+                  <Illustration kind={STEP_ILLOS[i]} />
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                </div>
               </li>
             ))}
           </ol>
@@ -355,9 +357,10 @@ export default async function AppLandingPage({
           </div>
           <div className="al-grid">
             {copy.features.map((item, i) => (
-              <div className={`al-feature tone-${i % 4}`} key={item.title}>
-                <Icon index={featureIcons[i]} />
-                <div>
+              <div className="al-feature" key={item.title}>
+                <div className="al-window-bar" aria-hidden="true"><i /><i /><i /></div>
+                <Illustration kind={FEATURE_ILLOS[i]} />
+                <div className="al-feature-text">
                   <h3>{item.title}</h3>
                   <p>{item.body}</p>
                 </div>

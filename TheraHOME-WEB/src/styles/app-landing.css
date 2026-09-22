@@ -79,21 +79,22 @@
 .al-lang-menu a:hover { background: var(--bg-card-alt); }
 .al-lang-menu [aria-current] { font-weight: 700; background: var(--color-primary-tint-05); }
 
-/* ----------------------------------------------------------------- tones */
-/* The token palette's secondary accents, one per item, so a list of
-   features reads as distinct things rather than one blue repeated. */
-.app-landing { --tone: var(--color-primary); --tone-bg: var(--color-primary-tint-10); }
-.tone-0 { --tone: var(--color-primary); --tone-bg: var(--color-primary-tint-10); }
-.tone-1 { --tone: color-mix(in srgb, var(--accent-teal) 62%, var(--text-primary)); --tone-bg: color-mix(in srgb, var(--accent-teal) 18%, var(--bg-card)); }
-.tone-2 { --tone: color-mix(in srgb, var(--accent-orange) 72%, var(--text-primary)); --tone-bg: var(--accent-orange-tint); }
-.tone-3 { --tone: color-mix(in srgb, var(--accent-purple) 85%, var(--text-primary)); --tone-bg: color-mix(in srgb, var(--accent-purple) 14%, var(--bg-card)); }
+/* ------------------------------------------------------------- shades */
+/* One hue in five steps, lightest to deepest. Harmony comes from how light
+   or dark a surface is, not from adding colours (owner note 2026-09-22). */
+.app-landing {
+  --s0: var(--bg-card);
+  --s1: var(--color-primary-tint-10);
+  --s2: color-mix(in srgb, var(--color-primary-light) 45%, var(--bg-card));
+  --s3: var(--color-primary);
+  --s4: var(--color-primary-dark);
+}
 
 /* ------------------------------------------------------------------ hero */
 .al-hero {
   padding: clamp(36px, 6vw, 88px) 0 clamp(40px, 6vw, 80px); overflow-x: clip;
   background:
-    radial-gradient(60% 50% at 0% 0%, color-mix(in srgb, var(--accent-teal) 12%, transparent), transparent 70%),
-    radial-gradient(50% 40% at 100% 10%, var(--color-primary-tint-05), transparent 70%);
+    radial-gradient(60% 50% at 0% 0%, var(--color-primary-tint-05), transparent 70%);
 }
 .al-hero-grid { display: grid; gap: clamp(32px, 5vw, 56px); align-items: center; }
 @media (min-width: 900px) { .al-hero-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); } }
@@ -133,7 +134,7 @@
 .al-icon {
   flex: none; width: 48px; height: 48px; border-radius: 14px;
   display: grid; place-items: center;
-  background: var(--tone-bg); color: var(--tone);
+  background: var(--s1); color: var(--s3);
 }
 .al-icon svg { width: 24px; height: 24px; }
 
@@ -143,55 +144,100 @@
 .al-stage { position: relative; padding: clamp(24px, 4vw, 48px) 0 clamp(8px, 2vw, 24px); }
 .al-stage::before {
   content: ""; position: absolute; left: 50%; top: 0; transform: translateX(-50%);
-  width: min(620px, 112%); aspect-ratio: 1; border-radius: 50%;
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--color-primary-light) 60%, var(--bg-card)) 0%,
-    color-mix(in srgb, var(--accent-teal) 22%, var(--bg-card)) 55%,
-    var(--bg-card) 92%);
+  width: min(470px, 104%); aspect-ratio: 1; border-radius: 50%;
+  background: linear-gradient(180deg, var(--s2) 0%, var(--s1) 50%, var(--bg-card) 92%);
 }
 .al-phones { position: relative; display: flex; justify-content: center; align-items: flex-start; gap: clamp(12px, 2.5vw, 28px); padding-top: clamp(24px, 4vw, 56px); }
 .al-phone {
-  display: block; width: clamp(140px, 22vw, 250px); height: auto;
+  display: block; width: clamp(118px, 15vw, 185px); height: auto;
   border-radius: clamp(14px, 2vw, 22px);
   box-shadow: 0 24px 60px rgba(0, 60, 140, 0.25), 0 2px 6px rgba(0, 60, 140, 0.12);
 }
-.al-phone.is-back { margin-top: clamp(40px, 6vw, 88px); }
-@media (max-width: 899px) { .al-phone { width: clamp(140px, 40vw, 250px); } }
+.al-phone.is-back { margin-top: clamp(36px, 5vw, 64px); }
+@media (max-width: 899px) { .al-phone { width: clamp(118px, 34vw, 190px); } }
 
 /* --------------------------------------------------------------- blocks */
 .al-section { padding: clamp(56px, 8vw, 96px) 0; }
-.al-section.is-tint { background: linear-gradient(180deg, var(--color-primary-tint-05), color-mix(in srgb, var(--accent-teal) 7%, var(--bg-card))); }
+.al-section.is-tint { background: var(--color-primary-tint-05); }
 .al-section-head { text-align: center; max-width: 640px; margin: 0 auto clamp(28px, 4vw, 44px); }
 .al-section-head h2 { margin: 0; font-size: clamp(26px, 3.2vw, 36px); font-weight: 700; line-height: 1.2; letter-spacing: -0.015em; text-wrap: balance; }
 .al-section-head p { margin: 12px 0 0; color: var(--text-secondary); font-size: 16.5px; }
 
-/* How it works — a real sequence, so the steps are numbered. */
-.al-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); counter-reset: step; }
-.al-step { position: relative; padding: 24px 22px 22px; border-radius: 18px; background: var(--bg-card); border: 1px solid var(--border-light); counter-increment: step; }
-.al-step::before {
-  content: counter(step); display: grid; place-items: center;
-  width: 34px; height: 34px; border-radius: 50%; margin-bottom: 14px;
-  background: var(--tone); color: var(--text-on-primary); font-weight: 600; font-size: 15px;
+/* How it works — a real sequence: numbered dots on a rail, a card under each. */
+.al-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); position: relative; }
+.al-step { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.al-step-num {
+  position: relative; z-index: 1; display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--s3); color: var(--text-on-primary); font-weight: 600; font-size: 15px;
   font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 6px var(--s1);
 }
-.al-step h3 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
-.al-step p { margin: 0; font-size: 15.5px; color: var(--text-secondary); }
+@media (min-width: 980px) {
+  .al-steps { grid-template-columns: repeat(4, 1fr); }
+  .al-steps::before {
+    content: ""; position: absolute; top: 17px; left: 12.5%; right: 12.5%; height: 2px;
+    background: var(--s2);
+  }
+}
+.al-step-card {
+  align-self: stretch; flex: 1; padding: 14px 14px 20px; border-radius: 18px;
+  background: var(--s0); border: 1px solid var(--border-input);
+}
+.al-step-card h3 { margin: 14px 6px 4px; font-size: 17px; font-weight: 600; }
+.al-step-card p { margin: 0 6px; font-size: 15.5px; color: var(--text-secondary); }
 
-.al-grid { display: grid; gap: 28px 32px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-.al-feature { display: flex; gap: 16px; align-items: flex-start; }
-.al-feature h3 { margin: 2px 0 4px; font-size: 17px; font-weight: 600; }
+/* Illustration panel inside a card. */
+.al-illo { border-radius: 12px; background: var(--color-primary-tint-05); padding: 6px; }
+.al-illo svg { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; }
+.al-illo .s0 { fill: var(--s0); }
+.al-illo .s1 { fill: var(--s1); }
+.al-illo .s2 { fill: var(--s2); }
+.al-illo .s3 { fill: var(--s3); }
+.al-illo .s4 { fill: var(--s4); }
+.al-illo .edge { stroke: var(--s2); stroke-width: 1.5; }
+.al-illo .edge-strong { stroke: var(--s3); stroke-width: 2; }
+.al-illo .ring { stroke: var(--s0); stroke-width: 3; }
+.al-illo .stroke-s0 { stroke: var(--s0); }
+.al-illo .stroke-s3 { stroke: var(--s3); }
+.al-illo .stroke-s4 { stroke: var(--s4); }
+.al-illo .glyph { font: 700 22px var(--font-brand), sans-serif; }
+.al-illo .time { font: 600 14px var(--font-brand), sans-serif; font-variant-numeric: tabular-nums; }
+.al-illo .s0-text { fill: var(--s0); }
+.al-illo .s3-text { fill: var(--s3); }
+
+/* What's inside — cards drawn as small app windows. */
+.al-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+@media (min-width: 640px) { .al-grid { gap: 20px; } }
+@media (min-width: 980px) { .al-grid { grid-template-columns: repeat(3, 1fr); } }
+.al-feature {
+  display: flex; flex-direction: column; border-radius: 18px; overflow: hidden;
+  background: var(--s0); border: 1px solid var(--border-input);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.al-feature:hover { border-color: var(--s2); box-shadow: 0 12px 28px color-mix(in srgb, var(--s3) 10%, transparent); }
+.al-window-bar { display: flex; gap: 6px; padding: 12px 14px 0; }
+.al-window-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--s1); }
+.al-feature .al-illo { margin: 10px 14px 0; }
+.al-feature-text { padding: 16px 20px 22px; }
+.al-feature h3 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
 .al-feature p { margin: 0; font-size: 15.5px; color: var(--text-secondary); }
 
-/* FAQ */
-.al-faq { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+/* FAQ — two columns on wide screens, as on the reference. */
+.al-faq { display: grid; gap: 12px; align-items: start; }
+@media (min-width: 900px) { .al-faq { grid-template-columns: 1fr 1fr; } }
 .al-faq details { border: 1px solid var(--border-input); border-radius: 16px; background: var(--bg-card); }
 .al-faq summary {
   list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 18px 20px; font-weight: 600; font-size: 16px;
 }
 .al-faq summary::-webkit-details-marker { display: none; }
-.al-faq summary::after { content: "+"; flex: none; font-size: 22px; font-weight: 400; color: var(--color-primary); line-height: 1; }
-.al-faq details[open] summary::after { content: "−"; }
+.al-faq summary::after {
+  content: ""; flex: none; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--s1) no-repeat center / 14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007fd9' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  transition: transform 0.2s ease;
+}
+.al-faq details[open] summary::after { transform: rotate(180deg); }
 .al-faq details p { margin: 0; padding: 0 20px 18px; color: var(--text-secondary); font-size: 15.5px; }
 
 /* Closing call to action */
@@ -199,8 +245,7 @@
   position: relative; overflow: hidden;
   text-align: center; padding: clamp(40px, 6vw, 64px) 24px; border-radius: 28px;
   background:
-    radial-gradient(40% 70% at 100% 0%, color-mix(in srgb, var(--accent-teal) 55%, transparent), transparent 70%),
-    radial-gradient(35% 60% at 0% 100%, color-mix(in srgb, var(--color-primary-light) 70%, transparent), transparent 70%),
+    radial-gradient(45% 80% at 100% 0%, color-mix(in srgb, var(--color-primary-light) 55%, transparent), transparent 70%),
     linear-gradient(120deg, var(--color-primary-dark), var(--color-primary));
   color: var(--text-on-primary);
 }
@@ -288,4 +333,14 @@
 @keyframes al-rise { from { opacity: 0; transform: translateY(12px); } }
 @media (prefers-reduced-motion: reduce) {
   .al-modal-scrim, .al-modal { animation: none; }
+}
+
+/* Phones: two cards a row, so each card and its drawing stay small. */
+@media (max-width: 639px) {
+  .al-step-card, .al-feature-text { padding-left: 12px; padding-right: 12px; }
+  .al-step-card h3, .al-feature h3 { font-size: 15.5px; margin-left: 0; margin-right: 0; }
+  .al-step-card p, .al-feature p { font-size: 14.5px; margin-left: 0; margin-right: 0; }
+  .al-step-card { padding-top: 10px; }
+  .al-feature .al-illo { margin: 8px 10px 0; }
+  .al-feature-text { padding-top: 12px; padding-bottom: 16px; }
 }
