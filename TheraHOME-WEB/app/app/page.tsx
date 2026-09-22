@@ -19,6 +19,7 @@ import { getSiteContent } from "@/lib/siteContent";
 import { LegalFooter } from "@/components/LegalFooter";
 import { StoreBadges } from "@/components/appLanding/StoreBadges";
 import { brandFont } from "@/lib/brandFont";
+import { DownloadPrompt } from "@/components/appLanding/DownloadPrompt";
 
 export const metadata: Metadata = {
   title: "Ứng dụng TheraHOME · TheraHOME app",
@@ -50,6 +51,7 @@ interface Copy {
   faq: { q: string; a: string }[];
   ctaTitle: string;
   ctaBody: string;
+  prompt: { title: string; body: string; featuresTitle: string; features: string[]; dontShow: string; close: string };
 }
 
 const COPY: Record<LegalLanguage, Copy> = {
@@ -64,7 +66,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { title: "Hỏi AI bất cứ lúc nào", body: "Về buổi tập, cách dùng thiết bị, cường độ phù hợp." },
       { title: "Tập theo video", body: "Xem trong app hoặc phát lên TV. Xem xong là ghi nhận." },
     ],
-    phonesAlt: ["Màn hình chính ứng dụng TheraHOME", "Lộ trình tập trong ứng dụng TheraHOME"],
+    phonesAlt: ["Màn hình chính ứng dụng TheraHOME", "Cộng đồng trong ứng dụng TheraHOME"],
     howTitle: "Bắt đầu trong 4 bước",
     howIntro: "",
     steps: [
@@ -93,6 +95,14 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     ctaTitle: "Tải TheraHOME",
     ctaBody: "Kích hoạt thiết bị và tập buổi đầu tiên ngay hôm nay.",
+    prompt: {
+      title: "Tải ứng dụng TheraHOME",
+      body: "Tập theo lộ trình mỗi ngày, ngay trên điện thoại.",
+      featuresTitle: "Có gì trong app:",
+      features: ["Video hướng dẫn từng buổi", "Trợ lý AI trả lời ngay", "Nhắc giờ tập hằng ngày"],
+      dontShow: "Không hiện lại",
+      close: "Đóng",
+    },
   },
   en: {
     download: "Download",
@@ -105,7 +115,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { title: "Ask the AI any time", body: "About your session, the device, or the right intensity." },
       { title: "Follow the video", body: "In the app or on your TV. Finish it and the day is logged." },
     ],
-    phonesAlt: ["The TheraHOME app home screen", "The training roadmap in the TheraHOME app"],
+    phonesAlt: ["The TheraHOME app home screen", "The community in the TheraHOME app"],
     howTitle: "Get started in 4 steps",
     howIntro: "",
     steps: [
@@ -134,6 +144,14 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     ctaTitle: "Get TheraHOME",
     ctaBody: "Activate your device and do your first session today.",
+    prompt: {
+      title: "Get the TheraHOME app",
+      body: "Follow your roadmap every day, right on your phone.",
+      featuresTitle: "In the app:",
+      features: ["A guided video for every session", "An AI assistant that answers instantly", "Daily training reminders"],
+      dontShow: "Don't show again",
+      close: "Close",
+    },
   },
   ms: {
     download: "Muat turun",
@@ -146,7 +164,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { title: "Tanya AI bila-bila masa", body: "Tentang sesi, peranti atau intensiti yang sesuai." },
       { title: "Ikut video", body: "Dalam aplikasi atau di TV. Selesai menonton, hari itu direkodkan." },
     ],
-    phonesAlt: ["Skrin utama aplikasi TheraHOME", "Pelan latihan dalam aplikasi TheraHOME"],
+    phonesAlt: ["Skrin utama aplikasi TheraHOME", "Komuniti dalam aplikasi TheraHOME"],
     howTitle: "Mula dalam 4 langkah",
     howIntro: "",
     steps: [
@@ -175,6 +193,14 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     ctaTitle: "Dapatkan TheraHOME",
     ctaBody: "Aktifkan peranti anda dan mulakan sesi pertama hari ini.",
+    prompt: {
+      title: "Dapatkan aplikasi TheraHOME",
+      body: "Ikuti pelan anda setiap hari, terus di telefon.",
+      featuresTitle: "Dalam aplikasi:",
+      features: ["Video berpandu untuk setiap sesi", "Pembantu AI yang menjawab segera", "Peringatan latihan harian"],
+      dontShow: "Jangan tunjuk lagi",
+      close: "Tutup",
+    },
   },
 };
 
@@ -225,7 +251,7 @@ export default async function AppLandingPage({
           <a className="al-brand" href={`/app?lang=${language}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/landing/logo.png" alt="" width={36} height={36} />
-            <span className="al-wordmark">Thera<b>HOME</b></span>
+            <span className="al-wordmark"><span>Thera</span><b>HOME</b></span>
           </a>
           <details className="al-lang">
             <summary aria-label={copy.language}>
@@ -277,14 +303,12 @@ export default async function AppLandingPage({
 
         <div className="al-stage">
           <div className="al-phones">
-            <div className="al-phone">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/landing/app/home.jpg" alt={copy.phonesAlt[0]} width={760} height={1645} />
-            </div>
-            <div className="al-phone is-back">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/landing/app/roadmap.jpg" alt={copy.phonesAlt[1]} width={760} height={1645} />
-            </div>
+            {/* The two App Store panels, whole: they are the brand's own
+                artwork and already frame the app screens. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="al-phone" src="/landing/app-page/home.webp" alt={copy.phonesAlt[0]} width={853} height={1844} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="al-phone is-back" src="/landing/app-page/community.webp" alt={copy.phonesAlt[1]} width={853} height={1844} loading="lazy" />
           </div>
         </div>
       </section>
@@ -352,6 +376,10 @@ export default async function AppLandingPage({
           <LegalFooter language={language} />
         </div>
       </section>
+
+      <DownloadPrompt {...copy.prompt}>
+        <StoreBadges links={app_links} language={language} />
+      </DownloadPrompt>
 
       <div className="al-stickybar">
         <StoreBadges links={app_links} language={language} note={false} />
