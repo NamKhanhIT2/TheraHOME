@@ -23,6 +23,7 @@ import { DownloadPrompt } from "@/components/appLanding/DownloadPrompt";
 import { Illustration, type IlloKind } from "@/components/appLanding/Illustrations";
 import { Flag } from "@/components/appLanding/Flag";
 import { Reveal } from "@/components/appLanding/Reveal";
+import { AppGallery } from "@/components/appLanding/AppGallery";
 
 const STEP_ILLOS: IlloKind[] = ["signin", "activate", "daily", "survey"];
 const FEATURE_ILLOS: IlloKind[] = ["roadmap", "video", "ai", "reminder", "community", "support"];
@@ -68,6 +69,7 @@ interface Copy {
   galleryTitle: string;
   galleryIntro: string;
   galleryAlts: string[];
+  galleryNav: { prev: string; next: string; dot: string };
   deviceTitle: string;
   deviceBody: string;
   deviceLink: string;
@@ -130,6 +132,7 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     galleryTitle: "Xem trước ứng dụng",
     galleryIntro: "Vuốt để xem từng màn hình.",
+    galleryNav: { prev: "Màn trước", next: "Màn tiếp theo", dot: "Xem màn {n}" },
     galleryAlts: ["Màn hình chính", "Lộ trình 14 ngày", "Buổi tập có video", "Cộng đồng", "Tập theo video", "Trợ lý AI", "Hỗ trợ từ TheraHOME"],
     deviceTitle: "Đi cùng thiết\u00a0bị TheraNECK+",
     deviceBody: "Ứng dụng cung cấp video hướng dẫn tập luyện đi kèm thiết bị. TheraNECK+ là dụng cụ hỗ trợ thư giãn cơ và tập luyện tại nhà, không phải thiết bị y tế.",
@@ -206,6 +209,7 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     galleryTitle: "See the app",
     galleryIntro: "Swipe through the screens.",
+    galleryNav: { prev: "Previous screen", next: "Next screen", dot: "Show screen {n}" },
     galleryAlts: ["Home screen", "14-day roadmap", "Video session", "Community", "Follow the video", "AI assistant", "Support from TheraHOME"],
     deviceTitle: "Made for TheraNECK+",
     deviceBody: "The app provides the workout videos that accompany the device. TheraNECK+ is a home muscle-relaxation and training aid, not a medical device.",
@@ -282,6 +286,7 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     galleryTitle: "Lihat aplikasi",
     galleryIntro: "Leret untuk melihat setiap skrin.",
+    galleryNav: { prev: "Skrin sebelumnya", next: "Skrin seterusnya", dot: "Tunjuk skrin {n}" },
     galleryAlts: ["Skrin utama", "Pelan 14 hari", "Sesi video", "Komuniti", "Ikut video", "Pembantu AI", "Sokongan TheraHOME"],
     deviceTitle: "Untuk peranti TheraNECK+",
     deviceBody: "Aplikasi menyediakan video latihan yang mengiringi peranti. TheraNECK+ ialah alat bantu relaksasi otot dan latihan di rumah, bukan peranti perubatan.",
@@ -492,13 +497,13 @@ export default async function AppLandingPage({
             <p>{copy.galleryIntro}</p>
           </div>
         </div>
-        {/* A scroll-snap strip: native swipe on phones, a scrollbar on desktop,
-            no carousel script. The seven App Store panels, in app order. */}
-        <div className="al-gallery" data-reveal>
-          {GALLERY.map((name, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={name} src={`/landing/app-page/${name}.webp`} alt={copy.galleryAlts[i]} width={853} height={1844} loading="lazy" />
-          ))}
+        <div data-reveal>
+          <AppGallery
+            images={GALLERY.map((name, i) => ({ src: `/landing/app-page/${name}.webp`, alt: copy.galleryAlts[i] }))}
+            prevLabel={copy.galleryNav.prev}
+            nextLabel={copy.galleryNav.next}
+            dotLabel={copy.galleryNav.dot}
+          />
         </div>
       </section>
 

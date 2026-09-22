@@ -141,7 +141,7 @@ html:has(.app-landing) { scroll-behavior: smooth; scroll-padding-top: 84px; }
 .al-stage::before {
   content: ""; position: absolute; left: 50%; top: 0; transform: translateX(-50%);
   width: min(470px, 104%); aspect-ratio: 1; border-radius: 50%;
-  background: linear-gradient(180deg, var(--s2) 0%, var(--s1) 50%, var(--bg-card) 92%);
+  background: linear-gradient(180deg, var(--s2) 0%, var(--s1) 50%, var(--nm-bg, var(--bg-card)) 92%);
 }
 .al-phones { position: relative; display: flex; justify-content: center; align-items: flex-start; gap: clamp(12px, 2.5vw, 28px); padding-top: clamp(24px, 4vw, 56px); }
 .al-phone {
@@ -358,15 +358,38 @@ html:has(.app-landing) { scroll-behavior: smooth; scroll-padding-top: 84px; }
 .al-stats-row dt { font-size: 14.5px; color: var(--text-secondary); }
 
 /* --------------------------------------------------------------- gallery */
-.al-gallery {
-  display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory;
-  padding: 4px max(20px, calc((100vw - 1080px) / 2 + 20px)) 20px;
-  scrollbar-width: thin; scrollbar-color: var(--s2) transparent;
+/* Coverflow (AppGallery.tsx): a snap strip whose items scale, fade and tilt
+   by their distance from the centre via --cf-* set on scroll. */
+.al-cf { --cf-w: clamp(168px, 22vw, 232px); }
+.al-cf-track {
+  display: flex; gap: clamp(4px, 1vw, 12px); overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 28px calc(50% - var(--cf-w) / 2) 36px;
+  scrollbar-width: none; perspective: 1200px;
 }
-.al-gallery img {
-  flex: none; width: clamp(150px, 20vw, 210px); height: auto; border-radius: 18px;
-  scroll-snap-align: center; box-shadow: 0 14px 30px rgba(0, 60, 140, 0.16);
+.al-cf-track::-webkit-scrollbar { display: none; }
+.al-cf-item {
+  flex: none; width: var(--cf-w); scroll-snap-align: center; position: relative;
+  transform: rotateY(var(--cf-tilt, 0deg)) scale(var(--cf-scale, 1));
+  opacity: var(--cf-fade, 1);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.35s ease;
+  will-change: transform;
 }
+.al-cf-item img {
+  display: block; width: 100%; height: auto; border-radius: 20px; user-select: none;
+  box-shadow: 10px 14px 28px var(--nm-dark), -8px -8px 20px var(--nm-light);
+}
+.al-cf-controls { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 4px; }
+.al-cf-dots { display: flex; gap: 10px; }
+.al-cf-dots button {
+  width: 12px; height: 12px; padding: 0; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--nm-bg); box-shadow: inset 2px 2px 4px var(--nm-dark), inset -2px -2px 4px var(--nm-light);
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.al-cf-dots button.is-on { width: 28px; background: var(--color-primary); box-shadow: 2px 2px 5px var(--nm-dark), -2px -2px 5px var(--nm-light); }
+/* Dots stay 12px to look right; a larger invisible hit area keeps them tappable. */
+.al-cf-dots button { position: relative; }
+.al-cf-dots button::after { content: ""; position: absolute; inset: -14px -4px; }
+@media (prefers-reduced-motion: reduce) { .al-cf-item { transition: none; } }
 
 /* ---------------------------------------------------------------- device */
 .al-device { display: grid; gap: clamp(24px, 4vw, 56px); align-items: center; }
@@ -474,3 +497,103 @@ a.al-trust-card:hover { border-color: var(--s2); background: var(--color-primary
   .al-cta { padding: 36px 18px; border-radius: 22px; }
   .al-cta .al-badges { flex-wrap: wrap; }
 }
+
+/* ============================================================ neumorphism */
+/* Soft UI (owner request 2026-09-22): every card and control is the same
+   colour as the page and is shaped only by two soft shadows — light from the
+   top-left, shade to the bottom-right. That needs ONE ground colour, so the
+   alternating white/tinted sections become a single soft blue-grey. Text
+   keeps its AA colours; focus rings stay visible. The App Store / Google Play
+   badges are the stores' own artwork and are not restyled, only shadowed. */
+.app-landing {
+  --nm-bg: color-mix(in srgb, var(--bg-app) 70%, var(--bg-card));
+  --nm-light: rgba(255, 255, 255, 0.92);
+  --nm-dark: color-mix(in srgb, var(--bg-app) 55%, var(--text-primary) 18%);
+  --nm-raise: 8px 8px 18px var(--nm-dark), -8px -8px 18px var(--nm-light);
+  --nm-raise-sm: 4px 4px 10px var(--nm-dark), -4px -4px 10px var(--nm-light);
+  --nm-inset: inset 5px 5px 10px var(--nm-dark), inset -5px -5px 10px var(--nm-light);
+  --nm-inset-sm: inset 3px 3px 6px var(--nm-dark), inset -3px -3px 6px var(--nm-light);
+  --s0: var(--nm-bg);
+  background: var(--nm-bg);
+}
+.app-landing .al-hero,
+.app-landing .al-section,
+.app-landing .al-section.is-tint { background: var(--nm-bg); }
+.al-header { background: color-mix(in srgb, var(--nm-bg) 90%, transparent); border-bottom-color: transparent; box-shadow: 0 6px 16px color-mix(in srgb, var(--nm-dark) 45%, transparent); }
+.al-stickybar { background: color-mix(in srgb, var(--nm-bg) 94%, transparent); border-top-color: transparent; box-shadow: 0 -6px 16px color-mix(in srgb, var(--nm-dark) 40%, transparent); }
+
+/* Raised surfaces */
+.al-step-card, .al-feature, .al-trust-card, .al-faq details, .al-review, .al-device-art, .al-lang-menu {
+  background: var(--nm-bg); border-color: transparent; box-shadow: var(--nm-raise);
+}
+.al-feature:hover, a.al-trust-card:hover { border-color: transparent; background: var(--nm-bg); box-shadow: 12px 12px 24px var(--nm-dark), -10px -10px 22px var(--nm-light); }
+a.al-trust-card:active { box-shadow: var(--nm-inset); }
+.al-trust-card { background: var(--nm-bg); }
+
+/* Stats: one raised slab, cells divided by space rather than hairlines. */
+.al-stats-row { background: var(--nm-bg); border: 0; box-shadow: var(--nm-raise); gap: 0; }
+.al-stats-row > div { background: transparent; }
+
+/* Debossed: the drawings sit in shallow wells, the icons on small pillows. */
+.al-illo { background: var(--nm-bg); box-shadow: var(--nm-inset-sm); }
+.al-window-bar i { background: var(--nm-bg); box-shadow: var(--nm-inset-sm); }
+.al-icon { background: var(--nm-bg); box-shadow: var(--nm-raise-sm); }
+.al-avatar { background: var(--nm-bg); box-shadow: var(--nm-raise-sm); }
+.al-faq summary::after { background-color: var(--nm-bg); box-shadow: var(--nm-raise-sm); }
+.al-faq details[open] { box-shadow: var(--nm-inset); }
+
+/* Step numbers: raised discs on a grooved rail. */
+.al-step-num { background: var(--nm-bg); color: var(--color-primary); box-shadow: var(--nm-raise-sm); }
+.al-steps::before { background: var(--nm-bg); height: 6px; top: 15px; border-radius: 3px; box-shadow: var(--nm-inset-sm); }
+
+/* Controls: pillows that press in. */
+.al-nm-round, .al-lang summary, .al-nav a, .al-btn-ghost, .al-modal-x {
+  background: var(--nm-bg); border: 0; box-shadow: var(--nm-raise-sm); color: var(--text-primary);
+  transition: box-shadow 0.15s ease, color 0.15s ease;
+}
+.al-nm-round { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; color: var(--color-primary); }
+.al-nav a { box-shadow: none; }
+.al-nav a:hover { background: var(--nm-bg); box-shadow: var(--nm-raise-sm); }
+.al-lang summary:hover, .al-nm-round:hover, .al-btn-ghost:hover, .al-modal-x:hover { background: var(--nm-bg); color: var(--color-primary); }
+.al-nm-round:active, .al-lang summary:active, .al-nav a:active, .al-btn-ghost:active, .al-modal-x:active,
+.al-lang[open] summary { box-shadow: var(--nm-inset-sm); }
+
+/* Primary buttons keep the brand blue, lit and shaded the same way. */
+.al-download, .al-signin, .al-btn-primary {
+  box-shadow: 6px 6px 14px var(--nm-dark), -6px -6px 14px var(--nm-light),
+    inset 1px 1px 0 color-mix(in srgb, var(--bg-card) 35%, transparent);
+  transition: box-shadow 0.15s ease, filter 0.15s ease;
+}
+.al-signin:hover, .al-download:hover, .al-btn-primary:hover {
+  filter: brightness(1.05);
+  box-shadow: 9px 9px 18px var(--nm-dark), -8px -8px 18px var(--nm-light),
+    inset 1px 1px 0 color-mix(in srgb, var(--bg-card) 35%, transparent);
+}
+.al-signin:active, .al-download:active, .al-btn-primary:active {
+  box-shadow: inset 4px 4px 10px color-mix(in srgb, var(--color-primary-dark) 70%, black 30%),
+    inset -3px -3px 8px color-mix(in srgb, var(--color-primary-light) 60%, transparent);
+}
+
+/* Store badges: the stores' artwork, only lifted. */
+.al-badge { box-shadow: 5px 5px 12px var(--nm-dark), -5px -5px 12px var(--nm-light); }
+.al-cta .al-badge { box-shadow: 0 8px 18px rgba(0, 30, 80, 0.3); }
+
+/* Modal and QR card sit on the same ground. */
+.al-modal { background: var(--nm-bg); }
+.al-modal-head, .al-modal-foot { border-color: transparent; }
+.al-modal-features { background: var(--nm-bg); box-shadow: var(--nm-inset-sm); }
+.al-qr { background: var(--nm-bg); }
+.al-qr img { border-radius: 8px; }
+
+/* The CTA panel is the one deep-blue object on the page: raised, not flat. */
+.al-cta { box-shadow: 12px 14px 30px var(--nm-dark), -10px -10px 24px var(--nm-light); }
+
+.app-landing :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 4px; }
+
+/* Soft shadows need air between neighbours, or they merge into one blur. */
+.al-steps { gap: 28px 16px; }
+.al-grid { gap: 16px; }
+@media (min-width: 640px) { .al-grid { gap: 28px; } }
+@media (min-width: 980px) { .al-steps { gap: 28px; } }
+.al-trust-row { gap: 20px; }
+.al-faq { gap: 18px; }
