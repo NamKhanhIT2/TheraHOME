@@ -21,6 +21,8 @@ import { StoreBadges } from "@/components/appLanding/StoreBadges";
 import { brandFont } from "@/lib/brandFont";
 import { DownloadPrompt } from "@/components/appLanding/DownloadPrompt";
 import { Illustration, type IlloKind } from "@/components/appLanding/Illustrations";
+import { Flag } from "@/components/appLanding/Flag";
+import { Reveal } from "@/components/appLanding/Reveal";
 
 const STEP_ILLOS: IlloKind[] = ["signin", "activate", "daily", "survey"];
 const FEATURE_ILLOS: IlloKind[] = ["roadmap", "video", "ai", "reminder", "community", "support"];
@@ -33,7 +35,7 @@ export const metadata: Metadata = {
 // Store links and contact details are edited in Admin; pick edits up within a minute.
 export const revalidate = 60;
 
-const CODES: Record<LegalLanguage, string> = { vi: "VI", en: "EN", ms: "MS" };
+const GALLERY = ["home", "roadmap", "video", "ai-chat", "community", "support", "video-alt"];
 
 type Item = { title: string; body: string };
 
@@ -56,6 +58,17 @@ interface Copy {
   ctaTitle: string;
   ctaBody: string;
   startLabel: string;
+  nav: { how: string; features: string; faq: string };
+  stats: { value: string; label: string }[];
+  galleryTitle: string;
+  galleryIntro: string;
+  galleryAlts: string[];
+  deviceTitle: string;
+  deviceBody: string;
+  deviceLink: string;
+  deviceAlt: string;
+  trustTitle: string;
+  trust: { title: string; body: string; href?: string }[];
   signIn: string;
   prompt: { title: string; body: string; featuresTitle: string; features: string[]; dontShow: string; close: string };
 }
@@ -98,8 +111,29 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "Ứng dụng có thay thế bác sĩ không?", a: "Không. TheraHOME hỗ trợ vận động, không thay thế chẩn đoán hay điều trị y khoa." },
       { q: "Làm sao để mở ngày tập tiếp theo?", a: "Các ngày trong lộ trình tự mở khoá theo thời gian: mỗi ngày mở một ngày mới vào 0h. Xem video bài tập để ghi nhận hoàn thành ngày hôm đó." },
       { q: "Dùng được trên những máy nào?", a: "iPhone và Android. Một tài khoản dùng trên cả hai, tiến độ luôn đồng bộ." },
+      { q: "Quên mật khẩu thì làm sao?", a: "Chọn Quên mật khẩu ở màn đăng nhập và nhập email, TheraHOME sẽ gửi mã để bạn đặt lại mật khẩu." },
     ],
     startLabel: "Tải ứng dụng để bắt đầu",
+    nav: { how: "Cách dùng", features: "Tính năng", faq: "Hỏi đáp" },
+    stats: [
+      { value: "14 ngày", label: "một lộ trình" },
+      { value: "15–20 phút", label: "mỗi buổi tập" },
+      { value: "24/7", label: "trợ lý AI" },
+      { value: "3", label: "ngôn ngữ" },
+    ],
+    galleryTitle: "Xem trước ứng dụng",
+    galleryIntro: "Vuốt để xem từng màn hình.",
+    galleryAlts: ["Màn hình chính", "Lộ trình 14 ngày", "Buổi tập có video", "Trợ lý AI", "Cộng đồng", "Hỗ trợ từ TheraHOME", "Tập theo video"],
+    deviceTitle: "Đi cùng thiết bị TheraNECK+",
+    deviceBody: "Ứng dụng cung cấp video hướng dẫn tập luyện đi kèm thiết bị. TheraNECK+ là dụng cụ hỗ trợ thư giãn cơ và tập luyện tại nhà, không phải thiết bị y tế.",
+    deviceLink: "Xem thiết bị",
+    deviceAlt: "Thiết bị TheraNECK+",
+    trustTitle: "Yên tâm khi dùng",
+    trust: [
+      { title: "Dữ liệu được bảo vệ", body: "Xem TheraHOME thu thập và xử lý dữ liệu thế nào.", href: "/privacy" },
+      { title: "Xoá tài khoản bất cứ lúc nào", body: "Ngay trong app, mục Hồ sơ.", href: "/account-deletion" },
+      { title: "Ba ngôn ngữ", body: "Tiếng Việt, English và Bahasa Melayu." },
+    ],
     signIn: "Đăng nhập để tập trên web",
     ctaTitle: "Tải TheraHOME",
     ctaBody: "Kích hoạt thiết bị và tập buổi đầu tiên ngay hôm nay.",
@@ -149,8 +183,29 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "Does the app replace a doctor?", a: "No. TheraHOME is a fitness and wellness app; it does not provide medical diagnosis or treatment." },
       { q: "How do I unlock the next day?", a: "Days unlock automatically over time: one new day opens at midnight. Watch the workout video to record that day as completed." },
       { q: "Which phones does it run on?", a: "iPhone and Android. One account works on both, and progress stays in sync." },
+      { q: "I forgot my password. What now?", a: "Tap Forgot password on the sign-in screen and enter your email; TheraHOME sends a code to reset it." },
     ],
     startLabel: "Download the app to get started",
+    nav: { how: "How it works", features: "Features", faq: "FAQ" },
+    stats: [
+      { value: "14 days", label: "per roadmap" },
+      { value: "15–20 min", label: "per session" },
+      { value: "24/7", label: "AI assistant" },
+      { value: "3", label: "languages" },
+    ],
+    galleryTitle: "See the app",
+    galleryIntro: "Swipe through the screens.",
+    galleryAlts: ["Home screen", "14-day roadmap", "Video session", "AI assistant", "Community", "Support from TheraHOME", "Follow the video"],
+    deviceTitle: "Made for TheraNECK+",
+    deviceBody: "The app provides the workout videos that accompany the device. TheraNECK+ is a home muscle-relaxation and training aid, not a medical device.",
+    deviceLink: "See the device",
+    deviceAlt: "The TheraNECK+ device",
+    trustTitle: "Use it with confidence",
+    trust: [
+      { title: "Your data is protected", body: "See how TheraHOME collects and handles it.", href: "/privacy" },
+      { title: "Delete your account any time", body: "Right in the app, under Profile.", href: "/account-deletion" },
+      { title: "Three languages", body: "Tiếng Việt, English and Bahasa Melayu." },
+    ],
     signIn: "Sign in to train on the web",
     ctaTitle: "Get TheraHOME",
     ctaBody: "Activate your device and do your first session today.",
@@ -200,8 +255,29 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "Adakah aplikasi ini menggantikan doktor?", a: "Tidak. TheraHOME ialah aplikasi kecergasan dan kesejahteraan; ia tidak menyediakan diagnosis atau rawatan perubatan." },
       { q: "Bagaimana saya membuka hari seterusnya?", a: "Hari dalam pelan dibuka secara automatik mengikut masa: satu hari baharu dibuka pada tengah malam. Tonton video latihan untuk merekodkan hari itu sebagai selesai." },
       { q: "Telefon apa yang disokong?", a: "iPhone dan Android. Satu akaun untuk kedua-duanya, kemajuan sentiasa diselaraskan." },
+      { q: "Saya lupa kata laluan. Bagaimana?", a: "Ketik Lupa kata laluan di skrin log masuk dan masukkan e-mel anda; TheraHOME akan menghantar kod untuk menetapkannya semula." },
     ],
     startLabel: "Muat turun aplikasi untuk bermula",
+    nav: { how: "Cara guna", features: "Ciri", faq: "Soalan" },
+    stats: [
+      { value: "14 hari", label: "setiap pelan" },
+      { value: "15–20 min", label: "setiap sesi" },
+      { value: "24/7", label: "pembantu AI" },
+      { value: "3", label: "bahasa" },
+    ],
+    galleryTitle: "Lihat aplikasi",
+    galleryIntro: "Leret untuk melihat setiap skrin.",
+    galleryAlts: ["Skrin utama", "Pelan 14 hari", "Sesi video", "Pembantu AI", "Komuniti", "Sokongan TheraHOME", "Ikut video"],
+    deviceTitle: "Untuk peranti TheraNECK+",
+    deviceBody: "Aplikasi menyediakan video latihan yang mengiringi peranti. TheraNECK+ ialah alat bantu relaksasi otot dan latihan di rumah, bukan peranti perubatan.",
+    deviceLink: "Lihat peranti",
+    deviceAlt: "Peranti TheraNECK+",
+    trustTitle: "Guna dengan yakin",
+    trust: [
+      { title: "Data anda dilindungi", body: "Lihat cara TheraHOME mengumpul dan mengendalikannya.", href: "/privacy" },
+      { title: "Padam akaun bila-bila masa", body: "Terus dalam aplikasi, di bahagian Profil.", href: "/account-deletion" },
+      { title: "Tiga bahasa", body: "Tiếng Việt, English dan Bahasa Melayu." },
+    ],
     signIn: "Log masuk untuk berlatih di web",
     ctaTitle: "Dapatkan TheraHOME",
     ctaBody: "Aktifkan peranti anda dan mulakan sesi pertama hari ini.",
@@ -257,23 +333,28 @@ export default async function AppLandingPage({
           <a className="al-brand" href={`/app?lang=${language}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/landing/logo.png" alt="" width={36} height={36} />
-            <span className="al-wordmark"><span>Thera</span><b>HOME</b></span>
+            <span className="al-wordmark">Thera<b>HOME</b></span>
           </a>
+          <nav className="al-nav" aria-label="TheraHOME">
+            <a href="#cach-dung">{copy.nav.how}</a>
+            <a href="#tinh-nang">{copy.nav.features}</a>
+            <a href="#hoi-dap">{copy.nav.faq}</a>
+          </nav>
           <details className="al-lang">
             <summary aria-label={copy.language}>
-              <span aria-hidden="true">{CODES[language]}</span>
+              <Flag code={language} />
               <svg className="al-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
             </summary>
             <nav className="al-lang-menu" aria-label={copy.language}>
               {LEGAL_LANGUAGES.map((entry) =>
                 entry.code === language ? (
                   <span key={entry.code} aria-current="true">
-                    <span className="al-code" aria-hidden="true">{CODES[entry.code]}</span>
+                    <Flag code={entry.code} />
                     {entry.label}
                   </span>
                 ) : (
                   <a key={entry.code} href={`?lang=${entry.code}`} hrefLang={entry.code}>
-                    <span className="al-code" aria-hidden="true">{CODES[entry.code]}</span>
+                    <Flag code={entry.code} />
                     {entry.label}
                   </a>
                 ),
@@ -289,7 +370,7 @@ export default async function AppLandingPage({
 
       <section className="al-hero">
         <div className="al-wrap al-hero-grid">
-          <div className="al-hero-copy">
+          <div className="al-hero-copy al-enter">
             <h1>
               {copy.headlineLead} <em>{copy.headlineBrand}</em>
             </h1>
@@ -315,7 +396,7 @@ export default async function AppLandingPage({
             </ul>
           </div>
 
-          <div className="al-stage">
+          <div className="al-stage al-enter-late">
             <div className="al-phones">
               {/* The owner's two App Store panels, whole: they are the brand's
                   own artwork and already frame the app screens. */}
@@ -328,15 +409,28 @@ export default async function AppLandingPage({
         </div>
       </section>
 
-      <section className="al-section is-tint">
+      <section className="al-stats">
         <div className="al-wrap">
-          <div className="al-section-head">
+          <dl className="al-stats-row">
+            {copy.stats.map((st, i) => (
+              <div key={st.label} data-reveal data-reveal-delay={i * 80}>
+                <dt>{st.label}</dt>
+                <dd>{st.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      <section className="al-section is-tint" id="cach-dung">
+        <div className="al-wrap">
+          <div className="al-section-head" data-reveal>
             <h2>{copy.howTitle}</h2>
             {copy.howIntro ? <p>{copy.howIntro}</p> : null}
           </div>
           <ol className="al-steps">
             {copy.steps.map((step, i) => (
-              <li className="al-step" key={step.title}>
+              <li className="al-step" key={step.title} data-reveal data-reveal-delay={i * 90}>
                 <span className="al-step-num" aria-hidden="true">{i + 1}</span>
                 <div className="al-step-card">
                   <Illustration kind={STEP_ILLOS[i]} />
@@ -349,15 +443,15 @@ export default async function AppLandingPage({
         </div>
       </section>
 
-      <section className="al-section">
+      <section className="al-section" id="tinh-nang">
         <div className="al-wrap">
-          <div className="al-section-head">
+          <div className="al-section-head" data-reveal>
             <h2>{copy.insideTitle}</h2>
             {copy.insideIntro ? <p>{copy.insideIntro}</p> : null}
           </div>
           <div className="al-grid">
             {copy.features.map((item, i) => (
-              <div className="al-feature" key={item.title}>
+              <div className="al-feature" key={item.title} data-reveal data-reveal-delay={(i % 3) * 90}>
                 <div className="al-window-bar" aria-hidden="true"><i /><i /><i /></div>
                 <Illustration kind={FEATURE_ILLOS[i]} />
                 <div className="al-feature-text">
@@ -370,14 +464,67 @@ export default async function AppLandingPage({
         </div>
       </section>
 
-      <section className="al-section is-tint">
+      <section className="al-section is-tint al-gallery-section">
         <div className="al-wrap">
-          <div className="al-section-head">
+          <div className="al-section-head" data-reveal>
+            <h2>{copy.galleryTitle}</h2>
+            <p>{copy.galleryIntro}</p>
+          </div>
+        </div>
+        {/* A scroll-snap strip: native swipe on phones, a scrollbar on desktop,
+            no carousel script. The seven App Store panels, in app order. */}
+        <div className="al-gallery" data-reveal>
+          {GALLERY.map((name, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={name} src={`/landing/app/${name}.jpg`} alt={copy.galleryAlts[i]} width={760} height={1645} loading="lazy" />
+          ))}
+        </div>
+      </section>
+
+      <section className="al-section">
+        <div className="al-wrap al-device">
+          <div className="al-device-art" data-reveal>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/landing/combo/may.webp" alt={copy.deviceAlt} loading="lazy" />
+          </div>
+          <div className="al-device-copy" data-reveal data-reveal-delay={120}>
+            <h2>{copy.deviceTitle}</h2>
+            <p>{copy.deviceBody}</p>
+            <a className="al-link" href="/san-pham">
+              {copy.deviceLink}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </a>
+          </div>
+        </div>
+
+        <div className="al-wrap al-trust">
+          <h2 className="al-trust-title" data-reveal>{copy.trustTitle}</h2>
+          <div className="al-trust-row">
+            {copy.trust.map((item, i) => {
+              const inner = (
+                <>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </>
+              );
+              return item.href ? (
+                <a key={item.title} className="al-trust-card" href={`${item.href}?lang=${language}`} data-reveal data-reveal-delay={i * 90}>{inner}</a>
+              ) : (
+                <div key={item.title} className="al-trust-card" data-reveal data-reveal-delay={i * 90}>{inner}</div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="al-section is-tint" id="hoi-dap">
+        <div className="al-wrap">
+          <div className="al-section-head" data-reveal>
             <h2>{copy.faqTitle}</h2>
           </div>
           <div className="al-faq">
             {copy.faq.map((item) => (
-              <details key={item.q}>
+              <details key={item.q} data-reveal>
                 <summary>{item.q}</summary>
                 <p>{item.a}</p>
               </details>
@@ -388,7 +535,7 @@ export default async function AppLandingPage({
 
       <section className="al-section" id="tai-app">
         <div className="al-wrap">
-          <div className="al-cta">
+          <div className="al-cta" data-reveal>
             <h2>{copy.ctaTitle}</h2>
             <p>{copy.ctaBody}</p>
             <StoreBadges links={app_links} language={language} />
@@ -401,8 +548,10 @@ export default async function AppLandingPage({
         <StoreBadges links={app_links} language={language} />
       </DownloadPrompt>
 
+      <Reveal />
+
       <div className="al-stickybar">
-        <StoreBadges links={app_links} language={language} note={false} />
+        <StoreBadges links={app_links} language={language} />
       </div>
     </div>
   );

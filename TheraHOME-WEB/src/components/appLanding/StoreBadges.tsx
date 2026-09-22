@@ -1,10 +1,10 @@
 import type { AppLinks } from "@/lib/siteContent";
 import type { LegalLanguage } from "@/lib/appLegalContent";
 
-const COPY: Record<LegalLanguage, { appStoreTop: string; playTop: string; soon: string }> = {
-  vi: { appStoreTop: "Tải về trên", playTop: "TẢI NỘI DUNG TRÊN", soon: "Bản Android sắp có trên Google Play." },
-  en: { appStoreTop: "Download on the", playTop: "GET IT ON", soon: "The Android app is coming to Google Play soon." },
-  ms: { appStoreTop: "Muat turun di", playTop: "DAPATKANNYA DI", soon: "Aplikasi Android akan tiba di Google Play tidak lama lagi." },
+const COPY: Record<LegalLanguage, { appStoreTop: string; playTop: string; soonTop: string; soonTag: string }> = {
+  vi: { appStoreTop: "Tải về trên", playTop: "TẢI NỘI DUNG TRÊN", soonTop: "SẮP CÓ TRÊN", soonTag: "Sắp ra mắt" },
+  en: { appStoreTop: "Download on the", playTop: "GET IT ON", soonTop: "COMING SOON ON", soonTag: "Coming soon" },
+  ms: { appStoreTop: "Muat turun di", playTop: "DAPATKANNYA DI", soonTop: "AKAN DATANG DI", soonTag: "Akan datang" },
 };
 
 function AppleMark() {
@@ -28,30 +28,39 @@ function PlayMark() {
 
 /** App Store / Google Play buttons for /app.
  *
- * A button only appears once its store actually lists the app — the links
- * come from Admin → Nội dung website → app_links, the same rule /ung-dung
- * follows. Android is in closed testing, so its public listing would 404;
- * while that field is empty a one-line note says Android is on its way
- * instead of handing visitors a dead link. */
-export function StoreBadges({ links, language, note = true }: { links: AppLinks; language: LegalLanguage; note?: boolean }) {
+ * Links come from Admin → Nội dung website → app_links. Both buttons always
+ * show: a store whose link is still empty (Google Play, while Android is in
+ * closed testing and its public listing would 404) renders as a muted
+ * "coming soon" badge that is not a link. Filling the field in Admin turns it
+ * into the real button within a minute, no deploy. */
+export function StoreBadges({ links, language }: { links: AppLinks; language: LegalLanguage }) {
   const copy = COPY[language];
   return (
-    <div>
-      <div className="al-badges">
-        {links.appStore ? (
-          <a className="al-badge" href={links.appStore} target="_blank" rel="noreferrer">
-            <AppleMark />
-            <span><small>{copy.appStoreTop}</small><strong>App Store</strong></span>
-          </a>
-        ) : null}
-        {links.playStore ? (
-          <a className="al-badge" href={links.playStore} target="_blank" rel="noreferrer">
-            <PlayMark />
-            <span><small>{copy.playTop}</small><strong>Google Play</strong></span>
-          </a>
-        ) : null}
-      </div>
-      {note && !links.playStore ? <p className="al-badges-note">{copy.soon}</p> : null}
+    <div className="al-badges">
+      {links.appStore ? (
+        <a className="al-badge" href={links.appStore} target="_blank" rel="noreferrer">
+          <AppleMark />
+          <span><small>{copy.appStoreTop}</small><strong>App Store</strong></span>
+        </a>
+      ) : (
+        <span className="al-badge is-soon" aria-disabled="true">
+          <AppleMark />
+          <span><small>{copy.soonTop}</small><strong>App Store</strong></span>
+          <em>{copy.soonTag}</em>
+        </span>
+      )}
+      {links.playStore ? (
+        <a className="al-badge" href={links.playStore} target="_blank" rel="noreferrer">
+          <PlayMark />
+          <span><small>{copy.playTop}</small><strong>Google Play</strong></span>
+        </a>
+      ) : (
+        <span className="al-badge is-soon" aria-disabled="true">
+          <PlayMark />
+          <span><small>{copy.soonTop}</small><strong>Google Play</strong></span>
+          <em>{copy.soonTag}</em>
+        </span>
+      )}
     </div>
   );
 }

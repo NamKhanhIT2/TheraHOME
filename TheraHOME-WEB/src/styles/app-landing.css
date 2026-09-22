@@ -31,20 +31,10 @@
 }
 .al-header .al-wrap { display: flex; align-items: center; gap: 12px; height: 68px; }
 .al-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; margin-right: auto; }
-/* Wordmark after the store artwork: a light "Thera" run straight into a
-   heavy, wide-tracked "HOME" carrying the brand blue gradient, with a small
-   tick of the same blue under "HOME" as a signature. */
-.al-wordmark { display: inline-flex; align-items: baseline; font-size: 20px; line-height: 1; }
-.al-wordmark span { font-weight: 300; letter-spacing: -0.01em; color: var(--text-primary); }
-.al-wordmark b {
-  position: relative; font-weight: 700; letter-spacing: 0.04em;
-  background: linear-gradient(100deg, var(--color-primary-dark) 0%, var(--color-primary) 45%, var(--color-primary-light) 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.al-wordmark b::after {
-  content: ""; position: absolute; left: 2px; right: 0.04em; bottom: -5px; height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, var(--color-primary), color-mix(in srgb, var(--color-primary-light) 30%, transparent));
-}
+/* Wordmark: one solid weight throughout (the thin/heavy mix read as
+   uneven at this size) — ink "Thera", brand-blue "HOME". */
+.al-wordmark { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; line-height: 1; color: var(--text-primary); }
+.al-wordmark b { font-weight: 700; color: var(--color-primary); letter-spacing: 0.005em; }
 .al-brand img { box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 22%, transparent); }
 .al-brand img { width: 36px; height: 36px; border-radius: 10px; }
 .al-download {
@@ -64,8 +54,15 @@
 }
 .al-lang summary::-webkit-details-marker { display: none; }
 .al-lang summary:hover { background: var(--color-primary-tint-10); }
-.al-lang summary .al-chev { color: var(--color-primary); }
-.al-code { width: 26px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--text-muted); }
+.al-lang summary .al-chev { color: var(--text-muted); }
+.al-flag { flex: none; display: block; border-radius: 3px; box-shadow: 0 0 0 1px rgba(22, 33, 58, 0.12); }
+
+/* Section links, desktop only. */
+.al-nav { display: none; gap: 4px; margin-right: 8px; }
+.al-nav a { padding: 10px 14px; border-radius: 10px; font-size: 15px; font-weight: 500; color: var(--text-secondary); text-decoration: none; transition: color 0.15s ease, background 0.15s ease; }
+.al-nav a:hover { color: var(--color-primary); background: var(--color-primary-tint-05); }
+@media (min-width: 900px) { .al-nav { display: flex; } }
+html:has(.app-landing) { scroll-behavior: smooth; scroll-padding-top: 84px; }
 .al-lang-menu {
   position: absolute; right: 0; top: calc(100% + 6px); min-width: 190px;
   display: flex; flex-direction: column; padding: 6px;
@@ -113,7 +110,6 @@
 .al-lede { margin: 18px 0 0; max-width: 46ch; font-size: clamp(16px, 1.5vw, 18px); color: var(--text-secondary); }
 .al-start { margin: 28px 0 12px; font-size: 17px; font-weight: 500; }
 .al-hero-copy .al-badges { justify-content: flex-start; }
-.al-hero-copy .al-badges-note { color: var(--text-muted); }
 
 .al-signin {
   display: inline-flex; align-items: center; gap: 12px; margin-top: 20px;
@@ -264,7 +260,6 @@
 .al-badge small { display: block; font-size: 11px; letter-spacing: 0.02em; }
 .al-badge strong { display: block; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
 .al-badge:hover { background: #1c1c1e; }
-.al-badges-note { margin: 12px 0 0; font-size: 13.5px; }
 
 /* Sticky store bar — phones only, like the reference. */
 .al-stickybar {
@@ -319,7 +314,6 @@
 .al-modal-features ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .al-modal-features li { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--text-secondary); }
 .al-modal-features li svg { flex: none; color: var(--color-primary); }
-.al-modal .al-badges-note { text-align: center; color: var(--text-muted); }
 .al-modal-foot { display: flex; justify-content: space-between; gap: 12px; padding: 16px 24px 20px; border-top: 1px solid var(--border-light); }
 .al-btn-ghost, .al-btn-primary {
   min-height: 44px; padding: 0 20px; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
@@ -343,4 +337,105 @@
   .al-step-card { padding-top: 10px; }
   .al-feature .al-illo { margin: 8px 10px 0; }
   .al-feature-text { padding-top: 12px; padding-bottom: 16px; }
+}
+
+/* "Coming soon" store badge — not a link until Admin has the URL. */
+.al-badge.is-soon { position: relative; background: #3a3f47; border-color: #3a3f47; cursor: default; }
+.al-badge.is-soon:hover { background: #3a3f47; }
+.al-badge.is-soon > svg { opacity: 0.75; }
+.al-badge em {
+  position: absolute; top: -9px; right: -8px; padding: 2px 8px; border-radius: 999px;
+  background: var(--color-primary-tint-10); color: var(--color-primary-dark);
+  font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  box-shadow: 0 0 0 2px var(--bg-card);
+}
+.al-cta .al-badge em { box-shadow: none; }
+
+/* ----------------------------------------------------------------- stats */
+.al-stats { padding: 8px 0 clamp(40px, 5vw, 64px); }
+.al-stats-row {
+  margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
+  border-radius: 20px; overflow: hidden; background: var(--border-light); border: 1px solid var(--border-light);
+}
+@media (min-width: 720px) { .al-stats-row { grid-template-columns: repeat(4, 1fr); } }
+.al-stats-row > div { display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; padding: 22px 12px; background: var(--bg-card); text-align: center; }
+.al-stats-row dd { margin: 0; font-size: clamp(24px, 3vw, 32px); font-weight: 700; letter-spacing: -0.02em; color: var(--color-primary-dark); font-variant-numeric: tabular-nums; }
+.al-stats-row dt { font-size: 14.5px; color: var(--text-secondary); }
+
+/* --------------------------------------------------------------- gallery */
+.al-gallery {
+  display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 4px max(20px, calc((100vw - 1080px) / 2 + 20px)) 20px;
+  scrollbar-width: thin; scrollbar-color: var(--s2) transparent;
+}
+.al-gallery img {
+  flex: none; width: clamp(150px, 20vw, 210px); height: auto; border-radius: 18px;
+  scroll-snap-align: center; box-shadow: 0 14px 30px rgba(0, 60, 140, 0.16);
+}
+
+/* ---------------------------------------------------------------- device */
+.al-device { display: grid; gap: clamp(24px, 4vw, 56px); align-items: center; }
+@media (min-width: 820px) { .al-device { grid-template-columns: 1fr 1fr; } }
+.al-device-art {
+  display: grid; place-items: center; padding: clamp(24px, 4vw, 48px);
+  border-radius: 28px; background: radial-gradient(circle at 50% 40%, var(--s0), var(--s1) 70%);
+}
+.al-device-art img { width: min(100%, 420px); height: auto; filter: drop-shadow(0 24px 30px rgba(0, 60, 140, 0.18)); }
+.al-device-copy h2 { margin: 0; font-size: clamp(26px, 3.2vw, 36px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; text-wrap: balance; }
+.al-device-copy p { margin: 14px 0 20px; max-width: 48ch; font-size: 16.5px; color: var(--text-secondary); }
+.al-link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; color: var(--color-primary) !important; text-decoration: none; }
+.al-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* ----------------------------------------------------------------- trust */
+.al-trust { margin-top: clamp(56px, 8vw, 96px); }
+.al-trust-title { margin: 0 0 20px; font-size: clamp(22px, 2.6vw, 28px); font-weight: 700; letter-spacing: -0.01em; text-align: center; }
+.al-trust-row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.al-trust-card {
+  display: block; padding: 20px 22px; border-radius: 16px; text-decoration: none;
+  background: var(--s1); border: 1px solid transparent;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+a.al-trust-card:hover { border-color: var(--s2); background: var(--color-primary-tint-05); }
+.al-trust-card h3 { margin: 0 0 4px; font-size: 16.5px; font-weight: 600; color: var(--color-primary-dark); }
+.al-trust-card p { margin: 0; font-size: 15px; color: var(--text-secondary); }
+
+/* ---------------------------------------------------------------- motion */
+/* Hero: a short staggered rise on load; it ends visible, so a still frame
+   (thumbnail, no-JS) shows the finished page. */
+.al-enter > * { animation: al-up 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.al-enter > *:nth-child(2) { animation-delay: 0.08s; }
+.al-enter > *:nth-child(3) { animation-delay: 0.16s; }
+.al-enter > *:nth-child(4) { animation-delay: 0.22s; }
+.al-enter > *:nth-child(5) { animation-delay: 0.28s; }
+.al-enter > *:nth-child(6) { animation-delay: 0.34s; }
+.al-enter-late { animation: al-up 0.9s 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes al-up { from { opacity: 0; transform: translateY(18px); } }
+
+/* The two panels drift gently, out of step with each other. */
+.al-phone { animation: al-float 7s ease-in-out infinite; }
+.al-phone.is-back { animation-duration: 8.5s; animation-delay: -2s; }
+@keyframes al-float { 50% { transform: translateY(-10px); } }
+
+/* Scroll reveal: Reveal.tsx parks below-the-fold [data-reveal] elements
+   with .is-pending and adds .is-in as they enter the viewport. */
+[data-reveal].is-pending { opacity: 0; transform: translateY(24px); }
+[data-reveal].is-pending.is-in {
+  opacity: 1; transform: none;
+  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .al-enter > *, .al-enter-late, .al-phone { animation: none; }
+  html:has(.app-landing) { scroll-behavior: auto; }
+}
+
+/* Phones: both store buttons on one row, as on the reference. */
+@media (max-width: 480px) {
+  .al-badges { gap: 10px; flex-wrap: nowrap; }
+  .al-badge { min-height: 46px; padding: 6px 12px 6px 10px; gap: 8px; }
+  .al-badge svg { width: 22px; height: 22px; }
+  .al-badge small { font-size: 9.5px; }
+  .al-badge strong { font-size: 16px; }
+  .al-badge em { font-size: 10px; right: -4px; }
+  .al-signin { font-size: 16px; padding: 0 22px; }
 }
