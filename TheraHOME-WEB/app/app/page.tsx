@@ -51,6 +51,8 @@ interface Copy {
   faq: { q: string; a: string }[];
   ctaTitle: string;
   ctaBody: string;
+  startLabel: string;
+  signIn: string;
   prompt: { title: string; body: string; featuresTitle: string; features: string[]; dontShow: string; close: string };
 }
 
@@ -93,6 +95,8 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "Làm sao để mở ngày tập tiếp theo?", a: "Các ngày trong lộ trình tự mở khoá theo thời gian: mỗi ngày mở một ngày mới vào 0h. Xem video bài tập để ghi nhận hoàn thành ngày hôm đó." },
       { q: "Dùng được trên những máy nào?", a: "iPhone và Android. Một tài khoản dùng trên cả hai, tiến độ luôn đồng bộ." },
     ],
+    startLabel: "Tải ứng dụng để bắt đầu",
+    signIn: "Đăng nhập để tập trên web",
     ctaTitle: "Tải TheraHOME",
     ctaBody: "Kích hoạt thiết bị và tập buổi đầu tiên ngay hôm nay.",
     prompt: {
@@ -142,6 +146,8 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "How do I unlock the next day?", a: "Days unlock automatically over time: one new day opens at midnight. Watch the workout video to record that day as completed." },
       { q: "Which phones does it run on?", a: "iPhone and Android. One account works on both, and progress stays in sync." },
     ],
+    startLabel: "Download the app to get started",
+    signIn: "Sign in to train on the web",
     ctaTitle: "Get TheraHOME",
     ctaBody: "Activate your device and do your first session today.",
     prompt: {
@@ -191,6 +197,8 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "Bagaimana saya membuka hari seterusnya?", a: "Hari dalam pelan dibuka secara automatik mengikut masa: satu hari baharu dibuka pada tengah malam. Tonton video latihan untuk merekodkan hari itu sebagai selesai." },
       { q: "Telefon apa yang disokong?", a: "iPhone dan Android. Satu akaun untuk kedua-duanya, kemajuan sentiasa diselaraskan." },
     ],
+    startLabel: "Muat turun aplikasi untuk bermula",
+    signIn: "Log masuk untuk berlatih di web",
     ctaTitle: "Dapatkan TheraHOME",
     ctaBody: "Aktifkan peranti anda dan mulakan sesi pertama hari ini.",
     prompt: {
@@ -282,33 +290,42 @@ export default async function AppLandingPage({
       </header>
 
       <section className="al-hero">
-        <div className="al-wrap">
-          <h1>
-            {copy.headlineLead} <em>{copy.headlineBrand}</em>
-          </h1>
-          <p>{copy.intro}</p>
+        <div className="al-wrap al-hero-grid">
+          <div className="al-hero-copy">
+            <h1>
+              {copy.headlineLead} <em>{copy.headlineBrand}</em>
+            </h1>
+            <p className="al-lede">{copy.intro}</p>
 
-          <div className="al-cards">
-            {copy.highlights.map((item, i) => (
-              <div className="al-card" key={item.title}>
-                <Icon index={i} />
-                <div>
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                </div>
-              </div>
-            ))}
+            <p className="al-start">{copy.startLabel}</p>
+            <StoreBadges links={app_links} language={language} />
+            <a className="al-signin" href="/luyen-tap">
+              {copy.signIn}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </a>
+
+            <ul className="al-points">
+              {copy.highlights.map((item, i) => (
+                <li key={item.title} className={`tone-${i}`}>
+                  <Icon index={i} />
+                  <div>
+                    <h3>{item.title}</h3>
+                    <p>{item.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
 
-        <div className="al-stage">
-          <div className="al-phones">
-            {/* The two App Store panels, whole: they are the brand's own
-                artwork and already frame the app screens. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="al-phone" src="/landing/app-page/home.webp" alt={copy.phonesAlt[0]} width={853} height={1844} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="al-phone is-back" src="/landing/app-page/community.webp" alt={copy.phonesAlt[1]} width={853} height={1844} loading="lazy" />
+          <div className="al-stage">
+            <div className="al-phones">
+              {/* The owner's two App Store panels, whole: they are the brand's
+                  own artwork and already frame the app screens. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="al-phone" src="/landing/app-page/home.webp" alt={copy.phonesAlt[0]} width={853} height={1844} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="al-phone is-back" src="/landing/app-page/community.webp" alt={copy.phonesAlt[1]} width={853} height={1844} />
+            </div>
           </div>
         </div>
       </section>
@@ -320,8 +337,8 @@ export default async function AppLandingPage({
             {copy.howIntro ? <p>{copy.howIntro}</p> : null}
           </div>
           <ol className="al-steps">
-            {copy.steps.map((step) => (
-              <li className="al-step" key={step.title}>
+            {copy.steps.map((step, i) => (
+              <li className={`al-step tone-${i}`} key={step.title}>
                 <h3>{step.title}</h3>
                 <p>{step.body}</p>
               </li>
@@ -338,7 +355,7 @@ export default async function AppLandingPage({
           </div>
           <div className="al-grid">
             {copy.features.map((item, i) => (
-              <div className="al-feature" key={item.title}>
+              <div className={`al-feature tone-${i % 4}`} key={item.title}>
                 <Icon index={featureIcons[i]} />
                 <div>
                   <h3>{item.title}</h3>
