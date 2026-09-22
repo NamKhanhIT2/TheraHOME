@@ -234,9 +234,56 @@ export function SiteContentView() {
           </div>
         </div>
         <p style={hint}>
-          <strong>Để trống một link tải app thì nút đó sẽ ẩn hẳn trên trang Ứng dụng.</strong> Google Play đang
-          để trống vì bản Android còn ở closed testing, link chưa công khai nên bấm vào ra trang 404 — khi app
-          lên store chính thức, dán lại link là nút hiện lại ngay.
+          <strong>Để trống một link tải app thì nút đó ẩn trên trang Ứng dụng, còn trang /app hiện nút xám
+          &quot;Sắp ra mắt&quot;.</strong> Google Play đang để trống vì bản Android còn ở closed testing, link chưa
+          công khai nên bấm vào ra trang 404 — khi app lên store chính thức, dán link vào là nút thật hiện ngay,
+          và mã QR tải app cũng tự đưa máy Android sang Google Play.
+        </p>
+      </SectionCard>
+
+      <SectionCard
+        title="Đánh giá của khách (trang /app)"
+        action={<GhostBtn onClick={() => set("app_reviews", [...c.app_reviews, { name: "", detail: "", quote: "", stars: 5, consent: false }])}>+ Thêm đánh giá</GhostBtn>}
+      >
+        {c.app_reviews.map((r, i) => {
+          const edit = (patch: Partial<typeof r>) => set("app_reviews", c.app_reviews.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+          return (
+            <div key={i} style={{ ...rowBox, marginBottom: 10 }}>
+              <div style={grid2}>
+                <div>
+                  <FieldLabel>Tên hiển thị</FieldLabel>
+                  <input style={inputStyle} value={r.name} onChange={(e) => edit({ name: e.target.value })} placeholder="Chị Lan H." />
+                </div>
+                <div>
+                  <FieldLabel>Thông tin thêm</FieldLabel>
+                  <input style={inputStyle} value={r.detail} onChange={(e) => edit({ detail: e.target.value })} placeholder="Hà Nội · dùng TheraNECK+" />
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Nội dung đánh giá (giữ nguyên lời khách)</FieldLabel>
+                <textarea style={areaStyle} value={r.quote} onChange={(e) => edit({ quote: e.target.value })} />
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, justifyContent: "space-between" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                  Số sao
+                  <select style={{ ...inputStyle, width: 80 }} value={r.stars} onChange={(e) => edit({ stars: Number(e.target.value) })}>
+                    {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+                  <input type="checkbox" checked={r.consent} onChange={(e) => edit({ consent: e.target.checked })} />
+                  Khách đã đồng ý cho đăng
+                </label>
+                <GhostBtn color="var(--color-error, #d64545)" onClick={() => set("app_reviews", c.app_reviews.filter((_, j) => j !== i))}>Xoá đánh giá</GhostBtn>
+              </div>
+            </div>
+          );
+        })}
+        <p style={hint}>
+          <strong>Chỉ nhập đánh giá thật</strong> — từ App Store / Google Play, tin nhắn, khảo sát hay phản hồi của khách —
+          và giữ nguyên lời họ. Đánh giá chỉ hiện trên /app khi đã tick &quot;Khách đã đồng ý cho đăng&quot;; khi chưa
+          có đánh giá nào được đăng, cả mục tự ẩn. Đánh giá bịa là quảng cáo gian dối, bị cấm theo luật bảo vệ
+          người tiêu dùng và có thể khiến App Store / Google Play gỡ ứng dụng.
         </p>
       </SectionCard>
 

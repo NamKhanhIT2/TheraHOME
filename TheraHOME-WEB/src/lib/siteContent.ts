@@ -45,6 +45,10 @@ export interface FaqItem { q: string; a: string }
 export interface Contact { address: string; phone: string; phoneHref: string; email: string; hours: string }
 export interface Social { facebook: string; youtube: string }
 export interface AppLinks { appStore: string; playStore: string }
+/** A customer review shown on /app. Entered by an admin from a real customer
+ * (App Store / Google Play review, message, survey), never written for them —
+ * and only published once `consent` is ticked. */
+export interface AppReview { name: string; detail: string; quote: string; stars: number; consent: boolean }
 
 export interface SiteContent {
   pricing: Pricing;
@@ -55,6 +59,7 @@ export interface SiteContent {
   contact: Contact;
   social: Social;
   app_links: AppLinks;
+  app_reviews: AppReview[];
 }
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
@@ -110,6 +115,9 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   // so its listing 404s; the URL itself is correct and goes back in the moment
   // the app is public.
   app_links: { appStore: "https://apps.apple.com/vn/app/therahome/id6803739232", playStore: "" },
+  // Empty on purpose: the reviews section on /app stays hidden until an admin
+  // enters real ones. The App Store listing had no reviews on 2026-09-22.
+  app_reviews: [],
 };
 
 /** Merge a stored row over its default. A key the admin has never saved, or a

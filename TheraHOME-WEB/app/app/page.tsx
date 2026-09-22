@@ -35,7 +35,10 @@ export const metadata: Metadata = {
 // Store links and contact details are edited in Admin; pick edits up within a minute.
 export const revalidate = 60;
 
-const GALLERY = ["home", "roadmap", "video", "ai-chat", "community", "support", "video-alt"];
+// The owner's English App Store set (2026-09-22), used for every language.
+// Panels 1 and 4 are the same files the hero shows, so they are reused, not
+// downloaded twice.
+const GALLERY = ["home", "gallery-2", "gallery-3", "community", "gallery-5", "gallery-6", "gallery-7"];
 
 type Item = { title: string; body: string };
 
@@ -70,6 +73,8 @@ interface Copy {
   deviceLink: string;
   deviceAlt: string;
   trustTitle: string;
+  reviewsTitle: string;
+  starsLabel: string;
   trust: { title: string; body: string; href?: string }[];
   signIn: string;
   prompt: { title: string; body: string; featuresTitle: string; features: string[]; dontShow: string; close: string };
@@ -125,12 +130,14 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     galleryTitle: "Xem trước ứng dụng",
     galleryIntro: "Vuốt để xem từng màn hình.",
-    galleryAlts: ["Màn hình chính", "Lộ trình 14 ngày", "Buổi tập có video", "Trợ lý AI", "Cộng đồng", "Hỗ trợ từ TheraHOME", "Tập theo video"],
+    galleryAlts: ["Màn hình chính", "Lộ trình 14 ngày", "Buổi tập có video", "Cộng đồng", "Tập theo video", "Trợ lý AI", "Hỗ trợ từ TheraHOME"],
     deviceTitle: "Đi cùng thiết bị TheraNECK+",
     deviceBody: "Ứng dụng cung cấp video hướng dẫn tập luyện đi kèm thiết bị. TheraNECK+ là dụng cụ hỗ trợ thư giãn cơ và tập luyện tại nhà, không phải thiết bị y tế.",
     deviceLink: "Xem thiết bị",
     deviceAlt: "Thiết bị TheraNECK+",
     trustTitle: "Yên tâm khi dùng",
+    reviewsTitle: "Khách hàng nói gì",
+    starsLabel: "{n} trên 5 sao",
     trust: [
       { title: "Dữ liệu được bảo vệ", body: "Xem TheraHOME thu thập và xử lý dữ liệu thế nào.", href: "/privacy" },
       { title: "Xoá tài khoản bất cứ lúc nào", body: "Ngay trong app, mục Hồ sơ.", href: "/account-deletion" },
@@ -199,12 +206,14 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     galleryTitle: "See the app",
     galleryIntro: "Swipe through the screens.",
-    galleryAlts: ["Home screen", "14-day roadmap", "Video session", "AI assistant", "Community", "Support from TheraHOME", "Follow the video"],
+    galleryAlts: ["Home screen", "14-day roadmap", "Video session", "Community", "Follow the video", "AI assistant", "Support from TheraHOME"],
     deviceTitle: "Made for TheraNECK+",
     deviceBody: "The app provides the workout videos that accompany the device. TheraNECK+ is a home muscle-relaxation and training aid, not a medical device.",
     deviceLink: "See the device",
     deviceAlt: "The TheraNECK+ device",
     trustTitle: "Use it with confidence",
+    reviewsTitle: "What customers say",
+    starsLabel: "{n} out of 5 stars",
     trust: [
       { title: "Your data is protected", body: "See how TheraHOME collects and handles it.", href: "/privacy" },
       { title: "Delete your account any time", body: "Right in the app, under Profile.", href: "/account-deletion" },
@@ -273,12 +282,14 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     galleryTitle: "Lihat aplikasi",
     galleryIntro: "Leret untuk melihat setiap skrin.",
-    galleryAlts: ["Skrin utama", "Pelan 14 hari", "Sesi video", "Pembantu AI", "Komuniti", "Sokongan TheraHOME", "Ikut video"],
+    galleryAlts: ["Skrin utama", "Pelan 14 hari", "Sesi video", "Komuniti", "Ikut video", "Pembantu AI", "Sokongan TheraHOME"],
     deviceTitle: "Untuk peranti TheraNECK+",
     deviceBody: "Aplikasi menyediakan video latihan yang mengiringi peranti. TheraNECK+ ialah alat bantu relaksasi otot dan latihan di rumah, bukan peranti perubatan.",
     deviceLink: "Lihat peranti",
     deviceAlt: "Peranti TheraNECK+",
     trustTitle: "Guna dengan yakin",
+    reviewsTitle: "Kata pelanggan",
+    starsLabel: "{n} daripada 5 bintang",
     trust: [
       { title: "Data anda dilindungi", body: "Lihat cara TheraHOME mengumpul dan mengendalikannya.", href: "/privacy" },
       { title: "Padam akaun bila-bila masa", body: "Terus dalam aplikasi, di bahagian Profil.", href: "/account-deletion" },
@@ -332,7 +343,9 @@ export default async function AppLandingPage({
 }) {
   const language = await resolveLegalLanguage(searchParams);
   const copy = COPY[language];
-  const { app_links } = await getSiteContent();
+  const { app_links, app_reviews } = await getSiteContent();
+  // Published only with the customer's consent and actual words.
+  const reviews = app_reviews.filter((r) => r.consent && r.quote.trim());
 
   return (
     <div className={`app-landing ${brandFont.variable}`} lang={language}>
@@ -484,7 +497,7 @@ export default async function AppLandingPage({
         <div className="al-gallery" data-reveal>
           {GALLERY.map((name, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={name} src={`/landing/app/${name}.jpg`} alt={copy.galleryAlts[i]} width={760} height={1645} loading="lazy" />
+            <img key={name} src={`/landing/app-page/${name}.webp`} alt={copy.galleryAlts[i]} width={853} height={1844} loading="lazy" />
           ))}
         </div>
       </section>
@@ -524,6 +537,35 @@ export default async function AppLandingPage({
           </div>
         </div>
       </section>
+
+      {reviews.length ? (
+        <section className="al-section">
+          <div className="al-wrap">
+            <div className="al-section-head" data-reveal>
+              <h2>{copy.reviewsTitle}</h2>
+            </div>
+            <div className="al-reviews">
+              {reviews.map((r, i) => {
+                const stars = Math.min(5, Math.max(1, Math.round(r.stars || 5)));
+                return (
+                  <figure className="al-review" key={`${r.name}-${i}`} data-reveal data-reveal-delay={(i % 3) * 90}>
+                    <div className="al-stars" role="img" aria-label={copy.starsLabel.replace("{n}", String(stars))}>
+                      {Array.from({ length: 5 }, (_, k) => (
+                        <svg key={k} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" className={k < stars ? "on" : ""}><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
+                      ))}
+                    </div>
+                    <blockquote>{r.quote}</blockquote>
+                    <figcaption>
+                      <span className="al-avatar" aria-hidden="true">{(r.name.trim()[0] ?? "•").toUpperCase()}</span>
+                      <span><strong>{r.name}</strong>{r.detail ? <small>{r.detail}</small> : null}</span>
+                    </figcaption>
+                  </figure>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="al-section is-tint" id="hoi-dap">
         <div className="al-wrap">
