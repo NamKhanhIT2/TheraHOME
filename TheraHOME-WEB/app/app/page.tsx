@@ -29,7 +29,8 @@ const STEP_ILLOS: IlloKind[] = ["signin", "activate", "daily", "survey"];
 const FEATURE_ILLOS: IlloKind[] = ["roadmap", "video", "ai", "reminder", "community", "support"];
 
 export const metadata: Metadata = {
-  title: "Ứng dụng TheraHOME · TheraHOME app",
+  // The tab reads just the brand, next to the house favicon (owner 2026-09-22).
+  title: "TheraHOME",
   description: "Lộ trình tập cổ vai gáy mỗi ngày với video hướng dẫn, trợ lý AI và đội ngũ hỗ trợ TheraHOME. Tải trên App Store.",
 };
 
