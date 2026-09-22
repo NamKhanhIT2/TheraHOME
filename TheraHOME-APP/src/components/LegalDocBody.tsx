@@ -4,7 +4,13 @@ import { useTheme } from '@/theme';
 import { type LegalDocKey } from '@/lib/legalContent';
 import { useLegalDoc } from '@/hooks/useLegalDoc';
 
-const SECTION_HEADER_RE = /^\d+(\.\d+)?\.\s/;
+/** "1. " or "2.1 " — the trailing dot OR the sub-number is required, so a
+ * paragraph that merely opens with a year ("2026 là ...") is not a heading.
+ * The old pattern demanded a dot before the space, so every sub-heading in
+ * the documents ("2.1 Dữ liệu bạn cung cấp trực tiếp") missed it and rendered
+ * as ordinary body text (found while relaying these rules to the web,
+ * 2026-09-21). Group 2 is the sub-number, i.e. the heading level. */
+const SECTION_HEADER_RE = /^(\d+)\.(?:(\d+)\s|\s)/;
 
 export interface LegalDocBodyProps {
   docKey: LegalDocKey;
@@ -12,9 +18,12 @@ export interface LegalDocBodyProps {
 
 /** Ported line-by-line from the reference `LegalDocBody` parser: line 0 is
  * the big title, line 1 a bold subtitle, line 2 a small muted line, line 3 a
- * disclaimer box, numbered lines (`1.`, `2.1.`, ...) are section headers,
- * tab-prefixed lines are bullets, everything else is a body paragraph. Empty
- * lines are skipped. */
+ * disclaimer box UNLESS it is a heading, `1.`-style lines are section headers
+ * and `2.1`-style lines sub-headers, tab-prefixed lines are bullets,
+ * everything else is a body paragraph. Empty lines are skipped.
+ *
+ * The same grammar renders these documents on the web
+ * (TheraHOME-WEB/src/components/LegalDocBody.tsx) — keep the two in step. */
 export function LegalDocBody({ docKey }: LegalDocBodyProps) {
   const theme = useTheme();
   // Admin-published override when one exists, otherwise the bundled text.
@@ -26,6 +35,8 @@ export function LegalDocBody({ docKey }: LegalDocBodyProps) {
       {lines.map((raw, i) => {
         const line = raw.trim();
         if (!line) return null;
+
+        const heading = SECTION_HEADER_RE.exec(line);
 
         if (i === 0) {
           return (
@@ -48,7 +59,11 @@ export function LegalDocBody({ docKey }: LegalDocBodyProps) {
             </Text>
           );
         }
-        if (i === 3) {
+        // Only when line 3 is NOT itself a heading: just the community
+        // guidelines open with a standing note there, while terms, privacy
+        // and security put "1. ..." on that line and had it boxed as if it
+        // were a disclaimer.
+        if (i === 3 && !heading) {
           return (
             <View
               key={i}
@@ -58,9 +73,15 @@ export function LegalDocBody({ docKey }: LegalDocBodyProps) {
             </View>
           );
         }
-        if (SECTION_HEADER_RE.test(line)) {
+        if (heading) {
           return (
-            <Text key={i} style={[styles.sectionHeader, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>
+            <Text
+              key={i}
+              style={[
+                heading[2] ? styles.subSectionHeader : styles.sectionHeader,
+                { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold },
+              ]}
+            >
               {line}
             </Text>
           );
@@ -105,6 +126,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 20,
     marginBottom: 6,
+  },
+  subSectionHeader: {
+    fontSize: 13.5,
+    marginTop: 14,
+    marginBottom: 4,
   },
   bulletRow: {
     flexDirection: 'row',
