@@ -70,7 +70,7 @@ interface Copy {
   qrLabel: string;
   qrAlt: string;
   startLabel: string;
-  nav: { how: string; features: string; faq: string };
+  nav: { how: string; features: string; screens: string; device: string };
   stats: { value: string; label: string }[];
   galleryTitle: string;
   galleryIntro: string;
@@ -129,7 +129,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "Quên mật khẩu thì làm sao?", a: "Chọn Quên mật khẩu ở màn đăng nhập và nhập email, TheraHOME sẽ gửi mã để bạn đặt lại mật khẩu." },
     ],
     startLabel: "Tải ứng dụng để bắt đầu",
-    nav: { how: "Cách dùng", features: "Tính năng", faq: "Hỏi đáp" },
+    nav: { how: "Cách dùng", features: "Tính năng", screens: "Xem trước", device: "Thiết bị" },
     stats: [
       { value: "14 ngày", label: "một lộ trình" },
       { value: "15–20 phút", label: "mỗi buổi tập" },
@@ -206,7 +206,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "I forgot my password. What now?", a: "Tap Forgot password on the sign-in screen and enter your email; TheraHOME sends a code to reset it." },
     ],
     startLabel: "Download the app to get started",
-    nav: { how: "How it works", features: "Features", faq: "FAQ" },
+    nav: { how: "How it works", features: "Features", screens: "Screens", device: "Device" },
     stats: [
       { value: "14 days", label: "per roadmap" },
       { value: "15–20 min", label: "per session" },
@@ -283,7 +283,7 @@ const COPY: Record<LegalLanguage, Copy> = {
       { q: "Saya lupa kata laluan. Bagaimana?", a: "Ketik Lupa kata laluan di skrin log masuk dan masukkan e-mel anda; TheraHOME akan menghantar kod untuk menetapkannya semula." },
     ],
     startLabel: "Muat turun aplikasi untuk bermula",
-    nav: { how: "Cara guna", features: "Ciri", faq: "Soalan" },
+    nav: { how: "Cara guna", features: "Ciri", screens: "Skrin", device: "Peranti" },
     stats: [
       { value: "14 hari", label: "setiap pelan" },
       { value: "15–20 min", label: "setiap sesi" },
@@ -370,7 +370,8 @@ export default async function AppLandingPage({
           <nav className="al-nav" aria-label="TheraHOME">
             <a href="#cach-dung">{copy.nav.how}</a>
             <a href="#tinh-nang">{copy.nav.features}</a>
-            <a href="#hoi-dap">{copy.nav.faq}</a>
+            <a href="#xem-truoc">{copy.nav.screens}</a>
+            <a href="#thiet-bi">{copy.nav.device}</a>
           </nav>
           <details className="al-lang">
             <summary aria-label={copy.language}>
@@ -496,7 +497,7 @@ export default async function AppLandingPage({
         </div>
       </section>
 
-      <section className="al-section is-tint al-gallery-section">
+      <section className="al-section is-tint al-gallery-section" id="xem-truoc">
         <div className="al-wrap">
           <div className="al-section-head" data-reveal>
             <h2>{copy.galleryTitle}</h2>
@@ -513,7 +514,7 @@ export default async function AppLandingPage({
         </div>
       </section>
 
-      <section className="al-section">
+      <section className="al-section" id="thiet-bi">
         <div className="al-wrap al-device">
           <div className="al-device-art" data-reveal>
             {/* eslint-disable-next-line @next/next/no-img-element */}
