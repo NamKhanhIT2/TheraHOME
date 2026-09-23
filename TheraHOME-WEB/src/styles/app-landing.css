@@ -228,12 +228,14 @@ html:has(.app-landing) { scroll-behavior: smooth; scroll-padding-top: 84px; }
   padding: 18px 20px; font-weight: 600; font-size: 16px;
 }
 .al-faq summary::-webkit-details-marker { display: none; }
-.al-faq summary::after {
-  content: ""; flex: none; width: 28px; height: 28px; border-radius: 50%;
-  background: var(--s1) no-repeat center / 14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007fd9' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  transition: transform 0.2s ease;
+/* A round chevron button that turns over when the answer opens. */
+.al-faq-toggle {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--nm-bg); color: var(--link-blue); box-shadow: var(--nm-raise-sm);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease;
 }
-.al-faq details[open] summary::after { transform: rotate(180deg); }
+.al-faq details[open] .al-faq-toggle { transform: rotate(180deg); box-shadow: var(--nm-inset-sm); }
+.al-faq summary:hover .al-faq-toggle { box-shadow: 5px 5px 12px var(--nm-dark), -5px -5px 12px var(--nm-light); }
 .al-faq details p { margin: 0; padding: 0 20px 18px; color: var(--text-secondary); font-size: 15.5px; }
 
 /* Closing call to action */
@@ -539,7 +541,6 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
 .al-window-bar i { background: var(--nm-bg); box-shadow: var(--nm-inset-sm); }
 .al-icon { background: var(--nm-bg); box-shadow: var(--nm-raise-sm); }
 .al-avatar { background: var(--nm-bg); box-shadow: var(--nm-raise-sm); }
-.al-faq summary::after { background-color: var(--nm-bg); box-shadow: var(--nm-raise-sm); }
 .al-faq details[open] { box-shadow: var(--nm-inset); }
 
 /* Step numbers: raised discs on a grooved rail. */
@@ -766,15 +767,6 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
 .al-link { color: var(--link-blue) !important; }
 .al-wordmark b, .al-step-num, .al-trust-card h3, .al-nm-round, .al-stats-row dd { color: var(--link-blue); }
 .al-lang summary:hover, .al-nm-round:hover, .al-btn-ghost:hover, .al-modal-x:hover { color: var(--link-blue); }
-.al-faq summary::after {
-  background-image: none;
-  background-color: var(--nm-bg);
-}
-.al-faq summary::after {
-  content: "+"; display: grid; place-items: center;
-  color: var(--link-blue); font-size: 20px; font-weight: 400; line-height: 1;
-}
-.al-faq details[open] summary::after { content: "−"; transform: none; }
 
 /* The theme switch itself: same pillow as the language menu, one icon shown. */
 .al-theme {
@@ -842,3 +834,23 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
 .al-cta .al-badge { box-shadow: 5px 5px 12px var(--nm-dark), -5px -5px 12px var(--nm-light); }
 .al-qr { box-shadow: var(--nm-raise-sm); }
 .al-qr figcaption { color: var(--text-muted); }
+
+/* The closing panel's heading: bigger, tighter, with the brand word in the
+   same gradient the hero uses. */
+.al-cta h2 { font-size: clamp(30px, 3.6vw, 42px); letter-spacing: -0.025em; line-height: 1.12; }
+.al-cta h2 em {
+  font-style: normal;
+  background: linear-gradient(100deg, var(--color-primary-dark), var(--color-primary) 45%, var(--color-primary-light));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+/* The lighter end of the ramp only on the dark ground; on the light panel it
+   would be too pale to read. */
+@media (prefers-color-scheme: dark) {
+  .app-landing:not([data-app-theme="light"]) .al-cta h2 em {
+    background-image: linear-gradient(100deg, var(--color-primary), var(--color-primary-light) 55%, var(--glow-b));
+  }
+}
+.app-landing[data-app-theme="dark"] .al-cta h2 em {
+  background-image: linear-gradient(100deg, var(--color-primary), var(--color-primary-light) 55%, var(--glow-b));
+}
+@media (prefers-reduced-motion: reduce) { .al-faq-toggle { transition: none; } }

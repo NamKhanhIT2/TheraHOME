@@ -601,7 +601,14 @@ export default async function AppLandingPage({
           <div className="al-faq">
             {copy.faq.map((item) => (
               <details key={item.q} data-reveal>
-                <summary>{item.q}</summary>
+                <summary>
+                  <span>{item.q}</span>
+                  <span className="al-faq-toggle" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </span>
+                </summary>
                 <p>{item.a}</p>
               </details>
             ))}
@@ -614,7 +621,11 @@ export default async function AppLandingPage({
           <div className="al-cta" data-reveal>
             <div className="al-cta-body">
               <div>
-                <h2>{copy.ctaTitle}</h2>
+                {/* The brand word carries the same gradient as the hero. */}
+                <h2>
+                  {copy.ctaTitle.split("TheraHOME")[0]}
+                  <em>TheraHOME</em>
+                </h2>
                 <p>{copy.ctaBody}</p>
                 <StoreBadges links={app_links} language={language} />
               </div>
