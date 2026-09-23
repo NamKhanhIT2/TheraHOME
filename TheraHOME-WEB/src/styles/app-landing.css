@@ -621,14 +621,14 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
     linear-gradient(135deg, rgba(255, 255, 255, 0.9), var(--glow-b) 40%, var(--glow-c)) border-box;
 }
 .al-signin::after, .al-download::after, .al-btn-primary::after {
-  content: ""; position: absolute; z-index: -1; left: 12%; right: 12%; bottom: -14px; height: 60%;
-  border-radius: 999px; filter: blur(16px); opacity: 0.75;
+  content: ""; position: absolute; z-index: -1; left: 16%; right: 16%; bottom: -8px; height: 42%;
+  border-radius: 999px; filter: blur(11px); opacity: 0.5;
   background: linear-gradient(90deg, var(--glow-b), var(--glow-a), var(--glow-c));
   transition: opacity 0.2s ease, bottom 0.2s ease;
 }
-.al-signin:hover::after, .al-download:hover::after, .al-btn-primary:hover::after { opacity: 1; bottom: -18px; }
-.al-signin:active::after, .al-download:active::after, .al-btn-primary:active::after { opacity: 0.45; bottom: -8px; }
-.al-download::after { bottom: -8px; filter: blur(10px); opacity: 0.55; }
+.al-signin:hover::after, .al-download:hover::after, .al-btn-primary:hover::after { opacity: 0.72; bottom: -11px; }
+.al-signin:active::after, .al-download:active::after, .al-btn-primary:active::after { opacity: 0.3; bottom: -5px; }
+.al-download::after { bottom: -6px; filter: blur(8px); opacity: 0.4; }
 
 /* Round controls and the active dot: a thin gradient rim. */
 .al-nm-round {
@@ -797,3 +797,29 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
   .al-theme { width: 40px; height: 40px; }
   .al-header .al-wrap { gap: 8px; }
 }
+
+/* Dark ground: a glow reads much stronger against it, and the white edge of
+   the rim turns into a halo — pull both back (owner 2026-09-23). */
+.al-signin, .al-download, .al-btn-primary { --rim-highlight: rgba(255, 255, 255, 0.9); }
+.al-signin, .al-download, .al-btn-primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%) padding-box,
+    linear-gradient(100deg, var(--color-primary-dark), var(--color-primary) 55%, var(--color-primary-light)) padding-box,
+    linear-gradient(135deg, var(--rim-highlight), var(--glow-b) 40%, var(--glow-c)) border-box;
+}
+@media (prefers-color-scheme: dark) {
+  .app-landing:not([data-app-theme="light"]) .al-signin,
+  .app-landing:not([data-app-theme="light"]) .al-download,
+  .app-landing:not([data-app-theme="light"]) .al-btn-primary { --rim-highlight: rgba(255, 255, 255, 0.4); }
+  .app-landing:not([data-app-theme="light"]) .al-signin::after,
+  .app-landing:not([data-app-theme="light"]) .al-download::after,
+  .app-landing:not([data-app-theme="light"]) .al-btn-primary::after { opacity: 0.34; }
+  .app-landing:not([data-app-theme="light"]) .al-cta::after { opacity: 0.32; filter: blur(34px); }
+}
+.app-landing[data-app-theme="dark"] .al-signin,
+.app-landing[data-app-theme="dark"] .al-download,
+.app-landing[data-app-theme="dark"] .al-btn-primary { --rim-highlight: rgba(255, 255, 255, 0.4); }
+.app-landing[data-app-theme="dark"] .al-signin::after,
+.app-landing[data-app-theme="dark"] .al-download::after,
+.app-landing[data-app-theme="dark"] .al-btn-primary::after { opacity: 0.34; }
+.app-landing[data-app-theme="dark"] .al-cta::after { opacity: 0.32; filter: blur(34px); }
