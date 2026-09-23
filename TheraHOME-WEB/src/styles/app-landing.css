@@ -388,7 +388,7 @@ html:has(.app-landing) { scroll-behavior: smooth; scroll-padding-top: 84px; }
 .al-cf-dots button.is-on { width: 28px; background: var(--color-primary); box-shadow: 2px 2px 5px var(--nm-dark), -2px -2px 5px var(--nm-light); }
 /* Dots stay 12px to look right; a larger invisible hit area keeps them tappable. */
 .al-cf-dots button { position: relative; }
-.al-cf-dots button::after { content: ""; position: absolute; inset: -14px -4px; }
+.al-cf-dots button::after { content: ""; position: absolute; inset: -16px -9px; }
 @media (prefers-reduced-motion: reduce) { .al-cf-item { transition: none; } }
 
 /* ---------------------------------------------------------------- device */
@@ -676,3 +676,14 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
 @media (prefers-reduced-motion: reduce) {
   .al-signin::after, .al-download::after, .al-btn-primary::after { transition: none; }
 }
+
+/* Footer links are 14px text; give each a finger-sized row on touch screens
+   without changing how the footer looks. */
+.app-landing footer a { display: inline-flex; align-items: center; min-height: 44px; }
+.app-landing footer nav { row-gap: 0; }
+
+/* Contrast and touch targets measured on a 375px screen (2026-09-23):
+   the brand blue is 3.85:1 on this ground, so text links take the darker
+   step (5.4:1); the brand lockup gets a finger-sized row. */
+.al-link { color: var(--color-primary-dark) !important; }
+.al-brand { min-height: 44px; }
