@@ -854,3 +854,45 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
   background-image: linear-gradient(100deg, var(--color-primary), var(--color-primary-light) 55%, var(--glow-b));
 }
 @media (prefers-reduced-motion: reduce) { .al-faq-toggle { transition: none; } }
+
+/* ===================================================== phone optimisation */
+/* Measured on a 390px screen (2026-09-23): no overflow, no text under 13.5px
+   and nothing below contrast, but the app itself was shown too small — the
+   screenshots are the reason someone installs. */
+@media (max-width: 640px) {
+  /* The two hero panels earn more of the width. */
+  .al-phone { width: clamp(150px, 39vw, 200px); }
+  .al-stage::before { width: min(470px, 116%); }
+  /* The centre panel of the carousel dominates instead of sitting level with
+     its neighbours. */
+  .al-cf { --cf-w: clamp(196px, 56vw, 240px); }
+  /* The device photo is an illustration, not the hero — cap it. */
+  .al-device-art { padding: 20px; }
+  .al-device-art img { width: min(100%, 300px); }
+  /* Two-line card titles break at a sensible place. */
+  .al-feature h3, .al-step-card h3, .al-trust-card h3 { text-wrap: balance; }
+}
+
+/* On the dark ground the light half of each shadow was almost invisible, so
+   cards lost their edge; both halves step up a little. */
+@media (prefers-color-scheme: dark) {
+  .app-landing:not([data-app-theme="light"]) {
+    --nm-light: rgba(255, 255, 255, 0.07);
+    --nm-dark: rgba(0, 0, 0, 0.66);
+  }
+}
+.app-landing[data-app-theme="dark"] {
+  --nm-light: rgba(255, 255, 255, 0.07);
+  --nm-dark: rgba(0, 0, 0, 0.66);
+}
+
+/* White text on the button's gradient: the old ramp ended on
+   --color-primary-light, where white measures 2.4:1. It now runs from a deep
+   blue to --color-primary-dark, with the vivid blue only in the last stretch
+   behind the arrow, so the label sits on 5.1:1 or better. */
+.al-signin, .al-download, .al-btn-primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 55%) padding-box,
+    linear-gradient(100deg, #004b85, var(--color-primary-dark) 62%, var(--color-primary)) padding-box,
+    linear-gradient(135deg, var(--rim-highlight), var(--glow-b) 40%, var(--glow-c)) border-box;
+}
