@@ -11,6 +11,7 @@
 // the store listings use — no treatment or recovery claims. The two
 // medical/device answers are the app's own FAQ strings, word for word.
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import "@/styles/app-landing.css";
 import type { LegalLanguage } from "@/lib/appLegalContent";
@@ -25,6 +26,7 @@ import { Flag } from "@/components/appLanding/Flag";
 import { Reveal } from "@/components/appLanding/Reveal";
 import { AppGallery } from "@/components/appLanding/AppGallery";
 import { LangMenuCloser } from "@/components/appLanding/LangMenuCloser";
+import { ThemeToggle } from "@/components/appLanding/ThemeToggle";
 
 /** The store's own pages (Shopify), linked from the hero and the device section. */
 const ABOUT_URL = "https://therahomeai.com/pages/v%E1%BB%81-chung-toi";
@@ -39,8 +41,11 @@ export const metadata: Metadata = {
   description: "Lộ trình tập cổ vai gáy mỗi ngày với video hướng dẫn, trợ lý AI và đội ngũ hỗ trợ TheraHOME. Tải trên App Store.",
 };
 
-// Store links and contact details are edited in Admin; pick edits up within a minute.
-export const revalidate = 60;
+// Rendered per request. The page reads ?lang= and Accept-Language, which
+// already forces dynamic rendering; saying so here keeps it explicit, so no
+// future `revalidate` can start serving one visitor's language to everyone.
+// Admin's store links and contact details are read live on each request too.
+export const dynamic = "force-dynamic";
 
 // The owner's English App Store set (2026-09-22), used for every language.
 // Panels 1 and 4 are the same files the hero shows, so they are reused, not
@@ -71,6 +76,7 @@ interface Copy {
   qrAlt: string;
   startLabel: string;
   nav: { how: string; features: string; screens: string; device: string };
+  themeLabel: string;
   stats: { value: string; label: string }[];
   galleryTitle: string;
   galleryIntro: string;
@@ -130,6 +136,7 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     startLabel: "Tải ứng dụng để bắt đầu",
     nav: { how: "Cách dùng", features: "Tính năng", screens: "Xem trước", device: "Thiết bị" },
+    themeLabel: "Đổi nền sáng / tối",
     stats: [
       { value: "14 ngày", label: "một lộ trình" },
       { value: "15–20 phút", label: "mỗi buổi tập" },
@@ -207,6 +214,7 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     startLabel: "Download the app to get started",
     nav: { how: "How it works", features: "Features", screens: "Screens", device: "Device" },
+    themeLabel: "Switch light / dark",
     stats: [
       { value: "14 days", label: "per roadmap" },
       { value: "15–20 min", label: "per session" },
@@ -284,6 +292,7 @@ const COPY: Record<LegalLanguage, Copy> = {
     ],
     startLabel: "Muat turun aplikasi untuk bermula",
     nav: { how: "Cara guna", features: "Ciri", screens: "Skrin", device: "Peranti" },
+    themeLabel: "Tukar mod cerah / gelap",
     stats: [
       { value: "14 hari", label: "setiap pelan" },
       { value: "15–20 min", label: "setiap sesi" },
@@ -355,11 +364,15 @@ export default async function AppLandingPage({
   const language = await resolveLegalLanguage(searchParams);
   const copy = COPY[language];
   const { app_links, app_reviews } = await getSiteContent();
+  // The light/dark choice, read on the server so the page is already in the
+  // right theme on the first paint. No cookie means "follow the device".
+  const stored = (await cookies()).get("therahome-theme")?.value;
+  const theme = stored === "dark" || stored === "light" ? stored : undefined;
   // Published only with the customer's consent and actual words.
   const reviews = app_reviews.filter((r) => r.consent && r.quote.trim());
 
   return (
-    <div className={`app-landing ${brandFont.variable}`} lang={language}>
+    <div className={`app-landing ${brandFont.variable}`} lang={language} data-app-theme={theme}>
       <header className="al-header">
         <div className="al-wrap">
           <a className="al-brand" href={`/app?lang=${language}`}>
@@ -394,9 +407,10 @@ export default async function AppLandingPage({
               )}
             </nav>
           </details>
-          <a className="al-download" href="#tai-app">
+          <ThemeToggle label={copy.themeLabel} />
+          <a className="al-download" href="#tai-app" aria-label={copy.download}>
             <DownloadGlyph />
-            {copy.download}
+            <span className="al-download-label">{copy.download}</span>
           </a>
         </div>
       </header>

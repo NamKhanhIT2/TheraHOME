@@ -705,3 +705,95 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
 @media (min-width: 900px) and (max-width: 1100px) {
   .al-nav a { padding: 10px 9px; font-size: 14.5px; }
 }
+
+/* ============================================================== dark mode */
+/* Three states: no choice follows the device, a choice wins. The palette is
+   the same one stepped down — the page keeps its soft-UI shape because the
+   two shadow colours move with it. Brand blue stays the fill colour; where
+   blue is TEXT it takes the lighter step, which the dark ground needs. */
+.app-landing {
+  --theme-icon-sun: none;
+  --theme-icon-moon: inline;
+}
+@media (prefers-color-scheme: dark) {
+  .app-landing:not([data-app-theme="light"]) {
+    color-scheme: dark;
+    --bg-app: #0f1622;
+    --bg-card: #172032;
+    --bg-card-alt: #1c2739;
+    --text-primary: #e9eef8;
+    --text-secondary: #b4c0d2;
+    --text-muted: #96a3b7;
+    --border-light: #232d3d;
+    --border-input: #2b3648;
+    --color-primary-tint-05: #151e2c;
+    --color-primary-tint-10: #1c2b42;
+    --nm-bg: #141c29;
+    --nm-light: rgba(255, 255, 255, 0.05);
+    --nm-dark: rgba(0, 0, 0, 0.62);
+    --theme-icon-sun: inline;
+    --theme-icon-moon: none;
+  }
+}
+.app-landing[data-app-theme="dark"] {
+  color-scheme: dark;
+  --bg-app: #0f1622;
+  --bg-card: #172032;
+  --bg-card-alt: #1c2739;
+  --text-primary: #e9eef8;
+  --text-secondary: #b4c0d2;
+  --text-muted: #96a3b7;
+  --border-light: #232d3d;
+  --border-input: #2b3648;
+  --color-primary-tint-05: #151e2c;
+  --color-primary-tint-10: #1c2b42;
+  --nm-bg: #141c29;
+  --nm-light: rgba(255, 255, 255, 0.05);
+  --nm-dark: rgba(0, 0, 0, 0.62);
+  --theme-icon-sun: inline;
+  --theme-icon-moon: none;
+}
+
+/* Blue as text needs the lighter step on the dark ground (#007fd9 is 3.0:1
+   there); as a fill it stays exactly as it is. */
+@media (prefers-color-scheme: dark) {
+  .app-landing:not([data-app-theme="light"]) {
+    --link-blue: var(--color-primary-light);
+  }
+}
+.app-landing[data-app-theme="dark"] { --link-blue: var(--color-primary-light); }
+.app-landing { --link-blue: var(--color-primary-dark); }
+.al-link { color: var(--link-blue) !important; }
+.al-wordmark b, .al-step-num, .al-trust-card h3, .al-nm-round, .al-stats-row dd { color: var(--link-blue); }
+.al-lang summary:hover, .al-nm-round:hover, .al-btn-ghost:hover, .al-modal-x:hover { color: var(--link-blue); }
+.al-faq summary::after {
+  background-image: none;
+  background-color: var(--nm-bg);
+}
+.al-faq summary::after {
+  content: "+"; display: grid; place-items: center;
+  color: var(--link-blue); font-size: 20px; font-weight: 400; line-height: 1;
+}
+.al-faq details[open] summary::after { content: "−"; transform: none; }
+
+/* The theme switch itself: same pillow as the language menu, one icon shown. */
+.al-theme {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px;
+  border: 0; cursor: pointer; color: var(--text-secondary);
+  background: var(--nm-bg); box-shadow: var(--nm-raise-sm);
+  transition: box-shadow 0.15s ease, color 0.15s ease;
+}
+.al-theme:hover { color: var(--link-blue); }
+.al-theme:active { box-shadow: var(--nm-inset-sm); }
+.al-theme .al-sun { display: var(--theme-icon-sun); }
+.al-theme .al-moon { display: var(--theme-icon-moon); }
+
+/* Phones: the bar carries logo, language, theme and download. Below 430px the
+   download button drops to its icon — the sticky bar at the bottom of the
+   screen already offers both store buttons — so the wordmark can stay. */
+@media (max-width: 430px) {
+  .al-download { padding: 0; width: 44px; height: 44px; justify-content: center; gap: 0; }
+  .al-download-label { display: none; }
+  .al-theme { width: 40px; height: 40px; }
+  .al-header .al-wrap { gap: 8px; }
+}

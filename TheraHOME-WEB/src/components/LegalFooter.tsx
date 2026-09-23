@@ -43,10 +43,33 @@ const ink = "var(--text-primary, #16213a)";
 // derived from the palette rather than a new hand-picked hex.
 const rule = "1px solid color-mix(in srgb, var(--text-muted, #6e7683) 35%, transparent)";
 
-function Row({ icon, children }: { icon: string; children: React.ReactNode }) {
+/** Line icons on a 24 grid, drawn rather than typed: the footer used the
+ * characters "f", "✉", "☎" and "⌖", which every platform renders in its own
+ * way — the phone came out as a 1950s handset (owner 2026-09-23). */
+const ICONS: Record<"facebook" | "mail" | "phone" | "pin", React.ReactNode> = {
+  facebook: <path d="M16.5 3.5h-2.2A4.3 4.3 0 0 0 10 7.8v2.7H7.5v3.4H10v6.6h3.4v-6.6h2.6l.5-3.4h-3.1V8.1c0-.6.4-1 1-1h2.1z" />,
+  mail: <><rect x="3" y="5.5" width="18" height="13" rx="2.5" /><path d="m4 7.5 8 5.5 8-5.5" /></>,
+  phone: <path d="M7.5 3.8h-2A2 2 0 0 0 3.6 6c.5 7.5 6.9 13.9 14.4 14.4a2 2 0 0 0 2.1-1.9v-2a1.6 1.6 0 0 0-1.3-1.6l-2.5-.5a1.6 1.6 0 0 0-1.6.7l-.8 1.2a13 13 0 0 1-5.6-5.6l1.2-.8c.6-.4.8-1 .7-1.6l-.5-2.5a1.6 1.6 0 0 0-1.6-1.3z" />,
+  pin: <><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z" /><circle cx="12" cy="10" r="2.6" /></>,
+};
+
+function Row({ icon, children }: { icon: keyof typeof ICONS; children: React.ReactNode }) {
   return (
     <span style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-      <span aria-hidden="true" style={{ width: 18, textAlign: "center", color: muted }}>{icon}</span>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width={18}
+        height={18}
+        fill="none"
+        stroke={muted}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ flex: "none", marginTop: 2 }}
+      >
+        {ICONS[icon]}
+      </svg>
       <span>{children}</span>
     </span>
   );
@@ -75,15 +98,15 @@ export async function LegalFooter({ language }: { language: LegalLanguage }) {
         <div style={{ flex: "0 1 280px", display: "flex", flexDirection: "column", gap: 10 }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: ink }}>{copy.contact}</span>
           {social.facebook ? (
-            <Row icon="f"><a href={social.facebook} target="_blank" rel="noreferrer" style={link}>Facebook</a></Row>
+            <Row icon="facebook"><a href={social.facebook} target="_blank" rel="noreferrer" style={link}>Facebook</a></Row>
           ) : null}
           {contact.email ? (
-            <Row icon="✉"><a href={`mailto:${contact.email}`} style={link}>{contact.email}</a></Row>
+            <Row icon="mail"><a href={`mailto:${contact.email}`} style={link}>{contact.email}</a></Row>
           ) : null}
           {contact.phone ? (
-            <Row icon="☎"><a href={contact.phoneHref || `tel:${contact.phone}`} style={link}>{contact.phone}</a></Row>
+            <Row icon="phone"><a href={contact.phoneHref || `tel:${contact.phone}`} style={link}>{contact.phone}</a></Row>
           ) : null}
-          {contact.address ? <Row icon="⌖">{contact.address}</Row> : null}
+          {contact.address ? <Row icon="pin">{contact.address}</Row> : null}
         </div>
       </div>
 
