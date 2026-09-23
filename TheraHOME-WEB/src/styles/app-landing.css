@@ -823,3 +823,22 @@ a.al-trust-card:active { box-shadow: var(--nm-inset); }
 .app-landing[data-app-theme="dark"] .al-download::after,
 .app-landing[data-app-theme="dark"] .al-btn-primary::after { opacity: 0.34; }
 .app-landing[data-app-theme="dark"] .al-cta::after { opacity: 0.32; filter: blur(34px); }
+
+/* The closing panel was a slab of solid brand blue — too heavy for a page
+   built out of soft, quiet surfaces (owner 2026-09-23). It is now the same
+   raised panel as every card, with only a breath of blue in the corners, and
+   its text back to the page's own ink. */
+.al-cta {
+  background:
+    radial-gradient(70% 120% at 100% 0%, var(--color-primary-tint-10), transparent 60%),
+    radial-gradient(60% 110% at 0% 100%, var(--color-primary-tint-05), transparent 60%),
+    var(--nm-bg);
+  color: var(--text-primary);
+  box-shadow: var(--nm-raise);
+}
+.al-cta::after { display: none; }
+.al-cta h2 { color: var(--text-primary); }
+.al-cta p { color: var(--text-secondary); }
+.al-cta .al-badge { box-shadow: 5px 5px 12px var(--nm-dark), -5px -5px 12px var(--nm-light); }
+.al-qr { box-shadow: var(--nm-raise-sm); }
+.al-qr figcaption { color: var(--text-muted); }
