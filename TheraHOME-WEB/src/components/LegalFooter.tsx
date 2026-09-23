@@ -55,7 +55,7 @@ const ICONS: Record<"facebook" | "mail" | "phone" | "pin", React.ReactNode> = {
 
 function Row({ icon, children }: { icon: keyof typeof ICONS; children: React.ReactNode }) {
   return (
-    <span style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+    <span style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 32 }}>
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"
@@ -66,7 +66,7 @@ function Row({ icon, children }: { icon: keyof typeof ICONS; children: React.Rea
         strokeWidth={1.7}
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ flex: "none", marginTop: 2 }}
+        style={{ flex: "none" }}
       >
         {ICONS[icon]}
       </svg>
