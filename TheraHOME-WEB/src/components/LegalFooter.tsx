@@ -43,17 +43,40 @@ const ink = "var(--text-primary, #16213a)";
 // derived from the palette rather than a new hand-picked hex.
 const rule = "1px solid color-mix(in srgb, var(--text-muted, #6e7683) 35%, transparent)";
 
-/** Line icons on a 24 grid, drawn rather than typed: the footer used the
+/** Contact icons on a 24 grid, drawn rather than typed: the footer used the
  * characters "f", "✉", "☎" and "⌖", which every platform renders in its own
- * way — the phone came out as a 1950s handset (owner 2026-09-23). */
-const ICONS: Record<"facebook" | "mail" | "phone" | "pin", React.ReactNode> = {
-  facebook: <path d="M16.5 3.5h-2.2A4.3 4.3 0 0 0 10 7.8v2.7H7.5v3.4H10v6.6h3.4v-6.6h2.6l.5-3.4h-3.1V8.1c0-.6.4-1 1-1h2.1z" />,
-  mail: <><rect x="3" y="5.5" width="18" height="13" rx="2.5" /><path d="m4 7.5 8 5.5 8-5.5" /></>,
-  phone: <path d="M7.5 3.8h-2A2 2 0 0 0 3.6 6c.5 7.5 6.9 13.9 14.4 14.4a2 2 0 0 0 2.1-1.9v-2a1.6 1.6 0 0 0-1.3-1.6l-2.5-.5a1.6 1.6 0 0 0-1.6.7l-.8 1.2a13 13 0 0 1-5.6-5.6l1.2-.8c.6-.4.8-1 .7-1.6l-.5-2.5a1.6 1.6 0 0 0-1.6-1.3z" />,
-  pin: <><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z" /><circle cx="12" cy="10" r="2.6" /></>,
+ * way — the phone came out as a 1950s handset (owner 2026-09-23).
+ *
+ * Facebook is the only brand mark here, so it keeps Meta's own blue and its
+ * own shape, unaltered — that is what Meta's brand guidelines allow when a
+ * mark simply links to your own page. The other three belong to no brand and
+ * take TheraHOME's blue. */
+const FACEBOOK_BLUE = "#1877F2";
+
+const ICONS: Record<"facebook" | "mail" | "phone" | "pin", { node: React.ReactNode; color: string; filled?: boolean }> = {
+  facebook: {
+    node: (
+      <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.49-3.91 3.77-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94z" />
+    ),
+    color: FACEBOOK_BLUE,
+    filled: true,
+  },
+  mail: {
+    node: (<><rect x="3" y="5.5" width="18" height="13" rx="2.5" /><path d="m4 7.5 8 5.5 8-5.5" /></>),
+    color: "var(--color-primary, #007fd9)",
+  },
+  phone: {
+    node: <path d="M7.5 3.8h-2A2 2 0 0 0 3.6 6c.5 7.5 6.9 13.9 14.4 14.4a2 2 0 0 0 2.1-1.9v-2a1.6 1.6 0 0 0-1.3-1.6l-2.5-.5a1.6 1.6 0 0 0-1.6.7l-.8 1.2a13 13 0 0 1-5.6-5.6l1.2-.8c.6-.4.8-1 .7-1.6l-.5-2.5a1.6 1.6 0 0 0-1.6-1.3z" />,
+    color: "var(--color-primary, #007fd9)",
+  },
+  pin: {
+    node: (<><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z" /><circle cx="12" cy="10" r="2.6" /></>),
+    color: "var(--color-primary, #007fd9)",
+  },
 };
 
 function Row({ icon, children }: { icon: keyof typeof ICONS; children: React.ReactNode }) {
+  const { node, color, filled } = ICONS[icon];
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 32 }}>
       <svg
@@ -61,14 +84,14 @@ function Row({ icon, children }: { icon: keyof typeof ICONS; children: React.Rea
         viewBox="0 0 24 24"
         width={18}
         height={18}
-        fill="none"
-        stroke={muted}
+        fill={filled ? color : "none"}
+        stroke={filled ? "none" : color}
         strokeWidth={1.7}
         strokeLinecap="round"
         strokeLinejoin="round"
         style={{ flex: "none" }}
       >
-        {ICONS[icon]}
+        {node}
       </svg>
       <span>{children}</span>
     </span>
