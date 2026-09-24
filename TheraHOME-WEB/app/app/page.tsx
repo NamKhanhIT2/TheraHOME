@@ -73,7 +73,8 @@ interface Copy {
   ctaTitle: string;
   ctaBody: string;
   qrLabel: string;
-  qrAlt: string;
+  qrAltIos: string;
+  qrAltAndroid: string;
   startLabel: string;
   nav: { how: string; features: string; screens: string; device: string };
   themeLabel: string;
@@ -163,7 +164,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     ctaTitle: "Tải TheraHOME",
     ctaBody: "Kích hoạt thiết bị và tập buổi đầu tiên ngay hôm nay.",
     qrLabel: "Quét bằng camera điện thoại để tải",
-    qrAlt: "Mã QR tải ứng dụng TheraHOME",
+    qrAltIos: "Mã QR tải ứng dụng TheraHOME trên App Store",
+    qrAltAndroid: "Mã QR tải ứng dụng TheraHOME trên Google Play",
     prompt: {
       title: "Tải ứng dụng TheraHOME",
       body: "Tập theo lộ trình mỗi ngày, ngay trên điện thoại.",
@@ -241,7 +243,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     ctaTitle: "Get TheraHOME",
     ctaBody: "Activate your device and do your first session today.",
     qrLabel: "Scan with your phone camera to download",
-    qrAlt: "QR code to download the TheraHOME app",
+    qrAltIos: "QR code to download the TheraHOME app from the App Store",
+    qrAltAndroid: "QR code to download the TheraHOME app from Google Play",
     prompt: {
       title: "Get the TheraHOME app",
       body: "Follow your roadmap every day, right on your phone.",
@@ -319,7 +322,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     ctaTitle: "Dapatkan TheraHOME",
     ctaBody: "Aktifkan peranti anda dan mulakan sesi pertama hari ini.",
     qrLabel: "Imbas dengan kamera telefon untuk muat turun",
-    qrAlt: "Kod QR untuk memuat turun aplikasi TheraHOME",
+    qrAltIos: "Kod QR untuk memuat turun aplikasi TheraHOME dari App Store",
+    qrAltAndroid: "Kod QR untuk memuat turun aplikasi TheraHOME dari Google Play",
     prompt: {
       title: "Dapatkan aplikasi TheraHOME",
       body: "Ikuti pelan anda setiap hari, terus di telefon.",
@@ -629,14 +633,30 @@ export default async function AppLandingPage({
                 <p>{copy.ctaBody}</p>
                 <StoreBadges links={app_links} language={language} />
               </div>
-              {/* Encodes /app/tai, which sends each scan to the right store —
-                  see app/app/tai/route.ts. Desktop only: on a phone the
-                  visitor is already holding the device the code would open. */}
-              <figure className="al-qr">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/landing/app-page/qr-tai-app.svg" alt={copy.qrAlt} width={148} height={148} loading="lazy" />
-                <figcaption>{copy.qrLabel}</figcaption>
-              </figure>
+              {/* One code per store, because a visitor knows which phone is in
+                  their pocket and a single unlabelled code does not tell them
+                  where it leads. Each encodes a FIXED url on this site
+                  (/app/tai/ios, /app/tai/android) rather than the store link
+                  itself, so a store link edited in Admin updates codes that
+                  are already printed — see app/app/tai/[store]/route.ts. The
+                  universal /app/tai still works for anything printed before
+                  this. Desktop only: on a phone the visitor is already holding
+                  the device the code would open. */}
+              <div className="al-qr-pair">
+                <p className="al-qr-hint">{copy.qrLabel}</p>
+                <div className="al-qr-row">
+                  <figure className="al-qr">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/landing/app-page/qr-app-store.svg" alt={copy.qrAltIos} width={124} height={124} loading="lazy" />
+                    <figcaption>App Store</figcaption>
+                  </figure>
+                  <figure className="al-qr">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/landing/app-page/qr-google-play.svg" alt={copy.qrAltAndroid} width={124} height={124} loading="lazy" />
+                    <figcaption>Google Play</figcaption>
+                  </figure>
+                </div>
+              </div>
             </div>
           </div>
           <LegalFooter language={language} />

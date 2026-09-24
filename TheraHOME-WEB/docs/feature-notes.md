@@ -2387,3 +2387,34 @@ Năm điểm, sửa hết:
 
 `min-height` cũng hạ từ 860 xuống 720px: bỏ chữ khổng lồ đi thì dải không còn
 gì để lấp chiều cao đó.
+
+### Google Play: link thật, và một mã QR cho mỗi cửa hàng (2026-09-24)
+
+Chủ dự án đưa link `https://play.google.com/store/apps/details?id=ai.therahome`
+và nhờ thêm mã QR tải trên Google Play ở `ad.therahomeai.com/app`.
+
+**Việc đầu tiên không phải là mã QR mà là điền link.** `app_links.playStore`
+trong `site_content` vẫn còn rỗng, nên mọi thứ phụ thuộc vào nó đều đang tắt:
+nút Google Play trên `/app`, `/ung-dung`, thanh dính và hộp mời tải đều bị ẩn,
+còn `/app/tai` thì gặp máy Android là rơi về `/app` thay vì sang cửa hàng. Điền
+xong là cả năm chỗ sống lại mà không phải sửa dòng code nào — đúng ý đồ khi
+dựng `/app/tai` hồi 2026-09-22.
+
+**Rồi mới đến mã QR.** Trước đó `/app` có **một** mã thông minh không nhãn, trỏ
+`/app/tai`, tự đoán cửa hàng theo user-agent. Giờ là **hai mã có nhãn** — App
+Store và Google Play — vì người xem biết trong túi mình là máy gì, còn một ô
+vuông không nhãn thì không nói cho họ biết nó dẫn đi đâu.
+
+Điểm phải giữ: **hai mã vẫn không mã hoá link cửa hàng.** Chúng mã hoá
+`/app/tai/ios` và `/app/tai/android` — hai route mới đọc link từ Admin ngay lúc
+quét (`app/app/tai/[store]/route.ts`). Nếu nhúng thẳng link cửa hàng vào ảnh QR
+thì mai kia đổi link trong Admin là mọi tờ in đã phát ra thành rác. Mã cũ
+`qr-tai-app.*` vẫn giữ và route `/app/tai` vẫn chạy, phòng khi đã có ai in.
+
+**Đã đọc ngược lại cả hai mã bằng `jsqr` trước khi ship** — một mã QR chưa ai
+giải thì mới chỉ là phỏng đoán, mà thứ này đem đi in.
+
+Kiểm trên localhost: `/app/tai/ios` → App Store, `/app/tai/android` → Google
+Play, `/app/tai` với user-agent Android → Google Play, với iPhone → App Store,
+đường dẫn lạ → `/app`. Bố cục hai mã đứng cạnh nhau ở 1440 và 960px, cả nền
+sáng lẫn nền tối, không tràn ngang.

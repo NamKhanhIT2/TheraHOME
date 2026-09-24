@@ -462,19 +462,32 @@ a.al-trust-card:hover { border-color: var(--s2); background: var(--color-primary
 /* ------------------------------------------------------------ QR in CTA */
 .al-cta-body { display: flex; flex-direction: column; align-items: center; gap: 28px; }
 .al-cta-body .al-badges { justify-content: center; }
-.al-qr { display: none; margin: 0; }
+/* Hidden on phones: the visitor is already holding the device the code would
+   open. The pair only appears once there is room for two of them. */
+.al-qr-pair { display: none; }
 @media (min-width: 900px) {
   .al-cta { text-align: left; padding-left: clamp(40px, 6vw, 72px); padding-right: clamp(40px, 6vw, 72px); }
-  .al-cta-body { flex-direction: row; justify-content: space-between; }
+  .al-cta-body { flex-direction: row; justify-content: space-between; gap: 32px; }
   .al-cta-body .al-badges { justify-content: flex-start; }
   .al-cta p { margin-left: 0; }
+  .al-qr-pair { flex: none; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  /* The instruction is said once, above both codes; each code then only has
+     to name its own store. */
+  .al-qr-hint {
+    margin: 0; max-width: 280px; text-align: center; font-size: 12.5px; line-height: 1.4;
+    color: color-mix(in srgb, var(--text-on-primary) 80%, transparent);
+  }
+  /* Wraps rather than squeezing: between 900 and ~1080px the panel is not
+     wide enough for both codes beside the copy, and a stacked pair reads
+     better than two cramped ones. */
+  .al-qr-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
   .al-qr {
-    flex: none; display: flex; flex-direction: column; align-items: center; gap: 10px;
-    padding: 14px 14px 12px; border-radius: 20px; background: var(--bg-card);
+    flex: none; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 12px 12px 10px; border-radius: 18px; background: var(--bg-card);
     box-shadow: 0 16px 40px rgba(0, 30, 80, 0.25);
   }
-  .al-qr img { display: block; width: 148px; height: 148px; image-rendering: pixelated; }
-  .al-qr figcaption { max-width: 150px; text-align: center; font-size: 12.5px; line-height: 1.4; color: var(--text-secondary); }
+  .al-qr img { display: block; width: 124px; height: 124px; image-rendering: pixelated; }
+  .al-qr figcaption { text-align: center; font-size: 12.5px; font-weight: 600; line-height: 1.4; color: var(--text-secondary); }
 }
 
 /* --------------------------------------------------------------- reviews */
