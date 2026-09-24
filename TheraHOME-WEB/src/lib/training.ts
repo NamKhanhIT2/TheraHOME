@@ -33,7 +33,7 @@ import { supabase } from "./supabase";
 
 /** Mirrors TheraHOME-APP's src/lib/features.ts IAP_ENABLED. Both app flags are
  * false, so no phase is locked anywhere; flip this only alongside them. */
-const PHASE_LOCK_ENABLED = false;
+const PHASE_LOCK_ENABLED = true;
 
 export type DayStatus = "done" | "current" | "missed" | "upcoming" | "locked";
 

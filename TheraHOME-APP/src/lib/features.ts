@@ -22,5 +22,9 @@ import { Platform } from 'react-native';
  * earlier shows a paywall whose purchases fail.
  */
 const IAP_ENABLED_IOS = false; // flip only in a post-approval iOS build
-const IAP_ENABLED_ANDROID = false; // flip after the Android checklist above is done
+// Android checklist done 2026-09-24: app live on Play, in-app product
+// neckplus_phase3 created and activated, payments profile and the
+// verify-google-purchase service-account secrets in place, phase 3 and its
+// google_product_id configured. iOS stays off until its own build.
+const IAP_ENABLED_ANDROID = true;
 export const IAP_ENABLED = Platform.OS === 'android' ? IAP_ENABLED_ANDROID : IAP_ENABLED_IOS;
