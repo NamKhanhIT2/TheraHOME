@@ -487,7 +487,9 @@ a.al-trust-card:hover { border-color: var(--s2); background: var(--color-primary
     box-shadow: 0 16px 40px rgba(0, 30, 80, 0.25);
   }
   .al-qr img { display: block; width: 124px; height: 124px; image-rendering: pixelated; }
-  .al-qr figcaption { text-align: center; font-size: 12.5px; font-weight: 600; line-height: 1.4; color: var(--text-secondary); }
+  .al-qr figcaption { text-align: center; line-height: 1.3; }
+  .al-qr figcaption strong { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .al-qr figcaption small { display: block; font-size: 11.5px; color: var(--text-muted); }
 }
 
 /* --------------------------------------------------------------- reviews */

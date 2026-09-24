@@ -75,6 +75,8 @@ interface Copy {
   qrLabel: string;
   qrAltIos: string;
   qrAltAndroid: string;
+  qrForIos: string;
+  qrForAndroid: string;
   startLabel: string;
   nav: { how: string; features: string; screens: string; device: string };
   themeLabel: string;
@@ -166,6 +168,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     qrLabel: "Quét bằng camera điện thoại để tải",
     qrAltIos: "Mã QR tải ứng dụng TheraHOME trên App Store",
     qrAltAndroid: "Mã QR tải ứng dụng TheraHOME trên Google Play",
+    qrForIos: "cho iPhone, iPad",
+    qrForAndroid: "cho Android",
     prompt: {
       title: "Tải ứng dụng TheraHOME",
       body: "Tập theo lộ trình mỗi ngày, ngay trên điện thoại.",
@@ -245,6 +249,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     qrLabel: "Scan with your phone camera to download",
     qrAltIos: "QR code to download the TheraHOME app from the App Store",
     qrAltAndroid: "QR code to download the TheraHOME app from Google Play",
+    qrForIos: "for iPhone, iPad",
+    qrForAndroid: "for Android",
     prompt: {
       title: "Get the TheraHOME app",
       body: "Follow your roadmap every day, right on your phone.",
@@ -324,6 +330,8 @@ const COPY: Record<LegalLanguage, Copy> = {
     qrLabel: "Imbas dengan kamera telefon untuk muat turun",
     qrAltIos: "Kod QR untuk memuat turun aplikasi TheraHOME dari App Store",
     qrAltAndroid: "Kod QR untuk memuat turun aplikasi TheraHOME dari Google Play",
+    qrForIos: "untuk iPhone, iPad",
+    qrForAndroid: "untuk Android",
     prompt: {
       title: "Dapatkan aplikasi TheraHOME",
       body: "Ikuti pelan anda setiap hari, terus di telefon.",
@@ -648,12 +656,18 @@ export default async function AppLandingPage({
                   <figure className="al-qr">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/landing/app-page/qr-app-store.svg" alt={copy.qrAltIos} width={124} height={124} loading="lazy" />
-                    <figcaption>App Store</figcaption>
+                    <figcaption>
+                      <strong>App Store</strong>
+                      <small>{copy.qrForIos}</small>
+                    </figcaption>
                   </figure>
                   <figure className="al-qr">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/landing/app-page/qr-google-play.svg" alt={copy.qrAltAndroid} width={124} height={124} loading="lazy" />
-                    <figcaption>Google Play</figcaption>
+                    <figcaption>
+                      <strong>Google Play</strong>
+                      <small>{copy.qrForAndroid}</small>
+                    </figcaption>
                   </figure>
                 </div>
               </div>

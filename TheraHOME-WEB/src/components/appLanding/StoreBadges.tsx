@@ -2,7 +2,7 @@ import type { AppLinks } from "@/lib/siteContent";
 import type { LegalLanguage } from "@/lib/appLegalContent";
 
 const COPY: Record<LegalLanguage, { appStoreTop: string; playTop: string; soonTop: string }> = {
-  vi: { appStoreTop: "Tải về trên", playTop: "TẢI NỘI DUNG TRÊN", soonTop: "SẮP CÓ TRÊN" },
+  vi: { appStoreTop: "Tải về trên", playTop: "Tải về trên", soonTop: "Sắp có trên" },
   en: { appStoreTop: "Download on the", playTop: "GET IT ON", soonTop: "COMING SOON ON" },
   ms: { appStoreTop: "Muat turun di", playTop: "DAPATKANNYA DI", soonTop: "AKAN DATANG DI" },
 };

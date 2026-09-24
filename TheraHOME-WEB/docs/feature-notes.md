@@ -2411,6 +2411,15 @@ quét (`app/app/tai/[store]/route.ts`). Nếu nhúng thẳng link cửa hàng v�
 thì mai kia đổi link trong Admin là mọi tờ in đã phát ra thành rác. Mã cũ
 `qr-tai-app.*` vẫn giữ và route `/app/tai` vẫn chạy, phòng khi đã có ai in.
 
+**Hai sửa chữ sau khi chủ dự án xem thật:** nhãn dưới mỗi mã không chỉ là tên
+cửa hàng nữa mà thêm dòng thiết bị — "App Store / cho iPhone, iPad" và
+"Google Play / cho Android" — vì câu người xem thật sự đang hỏi là "cái nào
+cho máy của tôi", tên cửa hàng không trả lời câu đó. Và nút Google Play đổi
+"TẢI NỘI DUNG TRÊN" thành "Tải về trên": đó vốn là chữ chính thức của Google
+bản tiếng Việt, nhưng đứng cạnh "Tải về trên" của Apple thì thành hai giọng
+khác nhau. Bản tiếng Anh và tiếng Mã Lai giữ nguyên chữ chính thức của từng
+cửa hàng, ở đó chúng không chỏi nhau.
+
 **Đã đọc ngược lại cả hai mã bằng `jsqr` trước khi ship** — một mã QR chưa ai
 giải thì mới chỉ là phỏng đoán, mà thứ này đem đi in.
 
