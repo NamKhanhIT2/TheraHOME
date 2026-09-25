@@ -27,16 +27,19 @@ export function usePhasePurchases(userId: string | undefined) {
 /** How far into a BOUGHT phase its days are open (owner 2026-09-25).
  *
  * Buying opens the phase's first TWO days at once, so the buyer can start
- * straight away. Twenty-four hours after the purchase the REST of the phase
- * opens in one go — the wait puts a gap between paying and holding the whole
- * phase; it is not a day-by-day drip.
+ * straight away. The REST of the phase opens in one go once the wait below
+ * has passed — it is not a day-by-day drip.
  *
- * Hours from the purchase, not calendar midnights: the row says "Mở sau 24h".
+ * 49 hours, not 24: the point of the wait is to outlast Google Play's
+ * 48-hour self-service refund window, so nobody can buy, binge the whole
+ * phase and take the money back automatically (owner 2026-09-25).
+ *
+ * Hours from the purchase itself, not calendar midnights.
  *
  * Returns the highest day number open right now — Infinity once the wait is
  * over.
  */
-export const BOUGHT_PHASE_WAIT_HOURS = 24;
+export const BOUGHT_PHASE_WAIT_HOURS = 49;
 
 export function daysOpenAfterPurchase(phaseFirstDayNumber: number, purchasedAtIso: string): number {
   const elapsedHours = (Date.now() - new Date(purchasedAtIso).getTime()) / 3_600_000;

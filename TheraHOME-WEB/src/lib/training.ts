@@ -59,8 +59,9 @@ export interface TrainingDay {
    * every 24 hours (owner 2026-09-25). Mirrors the app's
    * daysOpenAfterPurchase and the server's mark_day_watched. */
   phaseBought: boolean;
-  /** Bought, but inside the 24-hour wait — the tile says "Mở sau 24h" rather
-   * than the calendar's "Chưa mở". */
+  /** Bought, but inside the wait — the tile says "Mở sau 24h" rather than
+   * the calendar's "Chưa mở". The wait is 49 hours; the wording is the
+   * owner's (2026-09-25). */
   boughtWaiting: boolean;
 }
 
@@ -206,9 +207,10 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
     if (seen === undefined || d.day_number < seen) firstDayByPhase.set(d.phase_id, d.day_number);
   }
   /** Highest day number open in a bought phase: the first two at once, and
-   * the whole phase 24 hours after the purchase. Same formula as the app's
+   * the whole phase once the wait has passed. 49 hours, to outlast Google
+   * Play's 48-hour self-service refund window. Same formula as the app's
    * daysOpenAfterPurchase and the server's mark_day_watched. */
-  const BOUGHT_PHASE_WAIT_HOURS = 24;
+  const BOUGHT_PHASE_WAIT_HOURS = 49;
   const openThrough = (phaseId: string | null): number | null => {
     if (!phaseId) return null;
     const purchasedAt = purchasedAtByPhase.get(phaseId);
