@@ -63,6 +63,12 @@
 .al-nav a:hover { color: var(--color-primary); background: var(--color-primary-tint-05); }
 @media (min-width: 900px) { .al-nav { display: flex; } }
 html:has(.app-landing) { scroll-behavior: smooth; scroll-padding-top: 84px; }
+/* The canvas — what shows when the page rubber-bands past its own edges — is
+   painted from <html>, which sits outside .app-landing and so never sees its
+   tokens. The page defaults to dark now, so without this every bounce lands on
+   the light background the rest of the app uses. The literal is the dark
+   --nm-bg, the page's own ground; keep the two in step. */
+html:has(.app-landing[data-app-theme="dark"]) { background: #141c29; }
 .al-lang-menu {
   position: absolute; right: 0; top: calc(100% + 6px); min-width: 190px;
   display: flex; flex-direction: column; padding: 6px;

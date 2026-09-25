@@ -377,9 +377,13 @@ export default async function AppLandingPage({
   const copy = COPY[language];
   const { app_links, app_reviews } = await getSiteContent();
   // The light/dark choice, read on the server so the page is already in the
-  // right theme on the first paint. No cookie means "follow the device".
+  // right theme on the first paint. The page is DARK by default (owner
+  // 2026-09-25) — it no longer follows the device, because the app itself and
+  // the rest of the site are dark, and a visitor arriving from either should
+  // not have the page change colour on them. Only an explicit "light" from the
+  // toggle wins.
   const stored = (await cookies()).get("therahome-theme")?.value;
-  const theme = stored === "dark" || stored === "light" ? stored : undefined;
+  const theme = stored === "light" ? "light" : "dark";
   // Published only with the customer's consent and actual words.
   const reviews = app_reviews.filter((r) => r.consent && r.quote.trim());
 

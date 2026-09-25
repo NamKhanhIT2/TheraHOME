@@ -2476,3 +2476,28 @@ cả desktop lẫn menu điện thoại 375px; menu tài khoản khi đăng nh�
 xuất" (nhân viên vẫn có "Bảng điều khiển"); `/luyen-tap` và `/ung-dung` đều sang
 `/app`; `next build` và `eslint` sạch; không còn chuỗi "Luyện tập" nào trong mã
 nguồn hay trong gói client đã build.
+
+### `/app` mặc định nền tối (2026-09-25)
+
+Chủ dự án: "để mặc định màu /app là tối". Trước đây trang theo cài đặt của máy
+(`prefers-color-scheme`) khi chưa có lựa chọn nào; giờ **luôn mở ra nền tối**,
+chỉ khi khách tự bấm sang sáng thì cookie mới ghi đè. Sửa đúng một dòng trong
+`app/app/page.tsx` vì lựa chọn vốn đã đọc ở server và đóng dấu
+`data-app-theme` — nên không có chớp sáng lúc tải, không cần script khởi động.
+
+**Nút sáng/tối gọn theo:** trước nó phải đoán trạng thái hiện tại bằng
+`matchMedia` khi chưa có dấu; giờ server luôn đóng dấu một trong hai nên chỉ
+cần đọc `data-app-theme`.
+
+**Một chỗ dễ sót: nền sau lưng trang.** `.app-landing` tự sơn nền của nó, nhưng
+phần "cao su" khi kéo quá mép trang là do `<html>` sơn — mà `<html>` nằm ngoài
+`.app-landing` nên không thấy token của nó. Để mặc định tối mà không sửa chỗ
+này thì mỗi lần kéo quá đầu/cuối trang sẽ lộ ra dải nền sáng của phần còn lại
+của app. Đã thêm `html:has(.app-landing[data-app-theme="dark"])` với đúng màu
+nền của trang (`--nm-bg` bản tối, `#141c29`).
+
+Kiểm trên localhost, cả ba trạng thái: chưa có cookie → tối; bấm nút → sáng,
+cookie ghi `light`, tải lại vẫn sáng; bấm lại → tối, tải lại vẫn tối. `?lang=`
+vẫn chạy song song (thử `?lang=en` ở nền tối). Nền `<html>` và nền trang đo ra
+cùng một màu. Xem ở 375px: đầu trang, thân trang và chân trang đều tối, không
+còn mảng sáng nào.

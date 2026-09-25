@@ -4,8 +4,8 @@ const COOKIE = "therahome-theme";
 
 /** Sun/moon switch for /app, between the language menu and Download.
  *
- * Three states, not two: with no stored choice the page follows the device
- * (prefers-color-scheme); picking a side stores it and wins from then on.
+ * The page opens dark (owner 2026-09-25) whatever the device is set to;
+ * picking light stores that and wins from then on.
  *
  * The choice is kept in a first-party cookie, so the SERVER already knows it
  * and stamps `data-app-theme` on the page — no boot script, no flash of the
@@ -22,10 +22,9 @@ export function ThemeToggle({ label }: { label: string }) {
       onClick={(e) => {
         const root = e.currentTarget.closest(".app-landing") as HTMLElement | null;
         if (!root) return;
-        const dark =
-          root.dataset.appTheme === "dark" ||
-          (!root.dataset.appTheme && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        const next = dark ? "light" : "dark";
+        // The server always stamps one or the other, so the current theme is
+        // readable off the element — no media query, no guessing.
+        const next = root.dataset.appTheme === "light" ? "dark" : "light";
         root.dataset.appTheme = next;
         // A year, so the choice survives; SameSite=Lax, no other purpose.
         document.cookie = `${COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
