@@ -1,8 +1,9 @@
 "use client";
 
 // The signed-in half of the nav, ported from auth-state.js: the Đăng Ký /
-// Đăng Nhập pair is replaced by an account chip whose menu offers the
-// training area and sign-out.
+// Đăng Nhập pair is replaced by an account chip whose menu offers sign-out.
+// It used to open the web training area too; that was removed (owner
+// 2026-09-25) because training happens in the app.
 //
 // One addition the design could not have: staff. An admin or CSKH who is
 // browsing the public site gets a "Bảng điều khiển" entry back into their own
@@ -86,8 +87,6 @@ export function AccountChip({
             <span aria-hidden="true" style={{ display: "block", height: 1, margin: "6px 10px", background: "rgba(255,255,255,0.1)" }} />
           </>
         ) : null}
-        <Link href="/luyen-tap" className="nav-menu-item" style={item}>Luyện tập</Link>
-        <span aria-hidden="true" style={{ display: "block", height: 1, margin: "6px 10px", background: "rgba(255,255,255,0.1)" }} />
         <button type="button" onClick={handleSignOut} disabled={busy} className="nav-menu-item" style={{ ...item, width: "100%", textAlign: "left", border: "none", background: "transparent", fontFamily: "inherit", cursor: busy ? "default" : "pointer" }}>
           {busy ? "Đang đăng xuất..." : "Đăng xuất"}
         </button>

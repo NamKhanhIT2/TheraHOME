@@ -149,15 +149,7 @@ export function LandingNav() {
 
         <div className="nav-links" style={{ display: "flex", gap: "clamp(16px, 2.2vw, 40px)", fontSize: 13, letterSpacing: "0.06em" }}>
           {NAV_LINKS.map((link) => (
-            <Fragment key={link.href}>
-              {/* auth-state.js appends this between App and Về chúng tôi */}
-              {link.href === "/gioi-thieu" && session.signedIn ? (
-                <Link href="/luyen-tap" className={isCurrent("/luyen-tap") ? "nav-links-current" : undefined} style={{ color: isCurrent("/luyen-tap") ? "#fff" : "rgba(255,255,255,0.72)" }}>
-                  Luyện tập
-                </Link>
-              ) : null}
-              {renderLink(link)}
-            </Fragment>
+            <Fragment key={link.href}>{renderLink(link)}</Fragment>
           ))}
         </div>
 
@@ -200,9 +192,6 @@ export function LandingNav() {
             <span style={{ padding: "12px 4px 4px", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }}>Sản phẩm</span>
             <Link href="/san-pham" onClick={closeMenu} style={{ padding: "10px 4px 10px 18px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>TheraNECK+</Link>
             <Link href="/ung-dung" onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>App</Link>
-            {session.signedIn ? (
-              <Link href="/luyen-tap" onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, fontWeight: 600, color: "#7FBFFF" }}>Luyện tập</Link>
-            ) : null}
             <Link href="/gioi-thieu" onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>Về chúng tôi</Link>
             <span style={{ height: 1, margin: "8px 0", background: "rgba(255,255,255,0.1)" }} />
             {session.signedIn ? (

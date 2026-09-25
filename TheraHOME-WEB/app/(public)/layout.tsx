@@ -30,8 +30,8 @@ export const metadata: Metadata = {
 
 // Re-render the marketing pages at most once a minute, so an edit in Admin →
 // Nội dung website appears without a deploy and without making every visit hit
-// the database. /luyen-tap is a client page and fetches its own data live, so
-// this does not delay anything a signed-in customer sees.
+// the database. Nothing here is per-customer any more — the training area that
+// read live data moved out of the website entirely (owner 2026-09-25).
 export const revalidate = 60;
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {

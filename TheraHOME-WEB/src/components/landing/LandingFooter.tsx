@@ -9,8 +9,8 @@
 // placeholder "#" hrefs would have shipped dead links.
 //
 // The contact block and the social links are edited in Admin → Nội dung
-// website. This is a client component (it is rendered inside /luyen-tap, which
-// is one), so it reads them from context rather than fetching.
+// website. This is a client component, so it reads them from the public
+// layout's context rather than fetching them itself.
 import Link from "next/link";
 import { BrandMark } from "@/components/landing/BrandMark";
 import { useSiteContent } from "@/components/landing/SiteContentProvider";

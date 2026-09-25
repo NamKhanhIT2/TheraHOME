@@ -1,7 +1,7 @@
 "use client";
 
 // Makes the site content readable from CLIENT components — the footer, and
-// anything else under /luyen-tap, which is a client page.
+// anything else in a client component under the public layout.
 //
 // The (public) layout is a server component and fetches once per request; this
 // only carries the result down. `useSiteContent()` falls back to the built-in

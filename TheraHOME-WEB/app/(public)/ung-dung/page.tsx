@@ -109,7 +109,7 @@ export default async function AppPage() {
               Hiểu rõ tình trạng hiện tại, theo dõi cơn đau mỗi ngày và đi theo một lộ trình phù hợp hơn với chính cơ thể mình — ngay trên điện thoại.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 18 }}>
-              <LandingButton href="/luyen-tap">Tải miễn phí</LandingButton>
+              <LandingButton href="/app">Tải miễn phí</LandingButton>
               <span style={{ fontSize: 13, color: "rgba(255,255,255,0.62)" }}>Miễn phí trọn đời cho khách hàng TheraHome</span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 26, paddingTop: 8, fontSize: 13, color: "rgba(255,255,255,0.62)" }}>
