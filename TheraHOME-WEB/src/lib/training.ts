@@ -54,11 +54,14 @@ export interface TrainingDay {
   hasPainLog: boolean;
   /** This day sits in a paid phase the customer has not unlocked. */
   phaseLocked: boolean;
-  /** A paid phase this customer has BOUGHT: all of its days are open at
-   * once, with no calendar gating — buying a phase buys the whole phase
-   * (owner 2026-09-25). Mirrors the app's boughtPhaseIds and the server's
-   * mark_day_watched exemption. */
+  /** This day sits in a paid phase the customer has BOUGHT, and its turn has
+   * come: a purchase opens the phase's first two days at once and one more
+   * every 24 hours (owner 2026-09-25). Mirrors the app's
+   * daysOpenAfterPurchase and the server's mark_day_watched. */
   phaseBought: boolean;
+  /** Bought, but inside the 24-hour wait — the tile says "Mở sau 24h" rather
+   * than the calendar's "Chưa mở". */
+  boughtWaiting: boolean;
 }
 
 export interface TrainingProgram {
@@ -188,12 +191,32 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
       : Promise.resolve({ data: [] as { phase_id: string; apple_product_id: string | null; google_product_id: string | null }[] }),
     // `revoked_at is null` matters as much here as in the app: a refunded or
     // revoked purchase must stop unlocking the phase.
-    supabase.from("phase_purchases").select("phase_id").eq("user_id", userId).is("revoked_at", null),
+    supabase.from("phase_purchases").select("phase_id, purchased_at").eq("user_id", userId).is("revoked_at", null),
   ]);
   const paidPhases = new Set(
     (promos ?? []).filter((p) => p.apple_product_id !== null || p.google_product_id !== null).map((p) => p.phase_id),
   );
   const purchasedPhases = new Set((purchases ?? []).map((p) => p.phase_id));
+  const purchasedAtByPhase = new Map((purchases ?? []).map((p) => [p.phase_id, p.purchased_at as string]));
+  // First day number of each phase, for the drip maths below.
+  const firstDayByPhase = new Map<string, number>();
+  for (const d of days ?? []) {
+    if (!d.phase_id) continue;
+    const seen = firstDayByPhase.get(d.phase_id);
+    if (seen === undefined || d.day_number < seen) firstDayByPhase.set(d.phase_id, d.day_number);
+  }
+  /** Highest day number open in a bought phase: the first two at once, and
+   * the whole phase 24 hours after the purchase. Same formula as the app's
+   * daysOpenAfterPurchase and the server's mark_day_watched. */
+  const BOUGHT_PHASE_WAIT_HOURS = 24;
+  const openThrough = (phaseId: string | null): number | null => {
+    if (!phaseId) return null;
+    const purchasedAt = purchasedAtByPhase.get(phaseId);
+    const firstDay = firstDayByPhase.get(phaseId);
+    if (!purchasedAt || firstDay === undefined) return null;
+    const elapsedHours = (Date.now() - new Date(purchasedAt).getTime()) / 3_600_000;
+    return elapsedHours >= BOUGHT_PHASE_WAIT_HOURS ? Number.POSITIVE_INFINITY : firstDay + 1;
+  };
   // PHASE_LOCK_ENABLED is the web's half of the app's IAP_ENABLED kill switch.
   // Without it the two clients disagreed the moment a phase got a product id:
   // the app never locks anything while its flags are false, but the web locked
@@ -202,8 +225,13 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
   // this only together with the app's flags.
   const phaseIsLocked = (phaseId: string | null) =>
     PHASE_LOCK_ENABLED && !isReviewAccount && !!phaseId && paidPhases.has(phaseId) && !purchasedPhases.has(phaseId);
-  const phaseIsBought = (phaseId: string | null) =>
-    !!phaseId && paidPhases.has(phaseId) && purchasedPhases.has(phaseId);
+  const dayIsBoughtOpen = (phaseId: string | null, dayNumber: number) => {
+    if (!phaseId || !paidPhases.has(phaseId) || !purchasedPhases.has(phaseId)) return false;
+    const through = openThrough(phaseId);
+    return through !== null && dayNumber <= through;
+  };
+  const dayIsBoughtWaiting = (phaseId: string | null, dayNumber: number) =>
+    !!phaseId && paidPhases.has(phaseId) && purchasedPhases.has(phaseId) && !dayIsBoughtOpen(phaseId, dayNumber);
 
   const statusByDay = new Map((mine ?? []).map((r) => [r.program_day_id, r]));
   const phaseById = new Map((phases ?? []).map((p) => [p.id, pickMarket(market, p.name, p.name_en, p.name_ms)]));
@@ -247,7 +275,8 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
         status: deriveDayStatus(d.day_number, own?.status ?? null, todayDay),
         hasPainLog: painDays.has(d.id),
         phaseLocked: phaseIsLocked(d.phase_id),
-        phaseBought: phaseIsBought(d.phase_id),
+        phaseBought: dayIsBoughtOpen(d.phase_id, d.day_number),
+        boughtWaiting: dayIsBoughtWaiting(d.phase_id, d.day_number),
       };
     }),
   };

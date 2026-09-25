@@ -10,7 +10,7 @@ import { RoadmapComingSoonCard } from '@/components/roadmap/RoadmapComingSoonCar
 import { useRequestDay } from '@/hooks/useRequestDay';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
-import { usePhasePurchases } from '@/hooks/usePhasePurchase';
+import { usePhasePurchases, daysOpenAfterPurchase } from '@/hooks/usePhasePurchase';
 import { useQuizResolvedMap } from '@/hooks/useQuiz';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
@@ -138,18 +138,37 @@ export default function RoadmapScreen() {
   const phaseIds = useMemo(() => Array.from(new Set(days.map((d) => d.phaseId))), [days]);
   const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
   const purchasesQuery = usePhasePurchases(userId);
-  // Phases the user has PAID for: their days all open at once, with no
-  // calendar gating — buying a phase buys the whole phase (owner
-  // 2026-09-25). Everything else keeps the one-day-per-day mechanic.
-  const boughtPhaseIds = useMemo(() => {
-    if (!IAP_ENABLED) return new Set<string>();
+  // A phase the user has PAID for opens its first two days immediately and
+  // one more every 24 hours from the purchase (owner 2026-09-25) — the
+  // buyer can start at once without being handed the whole phase to binge.
+  // Maps phase id → the highest day number open in it right now.
+  const boughtPhaseOpenThrough = useMemo(() => {
+    const out = new Map<string, number>();
+    if (!IAP_ENABLED) return out;
     const requirements = lockRequirementsQuery.data;
     const purchased = purchasesQuery.data;
-    if (!requirements || !purchased) return new Set<string>();
-    return new Set(Array.from(requirements.keys()).filter((id) => purchased.has(id)));
-  }, [lockRequirementsQuery.data, purchasesQuery.data]);
+    if (!requirements || !purchased) return out;
+    for (const phaseId of requirements.keys()) {
+      const purchasedAt = purchased.get(phaseId);
+      if (!purchasedAt) continue;
+      const firstDay = days.filter((d) => d.phaseId === phaseId).reduce((min, d) => Math.min(min, d.id), Infinity);
+      if (!Number.isFinite(firstDay)) continue;
+      out.set(phaseId, daysOpenAfterPurchase(firstDay, purchasedAt));
+    }
+    return out;
+  }, [lockRequirementsQuery.data, purchasesQuery.data, days]);
+  /** This day is inside a bought phase AND its turn has come. */
+  const dayBoughtOpen = useCallback(
+    (day: { id: number; phaseId: string }) => day.id <= (boughtPhaseOpenThrough.get(day.phaseId) ?? -Infinity),
+    [boughtPhaseOpenThrough],
+  );
+  /** Bought, but still waiting for its 24 hours. */
+  const dayBoughtWaiting = useCallback(
+    (day: { id: number; phaseId: string }) => boughtPhaseOpenThrough.has(day.phaseId) && !dayBoughtOpen(day),
+    [boughtPhaseOpenThrough, dayBoughtOpen],
+  );
   // Declared after boughtPhaseIds: the gate needs that set.
-  const requestDayGate = useRequestDay(boughtPhaseIds);
+  const requestDayGate = useRequestDay(dayBoughtOpen);
   const lockedPhaseIds = useMemo(() => {
     // IAP is off for now — never lock a phase, so the paywall/purchase card is
     // unreachable and StoreKit is never opened (see IAP_ENABLED).
@@ -415,13 +434,14 @@ export default function RoadmapScreen() {
                       <PathNode
                         day={d}
                         isToday={program ? d.id === todayMarkerDay : false}
-                        unrestricted={isReviewAccount || boughtPhaseIds.has(d.phaseId)}
+                        unrestricted={isReviewAccount || dayBoughtOpen(d)}
+                        opensIn24h={dayBoughtWaiting(d)}
                         onPress={() => {
                           // Locked/future days don't open at all (except
                           // for App Review accounts); openable days go
                           // through the discomfort check-in gate (which
                           // skips itself once the day is answered).
-                          if (!isReviewAccount && !boughtPhaseIds.has(d.phaseId) && (d.status === 'locked' || d.status === 'upcoming')) return;
+                          if (!isReviewAccount && !dayBoughtOpen(d) && (d.status === 'locked' || d.status === 'upcoming')) return;
                           if (program) {
                             void requestDayGate.requestDay(d, program.userProgramId, program.productId);
                           } else {

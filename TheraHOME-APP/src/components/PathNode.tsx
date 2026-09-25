@@ -17,6 +17,10 @@ export interface PathNodeProps {
    * render those rows as open ("Sẵn sàng để xem", day number instead of a
    * lock/clock icon, full opacity) rather than contradicting the tap. */
   unrestricted?: boolean;
+  /** A day inside a phase the user HAS bought, whose turn in the 24-hour
+   * drip has not come yet: the row stays shut but says "Mở sau 24h" rather
+   * than the calendar's "Mở khoá vào 0h" (owner 2026-09-25). */
+  opensIn24h?: boolean;
   onPress: (id: number) => void;
 }
 
@@ -31,7 +35,7 @@ function stageOf(status: ProgramDay['status']): number {
  * node gets a brief emphasize pop as it becomes current — a lucide icon
  * can't be stroke-drawn like a hand-authored SVG check, so the pop-in is
  * the closest equivalent. */
-export function PathNode({ day, isToday = false, unrestricted = false, onPress }: PathNodeProps) {
+export function PathNode({ day, isToday = false, unrestricted = false, opensIn24h = false, onPress }: PathNodeProps) {
   const theme = useTheme();
   const { t } = useI18n();
   const reduceMotion = useReduceMotion();
@@ -154,11 +158,13 @@ export function PathNode({ day, isToday = false, unrestricted = false, onPress }
                   ? // Review accounts: any not-done day is simply openable —
                     // "Hôm nay" belongs only to the row isToday points at.
                     t('dayReadyReview')
-                  : isUpcoming
-                    ? t('unlockAtMidnight')
-                    : isPreview
-                      ? t('preview')
-                      : t('locked')}
+                  : opensIn24h
+                    ? t('unlockAfter24h')
+                    : isUpcoming
+                      ? t('unlockAtMidnight')
+                      : isPreview
+                        ? t('preview')
+                        : t('locked')}
         </Text>
       </View>
     </Pressable>

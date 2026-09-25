@@ -4,22 +4,43 @@ import { useIAP, type Purchase } from 'react-native-iap';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
-/** Which phases (by id) this user has a non-revoked verified purchase for.
- * Feeds the roadmap's phase-lock check. */
+/** Which phases (by id) this user has a non-revoked verified purchase for,
+ * mapped to WHEN they bought it. Feeds the roadmap's phase-lock check and
+ * the post-purchase wait below. A Map, not a Set, so `.has()` still reads
+ * the same at every existing call site. */
 export function usePhasePurchases(userId: string | undefined) {
   return useQuery({
     queryKey: ['phase_purchases', userId],
-    queryFn: async (): Promise<Set<string>> => {
+    queryFn: async (): Promise<Map<string, string>> => {
       const { data, error } = await supabase
         .from('phase_purchases')
-        .select('phase_id')
+        .select('phase_id, purchased_at')
         .eq('user_id', userId!)
         .is('revoked_at', null);
       if (error) throw error;
-      return new Set(data.map((r) => r.phase_id));
+      return new Map(data.map((r) => [r.phase_id, r.purchased_at as string]));
     },
     enabled: !!userId,
   });
+}
+
+/** How far into a BOUGHT phase its days are open (owner 2026-09-25).
+ *
+ * Buying opens the phase's first TWO days at once, so the buyer can start
+ * straight away. Twenty-four hours after the purchase the REST of the phase
+ * opens in one go — the wait puts a gap between paying and holding the whole
+ * phase; it is not a day-by-day drip.
+ *
+ * Hours from the purchase, not calendar midnights: the row says "Mở sau 24h".
+ *
+ * Returns the highest day number open right now — Infinity once the wait is
+ * over.
+ */
+export const BOUGHT_PHASE_WAIT_HOURS = 24;
+
+export function daysOpenAfterPurchase(phaseFirstDayNumber: number, purchasedAtIso: string): number {
+  const elapsedHours = (Date.now() - new Date(purchasedAtIso).getTime()) / 3_600_000;
+  return elapsedHours >= BOUGHT_PHASE_WAIT_HOURS ? Infinity : phaseFirstDayNumber + 1;
 }
 
 /** Drives the "Mở khoá ngay" button on `PhaseUnlockPromo` for one specific

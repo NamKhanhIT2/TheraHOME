@@ -61,6 +61,8 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; 
   // A paid phase the customer HAS bought: every day of it is open at once, so
   // "Chưa mở"/"Sắp tới" would contradict a tile that opens on tap.
   ready: { bg: "rgba(0,127,217,0.12)", border: "rgba(0,127,217,0.4)", color: "#8FCBFF", label: "Sẵn sàng" },
+  // Bought, but this day's turn in the 24-hour drip has not come yet.
+  waiting24h: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.62)", label: "Mở sau 24h" },
   // day_type === 'rest'. The app shows these as a non-tappable "Ngày nghỉ" row;
   // the web used to render them as ordinary, openable workout tiles.
   rest: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.68)", label: "Ngày nghỉ" },
@@ -526,14 +528,16 @@ export default function TrainingPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
                 {program.days.map((d) => {
                   const rest = isRestDay(d);
-                  const bought = d.phaseBought && (d.status === "locked" || d.status === "upcoming");
+                  const boughtReady = d.phaseBought && (d.status === "locked" || d.status === "upcoming");
                   const st = d.phaseLocked
                     ? STATUS_STYLE.phaseLocked
                     : rest
                       ? STATUS_STYLE.rest
-                      : bought
-                        ? STATUS_STYLE.ready
-                        : STATUS_STYLE[d.status];
+                      : d.boughtWaiting
+                        ? STATUS_STYLE.waiting24h
+                        : boughtReady
+                          ? STATUS_STYLE.ready
+                          : STATUS_STYLE[d.status];
                   const openable = canOpenDay(d, program.isReviewAccount);
                   return (
                     <button

@@ -8,7 +8,7 @@ import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useCatalogProgramDays, useMarkDayWatched } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
-import { usePhasePurchases } from '@/hooks/usePhasePurchase';
+import { usePhasePurchases, daysOpenAfterPurchase } from '@/hooks/usePhasePurchase';
 import { useProfile } from '@/hooks/useProfile';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -80,10 +80,19 @@ export default function DayDetailScreen() {
   // show as open on the Roadmap and bounce to the paywall here — the user
   // taps a day and the screen throws them straight back out.
   const phaseLocked = IAP_ENABLED && !!d && !isReviewAccount && lockDataReady && !!lockRequirement && !purchasesQuery.data?.has(d.phaseId);
-  // A phase the user has BOUGHT opens in full: every one of its days is
-  // reachable at once, with no calendar gating (owner 2026-09-25). Same rule
-  // as the Roadmap's boughtPhaseIds and the server's mark_day_watched.
-  const phaseBought = !!d && !!lockRequirement && !!purchasesQuery.data?.has(d.phaseId);
+  // A phase the user has BOUGHT opens its first two days at once and one
+  // more every 24 hours from the purchase (owner 2026-09-25). Same maths as
+  // the Roadmap and the server's mark_day_watched — this screen is reached
+  // by deep links too, so it cannot just trust the caller.
+  const purchasedAt = d ? purchasesQuery.data?.get(d.phaseId) : undefined;
+  const phaseFirstDay = useMemo(() => {
+    if (!d) return Infinity;
+    return (daysQuery.data ?? []).filter((x) => x.phaseId === d.phaseId).reduce((min, x) => Math.min(min, x.id), Infinity);
+  }, [daysQuery.data, d]);
+  const phaseBought =
+    !!d && !!lockRequirement && !!purchasedAt && Number.isFinite(phaseFirstDay)
+      ? d.id <= daysOpenAfterPurchase(phaseFirstDay, purchasedAt)
+      : false;
   // Unpublished roadmap (Admin switch): its days are not content yet.
   const productUnpublished = !!program && program.product.roadmapPublished === false;
   useEffect(() => {
