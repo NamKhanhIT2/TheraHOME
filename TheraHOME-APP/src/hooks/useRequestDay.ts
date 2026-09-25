@@ -9,7 +9,10 @@ import type { DayRow } from '@/hooks/usePrograms';
 /**
  * Discomfort check-in gate for opening roadmap days (restored 2026-09-01;
  * rules tightened 2026-09-02 per explicit request):
- *  - Locked/future days ('locked'/'upcoming') cannot be opened at all.
+ *  - Locked/future days ('locked'/'upcoming') cannot be opened at all,
+ *    EXCEPT in a phase the user has bought: paying for a phase opens all of
+ *    its days at once rather than one per calendar day (owner 2026-09-25).
+ *    Pass those phase ids in `unlockedPhaseIds`.
  *  - ANY openable day (today or past, watched or not) that has no
  *    discomfort log yet shows `PainScaleModal` first; confirming inserts
  *    that day's pain_logs row and then opens the day.
@@ -19,7 +22,7 @@ import type { DayRow } from '@/hooks/usePrograms';
  * Pure logging under the calendar-unlock mechanic — completion is still
  * only mark_day_watched. A failed lookup/insert opens the day anyway.
  */
-export function useRequestDay() {
+export function useRequestDay(unlockedPhaseIds?: Set<string>) {
   const { session } = useSession();
   // App Review accounts open ANY day regardless of the calendar unlock
   // (per explicit request 2026-09-03) — the server's mark_day_watched has a
@@ -39,7 +42,8 @@ export function useRequestDay() {
   }
 
   async function requestDay(day: DayRow, userProgramId: string, productId: string) {
-    if (!bypassDayLocks && (day.status === 'locked' || day.status === 'upcoming')) return;
+    const phaseBought = unlockedPhaseIds?.has(day.phaseId) ?? false;
+    if (!bypassDayLocks && !phaseBought && (day.status === 'locked' || day.status === 'upcoming')) return;
     if (!userProgramId) {
       openDay(day.id, productId);
       return;

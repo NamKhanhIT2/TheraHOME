@@ -80,6 +80,10 @@ export default function DayDetailScreen() {
   // show as open on the Roadmap and bounce to the paywall here — the user
   // taps a day and the screen throws them straight back out.
   const phaseLocked = IAP_ENABLED && !!d && !isReviewAccount && lockDataReady && !!lockRequirement && !purchasesQuery.data?.has(d.phaseId);
+  // A phase the user has BOUGHT opens in full: every one of its days is
+  // reachable at once, with no calendar gating (owner 2026-09-25). Same rule
+  // as the Roadmap's boughtPhaseIds and the server's mark_day_watched.
+  const phaseBought = !!d && !!lockRequirement && !!purchasesQuery.data?.has(d.phaseId);
   // Unpublished roadmap (Admin switch): its days are not content yet.
   const productUnpublished = !!program && program.product.roadmapPublished === false;
   useEffect(() => {
@@ -101,7 +105,7 @@ export default function DayDetailScreen() {
   const [checkInDone, setCheckInDone] = useState(false);
   const programDayId = d?.programDayId;
   const userProgramId = program?.userProgramId;
-  const dayOpenable = !!d && (d.status === 'current' || d.status === 'done' || d.status === 'missed');
+  const dayOpenable = !!d && (phaseBought || d.status === 'current' || d.status === 'done' || d.status === 'missed');
   useEffect(() => {
     if (checkInDone || !dayOpenable || !userProgramId || !programDayId) return;
     let cancelled = false;
@@ -196,8 +200,8 @@ export default function DayDetailScreen() {
   // Calendar-unlock mechanic: watching the video is what records completion
   // (no completion button, no pain gate). Days beyond tomorrow's midnight
   // unlock are still viewable but never record progress.
-  const progressLocked = d.status === 'locked' || d.status === 'upcoming';
-  const canRecordWatch = !!program && (d.status === 'current' || d.status === 'missed');
+  const progressLocked = !phaseBought && (d.status === 'locked' || d.status === 'upcoming');
+  const canRecordWatch = !!program && (phaseBought ? d.status !== 'done' : d.status === 'current' || d.status === 'missed');
   const videoUrl = normalizeVideoUrl(d.video);
   const supportToolsUrl = normalizeVideoUrl(d.supportToolsUrl);
   // Admin can name this per day/market; fall back to the translated default.

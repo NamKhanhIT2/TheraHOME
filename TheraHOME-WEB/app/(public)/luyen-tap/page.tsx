@@ -58,6 +58,9 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; 
   // a store product id yet — but it must not leak when Giai đoạn 3 ships, and
   // the web has no way to sell it, so it points at the app.
   phaseLocked: { bg: "rgba(255,182,72,0.1)", border: "rgba(255,182,72,0.32)", color: "#FFC978", label: "Cần mở khoá" },
+  // A paid phase the customer HAS bought: every day of it is open at once, so
+  // "Chưa mở"/"Sắp tới" would contradict a tile that opens on tap.
+  ready: { bg: "rgba(0,127,217,0.12)", border: "rgba(0,127,217,0.4)", color: "#8FCBFF", label: "Sẵn sàng" },
   // day_type === 'rest'. The app shows these as a non-tappable "Ngày nghỉ" row;
   // the web used to render them as ordinary, openable workout tiles.
   rest: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.68)", label: "Ngày nghỉ" },
@@ -523,7 +526,14 @@ export default function TrainingPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
                 {program.days.map((d) => {
                   const rest = isRestDay(d);
-                  const st = d.phaseLocked ? STATUS_STYLE.phaseLocked : rest ? STATUS_STYLE.rest : STATUS_STYLE[d.status];
+                  const bought = d.phaseBought && (d.status === "locked" || d.status === "upcoming");
+                  const st = d.phaseLocked
+                    ? STATUS_STYLE.phaseLocked
+                    : rest
+                      ? STATUS_STYLE.rest
+                      : bought
+                        ? STATUS_STYLE.ready
+                        : STATUS_STYLE[d.status];
                   const openable = canOpenDay(d, program.isReviewAccount);
                   return (
                     <button

@@ -53,7 +53,6 @@ export default function RoadmapScreen() {
   const productsQuery = useProducts();
   const programsQuery = useActivatedPrograms(userId);
   const defaultProductQuery = useDefaultProductId(userId);
-  const requestDayGate = useRequestDay();
   const activatedPrograms = programsQuery.data ?? [];
   // Memoized (not a fresh `?? []` per render) — feeds the dropdownProducts
   // memo below.
@@ -139,6 +138,18 @@ export default function RoadmapScreen() {
   const phaseIds = useMemo(() => Array.from(new Set(days.map((d) => d.phaseId))), [days]);
   const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
   const purchasesQuery = usePhasePurchases(userId);
+  // Phases the user has PAID for: their days all open at once, with no
+  // calendar gating — buying a phase buys the whole phase (owner
+  // 2026-09-25). Everything else keeps the one-day-per-day mechanic.
+  const boughtPhaseIds = useMemo(() => {
+    if (!IAP_ENABLED) return new Set<string>();
+    const requirements = lockRequirementsQuery.data;
+    const purchased = purchasesQuery.data;
+    if (!requirements || !purchased) return new Set<string>();
+    return new Set(Array.from(requirements.keys()).filter((id) => purchased.has(id)));
+  }, [lockRequirementsQuery.data, purchasesQuery.data]);
+  // Declared after boughtPhaseIds: the gate needs that set.
+  const requestDayGate = useRequestDay(boughtPhaseIds);
   const lockedPhaseIds = useMemo(() => {
     // IAP is off for now — never lock a phase, so the paywall/purchase card is
     // unreachable and StoreKit is never opened (see IAP_ENABLED).
@@ -404,13 +415,13 @@ export default function RoadmapScreen() {
                       <PathNode
                         day={d}
                         isToday={program ? d.id === todayMarkerDay : false}
-                        unrestricted={isReviewAccount}
+                        unrestricted={isReviewAccount || boughtPhaseIds.has(d.phaseId)}
                         onPress={() => {
                           // Locked/future days don't open at all (except
                           // for App Review accounts); openable days go
                           // through the discomfort check-in gate (which
                           // skips itself once the day is answered).
-                          if (!isReviewAccount && (d.status === 'locked' || d.status === 'upcoming')) return;
+                          if (!isReviewAccount && !boughtPhaseIds.has(d.phaseId) && (d.status === 'locked' || d.status === 'upcoming')) return;
                           if (program) {
                             void requestDayGate.requestDay(d, program.userProgramId, program.productId);
                           } else {

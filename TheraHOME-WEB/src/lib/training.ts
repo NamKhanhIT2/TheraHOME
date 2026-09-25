@@ -54,6 +54,11 @@ export interface TrainingDay {
   hasPainLog: boolean;
   /** This day sits in a paid phase the customer has not unlocked. */
   phaseLocked: boolean;
+  /** A paid phase this customer has BOUGHT: all of its days are open at
+   * once, with no calendar gating — buying a phase buys the whole phase
+   * (owner 2026-09-25). Mirrors the app's boughtPhaseIds and the server's
+   * mark_day_watched exemption. */
+  phaseBought: boolean;
 }
 
 export interface TrainingProgram {
@@ -197,6 +202,8 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
   // this only together with the app's flags.
   const phaseIsLocked = (phaseId: string | null) =>
     PHASE_LOCK_ENABLED && !isReviewAccount && !!phaseId && paidPhases.has(phaseId) && !purchasedPhases.has(phaseId);
+  const phaseIsBought = (phaseId: string | null) =>
+    !!phaseId && paidPhases.has(phaseId) && purchasedPhases.has(phaseId);
 
   const statusByDay = new Map((mine ?? []).map((r) => [r.program_day_id, r]));
   const phaseById = new Map((phases ?? []).map((p) => [p.id, pickMarket(market, p.name, p.name_en, p.name_ms)]));
@@ -240,6 +247,7 @@ export async function fetchTrainingProgram(userId: string): Promise<TrainingProg
         status: deriveDayStatus(d.day_number, own?.status ?? null, todayDay),
         hasPainLog: painDays.has(d.id),
         phaseLocked: phaseIsLocked(d.phase_id),
+        phaseBought: phaseIsBought(d.phase_id),
       };
     }),
   };
@@ -259,12 +267,14 @@ export function canOpenDay(day: TrainingDay, isReviewAccount: boolean): boolean 
   if (isRestDay(day)) return false;
   if (isReviewAccount) return true;
   if (day.phaseLocked) return false;
+  if (day.phaseBought) return true;
   return day.status !== "locked" && day.status !== "upcoming";
 }
 
 /** Can watching this day record completion? The app restricts it to today and
  * missed days — a finished day is already done, and nothing else is openable. */
 export function canRecordWatch(day: TrainingDay): boolean {
+  if (day.phaseBought) return day.status !== "done";
   return day.status === "current" || day.status === "missed";
 }
 
