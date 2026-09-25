@@ -21,7 +21,6 @@ import { LANG_LABEL, getLangSnapshot, getLangServerSnapshot, setLang, subscribeL
 export const NAV_LINKS = [
   { href: "/", label: "Trang chủ" },
   { href: "/san-pham", label: "Sản phẩm", dropdown: true },
-  { href: "/ung-dung", label: "App" },
   { href: "/gioi-thieu", label: "Về chúng tôi" },
 ] as const;
 
@@ -191,7 +190,6 @@ export function LandingNav() {
             <Link href="/" onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>Trang chủ</Link>
             <span style={{ padding: "12px 4px 4px", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }}>Sản phẩm</span>
             <Link href="/san-pham" onClick={closeMenu} style={{ padding: "10px 4px 10px 18px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>TheraNECK+</Link>
-            <Link href="/ung-dung" onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>App</Link>
             <Link href="/gioi-thieu" onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>Về chúng tôi</Link>
             <span style={{ height: 1, margin: "8px 0", background: "rgba(255,255,255,0.1)" }} />
             {session.signedIn ? (

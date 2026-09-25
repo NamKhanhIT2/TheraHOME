@@ -133,7 +133,7 @@ export default async function AboutPage() {
               <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.7, color: "rgba(255,255,255,0.64)" }}>
                 Ứng dụng giống như một chuyên gia trị liệu luôn bên cạnh bạn: theo dõi tình trạng mỗi ngày, gợi ý bài tập đúng với trạng thái, xác định vùng đau qua bản đồ Pain Map 3D, nhắc lịch tập và cập nhật kiến thức giảm đau khoa học.
               </p>
-              <Link href="/ung-dung" style={{ fontSize: 13, color: "#7FBFFF" }}>Tìm hiểu ứng dụng →</Link>
+              <Link href="/app" style={{ fontSize: 13, color: "#7FBFFF" }}>Tìm hiểu ứng dụng →</Link>
             </article>
           </div>
         </div>

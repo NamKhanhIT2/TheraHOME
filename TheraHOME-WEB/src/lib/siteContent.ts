@@ -110,10 +110,10 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   // is @therahomeai — identified from the channel that hosts the very videos
   // program_days serves to the app, not guessed.
   social: { facebook: "https://www.facebook.com/profile.php?id=61580995314862", youtube: "https://www.youtube.com/@therahomeai" },
-  // An empty string means "this store does not have the app yet" and hides the
-  // button — see app/(public)/ung-dung/page.tsx. Android is in closed testing,
-  // so its listing 404s; the URL itself is correct and goes back in the moment
-  // the app is public.
+  // An empty string means "this store does not have the app yet" and hides
+  // the badge and the QR code — see app/app/page.tsx, the app's own landing
+  // page. These are shipped defaults; the live values come from the
+  // site_content row an admin edits.
   app_links: { appStore: "https://apps.apple.com/vn/app/therahome/id6803739232", playStore: "" },
   // Empty on purpose: the reviews section on /app stays hidden until an admin
   // enters real ones. The App Store listing had no reviews on 2026-09-22.

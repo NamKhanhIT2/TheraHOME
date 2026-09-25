@@ -26,6 +26,9 @@ const nextConfig: NextConfig = {
       // product decision, not a permanent move of that URL.
       { source: "/luyen-tap", destination: "/app", permanent: false },
       { source: "/luyen-tap/:path*", destination: "/app", permanent: false },
+      // /ung-dung was the marketing site's own app page. /app replaced it
+      // (owner 2026-09-25) — one app page, not two telling the same story.
+      { source: "/ung-dung", destination: "/app", permanent: false },
     ];
   },
 };

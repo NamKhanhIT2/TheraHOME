@@ -49,7 +49,7 @@ const h2: CSSProperties = {
 
 const PILLARS = [
   { href: "/san-pham", eyebrow: "Thiết bị", title: "TheraNECK+", body: "Bốn liệu pháp trong một thiết bị dùng tại nhà, mỗi buổi 15–20 phút.", cta: "Xem sản phẩm →" },
-  { href: "/ung-dung", eyebrow: "Ứng dụng", title: "TheraAI", body: "Chấm vị trí đau, nhận lộ trình 14 ngày và theo dõi tiến trình mỗi ngày.", cta: "Tìm hiểu ứng dụng →" },
+  { href: "/app", eyebrow: "Ứng dụng", title: "TheraAI", body: "Chấm vị trí đau, nhận lộ trình 14 ngày và theo dõi tiến trình mỗi ngày.", cta: "Tìm hiểu ứng dụng →" },
   { href: null, eyebrow: "Đồng hành", title: "Đội ngũ hỗ trợ", body: "Hỗ trợ qua app và Zalo trong suốt lộ trình, không chỉ lúc mới mua.", cta: null },
 ];
 
@@ -120,7 +120,7 @@ export default async function HomePage() {
             </p>
           </div>
           <div style={{ display: "flex" }}>
-            <LandingButton href="/ung-dung">Kiểm tra bây giờ</LandingButton>
+            <LandingButton href="/app">Kiểm tra bây giờ</LandingButton>
           </div>
         </div>
       </section>

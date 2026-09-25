@@ -2427,3 +2427,52 @@ Kiểm trên localhost: `/app/tai/ios` → App Store, `/app/tai/android` → Goo
 Play, `/app/tai` với user-agent Android → Google Play, với iPhone → App Store,
 đường dẫn lạ → `/app`. Bố cục hai mã đứng cạnh nhau ở 1440 và 960px, cả nền
 sáng lẫn nền tối, không tràn ngang.
+
+### Gỡ hai tab khỏi web: Luyện tập và App (2026-09-25)
+
+Chủ dự án bỏ khu luyện tập trên web — "dùng trên điện thoại đủ rồi" — rồi bỏ
+luôn tab App, vì `/app` (trang giới thiệu ứng dụng dựng riêng từ 2026-09-22) đã
+làm đúng việc mà `/ung-dung` từng làm.
+
+**Gỡ hẳn trang chứ không chỉ giấu link.** Một trang không còn lối vào nhưng vẫn
+đọc/ghi dữ liệu thật thì tệ hơn là không có: nó vẫn phải giữ đồng bộ với app.
+Đã xoá `app/(public)/luyen-tap/`, `src/lib/training.ts`, `src/lib/appTabs.ts`,
+`StoreTab`, `CommunityTab`, `ActivationPanel`, `YouTubeLesson` (~2.200 dòng), và
+`app/(public)/ung-dung/`, `AppCarousel`, `public/landing/app/*.jpg` (1 MB, chỉ
+trang đó dùng). Lịch sử git giữ lại tất cả — commit `b964bf0` và commit này.
+
+**Mất theo khu luyện tập:** lưới ngày cùng phần ghi mức đau / lượng nước, khảo
+sát cuối giai đoạn, tab Cửa hàng, tab Cộng đồng, ô kích hoạt thiết bị. Tất cả
+chỉ sống trong trang đó, và app đã làm hết.
+
+**Được một thứ:** quy tắc mở khoá ngày tập trước đây viết hai lần (app và
+`training.ts`) và đã lệch nhau hai lần thật — hoàn thành bài kích hoạt theo sự
+kiện `load` của iframe, rồi `Math.floor` so với `Math.round` trong
+`daysSinceLocal`. Giờ chỉ còn một bản ở app, cộng luật phía server trong
+`mark_day_watched`. Không còn gì để chép qua chép lại.
+
+**Chuyển hướng chứ không 404.** `/luyen-tap`, `/luyen-tap/*` và `/ung-dung` →
+`/app`, khai trong `next.config.ts`, để **tạm thời** (307) vì đây là quyết định
+sản phẩm chứ không phải dời địa chỉ vĩnh viễn. Người đã lưu địa chỉ cũ rơi
+đúng vào trang phát app.
+
+**Link nội bộ phải đổi theo:** nút "Tải miễn phí" trên `/ung-dung` vốn trỏ vào
+khu luyện tập chứ không phải chỗ tải (giờ moot, trang đã xoá); thẻ "Ứng dụng /
+TheraAI" và nút "Kiểm tra bây giờ" ở trang chủ, link "Tìm hiểu ứng dụng" ở
+`/gioi-thieu` — tất cả về `/app`.
+
+**Đính chính cho mục 2026-09-24 ngay trên:** `app_links.playStore` không còn
+điều khiển nút trên `/ung-dung` nữa. Các chỗ còn đọc nó: `/app`, thanh dính, hộp
+mời tải, hai mã QR và `/app/tai*`.
+
+**Một đường nối cần biết:** `/app` nằm ngoài lớp giao diện tối của site
+marketing — nền sáng, ba ngôn ngữ, thanh điều hướng riêng — nên bấm từ trang chủ
+sang là đổi hẳn phong cách. Đó là hệ quả của việc chọn `/app` làm trang giới
+thiệu app, không phải lỗi; nếu thấy chỏi thì cách sửa là cho `/app` một lối
+quay lại site, chứ không phải dựng lại trang thứ hai.
+
+Kiểm trên localhost: thanh điều hướng còn Trang chủ · Sản phẩm · Về chúng tôi ở
+cả desktop lẫn menu điện thoại 375px; menu tài khoản khi đăng nhập còn "Đăng
+xuất" (nhân viên vẫn có "Bảng điều khiển"); `/luyen-tap` và `/ung-dung` đều sang
+`/app`; `next build` và `eslint` sạch; không còn chuỗi "Luyện tập" nào trong mã
+nguồn hay trong gói client đã build.
