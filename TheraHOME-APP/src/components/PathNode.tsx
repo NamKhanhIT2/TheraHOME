@@ -17,9 +17,9 @@ export interface PathNodeProps {
    * render those rows as open ("Sẵn sàng để xem", day number instead of a
    * lock/clock icon, full opacity) rather than contradicting the tap. */
   unrestricted?: boolean;
-  /** A day inside a phase the user HAS bought, whose turn in the 24-hour
-   * drip has not come yet: the row stays shut but says "Mở sau 24h" rather
-   * than the calendar's "Mở khoá vào 0h" (owner 2026-09-25). */
+  /** A day inside a phase the user HAS bought, still inside the 49-hour
+   * post-purchase wait: the row stays shut but says "Có thể xem sau 2 ngày
+   * nữa" rather than the calendar's "Mở khoá vào 0h" (owner 2026-09-25). */
   opensIn24h?: boolean;
   onPress: (id: number) => void;
 }
@@ -159,7 +159,7 @@ export function PathNode({ day, isToday = false, unrestricted = false, opensIn24
                     // "Hôm nay" belongs only to the row isToday points at.
                     t('dayReadyReview')
                   : opensIn24h
-                    ? t('unlockAfter24h')
+                    ? t('unlockAfterWait')
                     : isUpcoming
                       ? t('unlockAtMidnight')
                       : isPreview

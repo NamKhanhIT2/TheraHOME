@@ -59,9 +59,8 @@ export interface TrainingDay {
    * every 24 hours (owner 2026-09-25). Mirrors the app's
    * daysOpenAfterPurchase and the server's mark_day_watched. */
   phaseBought: boolean;
-  /** Bought, but inside the wait — the tile says "Mở sau 24h" rather than
-   * the calendar's "Chưa mở". The wait is 49 hours; the wording is the
-   * owner's (2026-09-25). */
+  /** Bought, but inside the 49-hour wait — the tile says "Có thể xem sau 2
+   * ngày nữa" rather than the calendar's "Chưa mở" (owner 2026-09-25). */
   boughtWaiting: boolean;
 }
 

@@ -62,7 +62,7 @@ const STATUS_STYLE: Record<string, { bg: string; border: string; color: string; 
   // "Chưa mở"/"Sắp tới" would contradict a tile that opens on tap.
   ready: { bg: "rgba(0,127,217,0.12)", border: "rgba(0,127,217,0.4)", color: "#8FCBFF", label: "Sẵn sàng" },
   // Bought, but still inside the post-purchase wait.
-  waiting24h: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.62)", label: "Mở sau 24h" },
+  waiting24h: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.62)", label: "Có thể xem sau 2 ngày nữa" },
   // day_type === 'rest'. The app shows these as a non-tappable "Ngày nghỉ" row;
   // the web used to render them as ordinary, openable workout tiles.
   rest: { bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.68)", label: "Ngày nghỉ" },
