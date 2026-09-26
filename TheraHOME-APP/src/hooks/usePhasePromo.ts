@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
@@ -9,6 +10,14 @@ import { useMarket, type StoreMarket } from '@/hooks/useMarket';
 // simply not gated on the other platform — no dead paywall while billing
 // rolls out platform by platform.
 const PLATFORM_PRODUCT_COLUMN = Platform.OS === 'android' ? 'google_product_id' : 'apple_product_id';
+
+// The last answer this device got, kept on disk. A FAILED lookup used to
+// leave the caller with no data at all, which every lock check reads as "no
+// phase is paid" — so one flaky request opened the paid phase to someone who
+// hadn't bought it (owner 2026-09-26). Falling back to what we last knew
+// keeps a network blink from giving content away, and any success overwrites
+// it. Per platform, because the product column differs.
+const LOCK_CACHE_KEY = `phase_lock_requirements_${Platform.OS}_v1`;
 
 export interface PhaseLockRequirement {
   /** This platform's store product id. */
@@ -30,18 +39,37 @@ export function usePhaseLockRequirements(phaseIds: string[]) {
     queryKey: ['phase_promos_lock', key],
     queryFn: async (): Promise<Map<string, PhaseLockRequirement>> => {
       if (phaseIds.length === 0) return new Map();
-      const { data, error } = await supabase
-        .from('phase_promos')
-        .select(`phase_id, sales_enabled, ${PLATFORM_PRODUCT_COLUMN}`)
-        .in('phase_id', phaseIds)
-        .not(PLATFORM_PRODUCT_COLUMN, 'is', null);
-      if (error) throw error;
-      return new Map(
-        (data as { phase_id: string; sales_enabled: boolean | null; [column: string]: string | boolean | null }[]).map((r) => [
-          r.phase_id,
-          { productId: r[PLATFORM_PRODUCT_COLUMN] as string, salesEnabled: r.sales_enabled !== false },
-        ]),
-      );
+      try {
+        const { data, error } = await supabase
+          .from('phase_promos')
+          .select(`phase_id, sales_enabled, ${PLATFORM_PRODUCT_COLUMN}`)
+          .in('phase_id', phaseIds)
+          .not(PLATFORM_PRODUCT_COLUMN, 'is', null);
+        if (error) throw error;
+        const map = new Map(
+          (data as { phase_id: string; sales_enabled: boolean | null; [column: string]: string | boolean | null }[]).map((r) => [
+            r.phase_id,
+            { productId: r[PLATFORM_PRODUCT_COLUMN] as string, salesEnabled: r.sales_enabled !== false },
+          ]),
+        );
+        // Remember it for the next failure. Fire-and-forget: a full disk must
+        // not fail a lookup that already succeeded.
+        void AsyncStorage.setItem(LOCK_CACHE_KEY, JSON.stringify([...map])).catch(() => {});
+        return map;
+      } catch (e) {
+        const cached = await AsyncStorage.getItem(LOCK_CACHE_KEY).catch(() => null);
+        if (cached) {
+          try {
+            const entries = JSON.parse(cached) as [string, PhaseLockRequirement][];
+            // Only the phases this screen asked about — the cache can outlive
+            // a phase that has since been deleted.
+            return new Map(entries.filter(([id]) => phaseIds.includes(id)));
+          } catch {
+            // Corrupt entry: fall through and report the real failure.
+          }
+        }
+        throw e;
+      }
     },
     enabled: phaseIds.length > 0,
   });

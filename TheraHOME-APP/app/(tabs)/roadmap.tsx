@@ -110,7 +110,6 @@ export default function RoadmapScreen() {
   const isLoading =
     productsQuery.isLoading || programsQuery.isLoading || (!!selectedProduct && daysQuery.isLoading);
   const loadError = productsQuery.error ?? programsQuery.error ?? (selectedProduct ? daysQuery.error : null);
-  const showSkeleton = useSteadyLoading(isLoading);
   // Stable reference (not a fresh `?? []` array each render) so the memos
   // below that key off `days` don't recompute every render.
   const days = useMemo(() => daysQuery.data ?? [], [daysQuery.data]);
@@ -138,6 +137,16 @@ export default function RoadmapScreen() {
   const phaseIds = useMemo(() => Array.from(new Set(days.map((d) => d.phaseId))), [days]);
   const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
   const purchasesQuery = usePhasePurchases(userId);
+  // Hold the skeleton until the paid-phase list has answered. Until it does,
+  // `lockedPhaseIds` below is empty — nothing is paid — so a customer whose
+  // calendar is already past day 14 would see the paid phase's days for that
+  // instant (owner 2026-09-26). One more beat of the skeleton costs less than
+  // a flash of content nobody bought. The query itself now falls back to the
+  // last known list when it fails, so this only waits on a genuinely first,
+  // still-running lookup.
+  const showSkeleton = useSteadyLoading(
+    isLoading || (IAP_ENABLED && !!selectedProduct && lockRequirementsQuery.isLoading),
+  );
   // A phase the user has PAID for opens its first two days immediately and
   // one more every 24 hours from the purchase (owner 2026-09-25) — the
   // buyer can start at once without being handed the whole phase to binge.

@@ -4372,3 +4372,34 @@ cầu tối thiểu bản 7, nên không có rủi ro bị từ chối khi nộp
   sớm hơn lúc danh sách kịp về trên máy chậm. Tự lành ngay sau đó (phần dò lại
   sẽ xác minh), nên chưa đụng vào con số đã được cân.
 - **Đổi tài khoản**: vẫn chỉ có câu lỗi chung.
+
+### Không biết thì phải khoá, chứ không phải mở (2026-09-26)
+
+Vá lỗ hổng ghi ở mục trên. `usePhaseLockRequirements` hỏi `phase_promos` xem
+giai đoạn nào phải trả tiền; khi **hỏng**, react-query để `data` là undefined,
+và mọi chỗ kiểm tra đọc đúng ý ngược lại: "không giai đoạn nào phải trả tiền".
+Một lần mạng chập là ngày 15–28 mở cho người chưa mua, suốt phiên đó — mà dữ
+liệu ngày vẫn còn trong bộ đệm nên màn hình trông vẫn bình thường.
+
+**Hai lớp vá:**
+
+1. **Nhớ câu trả lời gần nhất trên máy** (`AsyncStorage`, khoá theo nền tảng vì
+   cột sản phẩm khác nhau). Hỏi thành công thì ghi đè; hỏi hỏng thì dùng lại
+   danh sách đã biết thay vì trả về rỗng. Chỉ giữ những giai đoạn màn hình đang
+   hỏi, phòng khi một giai đoạn đã bị xoá. Bản ghi hỏng thì bỏ qua và báo lỗi
+   thật như cũ. Ghi là "bắn đi rồi quên" — đĩa đầy không được phép làm hỏng một
+   lượt hỏi đã thành công.
+2. **Giữ khung xương chờ trên Roadmap** cho tới khi danh sách đó trả lời. Trước
+   đây trong lúc chờ, màn hình vẽ luôn các ngày với `lockedPhaseIds` rỗng —
+   chớp một nhịp, nhưng bấm được. Thêm một nhịp chờ rẻ hơn một nhịp lộ nội dung
+   chưa bán. Phải dời `useSteadyLoading` xuống dưới chỗ khai báo truy vấn khoá;
+   hook vẫn gọi vô điều kiện nên thứ tự hook không đổi.
+
+Hướng vá chọn theo nguyên tắc: **khi chưa biết thì nghiêng về khoá**. Màn hình
+ngày (`app/day/[dayId].tsx`) vốn đã chờ dữ liệu khoá trước khi quyết định, giờ
+nó cũng được hưởng phần nhớ trên máy — hỏi hỏng không còn nghĩa là mở.
+
+Chưa làm: câu thông báo riêng cho trường hợp **giao dịch thuộc tài khoản khác**.
+Chỗ đó `supabase-js` gộp mọi phản hồi non-2xx thành một lỗi chung, nên muốn
+phân biệt thì hàm phải trả 200 kèm cờ riêng — tức là sửa máy chủ và deploy thêm
+một lần nữa, chờ chủ dự án.
