@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { useIAP, type Purchase } from 'react-native-iap';
+import { useIAP, ErrorCode, type Purchase } from 'react-native-iap';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -66,6 +66,9 @@ export function usePurchasePhase(
   const [verifying, setVerifying] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  // Google has the order but hasn't collected the money yet — its own state,
+  // not an error (owner 2026-09-26).
+  const [paymentPending, setPaymentPending] = useState(false);
   // Ref, not a dep — a caller passing an inline callback shouldn't retrigger
   // verifyAndFinish's identity (and the useIAP wiring below) every render.
   const onVerifiedRef = useRef(opts?.onVerified);
@@ -77,8 +80,18 @@ export function usePurchasePhase(
 
   const verifyAndFinish = useCallback(
     async (purchase: Purchase, finishTransaction: (args: { purchase: Purchase; isConsumable: boolean }) => Promise<void>) => {
+      // Not paid for yet: Play's slower methods (bank transfer, cash at a
+      // counter) resolve hours later. Finishing or verifying it now would be
+      // claiming money nobody has sent — leave it alone and let the catch-up
+      // check below find it once Google collects.
+      if (purchase.purchaseState === 'pending') {
+        setPaymentPending(true);
+        setPurchaseError(null);
+        return;
+      }
       setVerifying(true);
       setPurchaseError(null);
+      setPaymentPending(false);
       try {
         const { data, error } =
           Platform.OS === 'android'
@@ -89,6 +102,18 @@ export function usePurchasePhase(
                 body: { phaseId, transactionId: purchase.id },
               });
         if (error) throw error;
+        // Google still processing: say so and stop — no entitlement, no
+        // finishTransaction (an unfinished purchase stays restorable).
+        if (data?.pending) {
+          setPaymentPending(true);
+          return;
+        }
+        // Refunded. The phase stays locked — this only replaces the false
+        // "unlocked" screen a restore used to show.
+        if (data?.revoked) {
+          setPurchaseError('purchase_revoked');
+          return;
+        }
         if (!data?.ok) throw new Error(data?.error ?? 'verify_failed');
         // Only finalize with the platform once our own backend has recorded
         // the purchase — an unfinished transaction safely replays (iOS) or
@@ -114,6 +139,10 @@ export function usePurchasePhase(
     },
     onPurchaseError: (error) => {
       purchaseRequestedRef.current = false;
+      // Closing the Play sheet is a decision, not a failure. It used to show
+      // "Không thể hoàn tất giao dịch", which reads as a broken payment
+      // (owner 2026-09-26).
+      if (error.code === ErrorCode.UserCancelled) return;
       setPurchaseError(error.message);
       if (__DEV__) console.warn('IAP purchase failed:', error);
     },
@@ -126,6 +155,22 @@ export function usePurchasePhase(
   }, [connected, sku, fetchProducts]);
 
   const product = products.find((p) => p.id === sku) ?? null;
+
+  // Catch-up, once per screen: a purchase can be paid for while nobody is
+  // looking — Play's slow payment methods clear hours later, and an app
+  // killed between payment and verification leaves the same state. Either
+  // way the purchase is still sitting in the account, so ask for the list
+  // and let the effect below verify what it finds. Silent by design: unlike
+  // `restore`, nobody asked, so an empty list says nothing (owner
+  // 2026-09-26).
+  const caughtUpRef = useRef(false);
+  useEffect(() => {
+    if (!connected || !sku || caughtUpRef.current) return;
+    caughtUpRef.current = true;
+    getAvailablePurchases().catch((e: unknown) => {
+      if (__DEV__) console.warn('getAvailablePurchases (catch-up) failed:', e);
+    });
+  }, [connected, sku, getAvailablePurchases]);
 
   // "Khôi phục giao dịch": re-fetch the Apple account's owned purchases and
   // re-run server verification for the one matching this phase's product.
@@ -158,12 +203,24 @@ export function usePurchasePhase(
       });
   }, [sku, connected, getAvailablePurchases]);
 
+  // Consumes whatever either the explicit restore or the silent catch-up
+  // fetched. A token is verified once per screen — verification is
+  // idempotent server-side, but re-running it on every state change would
+  // leave the button spinning in a loop. A restore the user asked for always
+  // goes through, so it can still answer them.
+  const verifiedTokensRef = useRef(new Set<string>());
   useEffect(() => {
-    if (!restoreRequestedRef.current || !sku) return;
+    if (!sku) return;
     const match = availablePurchases.find((p) => p.productId === sku);
     if (!match) return;
-    restoreRequestedRef.current = false;
-    setRestoring(false);
+    const token = match.purchaseToken ?? match.id;
+    if (restoreRequestedRef.current) {
+      restoreRequestedRef.current = false;
+      setRestoring(false);
+    } else if (!token || verifiedTokensRef.current.has(token)) {
+      return;
+    }
+    if (token) verifiedTokensRef.current.add(token);
     void verifyAndFinish(match, finishTransaction);
   }, [availablePurchases, sku, verifyAndFinish, finishTransaction]);
 
@@ -175,6 +232,7 @@ export function usePurchasePhase(
     if (!sku || purchaseRequestedRef.current) return;
     purchaseRequestedRef.current = true;
     setPurchaseError(null);
+    setPaymentPending(false);
     // Both platform keys are passed; the library reads only the current
     // platform's. `requestPurchase` delivers its result via
     // onPurchaseSuccess/onPurchaseError above, but the promise itself can
@@ -196,6 +254,9 @@ export function usePurchasePhase(
     verifying,
     /** True while a restore request is looking up the account's purchases. */
     restoring,
+    /** Google has the order but hasn't collected the money yet — the phase
+     * stays locked and the screen says "still processing", not "failed". */
+    paymentPending,
     purchaseError,
     purchase,
     restore,

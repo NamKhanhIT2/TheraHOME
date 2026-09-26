@@ -150,8 +150,17 @@ Deno.serve(async (req: Request) => {
   }
   const purchase = (await purchaseRes.json()) as ProductPurchase;
 
+  // 2 = pending: Play's slower payment methods (bank transfer, cash at a
+  // counter) take hours to collect. That is not a failure and not an
+  // entitlement — say so plainly so the app can show "still processing"
+  // instead of "could not complete", and check again later (owner
+  // 2026-09-26). 200, not 4xx: supabase-js hands the client a generic
+  // FunctionsHttpError for any non-2xx, which would hide this distinction.
+  if (purchase.purchaseState === 2) {
+    return jsonResponse({ ok: false, pending: true });
+  }
   if (purchase.purchaseState !== 0) {
-    // 1 = canceled, 2 = pending — neither grants the phase.
+    // 1 = canceled.
     return jsonResponse({ error: "purchase_not_valid" }, 400);
   }
   if (purchase.productId && purchase.productId !== productId) {
@@ -162,7 +171,7 @@ Deno.serve(async (req: Request) => {
   // user actually redeemed it first (same rule as verify-apple-purchase).
   const { data: existing, error: existingError } = await adminClient
     .from("phase_purchases")
-    .select("user_id")
+    .select("user_id, revoked_at")
     .eq("google_purchase_token", purchaseToken)
     .maybeSingle();
   if (existingError) {
@@ -171,9 +180,17 @@ Deno.serve(async (req: Request) => {
   if (existing) {
     // Idempotent retry (network blip, restore) is fine; anyone else trying
     // to redeem an already-claimed token is not.
-    return existing.user_id === userId
-      ? jsonResponse({ ok: true })
-      : jsonResponse({ error: "transaction_already_claimed" }, 409);
+    if (existing.user_id !== userId) {
+      return jsonResponse({ error: "transaction_already_claimed" }, 409);
+    }
+    // Refunded (sync-voided-purchases set revoked_at): the phase stays
+    // locked, which is the point — but it used to answer "ok" here, so a
+    // restore showed the green "unlocked" screen over a still-locked
+    // roadmap. Answer honestly instead (owner 2026-09-26).
+    if (existing.revoked_at) {
+      return jsonResponse({ ok: false, revoked: true });
+    }
+    return jsonResponse({ ok: true });
   }
 
   const { error: insertError } = await adminClient.from("phase_purchases").insert({

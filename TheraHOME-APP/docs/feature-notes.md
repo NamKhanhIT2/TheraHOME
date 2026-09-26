@@ -4253,3 +4253,50 @@ dịch nháp EN/MS khi tạo.
 
 Còn để lại có chủ ý: tên giai đoạn, tên sản phẩm vẫn lùi về tiếng Việt khi
 chưa dịch — hiện cả hai bảng đều đã dịch đủ (0 thiếu), nên chưa cần chỉ báo.
+
+### IAP Android: ba lỗi nhỏ trong luồng mua (2026-09-26)
+
+Chủ dự án nhờ rà lại IAP trên Android sau khi giao dịch thật đầu tiên chạy
+được. Ba thứ sửa ở đây đều **không phải lỗi chặn mua** — chúng nằm ở chỗ app
+nói gì với khách khi có chuyện xảy ra.
+
+**1. Bấm "Huỷ" ở màn Google cũng bị báo lỗi.** `onPurchaseError` đổ mọi lỗi
+vào một câu duy nhất, "Không thể hoàn tất giao dịch. Vui lòng thử lại." — kể
+cả khi khách chủ động đóng màn thanh toán. Đóng màn là một quyết định, không
+phải hỏng. `react-native-iap` có sẵn mã `ErrorCode.UserCancelled`; giờ gặp mã
+đó thì im lặng.
+
+**2. Thanh toán chờ xử lý bị coi là thất bại.** Google có trạng thái "pending"
+cho các cách trả tiền chậm (chuyển khoản, trả tại quầy): đơn đã tạo nhưng tiền
+chưa về. `verify-google-purchase` gộp nó chung với "canceled" và trả 400, nên
+khách thấy báo lỗi dù tiền có thể về sau đó, và không có gì kiểm tra lại. Giờ:
+
+- Hàm trả `{ ok: false, pending: true }` với mã **200**, không phải 4xx —
+  `supabase-js` quy mọi phản hồi non-2xx về một `FunctionsHttpError` chung,
+  nên để 4xx là app không phân biệt được "đang chờ" với "hỏng".
+- App hiện câu "Google đang xử lý thanh toán…" màu cảnh báo, **không** gọi
+  `finishTransaction` (giao dịch chưa xong thì vẫn còn trong tài khoản).
+- Thêm một lần **dò lại im lặng**: mở màn paywall là hỏi Google xem tài khoản
+  còn giao dịch nào chưa ghi nhận không, có thì xác minh luôn. Cùng đường này
+  vá nốt trường hợp app bị tắt giữa lúc trả tiền và lúc xác minh. Im lặng có
+  chủ ý — khác nút "Khôi phục giao dịch" do khách bấm nên phải trả lời.
+  Mỗi mã giao dịch chỉ xác minh một lần mỗi lần mở màn, nếu không màn hình sẽ
+  quay vòng.
+
+**3. Khôi phục sau khi đã hoàn tiền báo mở khoá nhưng vẫn khoá.** Hàm chỉ hỏi
+"đã có dòng của chính người này chưa" rồi trả `ok`, không nhìn cờ `revoked_at`
+mà `sync-voided-purchases` đã đặt. Kết quả: màn xanh "Đã mở khoá" chồng lên
+một lộ trình vẫn đang khoá. **Quyền truy cập không đổi** — hoàn tiền thì phải
+khoá, đó mới là điều đúng; chỉ câu trả lời là sai. Giờ trả
+`{ ok: false, revoked: true }` và app nói thẳng: giao dịch đã được hoàn tiền,
+muốn xem tiếp thì mua lại.
+
+Nhân đây, một hiểu nhầm đáng ghi lại: **"Khôi phục giao dịch" không trừ tiền
+lần nữa.** Nó chỉ đọc lại những gì tài khoản Google đã sở hữu và xin cấp lại
+quyền — dành cho người cài lại app, đổi máy, hoặc giao dịch chưa kịp ghi nhận.
+Sau khi hoàn tiền thì khách không còn sở hữu gì để khôi phục, nên mở khoá ở đó
+là cho không nội dung. Muốn xem tiếp là mua lại qua nút "Mở khoá ngay".
+
+Tương thích ngược: bản app đang chạy ngoài kia gặp `ok:false` sẽ hiện câu lỗi
+chung như trước với trường hợp 2, và với trường hợp 3 thì hiện câu lỗi chung
+thay vì màn "đã mở khoá" sai — dở hơn bản mới nhưng vẫn hơn hiện trạng.

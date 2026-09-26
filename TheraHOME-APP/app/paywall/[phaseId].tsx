@@ -35,7 +35,7 @@ export default function PaywallScreen() {
   const promo = promoQuery.data;
   const purchasesQuery = usePhasePurchases(userId);
   const [purchasedNow, setPurchasedNow] = useState(false);
-  const { product, purchase, restore, verifying, restoring, purchaseError, connected } = usePurchasePhase(
+  const { product, purchase, restore, verifying, restoring, paymentPending, purchaseError, connected } = usePurchasePhase(
     phaseId,
     { apple: promo?.appleProductId ?? null, google: promo?.googleProductId ?? null },
     { onVerified: () => setPurchasedNow(true) },
@@ -176,15 +176,27 @@ export default function PaywallScreen() {
               </View>
             </View>
 
-            {purchaseError ? (
+            {/* Three different things, three different tones: money on its
+                way (not an error), a refunded purchase that stays locked, and
+                an actual failure. Cancelling the Play sheet now says nothing
+                at all — see usePurchasePhase. */}
+            {paymentPending ? (
+              <Text style={[theme.type.captionSm, { color: theme.colors.warning, textAlign: 'center', marginTop: 12 }]}>
+                {t('purchasePending')}
+              </Text>
+            ) : purchaseError ? (
               <Text style={[theme.type.captionSm, { color: theme.colors.error, textAlign: 'center', marginTop: 12 }]}>
-                {purchaseError === 'restore_not_found' ? t('restoreNotFound') : t('purchaseFailed')}
+                {purchaseError === 'restore_not_found'
+                  ? t('restoreNotFound')
+                  : purchaseError === 'purchase_revoked'
+                    ? t('purchaseRefunded')
+                    : t('purchaseFailed')}
               </Text>
             ) : null}
 
             {/* CTA */}
             <Button
-              style={{ width: '100%', marginTop: purchaseError ? 8 : 16 }}
+              style={{ width: '100%', marginTop: purchaseError || paymentPending ? 8 : 16 }}
               disabled={purchaseDisabled}
               loading={busy}
               onPress={purchase}
