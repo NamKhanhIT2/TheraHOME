@@ -77,6 +77,11 @@ export function usePurchasePhase(
   // consumed by the effect below or the empty-result timeout firing.
   const restoreRequestedRef = useRef(false);
   const purchaseRequestedRef = useRef(false);
+  // Tokens already sent for verification on this screen. The store hands the
+  // same purchase to us twice — once through onPurchaseSuccess, then again in
+  // `availablePurchases` — and verifying it twice at once used to race itself
+  // on the server's unique index.
+  const verifiedTokensRef = useRef(new Set<string>());
 
   const verifyAndFinish = useCallback(
     async (purchase: Purchase, finishTransaction: (args: { purchase: Purchase; isConsumable: boolean }) => Promise<void>) => {
@@ -89,6 +94,8 @@ export function usePurchasePhase(
         setPurchaseError(null);
         return;
       }
+      const token = purchase.purchaseToken ?? purchase.id;
+      if (token) verifiedTokensRef.current.add(token);
       setVerifying(true);
       setPurchaseError(null);
       setPaymentPending(false);
@@ -124,7 +131,7 @@ export function usePurchasePhase(
         onVerifiedRef.current?.();
       } catch (e) {
         setPurchaseError(e instanceof Error ? e.message : 'verify_failed');
-        if (__DEV__) console.warn('verify-apple-purchase failed:', e);
+        if (__DEV__) console.warn('purchase verification failed:', e);
       } finally {
         setVerifying(false);
       }
@@ -208,7 +215,6 @@ export function usePurchasePhase(
   // idempotent server-side, but re-running it on every state change would
   // leave the button spinning in a loop. A restore the user asked for always
   // goes through, so it can still answer them.
-  const verifiedTokensRef = useRef(new Set<string>());
   useEffect(() => {
     if (!sku) return;
     const match = availablePurchases.find((p) => p.productId === sku);
@@ -220,7 +226,6 @@ export function usePurchasePhase(
     } else if (!token || verifiedTokensRef.current.has(token)) {
       return;
     }
-    if (token) verifiedTokensRef.current.add(token);
     void verifyAndFinish(match, finishTransaction);
   }, [availablePurchases, sku, verifyAndFinish, finishTransaction]);
 

@@ -204,6 +204,22 @@ Deno.serve(async (req: Request) => {
       : new Date().toISOString(),
   });
   if (insertError) {
+    // 23505 = the token's unique index. Two verifications of the SAME
+    // purchase overlapped (the store hands it to the app twice — the
+    // purchase callback and the account's purchase list), and the other one
+    // won. The entitlement exists, so this is a success, not a 500 telling
+    // the buyer their payment failed.
+    if (insertError.code === "23505") {
+      const { data: raced } = await adminClient
+        .from("phase_purchases")
+        .select("user_id, revoked_at")
+        .eq("google_purchase_token", purchaseToken)
+        .maybeSingle();
+      if (raced && raced.user_id === userId) {
+        return raced.revoked_at ? jsonResponse({ ok: false, revoked: true }) : jsonResponse({ ok: true });
+      }
+      return jsonResponse({ error: "transaction_already_claimed" }, 409);
+    }
     return jsonResponse({ error: insertError.message }, 500);
   }
 

@@ -4300,3 +4300,37 @@ là cho không nội dung. Muốn xem tiếp là mua lại qua nút "Mở khoá 
 Tương thích ngược: bản app đang chạy ngoài kia gặp `ok:false` sẽ hiện câu lỗi
 chung như trước với trường hợp 2, và với trường hợp 3 thì hiện câu lỗi chung
 thay vì màn "đã mở khoá" sai — dở hơn bản mới nhưng vẫn hơn hiện trạng.
+
+### Rà lần hai: hai lần xác minh cùng một giao dịch (2026-09-26)
+
+Rà lại IAP sau khi sửa ba lỗi ở mục trên thì thấy **chính bản sửa đó mở ra một
+đường đâm nhau**: lần "dò lại im lặng" mới thêm có thể gửi đúng giao dịch mà
+`onPurchaseSuccess` đang gửi — cửa hàng đưa cùng một giao dịch cho app hai lần,
+một lần qua callback mua, một lần qua danh sách giao dịch của tài khoản.
+
+Nếu hai lần gọi chồng lên nhau, một lần ghi được, lần kia đụng chỉ mục duy nhất
+`phase_purchases_google_purchase_token_key` và hàm trả **500** kèm câu lỗi của
+Postgres — tức là khách vừa trả tiền xong, quyền đã được ghi, mà màn hình báo
+"Không thể hoàn tất giao dịch". Vá cả hai đầu:
+
+- **App**: nhớ mã giao dịch đã gửi đi (`verifiedTokensRef`), gửi một lần mỗi
+  lần mở màn. Chỉ nhớ **sau** khi đã qua kiểm tra "đang chờ thanh toán", nếu
+  không một giao dịch pending sẽ bị đánh dấu là đã gửi và lúc tiền về sẽ không
+  ai dò lại nữa.
+- **Máy chủ**: lỗi `23505` không còn là 500. Đọc lại dòng vừa bị người kia ghi:
+  cùng chủ thì trả thành công (hoặc `revoked` nếu đã hoàn tiền), khác chủ thì
+  vẫn là `transaction_already_claimed`.
+
+Ràng buộc duy nhất ở DB vốn đã đúng và đó là thứ đã chặn dòng trùng — chỗ sai
+chỉ là cách hàm diễn giải lỗi đó.
+
+**Đã soát mà không sửa, có lý do:**
+- **Roadmap nháy khoá một nhịp** khi dữ liệu mua chưa về: `lockedPhaseIds` coi
+  phase là khoá khi chưa biết. Đây là chiều an toàn — chiều ngược lại sẽ loé
+  nội dung đã trả tiền cho người chưa mua. Để nguyên.
+- **Đổi tài khoản**: mã giao dịch gắn chặt với người mua đầu tiên (đúng), nhưng
+  người đăng nhập bằng tài khoản khác rồi bấm khôi phục chỉ nhận câu lỗi chung.
+  Cần một câu riêng "giao dịch này thuộc tài khoản khác" — chưa làm, chờ ý chủ
+  dự án.
+- **Nội dung vẫn không chặn ở phía máy chủ**: `program_days` cho đọc công khai
+  và thời gian chờ 49 giờ tính theo đồng hồ máy. Vẫn như đã ghi hôm qua.
