@@ -4334,3 +4334,41 @@ chỉ là cách hàm diễn giải lỗi đó.
   dự án.
 - **Nội dung vẫn không chặn ở phía máy chủ**: `program_days` cho đọc công khai
   và thời gian chờ 49 giờ tính theo đồng hồ máy. Vẫn như đã ghi hôm qua.
+
+### Rà lần ba: hai đường lỗi còn lại của Play (2026-09-26)
+
+Hai mã lỗi `react-native-iap` có thể trả về mà app chưa xử lý, đều rơi vào câu
+"Không thể hoàn tất giao dịch" chung chung:
+
+**`deferred-payment`** — đây là **cách thứ hai** Play nói "trả tiền sau". Lần
+trước mới xử lý một đường: giao dịch được trao cho app với trạng thái pending.
+Nhưng với một số cách thanh toán, Billing trả lời ngay lời gọi mua bằng mã lỗi
+này chứ không trao giao dịch nào. Cùng ý nghĩa, giờ cùng một câu: "Google đang
+xử lý thanh toán…".
+
+**`already-owned`** — Play nói tài khoản đã sở hữu sản phẩm. Trước đây thành
+ngõ cụt: app báo lỗi, khách bấm mua lại thì Play lại từ chối vì đã sở hữu, lặp
+vô hạn. Mà đúng ra đây không phải lỗi thanh toán — tiền đã trả rồi, chỉ là bản
+ghi phía ta chưa có (xác minh đứt giữa chừng, hoặc mua bằng lần đăng nhập
+khác). Giờ app tự chạy đúng thao tác của nút "Khôi phục giao dịch": hỏi Play
+danh sách giao dịch của tài khoản rồi xác minh, nên kết cục là mở khoá chứ
+không phải bế tắc.
+
+**Đã đo, không có vấn đề:** bản build kéo theo `com.android.billingclient`
+**9.1.0** (qua `openiap-google` 3.3.2) — đọc từ báo cáo hợp nhất manifest của
+lần build release gần nhất, không phải đoán từ package.json. Google đang yêu
+cầu tối thiểu bản 7, nên không có rủi ro bị từ chối khi nộp bản mới.
+
+**Tìm thấy, chưa sửa — chờ chủ dự án quyết:**
+
+- **Khoá "mở" khi chưa biết.** `lockedPhaseIds` trong `roadmap.tsx` trả về tập
+  rỗng khi truy vấn `phase_promos` chưa về **hoặc lỗi**, nghĩa là trong khoảng
+  đó không giai đoạn nào bị khoá. Với người chưa mua mà lịch đã quá ngày 14,
+  ngày 15–28 hiện ra và bấm được. Bình thường chỉ là một nhịp chớp, nhưng nếu
+  truy vấn đó **hỏng** (mạng chập chờn, dữ liệu ngày vẫn còn trong bộ đệm) thì
+  mở suốt phiên. Cách sửa gọn: nhớ lại danh sách giai đoạn tính phí đã biết
+  trên máy, để một lần hỏi hỏng không bị hiểu thành "không có gì phải trả tiền".
+- **Cửa sổ 800ms của nút khôi phục** có thể trả lời "không tìm thấy giao dịch"
+  sớm hơn lúc danh sách kịp về trên máy chậm. Tự lành ngay sau đó (phần dò lại
+  sẽ xác minh), nên chưa đụng vào con số đã được cân.
+- **Đổi tài khoản**: vẫn chỉ có câu lỗi chung.

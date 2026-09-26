@@ -82,6 +82,11 @@ export function usePurchasePhase(
   // `availablePurchases` — and verifying it twice at once used to race itself
   // on the server's unique index.
   const verifiedTokensRef = useRef(new Set<string>());
+  // Bumped when Play says the product is already owned; the effect below
+  // turns that into a restore. A counter, not a flag, so a second attempt
+  // still fires.
+  const [ownedRetry, setOwnedRetry] = useState(0);
+  const handledOwnedRef = useRef(0);
 
   const verifyAndFinish = useCallback(
     async (purchase: Purchase, finishTransaction: (args: { purchase: Purchase; isConsumable: boolean }) => Promise<void>) => {
@@ -150,6 +155,22 @@ export function usePurchasePhase(
       // "Không thể hoàn tất giao dịch", which reads as a broken payment
       // (owner 2026-09-26).
       if (error.code === ErrorCode.UserCancelled) return;
+      // Play's OTHER way of saying "paid later": with a method that settles
+      // at a counter or by transfer, Billing answers the purchase call with
+      // this instead of handing over a pending purchase. Same meaning, same
+      // message — money on its way, not a failure.
+      if (error.code === ErrorCode.DeferredPayment) {
+        setPaymentPending(true);
+        return;
+      }
+      // "You already own this." Then the payment is not the problem — our
+      // record of it is (verification never finished, or it was bought under
+      // another sign-in). Asking Play for the account's purchases turns that
+      // into an unlock instead of an error the buyer can do nothing about.
+      if (error.code === ErrorCode.AlreadyOwned) {
+        setOwnedRetry((n) => n + 1);
+        return;
+      }
       setPurchaseError(error.message);
       if (__DEV__) console.warn('IAP purchase failed:', error);
     },
@@ -209,6 +230,15 @@ export function usePurchasePhase(
         if (__DEV__) console.warn('getAvailablePurchases failed:', e);
       });
   }, [sku, connected, getAvailablePurchases]);
+
+  // Play answered "already owned" — run the same lookup the button does, so
+  // the buyer gets the phase instead of a dead end. Keyed off the counter so
+  // a changing `restore` identity can't re-trigger it.
+  useEffect(() => {
+    if (ownedRetry === 0 || handledOwnedRef.current === ownedRetry) return;
+    handledOwnedRef.current = ownedRetry;
+    restore();
+  }, [ownedRetry, restore]);
 
   // Consumes whatever either the explicit restore or the silent catch-up
   // fetched. A token is verified once per screen — verification is
