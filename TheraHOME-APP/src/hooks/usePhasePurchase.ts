@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { useIAP, ErrorCode, type Purchase } from 'react-native-iap';
+import { useIAP, ErrorCode, getAvailablePurchases as fetchOwnedPurchases, type Purchase } from 'react-native-iap';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -46,6 +46,24 @@ export function daysOpenAfterPurchase(phaseFirstDayNumber: number, purchasedAtIs
   return elapsedHours >= BOUGHT_PHASE_WAIT_HOURS ? Infinity : phaseFirstDayNumber + 1;
 }
 
+/** The edge function's own error code out of a failed invoke.
+ *
+ * supabase-js flattens every non-2xx into one generic
+ * "Edge Function returned a non-2xx status code" — but it keeps the whole
+ * Response on `error.context`, so the code the function actually sent is
+ * still readable. Without this the buyer gets "thử lại" for a problem no
+ * amount of retrying can fix (owner 2026-09-26). */
+async function functionErrorCode(error: unknown): Promise<string | null> {
+  const context = (error as { context?: unknown })?.context;
+  if (!(context instanceof Response)) return null;
+  try {
+    const body = await context.clone().json();
+    return typeof body?.error === 'string' ? body.error : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Drives the "Mở khoá ngay" button on `PhaseUnlockPromo` for one specific
  * phase, on both platforms. Wraps `react-native-iap`'s `useIAP()`: fetches
  * the phase's product for the CURRENT platform (Apple product id on iOS,
@@ -73,15 +91,7 @@ export function usePurchasePhase(
   // verifyAndFinish's identity (and the useIAP wiring below) every render.
   const onVerifiedRef = useRef(opts?.onVerified);
   onVerifiedRef.current = opts?.onVerified;
-  // True between a restore request and either a matching purchase being
-  // consumed by the effect below or the empty-result timeout firing.
-  const restoreRequestedRef = useRef(false);
   const purchaseRequestedRef = useRef(false);
-  // Tokens already sent for verification on this screen. The store hands the
-  // same purchase to us twice — once through onPurchaseSuccess, then again in
-  // `availablePurchases` — and verifying it twice at once used to race itself
-  // on the server's unique index.
-  const verifiedTokensRef = useRef(new Set<string>());
   // Bumped when Play says the product is already owned; the effect below
   // turns that into a restore. A counter, not a flag, so a second attempt
   // still fires.
@@ -99,8 +109,6 @@ export function usePurchasePhase(
         setPurchaseError(null);
         return;
       }
-      const token = purchase.purchaseToken ?? purchase.id;
-      if (token) verifiedTokensRef.current.add(token);
       setVerifying(true);
       setPurchaseError(null);
       setPaymentPending(false);
@@ -113,7 +121,16 @@ export function usePurchasePhase(
             : await supabase.functions.invoke('verify-apple-purchase', {
                 body: { phaseId, transactionId: purchase.id },
               });
-        if (error) throw error;
+        if (error) {
+          // Bought under a different sign-in: retrying can never help, and
+          // buying again is impossible (Play says "already owned"), so name
+          // the actual problem.
+          if ((await functionErrorCode(error)) === 'transaction_already_claimed') {
+            setPurchaseError('claimed_by_other');
+            return;
+          }
+          throw error;
+        }
         // Google still processing: say so and stop — no entitlement, no
         // finishTransaction (an unfinished purchase stays restorable).
         if (data?.pending) {
@@ -144,7 +161,7 @@ export function usePurchasePhase(
     [phaseId, queryClient],
   );
 
-  const { connected, products, fetchProducts, requestPurchase, finishTransaction, availablePurchases, getAvailablePurchases } = useIAP({
+  const { connected, products, fetchProducts, requestPurchase, finishTransaction } = useIAP({
     onPurchaseSuccess: (purchase) => {
       purchaseRequestedRef.current = false;
       void verifyAndFinish(purchase, finishTransaction);
@@ -184,80 +201,68 @@ export function usePurchasePhase(
 
   const product = products.find((p) => p.id === sku) ?? null;
 
-  // Catch-up, once per screen: a purchase can be paid for while nobody is
-  // looking — Play's slow payment methods clear hours later, and an app
-  // killed between payment and verification leaves the same state. Either
-  // way the purchase is still sitting in the account, so ask for the list
-  // and let the effect below verify what it finds. Silent by design: unlike
-  // `restore`, nobody asked, so an empty list says nothing (owner
+  // Claim a purchase the store already holds for this account. Both entry
+  // points below go through here, and it is the pattern react-native-iap
+  // documents: ask for the owned purchases, verify each on the server, then
+  // finish it.
+  //
+  // The IMPERATIVE `getAvailablePurchases` is what resolves with the list.
+  // The hook's same-named function only refreshes reactive state, which is
+  // why this code used to race a timer against a re-render and could answer
+  // "nothing to restore" while the purchase was still on its way (owner
   // 2026-09-26).
+  //
+  // `announce` separates the two callers: the button owes the user an answer
+  // either way, the silent catch-up says nothing when there is nothing.
+  const claimOwnedPurchase = useCallback(
+    async ({ announce }: { announce: boolean }) => {
+      if (!sku || !connected) return;
+      if (announce) {
+        setPurchaseError(null);
+        setRestoring(true);
+      }
+      try {
+        const owned = await fetchOwnedPurchases();
+        const match = owned.find((p) => p.productId === sku);
+        if (!match) {
+          if (announce) setPurchaseError('restore_not_found');
+          return;
+        }
+        await verifyAndFinish(match, finishTransaction);
+      } catch (e) {
+        if (announce) setPurchaseError(e instanceof Error ? e.message : 'restore_failed');
+        if (__DEV__) console.warn('getAvailablePurchases failed:', e);
+      } finally {
+        if (announce) setRestoring(false);
+      }
+    },
+    [sku, connected, verifyAndFinish, finishTransaction],
+  );
+
+  // Catch-up, once per screen: a purchase can be paid for while nobody is
+  // looking — Play's slower methods clear hours later, and an app killed
+  // between payment and verification leaves the same state. Either way the
+  // purchase is still sitting in the account.
   const caughtUpRef = useRef(false);
   useEffect(() => {
     if (!connected || !sku || caughtUpRef.current) return;
     caughtUpRef.current = true;
-    getAvailablePurchases().catch((e: unknown) => {
-      if (__DEV__) console.warn('getAvailablePurchases (catch-up) failed:', e);
-    });
-  }, [connected, sku, getAvailablePurchases]);
+    void claimOwnedPurchase({ announce: false });
+  }, [connected, sku, claimOwnedPurchase]);
 
-  // "Khôi phục giao dịch": re-fetch the Apple account's owned purchases and
-  // re-run server verification for the one matching this phase's product.
-  // `getAvailablePurchases` delivers results through the hook's *reactive*
-  // `availablePurchases` state (its promise resolves before that state has
-  // re-rendered — see react-native-iap's useIAP docs), so the match is
-  // consumed by the effect below rather than right after the await.
+  /** "Khôi phục giao dịch" — the user asked, so they get an answer. */
   const restore = useCallback(() => {
-    if (!sku || !connected) return;
-    setPurchaseError(null);
-    restoreRequestedRef.current = true;
-    setRestoring(true);
-    getAvailablePurchases()
-      .then(() => {
-        // One generous frame for `availablePurchases` to land; if the effect
-        // below hasn't consumed a match by then, there is nothing to restore.
-        setTimeout(() => {
-          if (restoreRequestedRef.current) {
-            restoreRequestedRef.current = false;
-            setRestoring(false);
-            setPurchaseError('restore_not_found');
-          }
-        }, 800);
-      })
-      .catch((e: unknown) => {
-        restoreRequestedRef.current = false;
-        setRestoring(false);
-        setPurchaseError(e instanceof Error ? e.message : 'restore_failed');
-        if (__DEV__) console.warn('getAvailablePurchases failed:', e);
-      });
-  }, [sku, connected, getAvailablePurchases]);
+    void claimOwnedPurchase({ announce: true });
+  }, [claimOwnedPurchase]);
 
   // Play answered "already owned" — run the same lookup the button does, so
   // the buyer gets the phase instead of a dead end. Keyed off the counter so
-  // a changing `restore` identity can't re-trigger it.
+  // a changing callback identity can't re-trigger it.
   useEffect(() => {
     if (ownedRetry === 0 || handledOwnedRef.current === ownedRetry) return;
     handledOwnedRef.current = ownedRetry;
-    restore();
-  }, [ownedRetry, restore]);
-
-  // Consumes whatever either the explicit restore or the silent catch-up
-  // fetched. A token is verified once per screen — verification is
-  // idempotent server-side, but re-running it on every state change would
-  // leave the button spinning in a loop. A restore the user asked for always
-  // goes through, so it can still answer them.
-  useEffect(() => {
-    if (!sku) return;
-    const match = availablePurchases.find((p) => p.productId === sku);
-    if (!match) return;
-    const token = match.purchaseToken ?? match.id;
-    if (restoreRequestedRef.current) {
-      restoreRequestedRef.current = false;
-      setRestoring(false);
-    } else if (!token || verifiedTokensRef.current.has(token)) {
-      return;
-    }
-    void verifyAndFinish(match, finishTransaction);
-  }, [availablePurchases, sku, verifyAndFinish, finishTransaction]);
+    void claimOwnedPurchase({ announce: true });
+  }, [ownedRetry, claimOwnedPurchase]);
 
   const purchase = useCallback(() => {
     // `verifying` only flips true once the store CALLS BACK, so between the

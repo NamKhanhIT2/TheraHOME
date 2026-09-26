@@ -4403,3 +4403,48 @@ Chưa làm: câu thông báo riêng cho trường hợp **giao dịch thuộc t�
 Chỗ đó `supabase-js` gộp mọi phản hồi non-2xx thành một lỗi chung, nên muốn
 phân biệt thì hàm phải trả 200 kèm cờ riêng — tức là sửa máy chủ và deploy thêm
 một lần nữa, chờ chủ dự án.
+
+### Làm theo cách chuẩn: đọc thẳng kết quả, đọc thẳng mã lỗi (2026-09-26)
+
+Chủ dự án: "cách nào chuẩn nhất, phổ biến nhất thì làm". Hai chỗ trong luồng
+IAP đang tự chế trong khi cả hai thư viện đều có đường chính thức.
+
+**1. Khôi phục giao dịch: dùng API trả về danh sách, bỏ hẹn giờ.** Hàm
+`getAvailablePurchases` **của hook** chỉ làm mới state phản ứng và trả về
+`Promise<void>` — nên code cũ phải đặt hẹn 800ms rồi đoán "quá hạn thì coi như
+không có giao dịch nào", tức là đua giữa một hẹn giờ và một lượt vẽ lại. Bản
+**mệnh lệnh** cùng tên (export ở gốc thư viện) **trả về thẳng mảng giao dịch**,
+và ví dụ trong tài liệu của chính thư viện là: lấy danh sách → xác minh trên
+máy chủ → `finishTransaction`. Đã viết lại theo đúng mẫu đó.
+
+Gọn hơn hẳn: bỏ được `availablePurchases`, effect tiêu thụ nó, `restoreRequestedRef`
+và `verifiedTokensRef`. Cả nút "Khôi phục", lần dò im lặng lúc mở màn, và nhánh
+"đã sở hữu" giờ đi chung một hàm `claimOwnedPurchase({ announce })` — `announce`
+phân biệt ai hỏi: người bấm nút thì phải trả lời dù có hay không, lần dò im
+lặng thì không nói gì khi không có gì. Đường đua "xác minh hai lần cùng lúc"
+vá hôm qua cũng biến mất về mặt cấu trúc (phía máy chủ vẫn giữ phần chịu lỗi
+23505, vì nó đúng trong mọi trường hợp).
+
+**2. Đọc mã lỗi thật của edge function.** `supabase-js` gộp mọi phản hồi non-2xx
+thành một `FunctionsHttpError` với câu chung — nhưng **nó giữ nguyên `Response`
+ở `error.context`**, nên mã lỗi hàm gửi về vẫn đọc được:
+`await error.context.clone().json()`. Đây là cách chuẩn, và nó xoá luôn lý do
+hôm qua phải trả 200 kèm cờ riêng.
+
+Nhờ vậy trường hợp **giao dịch thuộc tài khoản khác** (409
+`transaction_already_claimed`) có câu riêng: "Giao dịch này đã gắn với một tài
+khoản TheraHOME khác. Hãy đăng nhập đúng tài khoản đã mua." Trước đó là "thử
+lại" — lời khuyên vô nghĩa, vì thử lại không bao giờ qua và mua lại thì Play
+chặn vì đã sở hữu. **Không phải sửa máy chủ, không phải deploy thêm.**
+
+**Hai mục chuẩn khác, cân nhắc rồi KHÔNG làm:**
+- **Đối chiếu giao dịch lúc mở app** (Google khuyến nghị gọi
+  `queryPurchasesAsync` ở `onCreate`/`onResume`). Ở đây quyền sở hữu nằm trên
+  máy chủ và bền, còn màn paywall đã đối chiếu đúng lúc khách nhận ra vấn đề —
+  giai đoạn khoá thì thẻ mời mua nằm ngay đó, bấm một cái là chạy. Đổi lại,
+  mở kết nối Billing ngay lúc khởi động app là thứ rủi ro nhất có thể ship khi
+  không test được trên máy thật.
+- **`obfuscatedAccountId`** khi gọi mua (Google khuyến nghị, giúp tín hiệu
+  chống gian lận và tra cứu đơn). Nó sửa đúng lời gọi lấy tiền, mà lợi ích gần
+  như bằng 0 khi mã giao dịch đã được gắn chặt với người mua ở phía máy chủ.
+  Để dành cho lần nào có máy thật để thử.

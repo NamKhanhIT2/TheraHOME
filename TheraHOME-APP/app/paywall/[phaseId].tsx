@@ -190,7 +190,9 @@ export default function PaywallScreen() {
                   ? t('restoreNotFound')
                   : purchaseError === 'purchase_revoked'
                     ? t('purchaseRefunded')
-                    : t('purchaseFailed')}
+                    : purchaseError === 'claimed_by_other'
+                      ? t('purchaseClaimedByOther')
+                      : t('purchaseFailed')}
               </Text>
             ) : null}
 
