@@ -154,7 +154,7 @@ Deno.serve(async (req: Request) => {
   // leaked log line) silently steal the purchase by overwriting user_id.
   const { data: existing, error: existingError } = await adminClient
     .from("phase_purchases")
-    .select("user_id")
+    .select("user_id, revoked_at")
     .eq("apple_transaction_id", String(claims.transactionId))
     .maybeSingle();
   if (existingError) {
@@ -163,9 +163,17 @@ Deno.serve(async (req: Request) => {
   if (existing) {
     // Idempotent retry (e.g. client retried after a network blip) is fine;
     // anyone else trying to redeem an already-claimed transaction is not.
-    return existing.user_id === userId
-      ? jsonResponse({ ok: true })
-      : jsonResponse({ error: "transaction_already_claimed" }, 409);
+    if (existing.user_id !== userId) {
+      return jsonResponse({ error: "transaction_already_claimed" }, 409);
+    }
+    // Refunded (sync-apple-refunds set revoked_at): the phase stays locked,
+    // which is the point — but answering "ok" here would put the green
+    // "unlocked" screen over a still-locked roadmap. Parity with
+    // verify-google-purchase (owner 2026-09-26).
+    if (existing.revoked_at) {
+      return jsonResponse({ ok: false, revoked: true });
+    }
+    return jsonResponse({ ok: true });
   }
 
   const { error: insertError } = await adminClient.from("phase_purchases").insert({
@@ -177,6 +185,22 @@ Deno.serve(async (req: Request) => {
     purchased_at: claims.purchaseDate ? new Date(Number(claims.purchaseDate)).toISOString() : new Date().toISOString(),
   });
   if (insertError) {
+    // 23505 = the transaction id's unique index. Two verifications of the
+    // SAME purchase overlapped (the store hands it to the app twice — the
+    // purchase callback and the account's purchase list) and the other one
+    // won. The entitlement exists, so this is a success, not a 500 telling
+    // the buyer their payment failed.
+    if (insertError.code === "23505") {
+      const { data: raced } = await adminClient
+        .from("phase_purchases")
+        .select("user_id, revoked_at")
+        .eq("apple_transaction_id", String(claims.transactionId))
+        .maybeSingle();
+      if (raced && raced.user_id === userId) {
+        return raced.revoked_at ? jsonResponse({ ok: false, revoked: true }) : jsonResponse({ ok: true });
+      }
+      return jsonResponse({ error: "transaction_already_claimed" }, 409);
+    }
     return jsonResponse({ error: insertError.message }, 500);
   }
 

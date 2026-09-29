@@ -4488,3 +4488,38 @@ gọi đúng câu lệnh mà pg_cron sẽ gọi → `200 {"ok":true,"checked":0,
 "unknown":0}`; gọi không kèm khoá bí mật, và gọi với khoá sai → cả hai đều
 `401 unauthorized`. Hàm để `verify_jwt = false` (pg_cron không gửi Authorization)
 nên chính lớp kiểm khoá này là thứ giữ cửa — vì vậy phải thử cả hai chiều.
+
+### Bật IAP trên iOS để test sandbox — build 22 (2026-09-29)
+
+Chủ dự án đã tạo đủ bốn sản phẩm non-consumable trong App Store Connect
+(`ai.therahome.{neckplus,neckpro,backplus,backpro}.phase3unlock`, trạng thái
+Prepare for Submission), Paid Apps Agreement đã Active, và bốn khoá
+`APPLE_*` đã nằm trong Supabase. Nên iOS đã đủ điều kiện để mua thử.
+
+**Ba việc phía mình:**
+
+1. `phase_promos.apple_product_id` của Giai đoạn 3 = `ai.therahome.neckplus.phase3unlock`.
+   Trước đó đang trống — nghĩa là dù cờ có bật, iOS vẫn không khoá gì.
+2. `IAP_ENABLED_IOS = true`, build number 21 → 22. Nhớ bump **ba chỗ**:
+   `app.json`, `ios/TheraHOME/Info.plist` (`CFBundleVersion` mới là nguồn thật
+   mà bản archive đọc), và `CURRENT_PROJECT_VERSION` ở hai config trong pbxproj.
+   Chỉ `app.json` được git theo dõi vì `ios/` nằm trong .gitignore.
+3. **`verify-apple-purchase` được kéo về ngang hàng với bản Google.** Đối chiếu
+   bản đang chạy với mã nguồn thì giống hệt — nhưng nó vẫn thiếu hai thứ mà bản
+   Google đã có từ 26/09:
+   - Giao dịch đã bị thu hồi (hoàn tiền) vẫn trả `ok: true`, tức là màn xanh
+     "Đã mở khoá" chồng lên một lộ trình vẫn khoá. Giờ trả `revoked: true`.
+   - Hai lần xác minh cùng một giao dịch đâm nhau ở chỉ mục duy nhất
+     `apple_transaction_id` thì trả 500. Giờ đọc lại dòng vừa bị ghi và coi là
+     thành công.
+   Đáng ghi: bản Apple này viết trước, bản Google chép theo — nên mọi sửa chữa
+   học được ở bên Google đều phải hỏi lại "bên Apple đã có chưa".
+
+**Mua trong TestFlight là giao dịch sandbox** — không mất tiền, dùng chính
+Apple ID của người test, không cần tạo tài khoản sandbox riêng. Hàm xác minh
+đã thử lần lượt máy chủ production rồi mới tới sandbox của Apple, nên cùng một
+mã chạy được cho cả hai môi trường.
+
+**Một hệ quả có chủ ý:** từ bản 22 trở đi, người dùng iOS nào đã qua ngày 14 sẽ
+thấy Giai đoạn 3 bị khoá thay vì mở free như hiện nay (đo được 4 người, chưa ai
+xem ngày nào của giai đoạn 3).
