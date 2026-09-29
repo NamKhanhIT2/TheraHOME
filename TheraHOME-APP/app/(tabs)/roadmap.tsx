@@ -5,7 +5,7 @@ import Reanimated from 'react-native-reanimated';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, useProducts, useRoadmapProducts } from '@/hooks/usePrograms';
+import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, useProducts, useRoadmapProducts, type DayRow } from '@/hooks/usePrograms';
 import { RoadmapComingSoonCard } from '@/components/roadmap/RoadmapComingSoonCard';
 import { useRequestDay } from '@/hooks/useRequestDay';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
@@ -176,8 +176,28 @@ export default function RoadmapScreen() {
     (day: { id: number; phaseId: string }) => boughtPhaseOpenThrough.has(day.phaseId) && !dayBoughtOpen(day),
     [boughtPhaseOpenThrough, dayBoughtOpen],
   );
-  // Declared after boughtPhaseIds: the gate needs that set.
-  const requestDayGate = useRequestDay(dayBoughtOpen);
+  /** The one gate for opening a day.
+   *
+   * A phase that must be BOUGHT answers ONLY to the purchase rule — never to
+   * the calendar (owner 2026-09-29). Someone who lapsed past day 17 and then
+   * bought used to get those days immediately, because the calendar already
+   * counted them as due, so the 49-hour wait never bit for exactly the people
+   * most likely to buy, binge and ask for a refund. A day already watched
+   * stays reachable so nothing completed disappears.
+   *
+   * A free phase keeps the calendar rule it always had. */
+  const dayBlocked = useCallback(
+    (day: { id: number; phaseId: string; status: DayRow['status'] }) => {
+      if (isReviewAccount) return false;
+      if (IAP_ENABLED && (lockRequirementsQuery.data?.has(day.phaseId) ?? false)) {
+        return !dayBoughtOpen(day) && day.status !== 'done';
+      }
+      return day.status === 'locked' || day.status === 'upcoming';
+    },
+    [isReviewAccount, lockRequirementsQuery.data, dayBoughtOpen],
+  );
+  // Declared after dayBlocked: the gate needs it.
+  const requestDayGate = useRequestDay(dayBlocked);
   const lockedPhaseIds = useMemo(() => {
     // IAP is off for now — never lock a phase, so the paywall/purchase card is
     // unreachable and StoreKit is never opened (see IAP_ENABLED).
@@ -446,11 +466,11 @@ export default function RoadmapScreen() {
                         unrestricted={isReviewAccount || dayBoughtOpen(d)}
                         opensIn24h={dayBoughtWaiting(d)}
                         onPress={() => {
-                          // Locked/future days don't open at all (except
-                          // for App Review accounts); openable days go
+                          // Blocked days don't open at all (see dayBlocked —
+                          // App Review accounts are exempt); openable days go
                           // through the discomfort check-in gate (which
                           // skips itself once the day is answered).
-                          if (!isReviewAccount && !dayBoughtOpen(d) && (d.status === 'locked' || d.status === 'upcoming')) return;
+                          if (dayBlocked(d)) return;
                           if (program) {
                             void requestDayGate.requestDay(d, program.userProgramId, program.productId);
                           } else {

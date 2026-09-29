@@ -4523,3 +4523,46 @@ mã chạy được cho cả hai môi trường.
 **Một hệ quả có chủ ý:** từ bản 22 trở đi, người dùng iOS nào đã qua ngày 14 sẽ
 thấy Giai đoạn 3 bị khoá thay vì mở free như hiện nay (đo được 4 người, chưa ai
 xem ngày nào của giai đoạn 3).
+
+### Giai đoạn có bán thì lịch không được quyết định nữa (2026-09-29)
+
+Phát hiện khi dựng tài khoản test cho iOS: đặt ngày kích hoạt lùi 20 ngày thì
+sau khi mua, ngày 17–20 mở ngay — luật chờ 49 giờ không hề có tác dụng. Lý do:
+cơ chế cũ cho mở mọi ngày thoả `day_number <= elapsed + 2`, mà với người đã bỏ
+tập lâu thì những ngày đó đã "tới hạn" theo lịch từ trước.
+
+Nghĩa là hàng rào chống mua-xem-hết-rồi-đòi-hoàn-tiền **hở đúng với nhóm dễ làm
+việc đó nhất**: người bỏ tập lâu rồi quay lại mua. Đo hôm nay: **18 trong 86 lộ
+trình** đã qua ngày 15, **5 lộ trình đã qua ngày 28** — nhóm 5 này mua là nhận
+trọn 14 ngày ngay lập tức, không chờ giây nào.
+
+**Luật mới, một câu:** giai đoạn nào có bán thì **chỉ** luật giao dịch quyết
+định; lịch không có tiếng nói. Giai đoạn miễn phí giữ nguyên luật lịch như cũ.
+
+Sửa ở ba nơi, cùng một ý:
+- `mark_day_watched`: hỏi `phase_promos` xem giai đoạn có mã sản phẩm không; có
+  thì bắt buộc `v_bought_open` (hoặc tài khoản duyệt app), không thì dùng lịch.
+  **Kèm theo một lỗ hổng lặng lẽ khác được bịt:** trước đây hàm này tin app sẽ
+  giấu giai đoạn tính phí khỏi người chưa mua — giờ chính máy chủ từ chối.
+- `roadmap.tsx`: gom hai nhánh rải rác thành một vị từ `dayBlocked`, dùng chung
+  cho cả nút bấm lẫn `useRequestDay`.
+- `day/[dayId].tsx`: `dayOpenable`, `progressLocked`, `canRecordWatch` cùng đi
+  theo `paidPhase`. Ngày **đã xem rồi vẫn mở** — không lấy đi thứ khách đã hoàn
+  thành. Tài khoản duyệt app vẫn miễn trừ.
+
+`useRequestDay` đổi tham số từ `isBoughtDayOpen` sang `isDayBlocked`: người gọi
+biết nhiều hơn cái ngày tự nó biết, nên để người gọi quyết định. Không truyền
+gì thì vẫn là luật lịch (màn Home).
+
+**Cách vá hàm SQL cũng đáng ghi:** migration không khai báo lại cả hàm mà đọc
+`pg_get_functiondef` rồi `replace` đúng hai đoạn, và **báo lỗi nếu không tìm
+thấy neo**. Hàm dài ~90 dòng, phần lớn là streak/adherence/thông báo mốc —
+chép tay lại toàn bộ chỉ để đổi một khối `if` là cách dễ làm sai nhất.
+
+Kiểm bằng dữ liệu thật, năm tình huống: tester iOS ngày 16 mở / ngày 17 khoá
+(đang chờ 49h); Android đã qua hạn chờ ngày 28 mở; **khách bỏ tập chưa mua ngày
+17 khoá** (trước đây mở); khách đó ngày 5 miễn phí vẫn mở.
+
+**Nửa máy chủ có hiệu lực ngay, nửa app thì phải chờ build.** Máy chủ từ chối
+ghi nhận tiến độ, nhưng bản app cũ vẫn cho *xem* video những ngày đó — nên lỗ
+hổng chỉ đóng hẳn sau khi bản mới tới tay khách.

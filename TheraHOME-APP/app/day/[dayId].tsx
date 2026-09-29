@@ -114,7 +114,19 @@ export default function DayDetailScreen() {
   const [checkInDone, setCheckInDone] = useState(false);
   const programDayId = d?.programDayId;
   const userProgramId = program?.userProgramId;
-  const dayOpenable = !!d && (phaseBought || d.status === 'current' || d.status === 'done' || d.status === 'missed');
+  // A phase that must be BOUGHT answers ONLY to the purchase rule — never to
+  // the calendar (owner 2026-09-29): for someone who lapsed past day 17 and
+  // then bought, the calendar counted those days as already due, so the whole
+  // phase opened at once and the 49-hour wait never bit. `lockRequirement` is
+  // what marks the phase as paid on this platform. A day already watched
+  // stays reachable, so nothing completed disappears; review accounts are
+  // exempt here as everywhere.
+  const paidPhase = !!lockRequirement;
+  const dayOpenable =
+    !!d &&
+    (paidPhase
+      ? isReviewAccount || phaseBought || d.status === 'done'
+      : d.status === 'current' || d.status === 'done' || d.status === 'missed');
   useEffect(() => {
     if (checkInDone || !dayOpenable || !userProgramId || !programDayId) return;
     let cancelled = false;
@@ -209,8 +221,10 @@ export default function DayDetailScreen() {
   // Calendar-unlock mechanic: watching the video is what records completion
   // (no completion button, no pain gate). Days beyond tomorrow's midnight
   // unlock are still viewable but never record progress.
-  const progressLocked = !phaseBought && (d.status === 'locked' || d.status === 'upcoming');
-  const canRecordWatch = !!program && (phaseBought ? d.status !== 'done' : d.status === 'current' || d.status === 'missed');
+  const progressLocked = paidPhase ? !dayOpenable : d.status === 'locked' || d.status === 'upcoming';
+  const canRecordWatch =
+    !!program &&
+    (paidPhase ? dayOpenable && d.status !== 'done' : d.status === 'current' || d.status === 'missed');
   const videoUrl = normalizeVideoUrl(d.video);
   const supportToolsUrl = normalizeVideoUrl(d.supportToolsUrl);
   // Admin can name this per day/market; fall back to the translated default.

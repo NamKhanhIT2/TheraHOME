@@ -22,7 +22,7 @@ import type { DayRow } from '@/hooks/usePrograms';
  * Pure logging under the calendar-unlock mechanic — completion is still
  * only mark_day_watched. A failed lookup/insert opens the day anyway.
  */
-export function useRequestDay(isBoughtDayOpen?: (day: DayRow) => boolean) {
+export function useRequestDay(isDayBlocked?: (day: DayRow) => boolean) {
   const { session } = useSession();
   // App Review accounts open ANY day regardless of the calendar unlock
   // (per explicit request 2026-09-03) — the server's mark_day_watched has a
@@ -42,8 +42,12 @@ export function useRequestDay(isBoughtDayOpen?: (day: DayRow) => boolean) {
   }
 
   async function requestDay(day: DayRow, userProgramId: string, productId: string) {
-    const phaseBought = isBoughtDayOpen?.(day) ?? false;
-    if (!bypassDayLocks && !phaseBought && (day.status === 'locked' || day.status === 'upcoming')) return;
+    // The caller decides what "blocked" means when it knows more than the
+    // day's own status — the Roadmap does, because a PAID phase answers only
+    // to the purchase rule, not the calendar. Without a predicate the plain
+    // calendar rule applies (Home).
+    const blocked = isDayBlocked ? isDayBlocked(day) : day.status === 'locked' || day.status === 'upcoming';
+    if (!bypassDayLocks && blocked) return;
     if (!userProgramId) {
       openDay(day.id, productId);
       return;
