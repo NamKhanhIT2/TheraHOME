@@ -37,10 +37,15 @@ step — see the function's own error responses):
    touched).
 5. App Store Connect → Users and Access → Sandbox Testers → create a test
    Apple ID to actually complete a purchase without being charged.
-6. Still not done: an Apple Server Notifications V2 webhook (and its
-   Google RTDN counterpart) to catch refunds after the fact (`revoked_at`
-   exists on `phase_purchases` but nothing sets it yet) — worth adding
-   once both purchase flows are confirmed working end to end.
+6. Refunds ARE handled now, on both stores, by two daily sweeps rather
+   than webhooks: `sync-voided-purchases` (Google, 03:20 UTC, live since
+   2026-09-25) and `sync-apple-refunds` (Apple, 03:40 UTC, added
+   2026-09-29). Both set `phase_purchases.revoked_at`, which every
+   entitlement check filters on. The Apple one needs the same four
+   `APPLE_*` secrets as `verify-apple-purchase`; with no iOS purchase on
+   file it returns before touching them. Apple's Server Notifications V2
+   (and Google's RTDN) remain the real-time upgrade if volume ever makes
+   the daily poll silly.
 
 **Google Play Billing (phase unlock, Android)** — code shipped 2026-09-03:
 `verify-google-purchase` (deployed), `google_product_id` on `phase_promos`

@@ -4448,3 +4448,39 @@ chặn vì đã sở hữu. **Không phải sửa máy chủ, không phải depl
   chống gian lận và tra cứu đơn). Nó sửa đúng lời gọi lấy tiền, mà lợi ích gần
   như bằng 0 khi mã giao dịch đã được gắn chặt với người mua ở phía máy chủ.
   Để dành cho lần nào có máy thật để thử.
+
+### Thu hồi khi Apple hoàn tiền (2026-09-29)
+
+Android có lưới chắn hoàn tiền từ 25/09, iOS thì chưa — nên nếu bật bán trên
+iOS trước khi làm việc này, đúng cái lỗ hổng vừa bịt bên Google sẽ mở lại bên
+Apple: khách mua, xem hết, xin hoàn tiền, `revoked_at` vẫn trống và nội dung
+vẫn mở. `sync-apple-refunds` lấp chỗ đó.
+
+**Vì sao hỏi từng giao dịch chứ không nhận thông báo đẩy của Apple.** Apple
+không có endpoint kiểu "liệt kê mọi đơn đã hoàn" như `voidedpurchases` của
+Google. Đường đẩy là App Store Server Notifications V2, nhưng mỗi thông báo là
+một JWS phải xác thực chuỗi chứng chỉ x5c ngược về CA gốc của Apple mới tin
+được — một endpoint công khai có quyền thu hồi truy cập là thứ phải làm đúng
+tuyệt đối, mà lại chưa thể test cho tới khi iOS bán thật. Trong khi đó ta đã
+giữ sẵn danh sách giao dịch còn hiệu lực trong bảng của mình, số lượng ít, và
+Apple trả lời "đơn này bị hoàn chưa" qua đúng App Store Server API mà
+`verify-apple-purchase` đang dùng. Nên: hỏi bằng khoá của mình, trên danh sách
+của mình. Cùng hình dạng và cùng nhịp ngày với tác vụ bên Google — một cách xử
+lý hoàn tiền, không phải hai.
+
+**Ba chi tiết đáng ghi:**
+- **Đọc bảng của mình trước, gọi Apple sau.** Chưa có giao dịch iOS nào thì hàm
+  trả về ngay, chưa đụng tới bốn secret `APPLE_*`. Nhờ vậy lên lịch được **ngay
+  bây giờ** dù chủ dự án chưa tạo khoá App Store Server API — nó chạy mỗi sáng
+  và không làm gì cả, thay vì lỗi mỗi sáng.
+- **Tra cứu hỏng thì không thu hồi.** Apple không trả lời (mạng, giới hạn gọi,
+  giao dịch sandbox cũ) thì đếm vào `unknown` và để nguyên quyền. Thu hồi khi
+  chưa biết là lấy mất nội dung của người đã trả tiền — sai chiều.
+- **Lấy đúng mốc thời gian Apple báo** (`revocationDate`) làm `revoked_at`, chứ
+  không phải `now()`. Bên Google buộc phải dùng `now()` vì `voidedpurchases`
+  là một dòng sự kiện; Apple thì nói thẳng lúc nào.
+
+Lịch: 03:40 UTC (10:40 giờ Hà Nội), lệch 20 phút sau tác vụ Google để hai cái
+không đụng nhau. Dùng chung secret trong Vault và chung RPC `cron_secret_matches`.
+
+Chưa deploy, chưa lên lịch — chờ chủ dự án cho phép, vì cả hai đều chạm production.
