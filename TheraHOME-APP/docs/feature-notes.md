@@ -4483,4 +4483,8 @@ lý hoàn tiền, không phải hai.
 Lịch: 03:40 UTC (10:40 giờ Hà Nội), lệch 20 phút sau tác vụ Google để hai cái
 không đụng nhau. Dùng chung secret trong Vault và chung RPC `cron_secret_matches`.
 
-Chưa deploy, chưa lên lịch — chờ chủ dự án cho phép, vì cả hai đều chạm production.
+**Đã deploy và lên lịch cùng ngày**, sau khi chủ dự án đồng ý. Kiểm tại chỗ:
+gọi đúng câu lệnh mà pg_cron sẽ gọi → `200 {"ok":true,"checked":0,"revoked":0,
+"unknown":0}`; gọi không kèm khoá bí mật, và gọi với khoá sai → cả hai đều
+`401 unauthorized`. Hàm để `verify_jwt = false` (pg_cron không gửi Authorization)
+nên chính lớp kiểm khoá này là thứ giữ cửa — vì vậy phải thử cả hai chiều.
