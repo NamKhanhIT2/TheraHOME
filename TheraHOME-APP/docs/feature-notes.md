@@ -4566,3 +4566,45 @@ Kiểm bằng dữ liệu thật, năm tình huống: tester iOS ngày 16 mở /
 **Nửa máy chủ có hiệu lực ngay, nửa app thì phải chờ build.** Máy chủ từ chối
 ghi nhận tiến độ, nhưng bản app cũ vẫn cho *xem* video những ngày đó — nên lỗ
 hổng chỉ đóng hẳn sau khi bản mới tới tay khách.
+
+### Tuân thủ: đếm những ngày đã tới lượt, và không bao giờ đứng yên nữa (2026-10-01)
+
+Sau khi sửa cột "Ngày" ở Admin thì lộ ra chuyện thứ hai: **Nguyen Hoang Anh Minh
+tới ngày 14, tập 2 buổi, vẫn ghi 100%**. Tung Van Phan ngày 10, tập 1 buổi,
+cũng 100%.
+
+**Nguyên nhân không phải công thức sai mà là nó chỉ chạy một nửa thời gian.**
+Phép tính nằm ngay trong `mark_day_watched`, nên nó chỉ được tính lại **lúc có
+người xem xong một ngày**. Ai bỏ tập thì con số đóng băng ở lần cuối cùng họ
+còn chăm: tập 2/2 ngày → 100%, rồi mười hai ngày trôi qua mà mẫu số không ai
+cộng thêm.
+
+**Công thức mới, nói bằng một câu:** trong những ngày **thực sự tới lượt** của
+người này, họ hoàn thành bao nhiêu?
+
+- Giai đoạn miễn phí: một ngày tới lượt khi lịch chạm tới nó.
+- Giai đoạn **tính phí**: chỉ tới lượt nếu đã mua, và theo đúng luật giao dịch
+  (hai ngày đầu ngay, phần còn lại sau thời gian chờ). Nhờ vậy **không mua Giai
+  đoạn 3 không bao giờ làm tụt điểm của ai** — nếu không thì mọi khách cũ sẽ
+  tự động xấu đi vào ngày mình bật bán, một kiểu phạt người ta vì không chịu
+  trả tiền.
+- Ngày nghỉ không phải bài tập của ai, nên bỏ khỏi cả tử số lẫn mẫu số.
+- Chặn trần 100: giai đoạn đã mua mở được những ngày lịch chưa tới, không ai
+  nên đọc thấy 130%.
+
+**Ba thay đổi:**
+1. `adherence_pct_for(user_program_id)` — **một định nghĩa duy nhất**, dạng hàm
+   SQL. `mark_day_watched` giờ gọi nó thay vì mang bản sao riêng.
+2. Chạy lại cho toàn bộ 103 lộ trình ngay lập tức.
+3. Tác vụ `recompute-adherence-daily` lúc 10:00 sáng mỗi ngày (giờ VN). Mẫu số
+   lớn lên theo lịch dù khách có mở app hay không — đó chính là lý do con số
+   cũ nói dối, nên phải có người tính lại hằng ngày.
+
+**Tác động, đo trên dữ liệu thật:** trung bình 55% → **26%**. 57 lộ trình giảm,
+**0 lộ trình tăng**, 46 giữ nguyên. Khách chăm chỉ không mất gì: Tuan HoKhac
+100→100, Khanh 100→100, Hùng 93→93. Người tụt là người đáng tụt: tập 1 buổi rồi
+nghỉ, trước ghi 100%, giờ ghi 5–13%.
+
+**Không cần build app.** Cả app lẫn Admin đều đọc cột `adherence_pct`, và cột
+đó giờ đúng. Nhưng lưu ý: màn Hồ sơ trong app **có hiện con số này cho khách**,
+nên nhiều người sẽ thấy phần trăm của mình tụt hẳn trong lần mở app tới.
