@@ -42,7 +42,23 @@ const USER_MARKET_TABS: Array<[UserMarketFilter, string]> = [
 ];
 const MARKET_SHORT_LABEL: Record<TheraAccountCountry, string> = { VN: "VN", US: "UK", MALAY: "ML" };
 
-function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact?: boolean; onOpenUser: (u: SampleUser) => void }) {
+/** Sorting the adherence column (owner 2026-10-01). Optional: a table
+ * rendered without `onToggleAdherenceSort` keeps a plain header. */
+export type AdherenceSort = "none" | "asc" | "desc";
+
+function UsersTable({
+  rows,
+  compact,
+  onOpenUser,
+  adherenceSort = "none",
+  onToggleAdherenceSort,
+}: {
+  rows: SampleUser[];
+  compact?: boolean;
+  onOpenUser: (u: SampleUser) => void;
+  adherenceSort?: AdherenceSort;
+  onToggleAdherenceSort?: () => void;
+}) {
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
       <thead>
@@ -51,7 +67,44 @@ function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Thị trường</th>
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Vùng tập</th>
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Ngày</th>
-          <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Tuân thủ</th>
+          <th
+            style={{ padding: "0 8px 10px", fontWeight: 600 }}
+            aria-sort={adherenceSort === "asc" ? "ascending" : adherenceSort === "desc" ? "descending" : "none"}
+          >
+            {onToggleAdherenceSort ? (
+              <button
+                type="button"
+                onClick={onToggleAdherenceSort}
+                title={
+                  adherenceSort === "none"
+                    ? "Sắp xếp từ thấp lên cao"
+                    : adherenceSort === "asc"
+                      ? "Đang từ thấp lên cao — bấm để đảo"
+                      : "Đang từ cao xuống thấp — bấm để bỏ sắp xếp"
+                }
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  font: "inherit",
+                  letterSpacing: "inherit",
+                  textTransform: "inherit",
+                  color: adherenceSort === "none" ? "inherit" : "var(--color-primary)",
+                  cursor: "pointer",
+                }}
+              >
+                Tuân thủ
+                <span aria-hidden="true" style={{ fontSize: 11 }}>
+                  {adherenceSort === "asc" ? "▲" : adherenceSort === "desc" ? "▼" : "↕"}
+                </span>
+              </button>
+            ) : (
+              "Tuân thủ"
+            )}
+          </th>
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Phân quyền</th>
           <th style={{ padding: "0 8px 10px", fontWeight: 600 }}>Trạng thái</th>
           {!compact ? <th style={{ padding: "0 8px 10px", fontWeight: 600 }}></th> : null}
@@ -506,6 +559,7 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
   const [status, setStatus] = useState<"all" | SampleUser["status"]>("all");
   const [market, setMarket] = useState<UserMarketFilter>("ALL");
   const [openId, setOpenId] = useState<SampleUser["id"] | null>(null);
+  const [adherenceSort, setAdherenceSort] = useState<AdherenceSort>("none");
 
   useEffect(() => {
     fetchAppUsers().then(setUsers).catch(() => setUsers([]));
@@ -513,9 +567,22 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
 
   const matchesMarket = (u: SampleUser) =>
     market === "ALL" || (market === "NONE" ? !u.country : u.country === market);
-  const rows = (users ?? []).filter(
+  const filtered = (users ?? []).filter(
     (u) => (status === "all" || u.status === status) && matchesMarket(u) && u.name.toLowerCase().includes(q.toLowerCase()),
   );
+  // Lowest first on the first click: the reason to sort this column is to find
+  // who has fallen behind. Customers with no activated program have no number
+  // at all — they stay at the bottom either way, so an ascending sort does not
+  // open on a wall of N/A.
+  const rows =
+    adherenceSort === "none"
+      ? filtered
+      : [...filtered].sort((a, b) => {
+          if (a.adherence == null && b.adherence == null) return 0;
+          if (a.adherence == null) return 1;
+          if (b.adherence == null) return -1;
+          return adherenceSort === "asc" ? a.adherence - b.adherence : b.adherence - a.adherence;
+        });
   const openUser = (users ?? []).find((u) => u.id === openId);
 
   async function updateUser(id: SampleUser["id"], patch: Partial<SampleUser>): Promise<boolean> {
@@ -571,7 +638,14 @@ export function UsersView({ role }: { role: "admin" | "care" }) {
             Không có khách hàng nào khớp bộ lọc.
           </div>
         ) : (
-          <UsersTable rows={rows} onOpenUser={(u) => setOpenId(u.id)} />
+          <UsersTable
+            rows={rows}
+            onOpenUser={(u) => setOpenId(u.id)}
+            adherenceSort={adherenceSort}
+            onToggleAdherenceSort={() =>
+              setAdherenceSort((cur) => (cur === "none" ? "asc" : cur === "asc" ? "desc" : "none"))
+            }
+          />
         )}
         {openUser ? (
           <UserDrawer user={openUser} readOnly={readOnly} onSave={(patch) => updateUser(openUser.id, patch)} onClose={() => setOpenId(null)} />
