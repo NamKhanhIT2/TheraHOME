@@ -1272,25 +1272,29 @@ function calendarDay(activatedAt: string, totalDays: number | undefined): number
   return totalDays ? Math.min(day, totalDays) : day;
 }
 
-/** Finished days per program. Paged: PostgREST silently truncates a plain
- * select at the server's row cap, and this table grows by a row per customer
- * per day. */
-async function fetchDoneDayCounts(): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-  const PAGE = 500;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from("user_program_days")
-      .select("user_program_id")
-      .eq("status", "done")
-      .range(from, from + PAGE - 1);
-    if (error) throw error;
-    for (const row of data ?? []) {
-      counts.set(row.user_program_id, (counts.get(row.user_program_id) ?? 0) + 1);
-    }
-    if (!data || data.length < PAGE) break;
-  }
-  return counts;
+export interface AdherenceParts {
+  daysDone: number;
+  daysDoneDue: number;
+  daysDue: number;
+}
+
+/** Days finished, and the days that had come due, per program — one round
+ * trip, counted by the database.
+ *
+ * `admin_adherence_parts` sits on the same `available_day_ids_for` the
+ * adherence percentage is computed from, so the fraction Admin prints can
+ * never disagree with the percentage next to it. Counting here instead would
+ * mean a second copy of the unlock rules in TypeScript, and the first change
+ * to those rules would split them. Staff-only and SECURITY DEFINER. */
+async function fetchAdherenceParts(): Promise<Map<string, AdherenceParts>> {
+  const { data, error } = await supabase.rpc("admin_adherence_parts");
+  if (error) throw error;
+  return new Map(
+    (data ?? []).map((r: { user_program_id: string; days_done: number; days_done_due: number; days_due: number }) => [
+      r.user_program_id,
+      { daysDone: r.days_done, daysDoneDue: r.days_done_due, daysDue: r.days_due },
+    ]),
+  );
 }
 
 export async function fetchAppUsers(): Promise<SampleUser[]> {
@@ -1305,17 +1309,20 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
 
   const contactByUser = new Map((contacts ?? []).map((c) => [c.user_id, c.contact_value]));
   const programCountByUser = new Map<string, number>();
-  const firstProgramByUser = new Map<string, { day: number; daysDone: number; totalDays: number | null; adherence_pct: number }>();
+  const firstProgramByUser = new Map<string, { day: number; daysDone: number; daysDoneDue: number; daysDue: number; totalDays: number | null; adherence_pct: number }>();
   const { data: productDays } = await supabase.from("products").select("id, total_days");
   const totalDaysByProduct = new Map((productDays ?? []).map((p) => [p.id, p.total_days]));
-  const doneByProgram = await fetchDoneDayCounts();
+  const partsByProgram = await fetchAdherenceParts();
   for (const program of programs ?? []) {
     programCountByUser.set(program.user_id, (programCountByUser.get(program.user_id) ?? 0) + 1);
     if (!firstProgramByUser.has(program.user_id)) {
       const total = totalDaysByProduct.get(program.product_id) ?? null;
+      const parts = partsByProgram.get(program.id);
       firstProgramByUser.set(program.user_id, {
         day: calendarDay(program.activated_at, total ?? undefined),
-        daysDone: doneByProgram.get(program.id) ?? 0,
+        daysDone: parts?.daysDone ?? 0,
+        daysDoneDue: parts?.daysDoneDue ?? 0,
+        daysDue: parts?.daysDue ?? 0,
         totalDays: total,
         adherence_pct: program.adherence_pct,
       });
@@ -1336,6 +1343,8 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
         day: program?.day ?? null,
         daysDone: program?.daysDone ?? null,
         totalDays: program?.totalDays ?? null,
+        daysDoneDue: program?.daysDoneDue ?? null,
+        daysDue: program?.daysDue ?? null,
         adherence: program ? Math.round(Number(program.adherence_pct)) : null,
         status: p.locked ? "inactive" : activated ? "active" : "unactivated",
         joined: new Date(p.created_at).toLocaleDateString("vi-VN"),
@@ -1422,6 +1431,9 @@ export interface UserProgramRow {
   /** Days actually finished — `currentDay` is where the calendar says they
    * are, this is what they did. */
   daysDone: number;
+  /** The fraction the adherence percentage is made of. */
+  daysDoneDue: number;
+  daysDue: number;
   totalDays: number;
   streak: number;
   adherencePct: number;
@@ -1466,17 +1478,7 @@ export async function fetchUserPrograms(userId: string): Promise<UserProgramRow[
     phasesByProduct.set(ph.product_id, list);
   }
 
-  // One extra round trip, but this screen shows a single user: how many days
-  // each of their programs has actually finished.
-  const { data: doneRows } = await supabase
-    .from("user_program_days")
-    .select("user_program_id")
-    .eq("status", "done")
-    .in("user_program_id", (programs ?? []).map((p) => p.id));
-  const doneByProgram = new Map<string, number>();
-  for (const row of doneRows ?? []) {
-    doneByProgram.set(row.user_program_id, (doneByProgram.get(row.user_program_id) ?? 0) + 1);
-  }
+  const partsByProgram = await fetchAdherenceParts();
 
   return (programs ?? []).map((p) => {
     const product = productById.get(p.product_id);
@@ -1491,7 +1493,9 @@ export async function fetchUserPrograms(userId: string): Promise<UserProgramRow[
       productId: p.product_id,
       productName: product?.name ?? p.product_id,
       currentDay,
-      daysDone: doneByProgram.get(p.id) ?? 0,
+      daysDone: partsByProgram.get(p.id)?.daysDone ?? 0,
+      daysDoneDue: partsByProgram.get(p.id)?.daysDoneDue ?? 0,
+      daysDue: partsByProgram.get(p.id)?.daysDue ?? 0,
       totalDays: product?.total_days ?? currentDay,
       streak: p.streak,
       adherencePct: Math.round(Number(p.adherence_pct)),

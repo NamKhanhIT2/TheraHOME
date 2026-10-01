@@ -4608,3 +4608,29 @@ nghỉ, trước ghi 100%, giờ ghi 5–13%.
 **Không cần build app.** Cả app lẫn Admin đều đọc cột `adherence_pct`, và cột
 đó giờ đúng. Nhưng lưu ý: màn Hồ sơ trong app **có hiện con số này cho khách**,
 nên nhiều người sẽ thấy phần trăm của mình tụt hẳn trong lần mở app tới.
+
+### Admin hiện phân số đứng sau phần trăm (2026-10-01)
+
+"1/14 ngày tới lượt" nói rõ hơn "7%": nhìn phân số là biết ngay phải gọi điện,
+còn phần trăm thì phải nghĩ một nhịp. Chỉ sửa web, **không đụng app** — đúng
+yêu cầu của chủ dự án là không build lại.
+
+**Điểm đáng ghi là chỗ lấy số.** Phân số phải khớp tuyệt đối với phần trăm nằm
+cạnh nó, mà phần trăm thì tính từ tập "ngày đã tới lượt" với đủ luật giai đoạn
+tính phí. Đếm lại bằng TypeScript ở web là tự tạo bản sao thứ hai của luật mở
+khoá — lần đổi luật tiếp theo là hai bên lệch nhau. Nên tách
+`available_day_ids_for()` ra thành một hàm riêng, `adherence_pct_for()` viết
+lại để dùng nó, và thêm `admin_adherence_parts()` trả về cả ba con số cho toàn
+bộ lộ trình trong một lượt gọi. Một định nghĩa, ba nơi dùng.
+
+Hàm mới là **staff-only**: nó trả về dữ liệu của toàn bộ khách hàng, mà web
+Admin không giữ khoá service — nó gọi bằng phiên đăng nhập của chính admin/CSKH.
+Đã thử gọi bằng khoá công khai: trả về `not_authorized`.
+
+Nhân tiện bỏ luôn đoạn đếm theo trang viết hôm trước — một lượt gọi RPC thay
+cho vòng lặp phân trang, và database đếm thì không bị cắt bớt.
+
+Kiểm: viết lại `adherence_pct_for` xong, 0 lộ trình lệch so với giá trị đang
+lưu. Ví dụ Admin sẽ hiện: Hùng "93% · 13/14", Hung Vu "71% · 10/14",
+Tung Van Phan "10% · 1/10" (anh này mới tới ngày 10 nên mẫu số là 10, không
+phải 14).

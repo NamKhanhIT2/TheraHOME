@@ -101,6 +101,11 @@ export interface SampleUser {
    * `day` says where they should be; this says what they did. */
   daysDone: number | null;
   totalDays: number | null;
+  /** The fraction behind the adherence percentage: days finished out of days
+   * that had come due. "1/14" makes a support call obvious in a way "7%"
+   * does not. */
+  daysDoneDue: number | null;
+  daysDue: number | null;
   adherence: number | null;
   status: SampleUserStatus;
   joined: string;

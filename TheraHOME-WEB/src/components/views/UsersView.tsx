@@ -93,7 +93,18 @@ function UsersTable({ rows, compact, onOpenUser }: { rows: SampleUser[]; compact
                   "N/A"
                 )}
               </td>
-              <td style={{ padding: "12px 8px", color: "var(--text-secondary)" }}>{u.adherence != null ? `${u.adherence}%` : "N/A"}</td>
+              <td style={{ padding: "12px 8px", color: "var(--text-secondary)" }}>
+                {u.adherence != null ? (
+                  <>
+                    {u.adherence}%
+                    {u.daysDue ? (
+                      <span style={{ color: "var(--text-muted)" }}> · {u.daysDoneDue}/{u.daysDue} ngày tới lượt</span>
+                    ) : null}
+                  </>
+                ) : (
+                  "N/A"
+                )}
+              </td>
               <td style={{ padding: "12px 8px" }}><Badge color={rc} bg={rb}>{rl}</Badge></td>
               <td style={{ padding: "12px 8px" }}><StatusPill status={u.locked ? "inactive" : u.status} /></td>
               {!compact ? (
@@ -279,6 +290,9 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
             </div>
             <div style={{ flex: 1, background: "#fff", borderRadius: 12, padding: 14, textAlign: "center", boxShadow: "var(--shadow-card)" }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>{user.adherence != null ? `${user.adherence}%` : "N/A"}</div>
+              {user.daysDue ? (
+                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{user.daysDoneDue}/{user.daysDue} ngày đã tới lượt</div>
+              ) : null}
               <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2 }}>tuân thủ</div>
             </div>
             <div style={{ flex: 1, background: "#fff", borderRadius: 12, padding: 14, textAlign: "center", boxShadow: "var(--shadow-card)" }}>
@@ -357,6 +371,7 @@ function UserDrawer({ user, onClose, readOnly, onSave }: { user: SampleUser; onC
                         <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>{p.productName}</div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
                           Ngày {p.currentDay}/{p.totalDays} · Đã tập {p.daysDone} · Streak {p.streak} · Tuân thủ {p.adherencePct}%
+                          {p.daysDue ? ` (${p.daysDoneDue}/${p.daysDue} ngày tới lượt)` : ""}
                           {p.currentPhaseName ? ` · ${p.currentPhaseName}` : ""}
                           {currentPhase?.requiresPayment ? (
                             <Badge color={currentPhase.purchased ? "#1E9E5E" : "#B9860B"} bg={currentPhase.purchased ? "rgba(30,158,94,0.12)" : "rgba(185,134,11,0.12)"}>
