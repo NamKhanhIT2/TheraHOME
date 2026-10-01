@@ -92,8 +92,15 @@ export interface SampleUser {
   avatarColor?: string;
   contact: string;
   area: string;
-  /** null when the user has no activated program yet — render as N/A. */
+  /** Where the CALENDAR says they are — the same number the app shows them,
+   * derived from activated_at, never from user_programs.current_day (dead
+   * since the calendar-unlock rewrite; see fetchAppUsers). null when the user
+   * has no activated program yet — render as N/A. */
   day: number | null;
+  /** How many days they have actually finished, and how long the roadmap is.
+   * `day` says where they should be; this says what they did. */
+  daysDone: number | null;
+  totalDays: number | null;
   adherence: number | null;
   status: SampleUserStatus;
   joined: string;

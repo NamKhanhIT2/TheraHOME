@@ -1253,11 +1253,51 @@ export async function uploadPhasePromoImage(phaseId: string, kind: "cross-sell" 
 // here for admin/CSKH to see, just with status "unactivated" and N/A stats.
 // `account_type` filters out staff/TheraHOME-issued rows (see TheraAccountsView),
 // which aren't patients and are managed there instead.
+/** The day the customer is on, exactly as the app computes it.
+ *
+ * `user_programs.current_day` is DEAD: nothing has written it since the
+ * calendar-unlock rewrite (2026-08-31), so Admin was showing "Ngày 1" for
+ * 100 of 102 programs while people were on day 15 (owner spotted it
+ * 2026-10-01). The app derives the day from `activated_at` — see
+ * `daysSinceLocal` + `currentDay` in TheraHOME-APP/src/hooks/usePrograms.ts.
+ * Mirrored here, `Math.round` and all, so both screens say the same number;
+ * change one, change the other. */
+function calendarDay(activatedAt: string, totalDays: number | undefined): number {
+  const start = new Date(activatedAt);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const elapsed = Math.max(0, Math.round((today.getTime() - start.getTime()) / 86_400_000));
+  const day = elapsed + 1;
+  return totalDays ? Math.min(day, totalDays) : day;
+}
+
+/** Finished days per program. Paged: PostgREST silently truncates a plain
+ * select at the server's row cap, and this table grows by a row per customer
+ * per day. */
+async function fetchDoneDayCounts(): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  const PAGE = 500;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("user_program_days")
+      .select("user_program_id")
+      .eq("status", "done")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      counts.set(row.user_program_id, (counts.get(row.user_program_id) ?? 0) + 1);
+    }
+    if (!data || data.length < PAGE) break;
+  }
+  return counts;
+}
+
 export async function fetchAppUsers(): Promise<SampleUser[]> {
   const [{ data: profiles, error: pErr }, { data: contacts, error: cErr }, { data: programs, error: upErr }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, phone, treatment_area, app_role, locked, created_at, account_type, country").is("deleted_at", null),
     supabase.from("user_access_contacts").select("user_id, contact_value"),
-    supabase.from("user_programs").select("user_id, product_id, current_day, adherence_pct"),
+    supabase.from("user_programs").select("id, user_id, product_id, activated_at, adherence_pct"),
   ]);
   if (pErr) throw pErr;
   if (cErr) throw cErr;
@@ -1265,17 +1305,18 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
 
   const contactByUser = new Map((contacts ?? []).map((c) => [c.user_id, c.contact_value]));
   const programCountByUser = new Map<string, number>();
-  const firstProgramByUser = new Map<string, { current_day: number; adherence_pct: number }>();
-  // Same cap as fetchUserPrograms: a roadmap that was shortened leaves stored
-  // current_day values past its new length.
+  const firstProgramByUser = new Map<string, { day: number; daysDone: number; totalDays: number | null; adherence_pct: number }>();
   const { data: productDays } = await supabase.from("products").select("id, total_days");
   const totalDaysByProduct = new Map((productDays ?? []).map((p) => [p.id, p.total_days]));
+  const doneByProgram = await fetchDoneDayCounts();
   for (const program of programs ?? []) {
     programCountByUser.set(program.user_id, (programCountByUser.get(program.user_id) ?? 0) + 1);
     if (!firstProgramByUser.has(program.user_id)) {
-      const cap = totalDaysByProduct.get(program.product_id);
+      const total = totalDaysByProduct.get(program.product_id) ?? null;
       firstProgramByUser.set(program.user_id, {
-        current_day: cap ? Math.min(program.current_day, cap) : program.current_day,
+        day: calendarDay(program.activated_at, total ?? undefined),
+        daysDone: doneByProgram.get(program.id) ?? 0,
+        totalDays: total,
         adherence_pct: program.adherence_pct,
       });
     }
@@ -1292,7 +1333,9 @@ export async function fetchAppUsers(): Promise<SampleUser[]> {
         contact: contactByUser.get(p.id) ?? p.email ?? p.phone ?? "N/A",
         area: p.treatment_area || "N/A",
         country: (p.country as SampleUser["country"]) ?? null,
-        day: program?.current_day ?? null,
+        day: program?.day ?? null,
+        daysDone: program?.daysDone ?? null,
+        totalDays: program?.totalDays ?? null,
         adherence: program ? Math.round(Number(program.adherence_pct)) : null,
         status: p.locked ? "inactive" : activated ? "active" : "unactivated",
         joined: new Date(p.created_at).toLocaleDateString("vi-VN"),
@@ -1376,6 +1419,9 @@ export interface UserProgramRow {
   productId: string;
   productName: string;
   currentDay: number;
+  /** Days actually finished — `currentDay` is where the calendar says they
+   * are, this is what they did. */
+  daysDone: number;
   totalDays: number;
   streak: number;
   adherencePct: number;
@@ -1391,7 +1437,7 @@ export interface UserProgramRow {
 // to per-product ownership).
 export async function fetchUserPrograms(userId: string): Promise<UserProgramRow[]> {
   const [{ data: programs, error: upErr }, { data: products, error: prErr }, { data: phases, error: phErr }, { data: promos, error: promoErr }, { data: purchases, error: purchErr }] = await Promise.all([
-    supabase.from("user_programs").select("id, product_id, current_day, streak, adherence_pct").eq("user_id", userId),
+    supabase.from("user_programs").select("id, product_id, activated_at, streak, adherence_pct").eq("user_id", userId),
     supabase.from("products").select("id, name, total_days"),
     supabase.from("program_phases").select("id, product_id, name, day_start, day_end").order("sort_order"),
     supabase.from("phase_promos").select("phase_id, apple_product_id, google_product_id"),
@@ -1420,20 +1466,33 @@ export async function fetchUserPrograms(userId: string): Promise<UserProgramRow[
     phasesByProduct.set(ph.product_id, list);
   }
 
+  // One extra round trip, but this screen shows a single user: how many days
+  // each of their programs has actually finished.
+  const { data: doneRows } = await supabase
+    .from("user_program_days")
+    .select("user_program_id")
+    .eq("status", "done")
+    .in("user_program_id", (programs ?? []).map((p) => p.id));
+  const doneByProgram = new Map<string, number>();
+  for (const row of doneRows ?? []) {
+    doneByProgram.set(row.user_program_id, (doneByProgram.get(row.user_program_id) ?? 0) + 1);
+  }
+
   return (programs ?? []).map((p) => {
     const product = productById.get(p.product_id);
     const productPhases = phasesByProduct.get(p.product_id) ?? [];
-    // Shortening a roadmap (dropping a phase, lowering total_days) leaves
-    // stored current_day values past the end — the app already caps its own
-    // calendar-derived day the same way, so never show "Ngày 15 / 14".
-    const currentDay = Math.min(p.current_day, product?.total_days ?? p.current_day);
+    // From activated_at, like the app — `current_day` stopped being written
+    // when the calendar unlock shipped. calendarDay() also caps a shortened
+    // roadmap, so this never reads "Ngày 15 / 14".
+    const currentDay = calendarDay(p.activated_at, product?.total_days ?? undefined);
     const currentPhase = productPhases.find((ph) => currentDay >= ph.dayStart && currentDay <= ph.dayEnd);
     return {
       userProgramId: p.id,
       productId: p.product_id,
       productName: product?.name ?? p.product_id,
       currentDay,
-      totalDays: product?.total_days ?? p.current_day,
+      daysDone: doneByProgram.get(p.id) ?? 0,
+      totalDays: product?.total_days ?? currentDay,
       streak: p.streak,
       adherencePct: Math.round(Number(p.adherence_pct)),
       currentPhaseId: currentPhase?.id ?? null,
