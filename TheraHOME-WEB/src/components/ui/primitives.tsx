@@ -166,9 +166,9 @@ export function countMissing(values: Array<string | null | undefined>): number {
  * tabs), pulled out as one shared piece for the new per-market/per-language
  * edit forms so it isn't rebuilt 4 times. Generic over the tab key type so
  * callers can use string unions like `"vn" | "us" | "malay"`. */
-export function PillTabs<T extends string>({ options, value, onChange }: { options: Array<[T, string]>; value: T; onChange: (value: T) => void }) {
+export function PillTabs<T extends string>({ options, value, onChange, marginBottom = 14 }: { options: Array<[T, string]>; value: T; onChange: (value: T) => void; /** 0 when the tabs share a row with something else instead of sitting above content. */ marginBottom?: number }) {
   return (
-    <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+    <div style={{ display: "flex", gap: 6, marginBottom }}>
       {options.map(([key, label]) => (
         <button
           key={key}

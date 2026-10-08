@@ -2501,3 +2501,37 @@ cookie ghi `light`, tải lại vẫn sáng; bấm lại → tối, tải lại 
 vẫn chạy song song (thử `?lang=en` ở nền tối). Nền `<html>` và nền trang đo ra
 cùng một màu. Xem ở 375px: đầu trang, thân trang và chân trang đều tối, không
 còn mảng sáng nào.
+
+### Kích hoạt: lọc theo trạng thái, và một ô tìm kiếm giả bị gỡ (2026-10-08)
+
+Chủ dự án xin "nút sắp xếp/lọc để phân loại chưa sử dụng và đã kích hoạt" cho
+tab Kích hoạt — danh sách TheraNECK+ đã 659 khách, không soi tay được nữa.
+
+**Ba nút lọc** (`PillTabs`) nằm cùng hàng với ô tìm kiếm: Tất cả / Chưa sử
+dụng / Đã kích hoạt, mỗi nút kèm số đếm. Hai quyết định nhỏ nhưng đáng ghi:
+
+- **Số đếm tính sau ô tìm kiếm**, không phải trên toàn bộ dữ liệu. Nếu tính
+  trên toàn bộ thì nút sẽ hứa một con số mà cú bấm không cho ra.
+- **Tiêu đề mỗi sản phẩm đổi thành "x / 659 khách"** khi có lọc *hoặc* có tìm
+  kiếm. Trước đây nó luôn ghi tổng, kể cả lúc đang tìm kiếm và bên dưới chỉ
+  còn ba dòng — lỗi có sẵn, sửa luôn.
+- **"Chờ duyệt" không phải một lựa chọn trong ba nút.** Đơn Shopify chờ duyệt
+  chưa được cấp quyền gì nên nó không phải "chưa sử dụng"; nó thuộc khối hàng
+  chờ riêng ở trên. Chọn "Đã kích hoạt" thì khối đó tự ẩn, vì không đơn nào
+  trong đó có thể đã kích hoạt.
+
+**Rồi chủ dự án chỉ ra hai ô tìm kiếm chồng nhau và bảo bỏ một.** Thứ phải bỏ
+không phải ô của trang mà là ô **"Tìm kiếm..." trên thanh đầu của `AppShell`**:
+nó **không có `value`, không có `onChange`, không nối với gì cả** — bê từ bản
+thiết kế sang và chưa từng tìm được thứ gì, trên *mọi* trang của bảng điều
+khiển chứ không riêng trang này. Hai ô cạnh nhau mà một ô im lặng không làm gì
+thì tệ hơn là chỉ có một ô chạy thật. Các trang khác vì thế cũng mất ô đó —
+chúng chỉ mất một ô giả; trang User vốn có ô tìm riêng và không ảnh hưởng. Nếu
+sau này làm tìm kiếm chung thật thì chỗ của nó vẫn ở đấy.
+
+Đoạn mô tả bốn dòng đầu trang cũng bỏ theo yêu cầu. Phần giải thích "đơn
+Shopify về đây chưa cấp quyền gì, phải bấm Duyệt" thì giữ — nó nằm trong khối
+hàng chờ và là luật duy nhất ở trang này mà người mới không tự đoán được.
+
+Chưa xem được bằng mắt từ phía tôi: trang Admin đòi đăng nhập và tôi không
+đăng nhập hộ. Chủ dự án tự mở localhost kiểm tra rồi mới cho deploy.

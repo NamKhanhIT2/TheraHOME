@@ -23,7 +23,7 @@ import {
   type ActivationProduct,
   type ActivationContact,
 } from "@/lib/db";
-import { SectionCard, PrimaryBtn, GhostBtn, Badge, inputStyle } from "@/components/ui/primitives";
+import { SectionCard, PrimaryBtn, GhostBtn, Badge, PillTabs, inputStyle } from "@/components/ui/primitives";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
@@ -179,6 +179,17 @@ function matchesFilter(group: ContactGroup, needle: string): boolean {
   return typedDigits.length >= 4 && group.digits.includes(typedDigits);
 }
 
+/** The two states a granted contact can be in, as the badges already name
+ * them. "Chờ duyệt" is deliberately not one of them: a queued Shopify order
+ * has been granted nothing yet, so it belongs to the queue card above, not to
+ * this split. */
+type StatusFilter = "all" | "unused" | "claimed";
+
+function matchesStatus(group: ContactGroup, status: StatusFilter): boolean {
+  if (status === "all") return true;
+  return status === "claimed" ? !!group.claimedByUserId : !group.claimedByUserId;
+}
+
 export function ActivationView() {
   const [products, setProducts] = useState<ActivationProduct[] | null>(null);
   const [contacts, setContacts] = useState<ActivationContact[] | null>(null);
@@ -187,6 +198,7 @@ export function ActivationView() {
   const [addErrors, setAddErrors] = useState<Record<string, string>>({});
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("all");
   const [deleteTarget, setDeleteTarget] = useState<ContactGroup | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
@@ -217,17 +229,29 @@ export function ActivationView() {
   );
   const queueTotal = useMemo(() => allGroups.filter((g) => g.pending).length, [allGroups]);
 
+  /** Everything already granted that matches the search box, before the
+   * status tabs narrow it — the tab counts are taken from here so they agree
+   * with what a click actually shows. */
+  const liveMatching = useMemo(
+    () => allGroups.filter((g) => !g.pending && matchesFilter(g, needle)),
+    [allGroups, needle],
+  );
+
+  const statusCounts = useMemo(() => {
+    const claimed = liveMatching.filter((g) => g.claimedByUserId).length;
+    return { all: liveMatching.length, claimed, unused: liveMatching.length - claimed };
+  }, [liveMatching]);
+
   const liveByProduct = useMemo(() => {
     const map = new Map<string, ContactGroup[]>();
-    for (const group of allGroups) {
-      if (group.pending) continue;
-      if (!matchesFilter(group, needle)) continue;
+    for (const group of liveMatching) {
+      if (!matchesStatus(group, status)) continue;
       const list = map.get(group.productId) ?? [];
       list.push(group);
       map.set(group.productId, list);
     }
     return map;
-  }, [allGroups, needle]);
+  }, [liveMatching, status]);
 
   const productNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -334,10 +358,24 @@ export function ActivationView() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* The explainer that used to sit here is gone (owner, 2026-10-08): the
+          two people who use this page know what it does, and it was pushing
+          the list down by four lines every visit. The queue card below still
+          explains the one genuinely surprising rule — that a Shopify order
+          grants nothing until someone approves it. */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 620 }}>
-          Thêm số điện thoại/email của khách vào đúng sản phẩm họ đã mua. Khi khách nhập thông tin này trong app, chỉ lộ trình của các sản phẩm có tên họ trong danh sách mới được mở khoá. Hai đường vào: đơn Shopify tự rơi vào mục &quot;chờ duyệt&quot;, còn khách mua ngoài Shopify thì thêm tay ở ô của từng sản phẩm.
-        </div>
+        {/* Counts come from the same list the tabs filter, so they follow the
+            search box rather than claiming a total the click cannot show. */}
+        <PillTabs
+          options={[
+            ["all", `Tất cả (${statusCounts.all})`],
+            ["unused", `Chưa sử dụng (${statusCounts.unused})`],
+            ["claimed", `Đã kích hoạt (${statusCounts.claimed})`],
+          ]}
+          value={status}
+          onChange={setStatus}
+          marginBottom={0}
+        />
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--border-input)", borderRadius: 10, padding: "8px 12px", width: 260 }}>
           <Icon name="search" size={15} color="var(--text-muted)" />
           <input
@@ -349,7 +387,9 @@ export function ActivationView() {
         </div>
       </div>
 
-      {queueTotal > 0 ? (
+      {/* Nothing in the queue can be activated — it has been granted nothing
+          yet — so under that tab the card would only be an empty distraction. */}
+      {queueTotal > 0 && status !== "claimed" ? (
         <SectionCard
           title="Đơn Shopify chờ duyệt"
           action={
@@ -427,7 +467,10 @@ export function ActivationView() {
                     Lộ trình chưa xuất bản
                   </span>
                 ) : null}
-                {total} khách
+                {/* `total` ignores both the search box and the tabs, so show it
+                    alone only when nothing is narrowing the list — otherwise the
+                    header would claim 659 above three visible rows. */}
+                {status === "all" && !needle ? `${total} khách` : `${rows.length} / ${total} khách`}
               </span>
             }
           >
@@ -466,7 +509,13 @@ export function ActivationView() {
             ) : null}
             {rows.length === 0 ? (
               <div style={{ padding: "16px 0", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                {filter.trim() ? "Không có liên hệ khớp tìm kiếm." : "Chưa có liên hệ nào cho sản phẩm này."}
+                {filter.trim()
+                  ? "Không có liên hệ khớp tìm kiếm."
+                  : status === "claimed"
+                    ? "Chưa có khách nào kích hoạt sản phẩm này."
+                    : status === "unused"
+                      ? "Mọi khách trong danh sách đều đã kích hoạt."
+                      : "Chưa có liên hệ nào cho sản phẩm này."}
               </div>
             ) : (
               rows.map((group, i) => (

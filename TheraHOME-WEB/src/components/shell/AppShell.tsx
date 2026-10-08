@@ -123,10 +123,13 @@ export function AppShell({
             <div id={HEADER_ACCESSORY_SLOT_ID} style={{ display: "flex", alignItems: "center", gap: 12 }} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--border-input)", borderRadius: 10, padding: "8px 12px", width: 240 }}>
-              <Icon name="search" size={15} color="var(--text-muted)" />
-              <input placeholder="Tìm kiếm..." style={{ border: "none", outline: "none", flex: 1, fontFamily: "var(--font-family)", fontSize: 13 }} />
-            </div>
+            {/* No global search box here. The design mock drew one, and it was
+                ported as a dead input: no value, no onChange, no handler on any
+                page. On Kích hoạt it sat directly above that page's real search
+                and the owner read the pair as a duplicate (2026-10-08) — which
+                it was, except only one of them did anything. Views that need
+                searching carry their own box; if a real global search is ever
+                built, it belongs here. */}
             {/* Way back to the public site. Staff land here straight after
                 signing in (resolvePostSignInRoute sends admin to /admin and
                 cskh to /care), so without this the console is a room with no
