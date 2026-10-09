@@ -198,6 +198,54 @@ table a client subscribes to via `postgres_changes` needs an explicit
 `alter publication supabase_realtime add table ...` — see the Realtime
 gotcha under Stack above.
 
+**agent_approvals** (added 2026-10-09, WEB only): the approval gate of the
+Agent console (`TheraHOME-WEB /agent`). An agent prepares a change that spends
+advertising money or alters what customers are told; a person releases it.
+Columns: `id` text PK (a stable, idempotent key an agent can re-derive, so
+re-running an analysis does not pile up duplicates), `kind`
+(`budget`|`content`), `title`, `agent`, `reason`, `from_value`, `to_value`,
+`target`, `evidence` jsonb (a short list of label/value pairs — the shape
+differs per proposal, so columns would mean a migration per new kind),
+`status` (`pending`|`approved`|`rejected`), `decided_by`, `decided_at`,
+`created_at`. Partial index on pending rows, which is the console's only hot
+query. RLS: **admin writes, admin-or-cskh reads** (two policies; the second
+added 2026-10-09 when the console opened to the customer-care accounts). A
+cskh UPDATE matches no policy, changes no row, and PostgREST reports zero
+rows — which the web client turns into an error rather than a silent success. `decided_by`/`decided_at` are stamped by a BEFORE UPDATE
+trigger from `auth.uid()`, never sent by the client; an audit trail the client
+fills in is not an audit trail. The client updates with `status = 'pending'`
+in the filter, so two open consoles cannot overwrite each other's call.
+Migration: `202610091400_agent_console_approvals.sql`. Nothing in the mobile
+app reads this table.
+
+**agent_metrics_days / agent_metrics_windows / agent_metrics_campaigns**
+(added 2026-10-09, WEB only): the figures the Agent console reads. They were
+written into `TheraHOME-WEB/src/lib/agentConsole.ts` as a dated snapshot until
+the owner pointed out that this puts the business's revenue, ad spend and
+order counts into git history, where deleting the file later does not remove
+them.
+
+`agent_metrics_days` is one row per day (Meta spend, orders created by
+source). `agent_metrics_windows` is one row per span the console's picker
+offers (7/14/30 days) with that window's Pancake totals — stored rather than
+derived, because revenue, cancellations and the product mix are their own
+per-window reads and cannot be had by adding day counts up. `by_product` is
+jsonb: three label/count pairs whose membership changes when a product is
+added. `agent_metrics_campaigns` is Meta spend joined to Pancake's
+utm_campaign orders, per window.
+
+These are the READ half of reading Meta and Pancake live, not an alternative
+to it: the console reads here, and what WRITES here is a separate question —
+today a human run through the MCP connectors, later a scheduled job holding
+real credentials, with no change to the web code. It is also the right shape
+regardless, since a dashboard should not call an ad platform's API on every
+page load. `captured_at` is on every row so a screen can say how old its
+numbers are.
+
+RLS mirrors `agent_approvals`: admin writes, admin-or-cskh reads. These are
+company financials; no policy admits anyone else. Nothing in the mobile app
+reads these tables.
+
 ## Edge Functions
 
 Three, all on project `nyjvtvmllwbyfokldgtj`. None of their source is

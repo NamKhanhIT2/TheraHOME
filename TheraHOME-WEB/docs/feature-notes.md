@@ -2535,3 +2535,234 @@ hàng chờ và là luật duy nhất ở trang này mà người mới không t
 
 Chưa xem được bằng mắt từ phía tôi: trang Admin đòi đăng nhập và tôi không
 đăng nhập hộ. Chủ dự án tự mở localhost kiểm tra rồi mới cho deploy.
+
+## Trung tâm điều hành Agent — `/agent`, a third console surface (2026-10-09)
+
+A third shell beside `/admin` and `/care`, for running the TheraHOME AI team
+(the `therahome-ai-team` plugin's seven agents) from the browser. Reached from
+the account menu on the public site, where the owner already is when they think
+of it; the menu's existing entry was renamed **"Bảng điều khiển App"** at the
+same time so the two read as siblings.
+
+**Who gets in (revised 2026-10-09).** Admin and cskh. The owner was asked
+whether to add a staff role and answered that the staff are the customer-care
+accounts — "nhân viên" and `cskh` are the same people — so no new role was
+invented and `AccessGate` learned to admit several instead
+(`requiredRole={["admin", "cskh"]}`; it depends on a joined string, not the
+array, or an inline literal would re-run the gate forever).
+
+What differs inside is what you may RELEASE, not what you may look at: only
+admin decides an approval or runs a command that changes advertising spend.
+`canApprove` reads the signed-in role, the console hides the buttons, and the
+database refuses the write independently — the rule is held in two places and
+neither is the only one holding it.
+
+Worth knowing: `current_web_roles()` resolves an `admin` account_type to
+`['admin', 'cskh']`, so the owner already carries both. Two accounts currently
+hold cskh, neither locked nor expired.
+
+A cskh reader sees Tổng quan and Chiến dịch, which show revenue and ad spend.
+That was the owner's call to open; narrowing it later is a per-tab check in
+`app/agent/page.tsx`, not a rework.
+
+**No cross-link to Admin, by request.** An earlier pass added a `shellLinks`
+prop to `AppShell` so the two consoles could link to each other; the owner said
+the two jobs are unrelated (2026-10-09) and it was reverted. `AppShell`,
+`adminMockData.ts` and `app/admin/page.tsx` are therefore untouched by this
+feature.
+
+**Its own dark shell, not `AppShell`.** `src/components/agent/AgentShell.tsx`.
+Keeping them apart means the light Admin/CSKH chrome is unaffected, and this
+surface can be dark without threading a theme flag through a shared component.
+Its palette lives in `src/styles/agentConsole.css`, scoped under
+`.agent-console` so none of it can leak.
+
+**Window picker (2026-10-09).** Top right of the header: 7 / 14 / 30 ngày,
+each a real read rather than a slider over one week's numbers. Three windows
+and not an open calendar, because the data behind them is a snapshot — a free
+date range would promise fetches this app cannot make. When the connectors
+land this becomes a date range and nothing else changes.
+
+It earns its place immediately: cancelled-and-returned orders are 8,6% over
+seven days and **10,5% over thirty**, so the same tile reads "Dưới ngưỡng" in
+green or "Vượt ngưỡng" in red depending only on how far back you look. CPA
+blended drifts upward as the window widens, and clears the ceiling in all
+three.
+
+Daily rows are one 30-day series and the shorter windows are SLICES of it, so
+a day cannot carry two values depending on which window is open; the Pancake
+totals and the campaign rows are per-window reads, because revenue,
+cancellations and campaign spend cannot be derived by adding day counts up.
+Cross-checked: per-day Meta spend sums to the per-campaign totals exactly in
+all three windows.
+
+Two chart consequences, both in `charts.tsx`: axis labels thin to every nth
+date and per-bar totals disappear past ten bars, and the CPA line now accepts
+`null`. 09/09 spent a full day's budget and recorded no orders at all — spend
+÷ 0 is not a
+number to draw, so that day is a GAP in the line (one path per unbroken run)
+rather than a straight leap across it, and the subtitle counts the gaps.
+
+**The figures left the source tree (2026-10-09).** They were a dated snapshot
+in `src/lib/agentConsole.ts`. The owner read the warning about git history
+before pushing and asked for them to be read at runtime instead, so they moved
+into three tables (`agent_metrics_days`, `_windows`, `_campaigns`) and are
+fetched by `src/lib/agentMetrics.ts`.
+
+This is the read half of live connectors, not a detour from them: what fills
+those tables stays an open question — a human run through the MCP connectors
+today, a scheduled job with credentials later — and neither `agentMetrics.ts`
+nor any view changes when that swaps. It is also the right shape on its own: a
+dashboard calling Meta's API on every page load buys rate limits and a slow
+first paint for nothing.
+
+`agentConsole.ts` keeps only what belongs in source control — who the agents
+are, the quick commands, the CPA band and the cancellation ceiling. Those
+change when the product changes, not when yesterday's orders come in.
+
+Both number screens go through `MetricsGate`, which distinguishes "đang đọc"
+from "không đọc được". They look identical if both render an empty dashboard,
+and a reader who cannot tell them apart will assume the business had no orders.
+
+**The figures were real.** `src/lib/agentConsole.ts` holds values read on
+2026-10-09 from Meta Ads (account 2259241291085932, account- and
+campaign-level spend) and Pancake POS (orders, revenue, cancellations,
+per-source and per-utm_campaign splits) for 2026-10-02 → 2026-10-08. It is a
+SNAPSHOT: the app holds no Meta or Pancake credentials, so nothing refreshes,
+and every screen states the window and the read date. Replacing that file with
+live server-side reads is the next step — same shapes.
+
+What the real numbers say, since it is the first thing anyone will ask: CPA
+blended is above the 150–250k target, so the console opens on a red tile. Per-campaign CPA is harsher still (491k and 566k) because only 92 of
+the window's 139 orders carry a `utm_campaign`; the Chiến dịch tab explains the
+gap rather than hiding it, since both numbers are true and answer different
+questions.
+
+**Screens with no data source are empty on purpose.** Bot CSKH and Nhật ký say
+what is missing and what would fill them. An audit log seeded with invented
+rows is the one kind of fake data that could later be mistaken for evidence.
+
+**Look (revised 2026-10-09, third pass).** The owner supplied two reference
+dashboards and a palette: near-black violet-navy page (`#090913`), violet-navy
+sidebar and cards (`#100C1D`, `#171327`), electric violet / neon pink / cyan
+accents with coral as a highlight. Implemented as a four-surface token set with
+layered card backgrounds (a violet sheen from the top-left, a faint cyan rise
+from the bottom, then the card colour), a hairline inner highlight plus a soft
+drop shadow, 18px radii, and an aurora of three wide radial lights behind the
+whole page. The selected sidebar item carries a cyan→violet→pink marker with a
+glow — the one place the full palette appears at once. The header carries three
+blurred ribbons of those accents: decoration only, behind the content, with
+`pointer-events: none` and `aria-hidden`.
+
+Chart series moved to cyan + magenta, re-validated on the new card surface
+(worst adjacent colour-blind ΔE 8.4); the donut ramp moved to violet and
+re-passed the ordinal checks. The brighter neon the design asks for (`#22D3EE`,
+`#EC4899`) is used for glow and for the top of a gradient, where nothing is
+read off it; the solid mark underneath stays the validated colour. Status hues
+are unchanged and still reserved, so "Vượt trần" reads as a warning rather than
+as another accent.
+
+**KPI tile alignment (2026-10-09).** The owner pointed out the figures sat at
+different heights across the strip. Cause: the status pill shared a row with
+the label, so a card with a pill wrapped to two lines while one without did
+not, and a long label wrapped where a short one did not — three different
+starting heights in one row.
+
+The first fix gave the label a row of its own that always reserved two lines.
+It aligned them and the owner immediately caught the cost: every tile grew
+about 40px taller, and the six-across breakpoint had been raised to 1800px to
+stop the figure wrapping, which dropped a ~1734px screen to three fat columns.
+
+The fix that held keeps three rows. The glyph is 34px tall and two lines of
+12.5px label come to 33px, so one row holding both is 34px whether the label
+wraps or not — no reserved row needed. The status pill moved BELOW the figure,
+where a card having one cannot push anything out of line, and where it reads in
+the right order anyway: the number, the verdict on it, then the target it is
+judged against. The figure never wraps and sizes with `clamp()` per layout
+(21px at two columns, `clamp(20px, 1.9vw, 28px)` at three, `clamp(19px,
+1.25vw, 24px)` at six), so it fits the narrowest column each layout produces
+without shrinking away on a wide screen; the six-across breakpoint went back to
+1500px. Measured at 1734, 1500, 1440, 960 and 430px: every figure in a row
+shares one top, nothing wraps, no horizontal page scroll.
+
+**Responsive.** Below 940px the sidebar becomes a horizontally scrolling strip
+across the top, the two panes become one scrolling document, and KPI figures
+step down from 28px to 21px — at the larger size the revenue figure ran
+straight out of its card on a phone. Checked at 430px: no horizontal page scroll.
+
+**The session is read in one place.** `AgentShell` and `ConsoleProvider` take
+`account`, `onSignOut`, `canApprove` and `actor` as props; only `ConsoleBody`
+in `app/agent/page.tsx` calls `useWebAccess`. That keeps the whole console
+renderable outside an authenticated session, which is what makes it possible
+to look at the thing while building it.
+
+**Look (2026-10-09, second pass).** The owner found the first dark
+pass flat and the charts stiff. What changed, and what did not: lines are now
+Catmull-Rom curves whose control points are clamped to each segment's own
+range, so a smoothed line can never bulge past a value the data never reached;
+areas and bars carry a vertical gradient; each line is drawn twice, a blurred
+pass under a crisp one, for the lit look those reference dashboards are built
+around; bars got a 7px cap; big figures wear a white→cool-grey gradient (pure
+white at the top of the ramp, so contrast is not spent on the effect). The
+categorical pair moved from blue+coral to blue+magenta, re-validated against
+this surface (worst-pair colour-blind ΔE 11.1). A product-mix donut was added —
+parts of a whole, so ONE hue light→dark validated as an ordinal ramp, not three
+categorical hues, with every slice named and numbered beside the ring.
+
+**Charts are hand-drawn** (`src/components/agent/charts.tsx`) — three small
+charts of seven points each do not justify a dependency. Every palette is run
+through a validator against this page's own surface before it ships — the
+categorical pair against the lightness band, chroma floor, colour-blind
+separation, normal-vision separation and contrast; the donut's ramp against
+monotone lightness, step gaps, single hue and light-end contrast. Status hues
+are reserved and never reused as a series colour; every chart carries a hover tooltip. Each
+chart picks a viewBox width in proportion to how wide it renders, because a
+single fixed viewBox prints a full-width chart's axis labels at twice the size
+of a half-width one's.
+
+**Approvals are the point, and they are real (2026-10-09).** An agent
+prepares, the owner releases. Backed by `agent_approvals` in the shared
+Supabase project — admin-only RLS, narrower than the admin-or-cskh policies
+most tables carry, because cskh has no business releasing an advertising
+change. A decision survives a reload and records who made it: `decided_by` and
+`decided_at` are stamped by a trigger from `auth.uid()` rather than sent by the
+client, and the update carries `status = 'pending'` in its filter so two open
+consoles cannot overwrite each other's call. PostgREST answers an update that
+matched nothing with `error: null`, so the zero-row case is turned into an
+error by hand — the same trap `runUpdate` in db.ts was written for. Queries
+live in `src/lib/agentApprovals.ts`, not db.ts, whose header says it serves
+Admin and CSKH.
+
+What a decision does NOT yet do is carry the change out: Meta Ads is not
+connected, so approving the seeded pause marks the decision rather than pausing
+the campaign, and the screen says so. The seeded proposal is built from real
+figures — pause "TheraNECK_ APP 2", the worst cost per tagged order in the
+account — and
+proposes a pause rather than a budget change, because the campaign's daily
+budget was never read and a budget card with a number nobody read would be the
+invented figure the rest of this console avoids.
+
+**No role switcher.** An earlier pass put a "Xem với vai" toggle in the topbar
+so the owner could preview the staff view. The owner removed it (2026-10-09):
+the console already knows who signed in, and a control that pretends otherwise
+is theatre. `canApprove` now reads the signed-in person's web role, and a
+dispatched job is credited to their account rather than to a hardcoded name.
+
+**Motion is entrance only.** Tiles and cards rise in on a 55ms stagger,
+figures count up once, bars grow from the baseline and lines draw themselves
+(`pathLength="1"` so one dash rule fits any length). Nothing loops and nothing
+moves while being read. The hidden start state lives only in the keyframes, so
+`prefers-reduced-motion` switches the whole set off with `animation: none` and
+every element still renders — a start state written as a base `opacity: 0`
+would have left the page blank for those readers instead.
+
+**No money amounts in this repository.** Figures live in `agent_metrics_*`
+and `agent_approvals`; these notes keep percentages and ratios, which carry
+the reasoning without carrying the books.
+
+**Known gap:** like `/admin`, the shell assumes a desktop width — fixed 252px
+sidebar, `height: 100vh`. Not addressed here.
+
+Files: `app/agent/page.tsx`, `src/lib/agentConsole.ts`,
+`src/styles/agentConsole.css`, and `src/components/agent/` (`AgentShell`,
+`state`, `parts`, `charts`, and the seven views).

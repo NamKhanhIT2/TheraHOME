@@ -45,10 +45,18 @@ export function AccessGate({
   requiredRole,
   children,
 }: {
-  requiredRole: WebAccessRole;
+  /** One role, or any of several. /admin and /care each admit exactly one;
+   * the Agent console admits admin and cskh, which hold different powers once
+   * inside — see `canApprove` in src/components/agent/state.tsx. */
+  requiredRole: WebAccessRole | WebAccessRole[];
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  // The effect depends on this string, not on `requiredRole`: an array literal
+  // written at the call site is a new reference on every render, which would
+  // re-run the gate forever.
+  const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+  const allowedKey = allowed.join(",");
   const [ready, setReady] = useState(false);
   const [roles, setRoles] = useState<WebAccessRole[]>([]);
   const [email, setEmail] = useState("");
@@ -69,7 +77,7 @@ export function AccessGate({
           return;
         }
         storeRoles(verifiedRoles);
-        if (!verifiedRoles.includes(requiredRole)) {
+        if (!verifiedRoles.some((role) => allowedKey.split(",").includes(role))) {
           router.replace(verifiedRoles.includes("admin") ? "/admin" : "/care");
           return;
         }
@@ -86,7 +94,7 @@ export function AccessGate({
     return () => {
       cancelled = true;
     };
-  }, [router, requiredRole]);
+  }, [router, allowedKey]);
 
   // A session can go stale while the tab just sits open — the access token
   // expires (~1h) and a background refresh silently fails (e.g. a revoked

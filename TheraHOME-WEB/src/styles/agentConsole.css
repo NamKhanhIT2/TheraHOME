@@ -1,0 +1,375 @@
+/* Agent console (/agent) — its own dark surface.
+ *
+ * Why a stylesheet instead of the app's usual inline styles: this is the one
+ * surface that is not on --bg-app, and it needs hover, focus, active and
+ * responsive states that inline styles cannot express. Everything is scoped
+ * under .agent-console so none of it can reach /admin or /care, which stay
+ * light.
+ *
+ * Colour is not chosen by eye. Every text and status colour below clears 4.5:1
+ * on all three surfaces it can land on (page, card, raised). The two chart
+ * series hues were run through a palette validator against the card surface
+ * and clear the lightness band, chroma floor, colour-blind separation
+ * (ΔE 8.4 worst adjacent pair), normal-vision separation and contrast; the
+ * donut's violet ramp clears the ordinal checks. The brighter neon the design
+ * calls for — #22D3EE, #EC4899 — is used for GLOW and for the top of a
+ * gradient, where nothing is being read off it; the solid mark underneath
+ * stays the validated colour.
+ */
+
+.agent-console {
+  /* surfaces, dark to light */
+  --ac-bg: #090913;
+  --ac-side: #100c1d;
+  --ac-card: #171327;
+  --ac-raised: #1f1933;
+
+  --ac-line: #2a2142;
+  --ac-hairline: #221a36;
+  --ac-edge: rgba(167, 139, 250, 0.2); /* the thin lit edge on a raised card */
+
+  --ac-ink: #edeaf7;
+  --ac-ink-2: #a79fc4;
+  --ac-ink-3: #8c84ac;
+
+  /* accents. --ac-accent is the one that ever carries text or an icon;
+     --ac-accent-strong only fills and glows. */
+  --ac-accent: #a78bfa;
+  --ac-accent-strong: #8b5cf6;
+  --ac-accent-soft: rgba(139, 92, 246, 0.16);
+  --ac-cyan: #22d3ee;
+  --ac-pink: #ec4899;
+  --ac-coral: #fb923c;
+  --ac-brand: #3b92dd; /* TheraHOME blue, kept for the brand mark */
+
+  /* categorical — fixed order, never cycled */
+  --ac-s1: #1e9db5;        /* web */
+  --ac-s1-lift: #22d3ee;
+  --ac-s2: #d4407f;        /* Messenger */
+  --ac-s2-lift: #ec4899;
+
+  /* sequential — one hue, light→dark, for parts of a whole */
+  --ac-seq-1: #cdbfff;
+  --ac-seq-2: #9b6bf2;
+  --ac-seq-3: #6534b8;
+
+  /* status — reserved, never reused as a series colour */
+  --ac-good: #3fbf80;
+  --ac-good-soft: rgba(63, 191, 128, 0.15);
+  --ac-warn: #e0a33f;
+  --ac-warn-soft: rgba(224, 163, 63, 0.15);
+  --ac-crit: #f2707a;
+  --ac-crit-soft: rgba(242, 112, 122, 0.16);
+
+  --ac-r: 18px;
+  --ac-r-s: 11px;
+
+  color-scheme: dark;
+  /* Three soft lights behind everything, so the panels sit in a space rather
+     than on a slab. Wide and low-opacity on purpose: an aurora, not neon. */
+  background:
+    radial-gradient(1200px 560px at 10% -12%, rgba(139, 92, 246, 0.2), transparent 68%),
+    radial-gradient(900px 460px at 90% -8%, rgba(236, 72, 153, 0.12), transparent 70%),
+    radial-gradient(820px 460px at 62% 108%, rgba(34, 211, 238, 0.07), transparent 70%),
+    var(--ac-bg);
+  color: var(--ac-ink);
+  font-family: var(--font-family);
+}
+
+.agent-console ::selection { background: var(--ac-accent-soft); }
+
+.agent-console :focus-visible {
+  outline: 2px solid var(--ac-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------- shell ---------- */
+.ac-shell { display: flex; height: 100vh; overflow: hidden; }
+.ac-side {
+  width: 254px; flex-shrink: 0; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.07), rgba(139, 92, 246, 0) 38%), var(--ac-side);
+  border-right: 1px solid var(--ac-line);
+}
+.ac-side-nav { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+.ac-side-foot { border-top: 1px solid var(--ac-line); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.ac-main { flex: 1; min-width: 0; overflow-y: auto; }
+.ac-head { position: sticky; top: 0; z-index: 5; border-bottom: 1px solid var(--ac-line); background: rgba(9, 9, 19, 0.82); backdrop-filter: blur(14px); }
+.ac-head-inner { position: relative; z-index: 1; padding: 18px 28px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+/* Decoration only: it sits behind the header's content, never over it, and is
+   hidden from assistive tech. */
+.ac-head-deco { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.ac-content { padding: 22px 28px 48px; }
+
+/* The console is an operations tool built for a desk, but it has to survive a
+   phone: below 940px the sidebar becomes a scrolling strip across the top and
+   the page scrolls as one document instead of two panes. */
+@media (max-width: 940px) {
+  .ac-shell { flex-direction: column; height: auto; overflow: visible; }
+  .ac-side { width: 100%; border-right: none; border-bottom: 1px solid var(--ac-line); }
+  .ac-side-nav { display: flex; gap: 6px; overflow-x: auto; padding: 0 12px 12px; }
+  .ac-side-nav > div { display: flex; gap: 6px; }
+  .ac-nav-group { display: none; }
+  .ac-nav-item { width: auto; white-space: nowrap; margin-bottom: 0; }
+  .ac-nav-item[aria-current="page"]::before { display: none; }
+  .ac-side-foot { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; }
+  .ac-main { overflow: visible; }
+  .ac-head { position: static; }
+  .ac-head-inner { padding: 16px; }
+  .ac-content { padding: 16px 16px 40px; }
+}
+
+/* ---------- sidebar nav ---------- */
+.ac-nav-group { margin: 18px 0 6px; padding: 0 20px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ac-ink-3); }
+
+.ac-nav-item {
+  position: relative; display: flex; align-items: center; gap: 11px; width: 100%;
+  border: none; background: none; color: var(--ac-ink-2);
+  padding: 9px 14px; margin-bottom: 2px; border-radius: var(--ac-r-s);
+  font-family: var(--font-family); font-size: 13.5px; font-weight: 500;
+  text-align: left; cursor: pointer; transition: background 160ms ease, color 160ms ease;
+}
+.ac-nav-item:hover { background: var(--ac-raised); color: var(--ac-ink); }
+.ac-nav-item[aria-current="page"] {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.24), rgba(139, 92, 246, 0.04));
+  color: var(--ac-ink); font-weight: 600;
+  box-shadow: 0 0 26px -12px var(--ac-accent-strong) inset;
+}
+/* The lit marker: the three accents stacked, so the selected item is the one
+   place the full palette appears at once. */
+.ac-nav-item[aria-current="page"]::before {
+  content: ""; position: absolute; left: -12px; top: 7px; bottom: 7px; width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--ac-cyan), var(--ac-accent-strong) 55%, var(--ac-pink));
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.9);
+}
+.ac-nav-count {
+  margin-left: auto; min-width: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--ac-warn-soft); color: var(--ac-warn);
+  font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums;
+}
+
+/* ---------- surfaces ----------
+ * Three layers, not one fill: a violet sheen from the top-left, a faint cyan
+ * rise from the bottom, then the card colour. Plus a hairline inner highlight
+ * on the top edge and a soft shadow underneath — the pair is what reads as
+ * "raised" rather than "drawn".
+ */
+.ac-card {
+  position: relative;
+  background:
+    linear-gradient(159deg, rgba(167, 139, 250, 0.08), rgba(167, 139, 250, 0) 44%),
+    linear-gradient(0deg, rgba(34, 211, 238, 0.035), rgba(34, 211, 238, 0) 52%),
+    var(--ac-card);
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-r);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 44px -30px rgba(0, 0, 0, 0.95);
+  transition: border-color 220ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms ease;
+}
+.ac-card-hover:hover {
+  border-color: var(--ac-edge);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 26px 52px -30px rgba(0, 0, 0, 1), 0 0 36px -22px var(--ac-accent-strong);
+}
+.ac-card-pad { padding: 20px 22px; }
+
+/* ---------- buttons ---------- */
+.ac-btn {
+  display: inline-flex; align-items: center; gap: 7px; border-radius: var(--ac-r-s);
+  border: 1px solid var(--ac-line); background: var(--ac-raised); color: var(--ac-ink);
+  padding: 9px 15px; font-family: var(--font-family); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.ac-btn:hover:not(:disabled) { background: #2a2242; border-color: var(--ac-edge); }
+.ac-btn:disabled { opacity: 0.42; cursor: not-allowed; }
+.ac-btn-primary {
+  background: linear-gradient(135deg, var(--ac-accent-strong), #6d3ff0);
+  border-color: transparent; color: #fff;
+  box-shadow: 0 8px 26px -12px var(--ac-accent-strong);
+}
+.ac-btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #9a6ffa, #7b50f3); }
+.ac-btn-good { background: linear-gradient(135deg, #34a86f, #2a9460); border-color: transparent; color: #fff; box-shadow: 0 8px 26px -14px #3fbf80; }
+.ac-btn-good:hover:not(:disabled) { background: linear-gradient(135deg, #3cbd7e, #2fa36b); }
+.ac-btn-crit { background: none; border-color: var(--ac-line); color: var(--ac-crit); }
+.ac-btn-crit:hover:not(:disabled) { background: var(--ac-crit-soft); border-color: var(--ac-crit); }
+
+.ac-chip {
+  border: 1px solid var(--ac-line); background: rgba(255, 255, 255, 0.02); color: var(--ac-ink-2);
+  border-radius: 999px; padding: 5px 13px; font-family: var(--font-family);
+  font-size: 12.5px; font-weight: 600; cursor: pointer; transition: color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.ac-chip:hover:not(:disabled) { color: var(--ac-accent); border-color: var(--ac-edge); box-shadow: 0 0 20px -10px var(--ac-accent-strong); }
+.ac-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- inputs ---------- */
+.ac-input {
+  width: 100%; box-sizing: border-box; background: rgba(9, 9, 19, 0.6);
+  border: 1px solid var(--ac-line); border-radius: var(--ac-r-s);
+  padding: 10px 12px; font-family: var(--font-family); font-size: 13.5px; color: var(--ac-ink);
+}
+.ac-input::placeholder { color: var(--ac-ink-3); }
+.ac-input:focus { border-color: var(--ac-accent); outline: none; box-shadow: 0 0 0 3px var(--ac-accent-soft); }
+
+/* ---------- table ---------- */
+.ac-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ac-table th {
+  text-align: left; padding: 11px 18px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ac-ink-3);
+  border-bottom: 1px solid var(--ac-line); white-space: nowrap;
+}
+.ac-table td { padding: 13px 18px; border-bottom: 1px solid var(--ac-hairline); color: var(--ac-ink-2); vertical-align: top; }
+.ac-table tr:last-child td { border-bottom: none; }
+.ac-table tbody tr { transition: background 160ms ease; }
+.ac-table tbody tr:hover { background: rgba(167, 139, 250, 0.05); }
+.ac-table .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--ac-ink); }
+
+/* ---------- misc ---------- */
+.ac-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: var(--ac-r-s);
+  border: 1px solid var(--ac-line); background: var(--ac-card); color: var(--ac-ink-2);
+  cursor: pointer; transition: color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.ac-icon-btn:hover { color: var(--ac-ink); border-color: var(--ac-edge); box-shadow: 0 0 22px -10px var(--ac-accent-strong); }
+
+/* Six tiles. auto-fit left one stranded on its own row at most widths, so the
+   column count is chosen rather than computed: six across on a wide screen,
+   three then two as it narrows, which always divides six evenly. */
+.agent-console .ac-tiles { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 880px) { .agent-console .ac-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1500px) { .agent-console .ac-tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+/* ---------- window picker ---------- */
+.agent-console .ac-range {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--ac-line); background: var(--ac-card); color: var(--ac-ink);
+  border-radius: 999px; padding: 7px 14px;
+  font-family: var(--font-family); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.agent-console .ac-range:hover,
+.agent-console .ac-range[aria-expanded="true"] { border-color: var(--ac-edge); box-shadow: 0 0 22px -10px var(--ac-accent-strong); }
+.agent-console .ac-range-dates { color: var(--ac-ink-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.agent-console .ac-range-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; min-width: 212px;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px;
+  background: var(--ac-raised); border: 1px solid var(--ac-line); border-radius: 14px;
+  box-shadow: 0 24px 56px -24px rgba(0, 0, 0, 0.95);
+}
+.agent-console .ac-range-option {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: none; background: none; color: var(--ac-ink-2);
+  border-radius: 9px; padding: 9px 11px;
+  font-family: var(--font-family); font-size: 13px; font-weight: 600; text-align: left; cursor: pointer;
+}
+.agent-console .ac-range-option:hover { background: rgba(167, 139, 250, 0.1); color: var(--ac-ink); }
+.agent-console .ac-range-option[aria-selected="true"] { background: var(--ac-accent-soft); color: var(--ac-ink); }
+.agent-console .ac-range-option .ac-range-dates { margin-left: auto; }
+
+/* ---------- KPI tile ----------
+ * Three rows, and the figures still line up across the strip.
+ *
+ * An earlier pass aligned them by giving the label a row of its own that
+ * always reserved two lines — correct, but it made every tile ~40px taller
+ * than it needed to be. This does it without the extra height: the glyph is
+ * 34px tall and two lines of 12.5px label come to 33px, so a row holding both
+ * is 34px whether the label wraps or not. The status pill moves BELOW the
+ * figure, where a card having one or not cannot push anything out of line —
+ * and where it reads in the right order anyway: the number, then the verdict
+ * on it, then the target it is judged against.
+ */
+.agent-console .ac-tile { padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.agent-console .ac-tile-top { display: flex; align-items: center; gap: 10px; min-height: 34px; }
+.agent-console .ac-tile-label { min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--ac-ink-2); line-height: 1.3; }
+/* Never wraps: a figure that breaks across lines drops its unit onto a line of
+   its own and the row stops reading as a row. It scales with the viewport
+   instead, bounded at both ends, so it fits the narrowest column each layout
+   produces without shrinking away on a wide screen. */
+.agent-console .ac-tile-val {
+  min-width: 0; font-size: 21px; font-weight: 700; line-height: 1.05;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.agent-console .ac-tile-val .unit { font-size: 14px; font-weight: 600; color: var(--ac-ink-2); margin-left: 3px; }
+.agent-console .ac-tile-note { font-size: 12px; color: var(--ac-ink-3); line-height: 1.45; }
+@media (min-width: 880px) {
+  .agent-console .ac-tile-val { font-size: clamp(20px, 1.9vw, 28px); }
+  .agent-console .ac-tile-val .unit { font-size: 0.55em; }
+}
+@media (min-width: 1500px) {
+  .agent-console .ac-tile-val { font-size: clamp(19px, 1.25vw, 24px); }
+}
+@media (max-width: 620px) { .agent-console .ac-tile { padding: 14px 15px; } }
+
+/* ---------- motion ----------
+ * Entrance only: the page assembles itself once and then holds still. Nothing
+ * loops, nothing moves while being read, and the whole set is switched off for
+ * anyone who asked for less motion — in which case every element renders in
+ * its final state rather than invisibly, because the hidden start state lives
+ * only inside the keyframes.
+ */
+@keyframes ac-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes ac-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ac-grow { from { transform: scaleY(0.02); } to { transform: scaleY(1); } }
+@keyframes ac-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes ac-pop   { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes ac-sheen { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+.agent-console .ac-in { animation: ac-rise 540ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0ms); }
+.agent-console .ac-in-fade { animation: ac-fade 420ms ease-out both; animation-delay: var(--d, 0ms); }
+
+.agent-console .ac-bar-group {
+  transform-box: fill-box; transform-origin: bottom;
+  animation: ac-grow 640ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0ms);
+}
+/* pathLength="1" normalises the line, so one dash rule draws any length. */
+.agent-console .ac-line {
+  stroke-dasharray: 1;
+  animation: ac-draw 1000ms cubic-bezier(0.33, 1, 0.68, 1) both; animation-delay: var(--d, 0ms);
+}
+.agent-console .ac-area { animation: ac-fade 700ms ease-out both; animation-delay: 420ms; }
+.agent-console .ac-dot {
+  transform-box: fill-box; transform-origin: center;
+  animation: ac-pop 420ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0ms);
+}
+.agent-console .ac-tip { animation: ac-sheen 160ms ease-out both; }
+
+/* Icon chip on a stat tile: the tint says which measure, the glow lifts it off
+   the panel. --ac-glow-* is set per tile. */
+.agent-console .ac-glyph {
+  width: 34px; height: 34px; flex: 0 0 auto; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ac-glow-bg);
+  box-shadow: 0 0 0 1px var(--ac-glow-ring) inset, 0 8px 22px -9px var(--ac-glow-ring);
+}
+
+/* A figure the size of a headline reads hard-edged in flat white. A short
+   vertical gradient down to a cool lavender softens it without dropping the
+   contrast that makes it readable — the top of the ramp is pure white. */
+.agent-console .ac-figure {
+  background: linear-gradient(176deg, #ffffff 16%, #c9beeb 100%);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+  letter-spacing: -0.03em;
+}
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .agent-console .ac-figure { color: var(--ac-ink); -webkit-text-fill-color: currentColor; }
+}
+
+.agent-console .ac-brand-mark {
+  background: linear-gradient(140deg, var(--ac-cyan), var(--ac-accent-strong) 58%, var(--ac-pink));
+  box-shadow: 0 8px 24px -8px rgba(139, 92, 246, 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-console * { transition-duration: 0.01ms !important; }
+  .agent-console .ac-in,
+  .agent-console .ac-in-fade,
+  .agent-console .ac-bar-group,
+  .agent-console .ac-line,
+  .agent-console .ac-area,
+  .agent-console .ac-dot,
+  .agent-console .ac-tip { animation: none !important; }
+  .agent-console .ac-line { stroke-dasharray: none; }
+  .agent-console .ac-card-hover:hover { transform: none; }
+}

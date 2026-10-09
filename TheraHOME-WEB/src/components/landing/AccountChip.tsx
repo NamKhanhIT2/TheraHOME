@@ -26,7 +26,14 @@ export function AccountChip({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const staffHome = session.roles.includes("admin") ? "/admin" : session.roles.includes("cskh") ? "/care" : null;
+  const isAdmin = session.roles.includes("admin");
+  const isCare = session.roles.includes("cskh");
+  const staffHome = isAdmin ? "/admin" : isCare ? "/care" : null;
+  // The Agent console (/agent) is a third surface beside Admin and CSKH. Staff
+  // reach it from here, which is where they already are when they think of it.
+  // Both roles get the entry; what differs is what they may release once
+  // inside, not whether they can look.
+  const agentHome = isAdmin || isCare ? "/agent" : null;
 
   async function handleSignOut() {
     if (busy) return;
@@ -82,10 +89,13 @@ export function AccountChip({
         style={{ position: "absolute", top: "calc(100% + 14px)", right: 0, minWidth: 208, padding: 8, borderRadius: 16, background: "rgba(8,14,26,0.97)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 30px 70px rgba(0,20,60,0.55)", backdropFilter: "blur(16px)", opacity: open ? 1 : 0, visibility: open ? "visible" : "hidden", transform: open ? "translateY(0)" : "translateY(-6px)", transition: "opacity 200ms ease-out, transform 240ms cubic-bezier(0.16,1,0.3,1), visibility 200ms" }}
       >
         {staffHome ? (
-          <>
-            <Link href={staffHome} className="nav-menu-item" style={item}>Bảng điều khiển</Link>
-            <span aria-hidden="true" style={{ display: "block", height: 1, margin: "6px 10px", background: "rgba(255,255,255,0.1)" }} />
-          </>
+          <Link href={staffHome} className="nav-menu-item" style={item}>Bảng điều khiển App</Link>
+        ) : null}
+        {agentHome ? (
+          <Link href={agentHome} className="nav-menu-item" style={item}>Bảng điều khiển Agent</Link>
+        ) : null}
+        {staffHome ? (
+          <span aria-hidden="true" style={{ display: "block", height: 1, margin: "6px 10px", background: "rgba(255,255,255,0.1)" }} />
         ) : null}
         <button type="button" onClick={handleSignOut} disabled={busy} className="nav-menu-item" style={{ ...item, width: "100%", textAlign: "left", border: "none", background: "transparent", fontFamily: "inherit", cursor: busy ? "default" : "pointer" }}>
           {busy ? "Đang đăng xuất..." : "Đăng xuất"}
