@@ -14,6 +14,194 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_approvals: {
+        Row: {
+          agent: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          evidence: Json
+          from_value: string
+          id: string
+          kind: string
+          reason: string
+          status: string
+          target: string
+          title: string
+          to_value: string
+        }
+        Insert: {
+          agent: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          evidence?: Json
+          from_value: string
+          id: string
+          kind: string
+          reason: string
+          status?: string
+          target: string
+          title: string
+          to_value: string
+        }
+        Update: {
+          agent?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          evidence?: Json
+          from_value?: string
+          id?: string
+          kind?: string
+          reason?: string
+          status?: string
+          target?: string
+          title?: string
+          to_value?: string
+        }
+        Relationships: []
+      }
+      agent_metrics_campaigns: {
+        Row: {
+          campaign_id: string
+          name: string
+          orders: number
+          revenue_vnd: number
+          spend_vnd: number
+          window_id: string
+        }
+        Insert: {
+          campaign_id: string
+          name: string
+          orders: number
+          revenue_vnd: number
+          spend_vnd: number
+          window_id: string
+        }
+        Update: {
+          campaign_id?: string
+          name?: string
+          orders?: number
+          revenue_vnd?: number
+          spend_vnd?: number
+          window_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_metrics_campaigns_window_id_fkey"
+            columns: ["window_id"]
+            isOneToOne: false
+            referencedRelation: "agent_metrics_windows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_metrics_days: {
+        Row: {
+          captured_at: string
+          date: string
+          messenger_orders: number
+          spend_vnd: number
+          web_orders: number
+        }
+        Insert: {
+          captured_at?: string
+          date: string
+          messenger_orders: number
+          spend_vnd: number
+          web_orders: number
+        }
+        Update: {
+          captured_at?: string
+          date?: string
+          messenger_orders?: number
+          spend_vnd?: number
+          web_orders?: number
+        }
+        Relationships: []
+      }
+      agent_metrics_windows: {
+        Row: {
+          avg_order_value_vnd: number
+          by_product: Json
+          cancel_return_pct: number
+          canceled: number
+          captured_at: string
+          combo_rate_pct: number
+          delivered: number
+          from_date: string
+          id: string
+          label: string
+          messenger_orders: number
+          messenger_revenue_vnd: number
+          orders_created: number
+          orders_valid: number
+          returned: number
+          revenue_vnd: number
+          sort_order: number
+          spend_vnd: number
+          to_date: string
+          untagged_orders: number
+          web_orders: number
+          web_revenue_vnd: number
+          zalo_orders: number
+          zalo_revenue_vnd: number
+        }
+        Insert: {
+          avg_order_value_vnd: number
+          by_product?: Json
+          cancel_return_pct: number
+          canceled: number
+          captured_at?: string
+          combo_rate_pct: number
+          delivered: number
+          from_date: string
+          id: string
+          label: string
+          messenger_orders: number
+          messenger_revenue_vnd: number
+          orders_created: number
+          orders_valid: number
+          returned: number
+          revenue_vnd: number
+          sort_order: number
+          spend_vnd: number
+          to_date: string
+          untagged_orders: number
+          web_orders: number
+          web_revenue_vnd: number
+          zalo_orders: number
+          zalo_revenue_vnd: number
+        }
+        Update: {
+          avg_order_value_vnd?: number
+          by_product?: Json
+          cancel_return_pct?: number
+          canceled?: number
+          captured_at?: string
+          combo_rate_pct?: number
+          delivered?: number
+          from_date?: string
+          id?: string
+          label?: string
+          messenger_orders?: number
+          messenger_revenue_vnd?: number
+          orders_created?: number
+          orders_valid?: number
+          returned?: number
+          revenue_vnd?: number
+          sort_order?: number
+          spend_vnd?: number
+          to_date?: string
+          untagged_orders?: number
+          web_orders?: number
+          web_revenue_vnd?: number
+          zalo_orders?: number
+          zalo_revenue_vnd?: number
+        }
+        Relationships: []
+      }
       ai_prompts: {
         Row: {
           id: boolean
@@ -2040,6 +2228,19 @@ export type Database = {
           product_name: string
         }[]
       }
+      adherence_pct_for: {
+        Args: { p_user_program_id: string }
+        Returns: number
+      }
+      admin_adherence_parts: {
+        Args: never
+        Returns: {
+          days_done: number
+          days_done_due: number
+          days_due: number
+          user_program_id: string
+        }[]
+      }
       admin_fetch_user_orders: {
         Args: { p_user_id: string }
         Returns: {
@@ -2058,6 +2259,10 @@ export type Database = {
       admin_update_user_contact: {
         Args: { p_email: string; p_phone: string; p_user_id: string }
         Returns: undefined
+      }
+      available_day_ids_for: {
+        Args: { p_user_program_id: string }
+        Returns: string[]
       }
       claim_user_access_contact: {
         Args: { p_contact: string }
@@ -2110,6 +2315,10 @@ export type Database = {
           p_title_us?: string
         }
         Returns: string
+      }
+      cron_secret_matches: {
+        Args: { p_name: string; p_value: string }
+        Returns: boolean
       }
       current_web_roles: { Args: never; Returns: string[] }
       delete_account: { Args: never; Returns: undefined }
