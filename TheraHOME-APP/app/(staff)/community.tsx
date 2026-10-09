@@ -97,6 +97,17 @@ export default function StaffCommunityTab() {
   const theme = useTheme();
   const reportsQuery = useContentReports();
   const reports = reportsQuery.data ?? [];
+  // Same fix as AdminThreadsList: the spinner belongs to a pull, not to every
+  // refetch (a focus refetch would flash it for no reason).
+  const [pulling, setPulling] = useState(false);
+  async function pullToRefresh() {
+    setPulling(true);
+    try {
+      await reportsQuery.refetch();
+    } finally {
+      setPulling(false);
+    }
+  }
   const [filter, setFilter] = useState<ContentReportRow['status'] | 'all'>('pending');
 
   const filtered = filter === 'all' ? reports : reports.filter((r) => r.status === filter);
@@ -135,8 +146,8 @@ export default function StaffCommunityTab() {
           renderItem={({ item }) => <ReportRow report={item} />}
           contentContainerStyle={filtered.length ? styles.list : styles.center}
           ListEmptyComponent={<Text style={[theme.type.body, { color: theme.colors.textMuted }]}>Không có báo cáo nào.</Text>}
-          refreshing={reportsQuery.isRefetching}
-          onRefresh={() => void reportsQuery.refetch()}
+          refreshing={pulling}
+          onRefresh={() => void pullToRefresh()}
         />
       )}
     </View>

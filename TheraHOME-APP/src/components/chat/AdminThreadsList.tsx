@@ -3,7 +3,7 @@
 // web_access_contacts staff row, see CLAUDE.md) and the (staff) tab shell's
 // Chat tab (purely-staff TheraHOME accounts). Same query either way —
 // useAdminChatThreads is already role-generic via current_web_roles().
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
@@ -17,6 +17,22 @@ export function AdminThreadsList() {
   const { t } = useI18n();
   const threadsQuery = useAdminChatThreads();
   const threads = threadsQuery.data ?? [];
+  // `refreshing` must track a PULL, not any refetch. Bound to
+  // isRefetching it also fires for refetches nobody asked for — and
+  // useAdminChatThreads invalidates on every realtime chat_messages change AND
+  // on every channel re-subscribe, which useRealtimeSync retries every 15s
+  // while the socket is unhappy. Each one dropped the RefreshControl spinner
+  // in and out, so the whole list lurched down and back up on its own (owner,
+  // 2026-10-09). Same manualRefreshing shape the community feed already uses.
+  const [pulling, setPulling] = useState(false);
+  async function pullToRefresh() {
+    setPulling(true);
+    try {
+      await threadsQuery.refetch();
+    } finally {
+      setPulling(false);
+    }
+  }
 
   function renderItem({ item }: { item: AdminChatThreadRow }) {
     const unread = item.unreadCount > 0;
@@ -70,8 +86,8 @@ export function AdminThreadsList() {
       renderItem={renderItem}
       contentContainerStyle={threads.length ? undefined : styles.center}
       ListEmptyComponent={<Text style={[theme.type.body, { color: theme.colors.textMuted }]}>Chưa có cuộc hội thoại nào.</Text>}
-      refreshing={threadsQuery.isRefetching}
-      onRefresh={() => void threadsQuery.refetch()}
+      refreshing={pulling}
+      onRefresh={() => void pullToRefresh()}
     />
   );
 }

@@ -135,6 +135,17 @@ export default function StaffNotificationsTab() {
   const theme = useTheme();
   const campaignsQuery = useNotificationCampaigns();
   const campaigns = campaignsQuery.data ?? [];
+  // Same fix as AdminThreadsList: the spinner belongs to a pull, not to every
+  // refetch (a focus refetch would flash it for no reason).
+  const [pulling, setPulling] = useState(false);
+  async function pullToRefresh() {
+    setPulling(true);
+    try {
+      await campaignsQuery.refetch();
+    } finally {
+      setPulling(false);
+    }
+  }
   const [composing, setComposing] = useState(false);
 
   return (
@@ -157,8 +168,8 @@ export default function StaffNotificationsTab() {
           renderItem={({ item }) => <CampaignRow campaign={item} />}
           contentContainerStyle={campaigns.length ? undefined : styles.center}
           ListEmptyComponent={<Text style={[theme.type.body, { color: theme.colors.textMuted, padding: 16 }]}>Chưa có thông báo nào được gửi.</Text>}
-          refreshing={campaignsQuery.isRefetching}
-          onRefresh={() => void campaignsQuery.refetch()}
+          refreshing={pulling}
+          onRefresh={() => void pullToRefresh()}
         />
       )}
     </View>
