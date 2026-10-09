@@ -2766,3 +2766,84 @@ sidebar, `height: 100vh`. Not addressed here.
 Files: `app/agent/page.tsx`, `src/lib/agentConsole.ts`,
 `src/styles/agentConsole.css`, and `src/components/agent/` (`AgentShell`,
 `state`, `parts`, `charts`, and the seven views).
+
+### Màn chat CSKH: tám chỗ sửa về trải nghiệm (2026-10-09)
+
+Bắt đầu từ một báo lỗi của chủ dự án: *"gửi tin nhắn mới nhất thì đoạn ko nhảy
+lên đầu tiên"*, kèm yêu cầu xem Messenger/Zalo/Telegram làm thế nào.
+
+**1. Danh sách sắp sai gốc.** Nó sắp theo `chat_threads.created_at` — ngày
+*mở* hội thoại, thứ không bao giờ đổi. Giờ hiển thị trong danh sách cũng là
+ngày đó. Đo trên dữ liệu thật lúc sửa: cuộc có **tin mới nhất toàn hệ thống**
+đang nằm ở **hàng 13**. Giờ sắp theo tin nhắn cuối, và giờ hiện ra cũng là giờ
+tin cuối.
+
+**2. Dòng xem trước** thêm "Bạn: " khi tin cuối là của mình (trước đây lời của
+chính CSKH nằm dưới tên khách, đọc ra như khách nói), và tin chỉ có tệp thì ghi
+"[Hình ảnh]" / "[Video]" thay vì để trống.
+
+Rồi chủ dự án hỏi còn gì tối ưu nữa không. Đọc kỹ thì ra sáu chỗ nữa:
+
+**3. Không có một dòng code cuộn nào.** Mở hội thoại là đứng ở tin **cũ nhất**;
+tin mới đến cũng không kéo xuống. Nay: mở là nhảy xuống đáy, tin mới kéo theo
+**chỉ khi** người đọc đang ở đáy — ai đang cuộn lên đọc lịch sử thì không bị
+giật xuống.
+
+**4. Ô nhập là `<input>` một dòng** nên không gõ nổi hai dòng. Đổi sang
+textarea cao dần, Enter gửi, Shift+Enter xuống dòng. Hai thứ phải sửa kèm, nếu
+không thì vô dụng: bong bóng tin nhắn phải `white-space: pre-wrap` (không thì
+xuống dòng bị nuốt), và Enter phải bỏ qua khi `isComposing` — **bộ gõ tiếng
+Việt** đang ghép chữ mà Enter tính là gửi thì tin bay đi với nửa chữ.
+
+**5. Trả lời/sửa/xoá/thả cảm xúc chỉ có qua chuột phải**, không có gì trên màn
+hình báo. Thêm nút ⋯ hiện khi rê chuột. Và bảng chọn trước đây luôn ghim sát ô
+nhập (`bottom: 70, left: 16`) nên bấm tin ở đầu cuộc hội thoại dài thì menu
+nhảy xuống tận đáy màn hình — nay nó mở ngay tại tin nhắn.
+
+**6. Chấm chưa đọc** chỉ tắt khi *đổi* hội thoại. Khách nhắn lúc đang mở đúng
+cuộc đó thì chấm vẫn còn. Thêm `active.unread` vào dependency; đánh dấu đã đọc
+làm cờ tắt nên effect dừng sau một lượt, không lặp.
+
+**7. Tìm kiếm** trong danh sách chat (trước đây không có), theo tên khách *và*
+nội dung tin nhắn.
+
+**8. Tệp đính kèm** giờ xem được và gỡ được. Kèm một lỗi có sẵn: chọn ảnh, bỏ
+ra, chọn lại **đúng ảnh đó** thì `input.value` chưa reset nên không có sự kiện
+nào bắn ra và ảnh không bao giờ quay lại.
+
+Cộng thêm: vạch ngăn theo ngày (Hôm nay / Hôm qua / thứ / ngày), và hộp xác
+nhận xoá chuyển từ `window.confirm` sang `ConfirmModal` của chính bảng điều
+khiển — chỗ cuối cùng còn dùng hộp trình duyệt.
+
+#### Cái đắt nhất: thôi tải toàn bộ lịch sử mỗi lần có thay đổi
+
+Mỗi sự kiện realtime — bất kỳ tin nhắn hay cảm xúc nào, ở bất kỳ hội thoại nào
+— kéo **toàn bộ `chat_messages`** + toàn bộ `profiles` + toàn bộ reactions về
+trình duyệt và ký lại mọi đường dẫn tệp, chỉ để vẽ ~15 dòng chữ xem trước. Chi
+phí tăng theo tổng lịch sử và không bao giờ giảm.
+
+View mới `chat_thread_overview` (migration `202610092000_…`) tính sẵn tin cuối
++ số chưa đọc của từng hội thoại trong Postgres, trên `chat_messages_thread_created_idx`
+đã có sẵn. `security_invoker = true` nên RLS cũ vẫn là thứ quyết định ai đọc
+được gì — đã thử gọi bằng khoá công khai: trả về rỗng. Danh sách đọc 15 dòng;
+tin nhắn chỉ tải cho **đúng hội thoại đang mở**; thả cảm xúc không còn tải lại
+danh sách; tìm theo nội dung chuyển xuống Postgres và nhờ thế tìm được **toàn
+bộ lịch sử** chứ không chỉ phần đang nằm trong trình duyệt.
+
+Một cái bẫy do chính thay đổi này sinh ra, đã chặn: vì tin nhắn tải riêng, bấm
+nhanh qua hai hội thoại có thể khiến kết quả về chậm của cuộc trước đổ vào cuộc
+sau. Tin nhắn lưu **kèm mã hội thoại** và chỉ hiển thị khi khớp.
+
+**Một chỗ tôi đã nói quá chắc rồi phải rút lại:** tôi bảo Supabase mặc định cắt
+ở 1.000 dòng nên lịch sử sẽ âm thầm biến mất. Kiểm lại thì trong database không
+có cấu hình `pgrst` nào; giới hạn đó nếu có nằm ở dashboard (Settings → API →
+Max rows), chỗ không đọc được từ đây. Lý do sửa vẫn đúng, nhưng là lý do hiệu
+năng chứ không phải mất dữ liệu.
+
+**Kiểm chứng:** view khớp 15/15 hội thoại với cách tính cũ (cả giờ tin cuối lẫn
+số chưa đọc). Trên giao diện thật: thứ tự đúng, cuộn chạm đáy (`scrollTop
+18/676`), Shift+Enter giữ `"dong mot\ndong hai"`, ô cao 39→59px, nút ⋯ hiện khi
+rê chuột, menu mở tại tin nhắn, vạch ngày đủ, tìm "máy" ra 4 cuộc đúng bằng số
+cuộc `kind='human'` chứa chữ đó trong database (6 cuộc tổng, 2 là chat AI),
+đính kèm xem và gỡ được, ảnh cũ vẫn tải sau khi tách theo hội thoại. Chưa kiểm
+được: chấm chưa đọc tự tắt khi khách nhắn lúc đang mở — cần tin thật từ khách.

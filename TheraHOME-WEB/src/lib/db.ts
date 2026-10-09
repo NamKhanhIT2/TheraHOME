@@ -2360,65 +2360,95 @@ export async function cancelUpsellCampaign(id: string) {
 // Chat (chat_threads / chat_messages) — CSKH specialist reply path
 // ---------------------------------------------------------------------------
 
+/** Which kind of attachment a storage path holds, by extension. */
+function attachmentKindOf(path: string | null): "image" | "video" | null {
+  if (!path) return null;
+  return /\.(mp4|mov|m4v|webm)(?:$|\?)/i.test(path) ? "video" : "image";
+}
+
+/**
+ * The CSKH chat LIST: one row per thread, newest activity first.
+ *
+ * Reads the chat_thread_overview view rather than the raw tables. The old
+ * version pulled EVERY row of chat_messages — all threads, all history —
+ * into the browser, plus every profile and every reaction, and signed every
+ * attachment URL, and did it again on each realtime event, in order to render
+ * one line of preview text per thread. That cost grows with total history and
+ * never shrinks. The view computes each thread's last message and unread
+ * count in Postgres, over an index that already existed.
+ */
 export async function fetchChatThreads(): Promise<ChatThread[]> {
-  const [{ data: threads, error: tErr }, { data: messages, error: mErr }, { data: profiles, error: pErr }, { data: reactions, error: rErr }] = await Promise.all([
-    supabase.from("chat_threads").select("id, user_id, created_at").eq("kind", "human").order("created_at", { ascending: false }),
-    supabase.from("chat_messages").select("id, thread_id, sender_type, body, created_at, attachment_path, read_at, edited_at, deleted_at, reply_to_message_id").order("created_at"),
-    supabase.from("profiles").select("id, full_name, email, language, country"),
+  const { data, error } = await supabase
+    .from("chat_thread_overview")
+    .select("id, user_id, full_name, email, language, country, last_message_at, last_body, last_sender_type, last_attachment_path, last_deleted_at, unread_count")
+    .order("last_message_at", { ascending: false });
+  if (error) throw error;
+
+  return (data ?? []).map((t) => ({
+    id: t.id,
+    userId: t.user_id,
+    user: t.full_name || t.email || "Người dùng",
+    language: (t.language as ChatThread["language"]) ?? "vi",
+    country: (t.country as ChatThread["country"]) ?? null,
+    unread: (t.unread_count ?? 0) > 0,
+    unreadCount: t.unread_count ?? 0,
+    time: new Date(t.last_message_at).toLocaleString("vi-VN"),
+    lastMessageAt: t.last_message_at,
+    lastBody: t.last_body ?? "",
+    lastFrom: t.last_sender_type === "specialist" ? "admin" : "user",
+    lastAttachmentKind: attachmentKindOf(t.last_attachment_path),
+    lastDeleted: !!t.last_deleted_at,
+  }));
+}
+
+/** The conversation itself — only ever for the thread being read. */
+export async function fetchThreadMessages(threadId: string): Promise<ChatMessage[]> {
+  const [{ data: messages, error: mErr }, { data: reactions, error: rErr }] = await Promise.all([
+    supabase
+      .from("chat_messages")
+      .select("id, sender_type, body, created_at, attachment_path, read_at, edited_at, deleted_at, reply_to_message_id")
+      .eq("thread_id", threadId)
+      .order("created_at"),
     supabase.from("chat_message_reactions").select("id, message_id, user_id, emoji"),
   ]);
-  if (tErr) throw tErr;
   if (mErr) throw mErr;
-  if (pErr) throw pErr;
   if (rErr) throw rErr;
 
-  const nameByUser = new Map((profiles ?? []).map((p) => [p.id, p.full_name || p.email || "Người dùng"]));
-  const profileByUser = new Map((profiles ?? []).map((p) => [p.id, p]));
-
-  // Threads are auto-created the moment a user OPENS the chat screen — one
-  // with zero messages is just that, so it stays out of the CSKH list (per
-  // explicit request) until the user actually sends something.
-  const threadsWithMessages = (threads ?? []).filter((t) => (messages ?? []).some((m) => m.thread_id === t.id));
-
-  // ONE signing call for every attachment instead of one per message — this
-  // fetch re-runs on every realtime change, and N+1 storage calls made the
-  // CSKH tab crawl once threads had a few hundred photos.
-  const attachmentPaths = [...new Set((messages ?? []).map((m) => m.attachment_path).filter((p): p is string => !!p))];
+  // ONE signing call for this thread's attachments instead of one per
+  // message — and now for one thread's worth rather than everybody's.
+  const paths = [...new Set((messages ?? []).map((m) => m.attachment_path).filter((p): p is string => !!p))];
   const signedByPath = new Map<string, string>();
-  if (attachmentPaths.length) {
-    const { data: signedList } = await supabase.storage.from("chat-attachments").createSignedUrls(attachmentPaths, 3600);
+  if (paths.length) {
+    const { data: signedList } = await supabase.storage.from("chat-attachments").createSignedUrls(paths, 3600);
     for (const item of signedList ?? []) if (item.path && item.signedUrl) signedByPath.set(item.path, item.signedUrl);
   }
 
-  return Promise.all(threadsWithMessages.map(async (t) => {
-    const msgs = (messages ?? []).filter((m) => m.thread_id === t.id);
-    const chatMessages: ChatMessage[] = await Promise.all(msgs.map(async (m) => {
-      const imageUrl: string | null = m.attachment_path ? signedByPath.get(m.attachment_path) ?? null : null;
-      return {
-        id: m.id,
-        from: m.sender_type === "specialist" ? "admin" : "user",
-        text: m.body,
-        time: new Date(m.created_at).toLocaleString("vi-VN"),
-        imageUrl,
-        attachmentKind: m.attachment_path?.match(/\.(mp4|mov|m4v|webm)(?:$|\?)/i) ? "video" : m.attachment_path ? "image" : null,
-        readAt: m.read_at,
-        editedAt: m.edited_at,
-        deletedAt: m.deleted_at,
-        replyToMessageId: m.reply_to_message_id,
-        reactions: (reactions ?? []).filter((reaction) => reaction.message_id === m.id).map((reaction) => ({ id: reaction.id, userId: reaction.user_id, emoji: reaction.emoji })),
-      };
-    }));
-    return {
-      id: t.id,
-      userId: t.user_id,
-      user: nameByUser.get(t.user_id) ?? "Người dùng",
-      language: (profileByUser.get(t.user_id)?.language as ChatThread["language"]) ?? "vi",
-      country: (profileByUser.get(t.user_id)?.country as ChatThread["country"]) ?? null,
-      unread: msgs.some((m) => m.sender_type === "user" && !m.read_at),
-      time: new Date(t.created_at).toLocaleString("vi-VN"),
-      messages: chatMessages.length ? chatMessages : [{ from: "user", text: "(Chưa có tin nhắn)", time: "" }],
-    };
+  return (messages ?? []).map((m) => ({
+    id: m.id,
+    from: m.sender_type === "specialist" ? "admin" : "user",
+    text: m.body,
+    time: new Date(m.created_at).toLocaleString("vi-VN"),
+    createdAt: m.created_at,
+    imageUrl: m.attachment_path ? signedByPath.get(m.attachment_path) ?? null : null,
+    attachmentKind: attachmentKindOf(m.attachment_path),
+    readAt: m.read_at,
+    editedAt: m.edited_at,
+    deletedAt: m.deleted_at,
+    replyToMessageId: m.reply_to_message_id,
+    reactions: (reactions ?? []).filter((reaction) => reaction.message_id === m.id).map((reaction) => ({ id: reaction.id, userId: reaction.user_id, emoji: reaction.emoji })),
   }));
+}
+
+/** Threads containing a message that matches — searched in Postgres, because
+ * the browser no longer holds everybody's messages to search through. */
+export async function searchChatThreadIds(needle: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .select("thread_id")
+    .ilike("body", `%${needle}%`)
+    .limit(500);
+  if (error) throw error;
+  return [...new Set((data ?? []).map((r) => r.thread_id as string))];
 }
 
 export async function sendSpecialistMessage(threadId: string, text: string, attachmentPath?: string | null, replyToMessageId?: string | null) {

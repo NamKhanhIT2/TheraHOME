@@ -194,7 +194,11 @@ export interface ChatMessage {
   id?: string;
   from: "user" | "admin";
   text: string;
+  /** Formatted for display. */
   time: string;
+  /** The same instant, unformatted — `time` is a vi-VN string that cannot be
+   * parsed back, and the day separators need to compare dates. */
+  createdAt?: string;
   imageUrl?: string | null;
   attachmentKind?: "image" | "video" | null;
   readAt?: string | null;
@@ -215,6 +219,18 @@ export interface ChatThread {
   country?: "VN" | "US" | "MALAY" | null;
   avatarColor?: string;
   unread: boolean;
+  /** Formatted time of the LAST message, which is what a chat list shows —
+   * not the time the thread was created. */
   time: string;
-  messages: ChatMessage[];
+  /** The same instant as an ISO string, so the list can be sorted on it. */
+  lastMessageAt?: string;
+  /** The last message, for the one-line preview under the name. The
+   * conversation itself is NOT here: it is loaded per thread, only for the
+   * one being read. */
+  lastBody: string;
+  lastFrom: "user" | "admin";
+  lastAttachmentKind?: "image" | "video" | null;
+  lastDeleted?: boolean;
+  unreadCount?: number;
 }
+
