@@ -12,7 +12,7 @@
 // difference between covering the line and not. Waiting is done over Realtime
 // on the `calls` row, which is free.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
@@ -47,7 +47,7 @@ import {
  * reason ("Không có người nghe máy") is readable rather than a flash. */
 const CLOSE_DELAY_MS = 1600;
 
-type MediaState = 'idle' | 'connecting' | 'live' | 'failed' | 'unsupported';
+type MediaState = 'idle' | 'connecting' | 'live' | 'reconnecting' | 'failed' | 'unsupported';
 
 export default function CallScreen() {
   const theme = useTheme();
@@ -73,7 +73,9 @@ export default function CallScreen() {
 
   const [media, setMedia] = useState<MediaState>('idle');
   const [micOn, setMicOn] = useState(true);
-  const [cameraOn, setCameraOn] = useState(true);
+  // A voice call starts with the camera down and may raise it; a video call
+  // starts with it up. Set once the row is known rather than guessed here.
+  const [cameraOn, setCameraOn] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(false);
   const [remoteJoined, setRemoteJoined] = useState(false);
   const roomRef = useRef<LiveKitRoom | null>(null);
@@ -82,7 +84,12 @@ export default function CallScreen() {
   // room object exists — see the effect below.
   const connectingRef = useRef(false);
 
-  const tracks = useCallVideoTracks(room, isVideo && media === 'live');
+  // Video is shown whenever a camera is actually publishing, not only when
+  // the call was PLACED as video — that is what lets a voice call become a
+  // video one mid-conversation.
+  const tracks = useCallVideoTracks(room, media === 'live' || media === 'reconnecting');
+  // Read by the back handler, which must not re-subscribe on every render.
+  const inCallRef = useRef(false);
 
   // The caller hears a quiet ringback while it rings at the other end. The
   // callee's own phone is rung by the incoming sheet, not here.
@@ -110,7 +117,10 @@ export default function CallScreen() {
         setMedia('live');
         // A video call starts on the speaker; reflect that in the toggle so
         // the button does not claim the opposite of what is happening.
-        if (wanted === 'video') setSpeakerOn(true);
+        if (wanted === 'video') {
+          setSpeakerOn(true);
+          setCameraOn(true);
+        }
         setRemoteJoined(connected.remoteParticipants.size > 0);
         connected.on('participantConnected', () => setRemoteJoined(true));
         connected.on('participantDisconnected', () => {
@@ -120,6 +130,11 @@ export default function CallScreen() {
           // even if their `end_call` never lands.
           void terminate('ended', 'remote_left');
         });
+        // LiveKit reconnects on its own when the network blips; what was
+        // missing was any sign of it, so the picture just froze. 'disconnected'
+        // is the FINAL give-up, not a blip.
+        connected.on('reconnecting', () => { if (!cancelled) setMedia('reconnecting'); });
+        connected.on('reconnected', () => { if (!cancelled) setMedia('live'); });
         connected.on('disconnected', () => {
           if (!cancelled) setMedia('failed');
         });
@@ -182,6 +197,18 @@ export default function CallScreen() {
     return () => clearTimeout(timer);
   }, [isOver, unreadable, isStaff]);
 
+  // Android's hardware back pops this screen, which unmounts it, which
+  // disconnects the room — so a stray back press ended the call outright.
+  // While a call is up, back is swallowed; the red button is the only way
+  // out. (iOS's swipe-back is already off via gestureEnabled on the route.)
+  useEffect(() => {
+    // Subscribed once and left alone: the handler reads the ref, so whether
+    // back is swallowed follows the call's state without this effect having
+    // to tear down and re-add a listener on every render.
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => inCallRef.current);
+    return () => subscription.remove();
+  }, []);
+
   // --------------------------------------------------------------- actions
   function toggleMic() {
     if (!roomRef.current) return;
@@ -215,6 +242,7 @@ export default function CallScreen() {
       case 'accepted':
         if (media === 'unsupported') return 'Bản cài đặt này chưa hỗ trợ gọi';
         if (media === 'failed') return 'Mất kết nối';
+        if (media === 'reconnecting') return 'Đang kết nối lại…';
         if (media !== 'live') return 'Đang kết nối…';
         return remoteJoined ? formatCallDuration(seconds) : 'Đang chờ đầu kia vào…';
       case 'busy':
@@ -236,9 +264,15 @@ export default function CallScreen() {
 
   const showAnswerButtons = !!call && call.status === 'ringing' && !isCaller;
   const inCall = call?.status === 'accepted';
-  // The remote picture only takes over once it is actually arriving; until
-  // then the identity card reads better than a black rectangle.
-  const videoStage = isVideo && inCall && media === 'live' && !!tracks.remote;
+  // Controls stay usable through a reconnect: muting while the socket is
+  // re-establishing should still take effect when it comes back.
+  const controlsLive = media === 'live' || media === 'reconnecting';
+  inCallRef.current = !!inCall && !isOver;
+  // Driven by whether a picture is actually arriving, not by how the call was
+  // placed — so a voice call that turns into a video one switches to the
+  // video stage, and a video call whose far end kills its camera falls back
+  // to the identity card instead of freezing on the last frame.
+  const videoStage = inCall && controlsLive && !!tracks.remote;
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: videoStage ? '#000' : theme.colors.bgApp }]}>
@@ -275,21 +309,24 @@ export default function CallScreen() {
 
       <View style={[styles.controls, videoStage ? styles.controlsOverVideo : null]}>
         {inCall ? (
+          // One row for every call. The camera button is always there, so a
+          // voice call can become a video one; "đổi camera" only appears once
+          // a camera is actually on, because there is nothing to switch
+          // otherwise. Speaker stays available in BOTH kinds — a video call
+          // opens on speaker but the user must be able to put it back to the
+          // earpiece, which the video-only layout had made impossible.
           <View style={styles.toggleRow}>
             <ToggleButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? 'Tắt tiếng' : 'Đã tắt tiếng'}
-              active={!micOn} onPress={toggleMic} disabled={media !== 'live'} onDark={videoStage} />
-            {isVideo ? (
-              <>
-                <ToggleButton icon={cameraOn ? 'video' : 'video-off'} label={cameraOn ? 'Tắt camera' : 'Bật camera'}
-                  active={!cameraOn} onPress={toggleCamera} disabled={media !== 'live'} onDark={videoStage} />
-                <ToggleButton icon="switch-camera" label="Đổi camera" active={false}
-                  onPress={() => void switchCallCamera(roomRef.current).catch(() => undefined)}
-                  disabled={media !== 'live' || !cameraOn} onDark={videoStage} />
-              </>
-            ) : (
-              <ToggleButton icon="volume-2" label="Loa ngoài" active={speakerOn}
-                onPress={toggleSpeaker} disabled={media !== 'live'} onDark={videoStage} />
-            )}
+              active={!micOn} onPress={toggleMic} disabled={!controlsLive} onDark={videoStage} />
+            <ToggleButton icon={cameraOn ? 'video' : 'video-off'} label={cameraOn ? 'Tắt camera' : 'Bật camera'}
+              active={!cameraOn} onPress={toggleCamera} disabled={!controlsLive} onDark={videoStage} />
+            {cameraOn ? (
+              <ToggleButton icon="switch-camera" label="Đổi camera" active={false}
+                onPress={() => void switchCallCamera(roomRef.current).catch(() => undefined)}
+                disabled={!controlsLive} onDark={videoStage} />
+            ) : null}
+            <ToggleButton icon="volume-2" label="Loa ngoài" active={speakerOn}
+              onPress={toggleSpeaker} disabled={!controlsLive} onDark={videoStage} />
           </View>
         ) : null}
 

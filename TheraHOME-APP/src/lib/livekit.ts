@@ -101,15 +101,15 @@ export async function connectCall(callId: string, media: 'audio' | 'video' = 'au
   await lk.AudioSession.startAudioSession();
 
   const room = new lkClient.Room({
-    // On a video call, adaptiveStream drops the resolution of a track whose
-    // view is small or hidden, and dynacast stops publishing layers nobody is
-    // watching. Both cut bandwidth, which is the free tier's OTHER limit
-    // (50GB downstream) and the one video actually presses against.
-    adaptiveStream: media === 'video',
-    dynacast: media === 'video',
-    ...(media === 'video'
-      ? { videoCaptureDefaults: { resolution: lkClient.VideoPresets.h540.resolution } }
-      : {}),
+    // adaptiveStream drops the resolution of a track whose view is small or
+    // hidden; dynacast stops publishing layers nobody is watching. Both cut
+    // bandwidth, which is the free tier's OTHER limit (50GB downstream) and
+    // the one video actually presses against. On for every call, not just
+    // video ones, because a voice call can now raise its camera mid-
+    // conversation and would otherwise publish at full rate.
+    adaptiveStream: true,
+    dynacast: true,
+    videoCaptureDefaults: { resolution: lkClient.VideoPresets.h540.resolution },
   });
 
   try {

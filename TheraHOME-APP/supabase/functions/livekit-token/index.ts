@@ -13,17 +13,21 @@
 //   - the requester must be that call's customer, or hold admin/cskh.
 // Anything else gets a 403 and no token, so a leaked call id is worthless.
 //
-// The grant is built from the CALL ROW's `media`, not from anything the
-// client asks for: an audio call gets `canPublishSources: ['microphone']` and
-// the media server refuses a camera track from that token, so a call placed
-// as voice cannot quietly become a video one.
+// The grant allows microphone AND camera on every call. It used to be built
+// from the row's `media`, refusing a camera track on a voice call — but that
+// is exactly what blocks "bật camera" mid-conversation, which every other
+// caller app offers and which the owner asked for. The row's `media` still
+// decides how the call OPENS (which screen, whether the camera starts on);
+// it is no longer a hard server-side lock.
 //
-// (An earlier version of this comment claimed audio-only kept the feature in
-// a cheaper price band, quoting US$0.99 vs $3.99 per 1,000 participant
-// minutes. That is ZEGOCLOUD's and Agora's model, not LiveKit's — LiveKit
-// Cloud bills connection minutes regardless of media type. What video
-// actually costs here is downstream bandwidth, the free tier's other limit,
-// which `adaptiveStream`/`dynacast` on the client are there to hold down.)
+// Two earlier claims in this file were wrong and are worth recording. The
+// lock was justified on price, quoting US$0.99 vs $3.99 per 1,000
+// participant minutes — that is ZEGOCLOUD's and Agora's model, not
+// LiveKit's, which bills connection minutes regardless of media type. And it
+// was described as one of several "locks" keeping the feature audio-only,
+// which stopped being a goal the moment video shipped. What video actually
+// costs here is downstream bandwidth, held down by `adaptiveStream` and
+// `dynacast` on the client.
 //
 // The JWT is signed here by hand with Web Crypto instead of pulling in
 // livekit-server-sdk. It is sixty lines of HS256 against a documented claim
@@ -90,7 +94,8 @@ async function mintAccessToken({
       roomJoin: true,
       canSubscribe: true,
       canPublish: true,
-      // Enforced server-side from the row, not from the request.
+      // Mic and camera on every call, so either side can raise its camera
+      // mid-conversation. Screen share is deliberately not in the list.
       canPublishSources: sources,
       canPublishData: false,
       // Nobody may reconfigure or list rooms with a client token.
@@ -188,9 +193,11 @@ Deno.serve(async (request: Request) => {
     ? "TheraHOME CSKH"
     : (profile?.full_name?.trim() || "Khách hàng");
 
-  const sources = call.media === "video"
-    ? ["microphone", "camera"]
-    : ["microphone"];
-  const token = await mintAccessToken({ identity, name, room: call.room_name, sources });
+  const token = await mintAccessToken({
+    identity,
+    name,
+    room: call.room_name,
+    sources: ["microphone", "camera"],
+  });
   return json({ token, url: LIVEKIT_URL, room: call.room_name, identity, media: call.media });
 });
