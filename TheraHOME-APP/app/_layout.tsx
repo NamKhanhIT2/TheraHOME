@@ -16,6 +16,8 @@ import { ThemeProvider, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useIsStaff } from '@/hooks/useWebRoles';
 import { IncomingCallSheet } from '@/components/call/IncomingCallSheet';
+import { useCallKeepBridge } from '@/hooks/useCallKeepBridge';
+import '@/lib/callBackgroundTask';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -146,6 +148,11 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // Checked after onboardingPending so the intake questions come first.
   const countryPending = authed && !isStaffAccount && !onboardingPending && profile?.countryConfirmed === false;
   const inApp = authed && !onboardingPending && !countryPending && !blockedReason;
+
+  // Android's system call screen — the only thing that rings a locked phone.
+  // Armed for anyone signed in, since calls now go both ways. Sits below
+  // `inApp`, which several auth checks above feed into.
+  useCallKeepBridge(inApp);
 
   // Also doubles as the "last active" heartbeat the win-back notification
   // job reads (profiles.last_login_at) — a persisted session means most

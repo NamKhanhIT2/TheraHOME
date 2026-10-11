@@ -234,7 +234,19 @@ Deno.serve(async (request) => {
       if (call.status !== 'ringing') return json({ sent: 0, reason: 'not_ringing' });
 
       const isVideo = call.media === 'video';
-      data = { type: 'call', callId: call.id };
+      // The Android background task raises the system call screen from this
+      // payload alone — it runs headless, with no session and no time for a
+      // database read — so the name and the media type have to travel with
+      // the push or the lock screen shows a generic "Khách hàng".
+      const { data: callerProfile } = await admin
+        .from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+      const callerDisplayName = callerProfile?.full_name?.trim() || 'Khách hàng';
+      data = {
+        type: 'call',
+        callId: call.id,
+        media: call.media,
+        callerName: call.callee_id ? 'TheraHOME CSKH' : callerDisplayName,
+      };
 
       if (call.callee_id) {
         // CSKH is calling a customer back. Ringing every staff phone here —
@@ -252,12 +264,10 @@ Deno.serve(async (request) => {
       } else {
         // A customer ringing the support line: every staff phone.
         recipientIds = await staffRecipientIds(admin);
-        const { data: caller } = await admin.from('profiles').select('full_name').eq('id', user.id).single();
-        const callerName = caller?.full_name?.trim() || 'Khách hàng';
         // Staff read Vietnamese, same as the support-message push below.
         compose = () => ({
           title: isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi đến',
-          body: `${callerName} đang gọi cho CSKH`,
+          body: `${callerDisplayName} đang gọi cho CSKH`,
         });
       }
     } else {
