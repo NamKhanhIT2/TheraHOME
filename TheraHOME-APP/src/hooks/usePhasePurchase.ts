@@ -64,6 +64,50 @@ async function functionErrorCode(error: unknown): Promise<string | null> {
   }
 }
 
+/** Server verdicts that will never change for THIS transaction.
+ *
+ * A transaction the store handed us stays in the device's queue until the
+ * app finishes it, and StoreKit re-delivers an unfinished one on every
+ * launch — forever. While one sits there unclaimable it also blocks every
+ * later purchase on that device: the buyer gets "thử lại" on a loop and
+ * cannot escape, not by reinstalling (the queue is the system's, not the
+ * app's) and not by switching accounts.
+ *
+ * That is exactly what happened on 2026-10-10: a purchase made under one
+ * TheraHOME account, then a different account signed in on the same iPhone
+ * — seven 409s in a row, and no way forward until the row was moved by hand
+ * in SQL. A real customer with two accounts on one phone hits the same wall.
+ *
+ * Finishing is safe for these: a non-consumable's entitlement lives with the
+ * Apple/Play account, not with the transaction, so `getAvailablePurchases`
+ * still returns it and the catch-up below can claim it later if the reason
+ * for the refusal is ever fixed.
+ *
+ * Deliberately NOT in this list: network errors, 5xx, and the store's own
+ * "not found" answers. Those can be a store API hiccup rather than a verdict
+ * about the purchase, and leaving them unfinished is what makes the next
+ * launch retry them. */
+const TERMINAL_VERIFY_ERRORS = new Set([
+  // Someone else already holds this entitlement, so the money WAS honoured —
+  // just not for this account. The jam this whole list exists for.
+  'transaction_already_claimed',
+  // Already refunded.
+  'transaction_revoked',
+  // The payload is not a purchase of anything we sell.
+  'product_id_mismatch',
+  'transaction_id_mismatch',
+  'bundle_id_mismatch',
+  'invalid_transaction_payload',
+]);
+
+// `phase_not_purchasable` and `purchase_not_valid` are deliberately absent
+// even though they are just as permanent. On Android finishTransaction is
+// ALSO the acknowledge call, and Google auto-refunds a purchase nobody
+// acknowledges within three days. If an admin clears a phase's product id
+// while a real purchase is in flight, refusing to acknowledge is what gets
+// that buyer their money back — finishing it would quietly keep the money
+// and give them nothing. A jammed queue is worth less than someone's 299k.
+
 /** Drives the "Mở khoá ngay" button on `PhaseUnlockPromo` for one specific
  * phase, on both platforms. Wraps `react-native-iap`'s `useIAP()`: fetches
  * the phase's product for the CURRENT platform (Apple product id on iOS,
@@ -98,6 +142,19 @@ export function usePurchasePhase(
   const [ownedRetry, setOwnedRetry] = useState(0);
   const handledOwnedRef = useRef(0);
 
+  /** finishTransaction, but a failure here must never turn a handled case
+   * into an unhandled rejection — the worst it costs is one more replay. */
+  const settle = useCallback(
+    async (purchase: Purchase, finishTransaction: (args: { purchase: Purchase; isConsumable: boolean }) => Promise<void>) => {
+      try {
+        await finishTransaction({ purchase, isConsumable: false });
+      } catch (e) {
+        if (__DEV__) console.warn('finishTransaction failed:', e);
+      }
+    },
+    [],
+  );
+
   const verifyAndFinish = useCallback(
     async (purchase: Purchase, finishTransaction: (args: { purchase: Purchase; isConsumable: boolean }) => Promise<void>) => {
       // Not paid for yet: Play's slower methods (bank transfer, cash at a
@@ -122,13 +179,18 @@ export function usePurchasePhase(
                 body: { phaseId, transactionId: purchase.id },
               });
         if (error) {
-          // Bought under a different sign-in: retrying can never help, and
-          // buying again is impossible (Play says "already owned"), so name
-          // the actual problem.
-          if ((await functionErrorCode(error)) === 'transaction_already_claimed') {
-            setPurchaseError('claimed_by_other');
+          const code = await functionErrorCode(error);
+          if (code && TERMINAL_VERIFY_ERRORS.has(code)) {
+            // Final answer: close the transaction so the store stops
+            // handing it back on every launch (see TERMINAL_VERIFY_ERRORS).
+            await settle(purchase, finishTransaction);
+            // Bought under a different sign-in: retrying can never help, and
+            // buying again is impossible (the store says "already owned"),
+            // so name the actual problem.
+            setPurchaseError(code === 'transaction_already_claimed' ? 'claimed_by_other' : code);
             return;
           }
+          // Transient — leave it unfinished so the next launch retries.
           throw error;
         }
         // Google still processing: say so and stop — no entitlement, no
@@ -140,6 +202,9 @@ export function usePurchasePhase(
         // Refunded. The phase stays locked — this only replaces the false
         // "unlocked" screen a restore used to show.
         if (data?.revoked) {
+          // The refund already happened; there is nothing left to do with
+          // this transaction, so close it rather than replay it forever.
+          await settle(purchase, finishTransaction);
           setPurchaseError('purchase_revoked');
           return;
         }
@@ -148,7 +213,7 @@ export function usePurchasePhase(
         // the purchase — an unfinished transaction safely replays (iOS) or
         // stays restorable (Android, where the server has also already
         // acknowledged it) if this step never runs, e.g. app killed mid-flow.
-        await finishTransaction({ purchase, isConsumable: false });
+        await settle(purchase, finishTransaction);
         void queryClient.invalidateQueries({ queryKey: ['phase_purchases'] });
         onVerifiedRef.current?.();
       } catch (e) {
@@ -158,7 +223,7 @@ export function usePurchasePhase(
         setVerifying(false);
       }
     },
-    [phaseId, queryClient],
+    [phaseId, queryClient, settle],
   );
 
   const { connected, products, fetchProducts, requestPurchase, finishTransaction } = useIAP({

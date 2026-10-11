@@ -93,6 +93,26 @@ function sameDay(a?: string, b?: string): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
+/** Messages from one person inside this window are drawn as one cluster with
+ * a single time under it, the way Messenger, Zalo and Telegram all do it. The
+ * old screen stamped every single message with "09:11:40 10/10/2026" — the
+ * seconds nobody reads, and the date already written on the day separator
+ * three lines above. */
+const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+function sameGroup(a: ChatMessage | undefined, b: ChatMessage | undefined): boolean {
+  if (!a || !b || a.from !== b.from) return false;
+  if (!a.createdAt || !b.createdAt) return false;
+  if (!sameDay(a.createdAt, b.createdAt)) return false;
+  return Math.abs(new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) < GROUP_WINDOW_MS;
+}
+
+/** 09:11 — the clock only. The date is the day separator's job. */
+function clock(iso?: string): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+}
+
 /** Tallest the composer grows before it scrolls instead — about six lines. */
 const COMPOSER_MAX_H = 132;
 
@@ -104,6 +124,20 @@ export function ChatView() {
    * you just left can never paint itself into the one you just opened. */
   const [loaded, setLoaded] = useState<{ threadId: string; items: ChatMessage[] } | null>(null);
   const [searchHits, setSearchHits] = useState<Set<string> | null>(null);
+  /** Messages drawn before the server has them. Keyed by thread for the same
+   * reason `loaded` is: so one thread's draft can never appear in another. */
+  const [sendingItems, setSendingItems] = useState<{ threadId: string; items: ChatMessage[] } | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; kind: "image" | "video" } | null>(null);
+  /** A message landed while the reader was scrolled up. The view deliberately
+   * does not jump to it — but something has to say it is there. */
+  const [hasNewBelow, setHasNewBelow] = useState(false);
+  const [canAskNotify, setCanAskNotify] = useState(false);
+  /** Newest message instant already accounted for. Seeded on the first load
+   * so opening the screen does not fire a notification per unread thread. */
+  const seenUntilRef = useRef<string | null>(null);
+  /** What the open thread held last time it loaded, so a refetch can tell an
+   * arrival from a re-read of the same messages. */
+  const lastLoadedRef = useRef<{ threadId: string; count: number } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   // Market filter (2026-09-06): `country` already rides along on every
@@ -135,7 +169,16 @@ export function ChatView() {
   function reloadMessages(threadId: string | null) {
     if (!threadId) return;
     fetchThreadMessages(threadId)
-      .then((items) => setLoaded({ threadId, items }))
+      .then((items) => {
+        // An arrival is an external event, so the "new below" flag is decided
+        // here rather than in a render pass: the thread grew, and the reader
+        // is not at the bottom to see it.
+        const prev = lastLoadedRef.current;
+        const grew = prev?.threadId === threadId && items.length > prev.count;
+        lastLoadedRef.current = { threadId, count: items.length };
+        setLoaded({ threadId, items });
+        if (grew && !nearBottomRef.current) setHasNewBelow(true);
+      })
       .catch(() => pushToast("Không thể tải tin nhắn"));
   }
 
@@ -191,7 +234,9 @@ export function ChatView() {
         (searchHits?.has(t.id) ?? false)),
   );
   const active = threads?.find((t) => t.id === activeId);
-  const messages = loaded?.threadId === activeId ? loaded.items : [];
+  const settled = loaded?.threadId === activeId ? loaded.items : [];
+  const inFlight = sendingItems?.threadId === activeId ? sendingItems.items : [];
+  const messages = inFlight.length ? [...settled, ...inFlight] : settled;
 
   // Also depends on `active.unread`, which is the fix: this used to run only
   // when you SWITCHED threads, so a message arriving while you were reading
@@ -240,9 +285,80 @@ export function ChatView() {
   }, [activeId]);
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || !nearBottomRef.current) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (!el) return;
+    if (!nearBottomRef.current) return;
+    // Assignment, not scrollTo({behavior:"smooth"}). Measured in Chrome on
+    // this pane: the smooth form moved it zero pixels while a plain write
+    // moved it the full 666 — so "follow the newest message" was quietly
+    // doing nothing at all. The distances here are a line or two; nobody
+    // misses the animation, and this always lands.
+    el.scrollTop = el.scrollHeight;
   }, [lastMessageId, messages.length]);
+
+  function jumpToLatest() {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    nearBottomRef.current = true;
+    setHasNewBelow(false);
+  }
+
+  // ---- unread in the browser tab, and a desktop notification for arrivals.
+  // The tab title is the half that needs no permission and so always works;
+  // the Notification is the half that reaches someone looking elsewhere.
+  const totalUnread = (threads ?? []).reduce((sum, t) => sum + (t.unreadCount ?? 0), 0);
+
+  useEffect(() => {
+    const original = document.title;
+    document.title = totalUnread > 0 ? `(${totalUnread}) ${original.replace(/^\(\d+\)\s*/, "")}` : original.replace(/^\(\d+\)\s*/, "");
+    return () => { document.title = original.replace(/^\(\d+\)\s*/, ""); };
+  }, [totalUnread]);
+
+  // Subscribed to, not read once: the Permissions API fires onchange when the
+  // visitor grants or blocks notifications in browser settings, so the button
+  // disappears the moment it stops being the right thing to offer. (Safari has
+  // no permissions.query for notifications — hence the fallback read.)
+  useEffect(() => {
+    if (typeof Notification === "undefined") return;
+    let cancelled = false;
+    let status: PermissionStatus | null = null;
+    const apply = () => { if (!cancelled) setCanAskNotify(Notification.permission === "default"); };
+    const query = navigator.permissions?.query?.({ name: "notifications" as PermissionName });
+    if (query) {
+      query.then((s) => { status = s; s.onchange = apply; apply(); }).catch(apply);
+    } else {
+      queueMicrotask(apply);
+    }
+    return () => { cancelled = true; if (status) status.onchange = null; };
+  }, []);
+
+  useEffect(() => {
+    if (!threads) return;
+    const newest = threads.reduce<string | null>((max, t) => (t.lastMessageAt && (!max || t.lastMessageAt > max) ? t.lastMessageAt : max), null);
+    const mark = seenUntilRef.current;
+    seenUntilRef.current = newest;
+    // First pass only records where we are: a screen that opens by firing one
+    // notification per unread thread is a screen nobody leaves open.
+    if (mark === null || !newest) return;
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+
+    for (const t of threads) {
+      if (!t.lastMessageAt || t.lastMessageAt <= mark) continue;
+      // Only the customer's own messages, and not the thread already on
+      // screen in a focused window — the reader can see that one.
+      if (t.lastFrom !== "user") continue;
+      if (t.id === activeIdRef.current && document.visibilityState === "visible") continue;
+      const n = new Notification(t.user, { body: threadPreview(t), tag: t.id, icon: "/landing/logo.png" });
+      n.onclick = () => { window.focus(); setActiveId(t.id); n.close(); };
+    }
+  }, [threads]);
+
+  async function askNotifyPermission() {
+    if (typeof Notification === "undefined") return;
+    const result = await Notification.requestPermission();
+    setCanAskNotify(result === "default");
+    if (result === "denied") pushToast("Trình duyệt đã chặn thông báo cho trang này");
+  }
 
   // A picked file used to be visible only as a tint on the paperclip and its
   // name in a tooltip — no way to see WHAT was attached, and no way to change
@@ -289,20 +405,57 @@ export function ChatView() {
   }
   async function send() {
     if ((!draft.trim() && !attachment) || !active || sending) return;
+    const threadId = active.id;
+    const text = draft.trim();
+    const file = attachment;
+    const replyId = replyTo?.id ?? null;
+    const isEdit = !!editing?.id;
+
+    // The composer empties NOW and, for a new message, the bubble is on
+    // screen NOW — pressing Send used to leave the thread unchanged until an
+    // upload, an insert and a refetch had all come back, which on a photo is
+    // seconds of wondering whether the click registered. Editing keeps the
+    // old behaviour: it rewrites a bubble that is already there.
+    setDraft("");
+    clearAttachment();
+    setReplyTo(null);
+    setEditing(null);
+    if (!isEdit) {
+      setSendingItems({
+        threadId,
+        items: [{
+          id: `sending-${Date.now()}`,
+          from: "admin",
+          text,
+          time: "",
+          createdAt: new Date().toISOString(),
+          // The local preview stands in until the signed URL exists.
+          imageUrl: file && file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+          attachmentKind: file ? (file.type.startsWith("video/") ? "video" : "image") : null,
+          replyToMessageId: replyId,
+          sending: true,
+        }],
+      });
+    }
+
     setSending(true);
     try {
-      if (editing?.id) await editSpecialistMessage(editing.id, draft.trim());
-      else {
-        const attachmentPath = attachment ? await uploadSpecialistChatImage(active.userId, active.id, attachment) : null;
-        await sendSpecialistMessage(active.id, draft.trim(), attachmentPath, replyTo?.id);
+      if (isEdit) {
+        await editSpecialistMessage(editing!.id!, text);
+      } else {
+        const attachmentPath = file ? await uploadSpecialistChatImage(active.userId, threadId, file) : null;
+        await sendSpecialistMessage(threadId, text, attachmentPath, replyId);
       }
-      setDraft("");
-      clearAttachment();
-      setReplyTo(null);
-      setEditing(null);
+      // Swap the placeholder for the real row in ONE commit, so the bubble
+      // never blinks out and back in.
+      const items = await fetchThreadMessages(threadId);
+      setLoaded({ threadId, items });
+      setSendingItems(null);
       reload();
-      reloadMessages(active.id);
     } catch {
+      // Hand the words back rather than losing them, and say so.
+      setSendingItems(null);
+      if (!isEdit) setDraft(text);
       pushToast("Không thể gửi tin nhắn");
     } finally {
       setSending(false);
@@ -418,7 +571,7 @@ export function ChatView() {
                 textAlign: "left",
               }}
             >
-              <Avatar name={t.user} color={t.avatarColor} size={36} />
+              <Avatar name={t.user} color={t.avatarColor} src={t.avatarUrl} size={36} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
                   <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 6 }}>
@@ -439,24 +592,42 @@ export function ChatView() {
       {active ? (
         <div style={{ flex: 1, background: "#fff", borderRadius: 16, boxShadow: "var(--shadow-card)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 16, borderBottom: "1px solid var(--divider)" }}>
-            <Avatar name={active.user} color={active.avatarColor} size={36} />
-            <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
+            <Avatar name={active.user} color={active.avatarColor} src={active.avatarUrl} size={36} />
+            <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
               {active.user}
               <LangBadge thread={active} />
             </div>
+            {canAskNotify ? (
+              <button
+                onClick={() => void askNotifyPermission()}
+                title="Hiện thông báo của trình duyệt khi khách nhắn, kể cả lúc bạn đang ở tab khác"
+                style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid var(--border-input)", background: "#fff", borderRadius: 999, padding: "6px 12px", cursor: "pointer", fontFamily: "var(--font-family)", fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)", flexShrink: 0 }}
+              >
+                <Icon name="bell" size={14} color="var(--text-muted)" />
+                Bật thông báo
+              </button>
+            ) : null}
           </div>
           <div
             ref={scrollRef}
             onScroll={(e) => {
               const el = e.currentTarget;
               nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+              if (nearBottomRef.current) setHasNewBelow(false);
             }}
-            style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "20px 28px", display: "flex", flexDirection: "column", gap: 10 }}
+            style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "20px 28px", display: "flex", flexDirection: "column", gap: 2 }}
           >
             {messages.map((m, i) => {
               const replied = messages.find((candidate) => candidate.id === m.replyToMessageId);
               const isLatestAdmin = m.from === "admin" && !messages.slice(i + 1).some((candidate) => candidate.from === "admin");
               const showDay = !!m.createdAt && !sameDay(m.createdAt, messages[i - 1]?.createdAt);
+              // A cluster is consecutive messages from one side, close in
+              // time. Only its last bubble carries a clock, and only its
+              // outer corners stay round — the shape that makes a run of
+              // messages read as one turn in the conversation.
+              const startsGroup = showDay || !sameGroup(messages[i - 1], m);
+              const endsGroup = !sameGroup(m, messages[i + 1]);
+              const mine = m.from === "admin";
               return (
               <Fragment key={m.id ?? i}>
               {showDay ? (
@@ -464,12 +635,40 @@ export function ChatView() {
                   {dayLabel(m.createdAt!)}
                 </div>
               ) : null}
-              <div className="chat-msg" style={{ position: "relative", alignSelf: m.from === "admin" ? "flex-end" : "flex-start", maxWidth: "65%" }}>
+              <div className="chat-msg" style={{ position: "relative", alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "65%", marginTop: startsGroup && !showDay ? 10 : 0, opacity: m.sending ? 0.6 : 1 }}>
                 {/* pre-wrap so the line breaks Shift+Enter now produces are
                     actually shown instead of collapsing into one paragraph. */}
-                <div onContextMenu={(event) => { event.preventDefault(); setActionMessage(m); }} style={{ position: "relative", background: m.from === "admin" ? "var(--color-primary)" : "var(--bg-card-alt)", color: m.from === "admin" ? "#fff" : "var(--text-primary)", borderRadius: 12, padding: "10px 14px", fontSize: 13.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                <div
+                  onContextMenu={(event) => { if (m.sending) return; event.preventDefault(); setActionMessage(m); }}
+                  style={{
+                    position: "relative",
+                    background: mine ? "var(--color-primary)" : "var(--bg-card-alt)",
+                    color: mine ? "#fff" : "var(--text-primary)",
+                    borderRadius: 14,
+                    ...(mine
+                      ? { borderTopRightRadius: startsGroup ? 14 : 5, borderBottomRightRadius: endsGroup ? 14 : 5 }
+                      : { borderTopLeftRadius: startsGroup ? 14 : 5, borderBottomLeftRadius: endsGroup ? 14 : 5 }),
+                    padding: "9px 14px",
+                    fontSize: 13.5,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
                   {m.replyToMessageId ? <div style={{ borderLeft: "3px solid currentColor", opacity: 0.7, paddingLeft: 8, marginBottom: 7, fontSize: 12 }}>{replied?.deletedAt ? "Tin nhắn đã xoá" : replied?.text || (replied?.imageUrl ? "Ảnh" : "Tin nhắn được trả lời")}</div> : null}
-                  {m.deletedAt ? <i style={{ opacity: 0.7 }}>Tin nhắn đã được xoá</i> : <>{m.imageUrl ? m.attachmentKind === "video" ? <video src={m.imageUrl} controls style={{ display: "block", width: "min(320px, 100%)", borderRadius: 8, marginBottom: m.text ? 8 : 0 }} /> : <Image src={m.imageUrl} alt="Ảnh đính kèm" width={320} height={240} unoptimized style={{ display: "block", width: "min(320px, 100%)", height: "auto", borderRadius: 8, marginBottom: m.text ? 8 : 0 }} /> : null}{m.text || null}</>}
+                  {m.deletedAt ? <i style={{ opacity: 0.7 }}>Tin nhắn đã được xoá</i> : <>{m.imageUrl ? m.attachmentKind === "video" ? <video src={m.imageUrl} controls style={{ display: "block", width: "min(320px, 100%)", borderRadius: 8, marginBottom: m.text ? 8 : 0 }} /> : (
+                    /* 320px is enough to know a photo arrived and not enough
+                       to read a device screen or look at someone's neck,
+                       which is what these photos are. Click opens it whole. */
+                    <Image
+                      src={m.imageUrl}
+                      alt="Ảnh đính kèm"
+                      width={320}
+                      height={240}
+                      unoptimized
+                      onClick={() => setLightbox({ url: m.imageUrl!, kind: "image" })}
+                      style={{ display: "block", width: "min(320px, 100%)", height: "auto", borderRadius: 8, marginBottom: m.text ? 8 : 0, cursor: "zoom-in" }}
+                    />
+                  ) : null}{m.text || null}</>}
                   {m.reactions?.length ? <span style={{ position: "absolute", right: 4, bottom: -15, background: "#fff", color: "#222", border: "1px solid var(--divider)", borderRadius: 12, padding: "1px 6px", fontSize: 12 }}>{Array.from(new Set(m.reactions.map((reaction) => reaction.emoji))).join(" ")} {m.reactions.length}</span> : null}
                 </div>
 
@@ -478,6 +677,7 @@ export function ChatView() {
                     so. This is the affordance Messenger uses: a quiet ⋯ that
                     appears on hover or keyboard focus. Right-click still
                     works for anyone who already knew. */}
+                {m.sending ? null : (
                 <button
                   className="chat-msg-more"
                   onClick={(event) => { event.stopPropagation(); setActionMessage(actionMessage?.id === m.id ? null : m); }}
@@ -486,6 +686,7 @@ export function ChatView() {
                 >
                   <Icon name="more-horizontal" size={14} color="var(--text-muted)" />
                 </button>
+                )}
 
                 {/* The menu opens AT the message. It used to be pinned just
                     above the composer, so right-clicking the first message of
@@ -511,12 +712,29 @@ export function ChatView() {
                   </div>
                 ) : null}
 
-                {m.time ? <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: m.reactions?.length ? 16 : 3, textAlign: m.from === "admin" ? "right" : "left" }}>{m.time}{m.editedAt ? " · Đã chỉnh sửa" : ""}{isLatestAdmin ? ` · ${m.readAt ? "Đã xem" : "Đã gửi"}` : ""}</div> : null}
+                {endsGroup || m.reactions?.length ? (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: m.reactions?.length ? 16 : 3, textAlign: mine ? "right" : "left" }}>
+                    {m.sending ? "Đang gửi…" : clock(m.createdAt)}
+                    {m.editedAt ? " · Đã chỉnh sửa" : ""}
+                    {isLatestAdmin && !m.sending ? ` · ${m.readAt ? "Đã xem" : "Đã gửi"}` : ""}
+                  </div>
+                ) : null}
               </div>
               </Fragment>
             );})}
           </div>
           {editing || replyTo ? <div style={{ padding: "8px 16px", borderLeft: "3px solid var(--color-primary)", background: "var(--bg-card-alt)", display: "flex", justifyContent: "space-between" }}><div><b style={{ fontSize: 12, color: "var(--color-primary)" }}>{editing ? "Chỉnh sửa tin nhắn" : "Đang trả lời"}</b><div style={{ fontSize: 12 }}>{(editing ?? replyTo)?.text || "Ảnh"}</div></div><button onClick={() => { setEditing(null); setReplyTo(null); if (editing) setDraft(""); }} style={{ border: 0, background: "none", cursor: "pointer" }}>×</button></div> : null}
+          {hasNewBelow ? (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={jumpToLatest}
+                style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", zIndex: 4, display: "flex", alignItems: "center", gap: 6, border: "none", borderRadius: 999, padding: "7px 14px", background: "var(--color-primary)", color: "#fff", fontFamily: "var(--font-family)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-card)" }}
+              >
+                Tin nhắn mới
+                <Icon name="chevron-down" size={14} color="#fff" />
+              </button>
+            </div>
+          ) : null}
           {attachment ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", background: "var(--bg-card-alt)" }}>
               {attachmentUrl && attachment.type.startsWith("image/") ? (
@@ -574,6 +792,19 @@ export function ChatView() {
               <Icon name="send" size={16} color="#fff" />
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {lightbox ? (
+        <div
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-label="Ảnh phóng to"
+          style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(8,14,26,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, cursor: "zoom-out" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox.url} alt="Ảnh đính kèm" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 10 }} />
+          <button onClick={() => setLightbox(null)} aria-label="Đóng" style={{ position: "absolute", top: 18, right: 22, border: "none", background: "rgba(255,255,255,0.14)", color: "#fff", width: 38, height: 38, borderRadius: "50%", fontSize: 20, cursor: "pointer" }}>×</button>
         </div>
       ) : null}
 

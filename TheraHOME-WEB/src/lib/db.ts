@@ -2380,7 +2380,7 @@ function attachmentKindOf(path: string | null): "image" | "video" | null {
 export async function fetchChatThreads(): Promise<ChatThread[]> {
   const { data, error } = await supabase
     .from("chat_thread_overview")
-    .select("id, user_id, full_name, email, language, country, last_message_at, last_body, last_sender_type, last_attachment_path, last_deleted_at, unread_count")
+    .select("id, user_id, full_name, email, avatar_url, language, country, last_message_at, last_body, last_sender_type, last_attachment_path, last_deleted_at, unread_count")
     .order("last_message_at", { ascending: false });
   if (error) throw error;
 
@@ -2388,6 +2388,7 @@ export async function fetchChatThreads(): Promise<ChatThread[]> {
     id: t.id,
     userId: t.user_id,
     user: t.full_name || t.email || "Người dùng",
+    avatarUrl: t.avatar_url ?? null,
     language: (t.language as ChatThread["language"]) ?? "vi",
     country: (t.country as ChatThread["country"]) ?? null,
     unread: (t.unread_count ?? 0) > 0,

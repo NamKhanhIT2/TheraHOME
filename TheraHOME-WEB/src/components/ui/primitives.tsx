@@ -1,10 +1,13 @@
 // Small shared UI atoms ported from .design-reference/admin-shared.jsx —
-// kept together in one file since they're stateless, tightly related, and
+// kept together in one file since they're tightly related and only ever
+// used by the Admin/Care views (Avatar holds one bit of state — whether its
+// photo failed — so this module is client-side; everything importing it
+// already was). Originally:
 // only ever used by the Admin/Care views (mirrors how the source kept them
 // all in one file too).
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Icon } from "./Icon";
 
 export const inputStyle: CSSProperties = {
@@ -18,7 +21,31 @@ export const inputStyle: CSSProperties = {
   color: "var(--text-primary)",
 };
 
-export function Avatar({ name, color, size = 34 }: { name: string; color?: string; size?: number }) {
+export function Avatar({ name, color, size = 34, src }: { name: string; color?: string; size?: number; src?: string | null }) {
+  const [broken, setBroken] = useState(false);
+  // A real photo when there is one, the initial when there is not. Not
+  // next/image: these are Supabase Storage URLs on a bucket that is not in
+  // next.config's remotePatterns, and the initial has to remain the fallback
+  // if the file 404s — which a plain <img> onError gives for free.
+  if (src && !broken) {
+    return (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        // Google account photos (lh3.googleusercontent.com) refuse to serve
+        // when a Referer is sent — half the avatars here come from Google
+        // sign-in and every one of them 404'd until this line.
+        referrerPolicy="no-referrer"
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, background: "var(--bg-card-alt)" }}
+        // Fall back to the initial. Hiding the element instead left a hole in
+        // the row where a face should be, which is worse than the letter.
+        onError={() => setBroken(true)}
+      />
+    );
+  }
   return (
     <div
       style={{

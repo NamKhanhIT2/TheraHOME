@@ -206,6 +206,9 @@ export interface ChatMessage {
   deletedAt?: string | null;
   replyToMessageId?: string | null;
   reactions?: { id: string; userId: string; emoji: string }[];
+  /** Drawn in the thread the instant Send is pressed, before the server has
+   * it. Replaced by the real row when the write comes back. */
+  sending?: boolean;
 }
 
 export interface ChatThread {
@@ -218,6 +221,7 @@ export interface ChatThread {
   /** Market the customer belongs to (profiles.country). */
   country?: "VN" | "US" | "MALAY" | null;
   avatarColor?: string;
+  avatarUrl?: string | null;
   unread: boolean;
   /** Formatted time of the LAST message, which is what a chat list shows —
    * not the time the thread was created. */
