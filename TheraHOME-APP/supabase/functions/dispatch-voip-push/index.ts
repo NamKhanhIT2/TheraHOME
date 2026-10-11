@@ -19,7 +19,9 @@
 // iOS kills an app that takes a VoIP push without doing so, and repeated
 // offences stop VoIP pushes being delivered at all. That is why this
 // function refuses to send for a call that is no longer ringing — a push
-// the app cannot honour is worse than no push.
+// the app cannot honour is worse than no push. A CANCEL is the one case
+// that sends for a call which is NOT ringing, and it is honoured the same
+// way: the app reports a call and ends it in the same breath.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets):
 //   APNS_KEY_ID      the Key ID of an APNs auth key (Apple Developer → Keys)
@@ -136,10 +138,14 @@ Deno.serve(async (request: Request) => {
   const user = userData.user;
 
   let callId: string;
+  // `cancel` turns this into the opposite push: stop ringing. See the long
+  // comment at the send site for what Apple requires of a cancel.
+  let cancel = false;
   try {
-    const body = await request.json() as { callId?: unknown };
+    const body = await request.json() as { callId?: unknown; cancel?: unknown };
     if (typeof body.callId !== "string" || !body.callId) throw new Error("callId");
     callId = body.callId;
+    cancel = body.cancel === true;
   } catch {
     return json({ error: "call_id_required" }, 400);
   }
@@ -147,15 +153,28 @@ Deno.serve(async (request: Request) => {
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: call, error: callError } = await admin
     .from("calls")
-    .select("id, caller_id, callee_id, status, media")
+    .select("id, caller_id, callee_id, answered_by, status, media")
     .eq("id", callId)
     .maybeSingle();
   if (callError) return json({ error: "lookup_failed", detail: callError.message }, 500);
   if (!call) return json({ error: "call_not_found" }, 404);
-  // Same authority rule as the normal push: the row says who is calling, not
-  // the request body.
-  if (call.caller_id !== user.id) return json({ error: "caller_required" }, 403);
-  if (call.status !== "ringing") return json({ sent: 0, reason: "not_ringing" });
+  if (cancel) {
+    // Anyone who was in the call may unring the others: the caller who gave
+    // up, and the person who answered first — who, on a support-line call,
+    // is `answered_by` rather than `callee_id`, because answering does not
+    // address the call to anyone.
+    const isParticipant = call.caller_id === user.id
+      || call.callee_id === user.id
+      || call.answered_by === user.id;
+    if (!isParticipant) return json({ error: "participant_required" }, 403);
+    // Refused while it is still ringing, so this cannot be used to silence
+    // a live call. A cancel can only ever follow a real resolution.
+    if (call.status === "ringing") return json({ sent: 0, reason: "still_ringing" });
+  } else {
+    // The row says who is calling, not the request body.
+    if (call.caller_id !== user.id) return json({ error: "caller_required" }, 403);
+    if (call.status !== "ringing") return json({ sent: 0, reason: "not_ringing" });
+  }
 
   // Who should ring: the named callee, or every staff account when the call
   // is addressed to the support line.
@@ -169,6 +188,9 @@ Deno.serve(async (request: Request) => {
       .map((row: unknown) => (typeof row === "string" ? row : (row as { staff_user_ids?: string })?.staff_user_ids))
       .filter((id: unknown): id is string => typeof id === "string" && !!id);
   }
+  // Never cancel back to whoever resolved it: on the "answered first" path
+  // that device is the one holding a LIVE call, and a cancel ends calls.
+  if (cancel) recipientIds = recipientIds.filter((id) => id !== user.id);
   if (!recipientIds.length) return json({ sent: 0, reason: "no_recipients" });
 
   const { data: tokenRows, error: tokenError } = await admin
@@ -189,11 +211,23 @@ Deno.serve(async (request: Request) => {
   // The payload the app hands straight to CallKit. Deliberately flat and
   // small: PushKit caps VoIP payloads, and the receiving code runs in a
   // context with no time to go and look anything up.
+  //
+  // A CANCEL carries the same shape plus the flag. It cannot simply ask the
+  // app to dismiss a call, because Apple's rule has no exception for it:
+  // EVERY VoIP push must report an incoming call to CallKit, cancels
+  // included, or iOS kills the app and eventually stops delivering VoIP
+  // pushes to it. So the app reports the call and ends it in the same
+  // breath — see plugins/withVoipPushKit.js. iOS shows nothing when the two
+  // happen together.
   const payload = JSON.stringify({
     callId: call.id,
     callerName,
     media: call.media,
     hasVideo: call.media === "video",
+    cancel,
+    // Only decides the label iOS writes into the phone's own call history:
+    // 4 = answered on another device, 2 = the other end ended it.
+    cancelReason: call.status === "accepted" ? 4 : 2,
   });
 
   const results = await Promise.all(tokens.map(async (token) => {

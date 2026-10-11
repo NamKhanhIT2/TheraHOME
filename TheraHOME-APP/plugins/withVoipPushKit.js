@@ -32,14 +32,28 @@ const BRIDGING_IMPORTS = [
 
 const REGISTRATION_CALL = '    RNVoipPushNotificationManager.voipRegistration()';
 
+// Bumped whenever PUSHKIT_EXTENSION below changes. The generated
+// AppDelegate.swift is only rewritten when the marker in it does not match,
+// so an edit here reaches the next prebuild instead of being skipped as
+// "already done" — which is how the first version of this plugin would have
+// silently shipped stale native code forever.
+const PUSHKIT_MARKER = '// MARK: - PushKit v2 (added by plugins/withVoipPushKit.js)';
+
 const PUSHKIT_EXTENSION = `
-// MARK: - PushKit (added by plugins/withVoipPushKit.js)
+${PUSHKIT_MARKER}
 //
 // Apple requires that every VoIP push report an incoming call to CallKit
 // immediately, in this callback, before completion() runs. Failing to do so
 // gets the app killed and eventually gets VoIP pushes withheld altogether.
 // That is why the payload carries everything needed to describe the call:
 // there is no time here to ask a server anything.
+//
+// A CANCEL push is the same rule with a twist. "Stop ringing" is still a
+// VoIP push and still owes CallKit a reported call, so it reports one and
+// ends it in the same breath. iOS shows nothing when the two happen
+// together, and the phone stops ringing — which is the whole point: when
+// the app is closed and the screen is locked, nothing else can take down a
+// call screen the system is drawing.
 extension AppDelegate: PKPushRegistryDelegate {
   func pushRegistry(
     _ registry: PKPushRegistry,
@@ -59,6 +73,20 @@ extension AppDelegate: PKPushRegistryDelegate {
     let callId = (data["callId"] as? String) ?? UUID().uuidString
     let callerName = (data["callerName"] as? String) ?? "TheraHOME"
     let hasVideo = (data["hasVideo"] as? Bool) ?? false
+    let isCancel = (data["cancel"] as? Bool) ?? false
+    // 2 = remote ended, 4 = answered on another device. Only affects the
+    // label iOS writes into the phone's own call history.
+    let cancelReason = (data["cancelReason"] as? Int) ?? 2
+
+    // A cancel for a call THIS device already answered would be a disaster:
+    // reporting a duplicate uuid fails, and the end that follows would hang
+    // up a conversation in progress. The server already excludes whoever
+    // answered, so this is the second line of defence — and if it ever
+    // fires, skipping Apple's reporting rule once is the cheaper mistake.
+    if isCancel && RNCallKeep.isCallActive(callId) {
+      completion()
+      return
+    }
 
     // FIRST, and unconditionally.
     RNCallKeep.reportNewIncomingCall(
@@ -75,6 +103,12 @@ extension AppDelegate: PKPushRegistryDelegate {
       payload: data,
       withCompletionHandler: nil
     )
+
+    if isCancel {
+      RNCallKeep.endCall(withUUID: callId, reason: Int32(cancelReason))
+      completion()
+      return
+    }
 
     // Then hand the payload to JS, which picks it up once the app is running.
     RNVoipPushNotificationManager.didReceiveIncomingPush(with: payload, forType: type.rawValue as String)
@@ -122,7 +156,20 @@ const withPushKitAppDelegate = (config) =>
       contents = contents.replace(anchor, `${REGISTRATION_CALL}\n\n${anchor}`);
     }
 
-    if (!contents.includes('PKPushRegistryDelegate')) {
+    // Replace rather than skip: an AppDelegate carrying an OLDER version of
+    // this extension has to be brought up to date, or a change here would
+    // never reach a device. The extension is always the last thing in the
+    // file, so cutting from its marker to the end is exact.
+    if (!contents.includes(PUSHKIT_MARKER)) {
+      const previous = contents.indexOf('// MARK: - PushKit');
+      if (previous !== -1) contents = contents.slice(0, previous).trimEnd() + '\n';
+      else if (contents.includes('PKPushRegistryDelegate')) {
+        throw new Error(
+          'withVoipPushKit: AppDelegate.swift already conforms to PKPushRegistryDelegate '
+          + 'but carries no marker this plugin recognises. Remove the extension by hand, '
+          + 'or the app will have two of them and will not compile.',
+        );
+      }
       contents += PUSHKIT_EXTENSION;
     }
 

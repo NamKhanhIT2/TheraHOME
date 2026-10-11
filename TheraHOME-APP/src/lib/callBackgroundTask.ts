@@ -22,6 +22,7 @@ import { displayIncomingCall, dismissCall, isAndroidCallKeep } from '@/lib/callk
 export const CALL_BACKGROUND_TASK = 'therahome-incoming-call';
 
 interface CallPushData {
+  /** 'call' to start ringing, 'call_cancel' to stop. */
   type?: string;
   callId?: string;
   callerName?: string;
@@ -54,7 +55,22 @@ TaskManager.defineTask(CALL_BACKGROUND_TASK, async ({ data, error }) => {
   if (!isAndroidCallKeep()) return;
 
   const call = readCallData(data);
-  if (!call || call.type !== 'call' || !call.callId) return;
+  if (!call?.callId) return;
+
+  // The counterpart of the ringing push: the caller gave up, or another CSKH
+  // answered first, and this phone is still showing a system call screen for
+  // a call that is over. Nothing in the app can take it down — the app is
+  // not running, which is the only reason that screen exists. So the server
+  // sends a silent push and the only job here is to dismiss.
+  //
+  // `dispatch-push` never sends this back to whoever resolved the call, so
+  // this cannot arrive on the phone holding the live conversation.
+  if (call.type === 'call_cancel') {
+    dismissCall(call.callId);
+    return;
+  }
+
+  if (call.type !== 'call') return;
 
   // A push for a call that is already over — answered on another device, or
   // cancelled while the push was in flight — must not raise a ringing screen

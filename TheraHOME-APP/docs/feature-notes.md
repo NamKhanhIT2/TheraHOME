@@ -4911,3 +4911,48 @@ gives up — only a cancel push can reach it, and there is none yet. CallKit
 audio-session hand-off is unverified (iOS may need LiveKit's session started
 from `didActivateAudioSession`). Speaker/earpiece routing still needs a real
 device; the emulator has one audio device.
+
+### Unringing a phone nobody is holding (2026-10-11)
+
+The gap the previous entry left open: a call screen raised by a push, on a
+phone whose app is closed, has nothing alive behind it to take it down. The
+caller gives up and the phone rings on until someone answers a call that
+ended minutes ago. Realtime cannot help — it needs a running app, and the
+whole reason that screen exists is that there isn't one.
+
+So a second push, on both channels, sent at the two moments a call stops
+being ringable without the receiving phone having done anything:
+
+- the caller hangs up or rings out — detected server-side as `answered_at`
+  still being null on the row `end_call` returns, rather than from whatever
+  status the client believed it was in;
+- another CSKH answers first — every other staff phone is still ringing.
+
+Two rules keep it from becoming a weapon. It is refused while the call is
+still `ringing`, so it can only ever follow a real resolution; and it is
+never sent back to whoever resolved it, which on the "answered first" path
+is the one device holding a live conversation.
+
+**It is its own Edge Function, `dispatch-call-cancel`, and briefly was not.**
+The first version added a `call_cancel` mode to `dispatch-push` — 400 lines
+serving broadcasts, chat, social and roadmap pushes, all of which would have
+been redeployed, hand-transcribed, to add one branch. Ninety lines in their
+own function cost fifteen duplicated lines of Expo send and put nothing else
+at risk. The iOS half stays in `dispatch-voip-push` (`cancel: true`), because
+PushKit is a different service with different tokens.
+
+**Apple has no exception for a cancel.** "Stop ringing" is still a VoIP push
+and still owes CallKit a reported call — an app that takes one without
+reporting is killed, and repeat offenders stop receiving VoIP pushes
+entirely. So the AppDelegate reports the call and ends it in the same breath;
+iOS shows nothing when the two happen together. The one case it refuses is a
+cancel for a call already active on that device: reporting a duplicate uuid
+fails and the end that followed would hang up a live conversation. The server
+already excludes that device, so this is the second line of defence — and if
+it ever fires, skipping Apple's rule once is the cheaper mistake.
+
+**The plugin now replaces its own output instead of skipping it.**
+`withVoipPushKit.js` guarded on `contents.includes('PKPushRegistryDelegate')`,
+which meant an AppDelegate that already had the extension was left alone — so
+this change would never have reached a device. It now carries a version
+marker and cuts the old extension out before appending the new one.

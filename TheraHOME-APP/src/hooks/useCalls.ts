@@ -182,8 +182,46 @@ export function useAnswerCall() {
       // iOS leaves CallKit stuck on "connecting". A no-op when the system
       // never knew about this call, which is the common case.
       markCallActive(call.id);
+      // Every OTHER staff phone is still ringing for a call that now has an
+      // answer. Nothing else stops them: a locked phone has no app running
+      // to hear the Realtime update. The function will not send this back to
+      // us, so the call we just took is safe.
+      cancelCallPushes(call.id);
     },
   });
+}
+
+/**
+ * Tells every other phone that was ringing for this call to stop.
+ *
+ * Realtime already tells any RUNNING app that the call is over. The case it
+ * cannot reach is the one that needs reaching: the app closed, the phone
+ * locked, and a system call screen raised by a push with nothing alive
+ * behind it. It rings on until someone answers a call that ended minutes
+ * ago. A second push is the only way to take that screen down, so both push
+ * channels get a cancel — Expo's for Android, APNs/PushKit for iOS.
+ *
+ * Two channels, same as starting a call: `dispatch-call-cancel` carries the
+ * Android half over Expo, `dispatch-voip-push` the iOS half over PushKit.
+ * They are separate services with separate device tokens; neither can do
+ * the other's job.
+ *
+ * Fire-and-forget on purpose. The call is already resolved in the database;
+ * a failed cancel must never fail the thing that resolved it. Both functions
+ * refuse a call that is still ringing and never send back to the caller of
+ * THIS function, so neither can be used to silence a live conversation.
+ */
+function cancelCallPushes(callId: string): void {
+  void supabase.functions
+    .invoke('dispatch-call-cancel', { body: { callId } })
+    .then(({ error }) => {
+      if (error && __DEV__) console.warn('call cancel push failed:', error);
+    });
+  void supabase.functions
+    .invoke('dispatch-voip-push', { body: { callId, cancel: true } })
+    .then(({ error }) => {
+      if (error && __DEV__) console.warn('voip cancel push failed:', error);
+    });
 }
 
 /**
@@ -209,6 +247,12 @@ export function useEndCall() {
       queryClient.setQueryData(['call', call.id], call);
       queryClient.invalidateQueries({ queryKey: ['incoming_call'] });
       queryClient.invalidateQueries({ queryKey: ['call_history'] });
+      // A call that was never answered was, by definition, still ringing
+      // somewhere when it ended — on phones that may have nothing running
+      // to notice. `answered_at` is the server's own record of that, which
+      // is why the condition reads off the returned row rather than off
+      // whatever the client thought the status was.
+      if (!call.answeredAt) cancelCallPushes(call.id);
     },
   });
 }
