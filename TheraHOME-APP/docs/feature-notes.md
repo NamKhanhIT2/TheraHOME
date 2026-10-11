@@ -5013,3 +5013,34 @@ participant carries a `connectionQuality` computed from packet loss and RTT.
 the phone can act on differently — either way, wait or move — so the worse
 of the two is what gets shown, and only when it is `poor` or `lost`.
 "Excellent" on screen is noise.
+
+### A handset that changes accounts can never register again (2026-10-11)
+
+Staff push tokens were still zero after two fixes aimed at exactly that, and
+the reason was in neither of them.
+
+`push_tokens` has one policy, `user_id = auth.uid()`, for every command. The
+client upserts on the token itself (`onConflict: expo_push_token`), which is
+right — a device has ONE Expo token and must not accumulate a row per
+account. But an upsert that lands on an existing row is an UPDATE, and the
+USING clause is evaluated against the row ALREADY THERE. If that row belongs
+to whoever used the handset last, the write is refused.
+
+Nothing said so. PostgREST returns the refusal in `error`, and the client
+never read it.
+
+Measured: the emulator being used to test CSKH had registered at 20:43 the
+same evening under a test patient account ("android 36"). So the staff-shell
+fix that was supposed to give CSKH a token could not have worked on the one
+device it was being tested on — and would have worked on a fresh phone,
+which is the worst kind of bug to chase.
+
+`register_push_token` is a SECURITY DEFINER RPC that keys on the token and
+reassigns it to whoever is signed in now, the same shape `register_voip_token`
+already had for PushKit. Ownership follows the handset. `auth.uid()` is read
+inside the function and never passed in, so no client can claim another
+device.
+
+The error is now logged unconditionally rather than behind `__DEV__`. That
+is the third time today a swallowed error cost hours — the login screen's
+empty catch, the two native-module guards that failed silently, and this.

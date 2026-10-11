@@ -95,14 +95,28 @@ export async function registerForPushNotifications(userId: string): Promise<bool
   try {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
     const { data: token } = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-    await supabase
-      .from('push_tokens')
-      .upsert(
-        { user_id: userId, expo_push_token: token, device_info: `${Platform.OS} ${Platform.Version}` },
-        { onConflict: 'expo_push_token' },
-      );
+    // Through an RPC, not a direct upsert. The table's only policy is
+    // `user_id = auth.uid()` for every command, and an upsert that lands on
+    // an existing row is an UPDATE checked against the row ALREADY THERE —
+    // so a handset that registered under one account could never register
+    // under the next one. The RPC reassigns the token to whoever is signed
+    // in now. See 202610112200_push_tokens_follow_the_handset.sql.
+    const { error } = await supabase.rpc('register_push_token', {
+      p_token: token,
+      p_device: `${Platform.OS} ${Platform.Version}`,
+    });
+    // Logged unconditionally, not behind __DEV__. The previous version threw
+    // this result away entirely, and a release build says nothing — which is
+    // exactly how zero staff push tokens went unnoticed through two rounds
+    // of "fixing" it. `userId` is passed in for the caller's benefit; the
+    // row is written from auth.uid() server-side, so a mismatch here is
+    // worth seeing too.
+    if (error) {
+      console.warn('register_push_token failed:', error.message, { userId });
+      return true;
+    }
   } catch (err) {
-    if (__DEV__) console.warn('Push token registration failed (expected in plain Expo Go):', err);
+    console.warn('Push token registration failed:', err);
   }
 
   return true;

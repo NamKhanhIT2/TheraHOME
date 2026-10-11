@@ -2584,6 +2584,10 @@ export type Database = {
         Args: { p_body: string; p_destination?: string; p_title: string }
         Returns: string
       }
+      register_push_token: {
+        Args: { p_device?: string; p_token: string }
+        Returns: undefined
+      }
       register_voip_token: { Args: { p_token: string }; Returns: undefined }
       resolve_thera_login_email: {
         Args: { p_username: string }
