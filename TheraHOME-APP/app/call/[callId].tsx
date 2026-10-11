@@ -251,7 +251,15 @@ export default function CallScreen() {
   const weakNetwork = controlsLive && (quality === 'poor' || quality === 'lost');
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: videoStage ? '#000' : theme.colors.bgApp }]}>
+    <SafeAreaView style={[styles.root, {
+      backgroundColor: videoStage ? '#000' : theme.colors.bgApp,
+      // On the video stage EVERY other element is absolutely positioned —
+      // the picture, the PiP, the name — so the controls are the only child
+      // left in flow, and `space-between` put that single child at the TOP,
+      // on top of the far end's face and overlapping the PiP. Reported from
+      // the device the first time video ever actually rendered.
+      justifyContent: videoStage ? 'flex-end' : 'space-between',
+    }]}>
       {videoStage ? (
         <>
           <CallVideo trackRef={stageTrack} style={styles.fill} objectFit="cover" mirror={stageIsSelf} />

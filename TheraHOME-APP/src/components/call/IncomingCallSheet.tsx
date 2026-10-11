@@ -14,7 +14,7 @@
 // Still not a native lock-screen ring: that needs CallKit on iOS and a
 // full-screen intent on Android. This covers the app being open or in the
 // foreground; the push from `dispatch-push` covers the rest.
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
@@ -22,7 +22,7 @@ import { AvatarImg } from '@/components/AvatarImg';
 import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
 import { useRingtone } from '@/hooks/useRingtone';
-import { dismissCall, isSystemRinging, wasAnsweredHere } from '@/lib/callkeep';
+import { dismissCall, isSystemRinging, subscribeSystemRinging, wasAnsweredHere } from '@/lib/callkeep';
 import { useAnswerCall, useCallTerminator, useCallerProfile, useIncomingCall } from '@/hooks/useCalls';
 
 export function IncomingCallSheet({ enabled, userId, isStaff }: {
@@ -40,13 +40,19 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
   const terminate = useCallTerminator(call?.id);
   const isVideo = call?.media === 'video';
 
+  // Whether the OS is already showing a call screen for this call. On iOS it
+  // almost always is: a VoIP push makes CallKit ring in native code before
+  // any JS runs. Subscribed rather than read once, so a sheet that is
+  // already up disappears the moment CallKit catches up.
+  const systemHasIt = useSyncExternalStore(
+    subscribeSystemRinging,
+    useCallback(() => (call ? isSystemRinging(call.id) : false), [call]),
+  );
+
   // Rings while the sheet is up, and the hook's own cleanup stops it on
-  // answer, decline, timeout and unmount alike.
-  //
-  // Silent when the telecom stack is already ringing for this same call — a
-  // push raised the system call screen while the app was alive, and two
-  // ringtones out of one phone sound like a fault rather than a call.
-  useRingtone(!!call && !isSystemRinging(call.id), 'incoming');
+  // answer, decline, timeout and unmount alike. Silent when the system is
+  // ringing — two ringtones out of one phone sound like a fault.
+  useRingtone(!!call && !systemHasIt, 'incoming');
 
   // Belt and braces against the ringtone outliving the call: if the row
   // disappears for any reason the component unmounts, and this records that
@@ -75,6 +81,12 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
   }, [call?.id]);
 
   if (!call) return null;
+  // The system has it: CallKit on iOS, the telecom call screen on Android.
+  // Drawing our own sheet on top produced two of everything — two names, two
+  // Decline buttons — and the owner had to press both before the call
+  // stopped. Whichever UI is on screen, Từ chối ends the same `calls` row;
+  // there should only ever be one of them.
+  if (systemHasIt) return null;
 
   const name = isStaff ? (caller.data?.fullName ?? 'Khách hàng') : 'TheraHOME CSKH';
 

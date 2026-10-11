@@ -179,6 +179,11 @@ export async function drainInitialCallKeepEvents(
         onAnswer(callId);
       }
       if (event.name === 'RNCallKeepPerformEndCallAction') onEnd(callId);
+      // A call still ringing in CallKit while this app was cold-starting —
+      // the usual shape of a VoIP push waking a killed app. Recording it
+      // keeps the in-app sheet from drawing itself over a live system call
+      // screen a moment after launch.
+      if (event.name === 'RNCallKeepDidDisplayIncomingCall') setSystemRinging(callId, true);
     }
     CALLKEEP.clearInitialEvents();
   } catch (error) {
@@ -187,16 +192,40 @@ export async function drainInitialCallKeepEvents(
   return { answered };
 }
 
-// Calls the SYSTEM is currently ringing for, so the app does not ring a
-// second time over the top of it. Only meaningful while the app is alive —
-// which is exactly when the double ring would happen.
-const systemRinging = new Set<CallKeepUUID>();
+// ---------------------------------------------------- who is ringing what
+//
+// Calls the SYSTEM is currently ringing for.
+//
+// This decides whether the app shows its own incoming-call sheet. On iOS the
+// VoIP push makes CallKit ring in native code, before any JS exists, and the
+// app had no idea — so a call arrived as TWO screens with two Decline
+// buttons, and the owner had to press both. Reported from the device.
+//
+// The answer is not to drop the in-app sheet: it is the only UI there is
+// when CallKit cannot ring (no VoIP token yet, or an Android phone account
+// the user has not enabled). So the sheet asks this instead, and steps
+// aside exactly when the system has it covered.
+const systemRinging = new Set<string>();
+const ringingListeners = new Set<() => void>();
 
-/** Whether the telecom stack is already ringing for this call. The in-app
- * sheet uses it to stay quiet rather than playing its own ringtone against
- * the system's. */
+function setSystemRinging(callId: CallKeepUUID, ringing: boolean): void {
+  const key = callId.toLowerCase();
+  const had = systemRinging.has(key);
+  if (ringing) systemRinging.add(key); else systemRinging.delete(key);
+  if (had !== ringing) for (const listener of ringingListeners) listener();
+}
+
+/** Whether the telecom stack is already showing a call screen for this call. */
 export function isSystemRinging(callId: CallKeepUUID): boolean {
-  return systemRinging.has(callId);
+  return systemRinging.has(callId.toLowerCase());
+}
+
+/** Subscribe for `useSyncExternalStore`, so a sheet already on screen
+ * disappears the moment CallKit catches up rather than sitting there next
+ * to it. */
+export function subscribeSystemRinging(listener: () => void): () => void {
+  ringingListeners.add(listener);
+  return () => { ringingListeners.delete(listener); };
 }
 
 /** Rings the phone, lock screen included. */
@@ -206,8 +235,18 @@ export async function displayIncomingCall(
   hasVideo: boolean,
 ): Promise<void> {
   if (!isCallKeepSupported()) return;
-  systemRinging.add(callId);
   await setupCallKeep();
+  // Marked here, not from the `didDisplayIncomingCall` event: Android fires
+  // that event only from its own native reportNewIncomingCall, never from
+  // the JS method this calls. iOS is the other way round, which is why both
+  // paths exist.
+  //
+  // Conditional on the phone account, because CallKeep's Android
+  // displayIncomingCall silently returns when the account is disabled. Mark
+  // it ringing then and the in-app sheet would stand aside for a call
+  // screen that never appeared, leaving the user with nothing at all —
+  // which is worse than the two screens this whole change is fixing.
+  if (await hasCallKeepAccount()) setSystemRinging(callId, true);
   try {
     // `handle` is what Android shows as the "number". There is no phone
     // number here, so the caller's name goes in both slots rather than
@@ -256,7 +295,7 @@ function isOurOwnEcho(callId: CallKeepUUID): boolean {
  * elsewhere, declined, timed out — or Android leaves a phantom call in the
  * telecom stack and the next one may not ring. */
 export function dismissCall(callId: CallKeepUUID): void {
-  systemRinging.delete(callId);
+  setSystemRinging(callId, false);
   if (!isCallKeepSupported()) return;
   selfEnded.set(callId, Date.now());
   try {
@@ -267,7 +306,7 @@ export function dismissCall(callId: CallKeepUUID): void {
 }
 
 export function dismissAllCalls(): void {
-  systemRinging.clear();
+  for (const id of [...systemRinging]) setSystemRinging(id, false);
   if (!isCallKeepSupported()) return;
   // No ids to record, so the whole window is suppressed instead.
   suppressAllEndsUntil = Date.now() + ECHO_WINDOW_MS;
@@ -286,7 +325,7 @@ const answeredHere = new Set<CallKeepUUID>();
  * off "connecting". */
 export function markCallActive(callId: CallKeepUUID): void {
   answeredHere.add(callId);
-  systemRinging.delete(callId);
+  setSystemRinging(callId, false);
   if (!isCallKeepSupported()) return;
   try {
     CALLKEEP.setCurrentCallActive(callId);
@@ -327,16 +366,27 @@ export interface CallKeepHandlers {
 /** Subscribes to the two events that matter and returns an unsubscribe. */
 export function listenToCallKeep({ onAnswer, onEnd }: CallKeepHandlers): () => void {
   if (!isCallKeepSupported()) return () => undefined;
+  // Fired once the system has actually PUT A CALL SCREEN UP — including the
+  // iOS case where native code did it from a VoIP push with no JS involved.
+  // `error` is a non-empty string when CallKit refused, in which case
+  // nothing is on screen and the in-app sheet must still show.
+  const displayed = ({ callUUID, error }: { callUUID: string; error?: string }) => {
+    if (error) return;
+    setSystemRinging(callUUID, true);
+  };
   const answer = ({ callUUID }: { callUUID: string }) => onAnswer(callUUID);
   const end = ({ callUUID }: { callUUID: string }) => {
     // See the echo guard above: a dismissal we issued ourselves comes back
     // here looking exactly like the user pressing Decline.
+    setSystemRinging(callUUID, false);
     if (isOurOwnEcho(callUUID)) return;
     onEnd(callUUID);
   };
+  CALLKEEP.addEventListener('didDisplayIncomingCall', displayed);
   CALLKEEP.addEventListener('answerCall', answer);
   CALLKEEP.addEventListener('endCall', end);
   return () => {
+    CALLKEEP.removeEventListener('didDisplayIncomingCall');
     CALLKEEP.removeEventListener('answerCall');
     CALLKEEP.removeEventListener('endCall');
   };
