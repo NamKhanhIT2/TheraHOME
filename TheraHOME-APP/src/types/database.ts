@@ -2196,6 +2196,27 @@ export type Database = {
           },
         ]
       }
+      voip_tokens: {
+        Row: {
+          platform: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          platform?: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       water_logs: {
         Row: {
           cups_logged: number
@@ -2563,6 +2584,7 @@ export type Database = {
         Args: { p_body: string; p_destination?: string; p_title: string }
         Returns: string
       }
+      register_voip_token: { Args: { p_token: string }; Returns: undefined }
       resolve_thera_login_email: {
         Args: { p_username: string }
         Returns: string
@@ -2633,6 +2655,7 @@ export type Database = {
         Returns: string
       }
       username_is_wellformed: { Args: { p_username: string }; Returns: boolean }
+      voip_tokens_for: { Args: { p_user_ids: string[] }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never

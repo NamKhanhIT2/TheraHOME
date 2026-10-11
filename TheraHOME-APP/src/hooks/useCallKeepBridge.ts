@@ -26,6 +26,7 @@ import {
   setupCallKeep,
 } from '@/lib/callkeep';
 import { registerCallBackgroundTask } from '@/lib/callBackgroundTask';
+import { registerVoipPush } from '@/lib/voipPush';
 
 export function useCallKeepBridge(enabled: boolean) {
   // The handlers below are registered once and must not be torn down on every
@@ -37,9 +38,17 @@ export function useCallKeepBridge(enabled: boolean) {
     if (!enabled || !isCallKeepSupported()) return;
     let cancelled = false;
 
+    // iOS needs its PushKit token on file before any VoIP push can reach it,
+    // and the token can change, so this subscription lives as long as the
+    // bridge does. A no-op on Android, which wakes through the background
+    // task below instead.
+    const stopVoip = registerVoipPush();
+
     void (async () => {
       const ready = await setupCallKeep();
       if (!ready || cancelled) return;
+      // Android only — iOS is woken by PushKit, which reports to CallKit in
+      // native code before any JS task could run.
       await registerCallBackgroundTask();
       // A phone account that survived a crash can leave a call ringing in the
       // telecom stack with nothing behind it. Starting clean means the next
@@ -89,6 +98,7 @@ export function useCallKeepBridge(enabled: boolean) {
     return () => {
       cancelled = true;
       unsubscribe();
+      stopVoip();
       appState.remove();
     };
   }, [enabled]);

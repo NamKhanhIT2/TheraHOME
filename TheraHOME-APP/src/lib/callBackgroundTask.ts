@@ -17,7 +17,7 @@
 // this file is imported for its side effect from app/_layout.tsx.
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import { displayIncomingCall, dismissCall, isCallKeepSupported } from '@/lib/callkeep';
+import { displayIncomingCall, dismissCall, isAndroidCallKeep } from '@/lib/callkeep';
 
 export const CALL_BACKGROUND_TASK = 'therahome-incoming-call';
 
@@ -51,7 +51,7 @@ TaskManager.defineTask(CALL_BACKGROUND_TASK, async ({ data, error }) => {
     if (__DEV__) console.warn('call background task error:', error);
     return;
   }
-  if (!isCallKeepSupported()) return;
+  if (!isAndroidCallKeep()) return;
 
   const call = readCallData(data);
   if (!call || call.type !== 'call' || !call.callId) return;
@@ -73,7 +73,7 @@ TaskManager.defineTask(CALL_BACKGROUND_TASK, async ({ data, error }) => {
 /** Registers the task with the notification system. Idempotent; safe on every
  * launch. Does nothing on iOS, where CallKit is not wired up. */
 export async function registerCallBackgroundTask(): Promise<void> {
-  if (!isCallKeepSupported()) return;
+  if (!isAndroidCallKeep()) return;
   try {
     await Notifications.registerTaskAsync(CALL_BACKGROUND_TASK);
   } catch (error) {

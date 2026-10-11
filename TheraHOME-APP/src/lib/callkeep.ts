@@ -32,7 +32,17 @@ export type CallKeepUUID = string;
 
 let setupDone = false;
 
+/** Both platforms now: Android draws the call screen through
+ * ConnectionService, iOS through CallKit. The two differ in what WAKES them
+ * — a data push handled by a headless task on Android, a PushKit push
+ * handled natively on iOS — not in this API. */
 export function isCallKeepSupported(): boolean {
+  return !!CALLKEEP;
+}
+
+/** Android-only pieces: the headless background task and the phone-account
+ * prompt have no iOS equivalent, because CallKit needs neither. */
+export function isAndroidCallKeep(): boolean {
   return Platform.OS === 'android' && !!CALLKEEP;
 }
 

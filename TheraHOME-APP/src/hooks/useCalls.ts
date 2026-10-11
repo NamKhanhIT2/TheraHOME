@@ -140,10 +140,22 @@ export function useStartCall() {
       // case, and it is fire-and-forget on purpose — a push that fails must
       // not fail the call, which is already ringing in the database by now.
       if (call.status === 'ringing') {
+        // TWO pushes, deliberately. The Expo one reaches an Android phone and
+        // an iPhone that is merely backgrounded; the VoIP one is the only
+        // thing that rings a LOCKED iPhone, and Expo's service cannot send
+        // it. Both are fire-and-forget: the call is already ringing in the
+        // database, and a failed push must not fail the call.
         void supabase.functions
           .invoke('dispatch-push', { body: { mode: 'call', callId: call.id } })
           .then(({ error: pushError }) => {
             if (pushError && __DEV__) console.warn('call push failed:', pushError);
+          });
+        void supabase.functions
+          .invoke('dispatch-voip-push', { body: { callId: call.id } })
+          .then(({ error: voipError }) => {
+            // 503 here just means APNs is not configured yet, which is not
+            // worth shouting about on every call.
+            if (voipError && __DEV__) console.warn('voip push failed:', voipError);
           });
       }
       return call;

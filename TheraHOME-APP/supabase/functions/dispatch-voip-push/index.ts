@@ -102,10 +102,28 @@ Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  if (!APNS_KEY_ID || !APNS_TEAM_ID || !APNS_PRIVATE_KEY) {
-    // A setup gap, not a user error. The caller treats this as "iOS cannot
-    // ring from the lock screen yet" and carries on with the normal push.
-    return json({ error: "apns_not_configured" }, 503);
+  // A setup gap, not a user error. The caller treats this as "iOS cannot
+  // ring from the lock screen yet" and carries on with the normal push.
+  //
+  // NAMES the missing variables. A bare "not configured" sent us looking at
+  // the wrong thing once already: all four secrets had in fact been added,
+  // one under a name this code does not read, and nothing said which.
+  // Reporting absence is safe — it is a list of variable names, never values.
+  const missing = [
+    ["APNS_KEY_ID", APNS_KEY_ID],
+    ["APNS_TEAM_ID", APNS_TEAM_ID],
+    ["APNS_PRIVATE_KEY", APNS_PRIVATE_KEY],
+  ].filter(([, value]) => !value).map(([name]) => name);
+  if (missing.length) {
+    return json({ error: "apns_not_configured", missing }, 503);
+  }
+  // A .p8 pasted without its armour is the other way this fails, and it
+  // fails later and far less clearly — at importKey, as a DataError.
+  if (!APNS_PRIVATE_KEY.includes("BEGIN PRIVATE KEY")) {
+    return json({
+      error: "apns_private_key_malformed",
+      hint: "APNS_PRIVATE_KEY must include the -----BEGIN PRIVATE KEY----- and -----END PRIVATE KEY----- lines",
+    }, 503);
   }
 
   const authorization = request.headers.get("Authorization");
