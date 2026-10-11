@@ -4956,3 +4956,60 @@ it ever fires, skipping Apple's rule once is the cheaper mistake.
 which meant an AppDelegate that already had the extension was left alone — so
 this change would never have reached a device. It now carries a version
 marker and cuts the old extension out before appending the new one.
+
+### Minimising, the ear, and a weak line (2026-10-11)
+
+The three things Messenger and Zalo have that this did not.
+
+**Minimising meant moving the call out of the screen that owned it.** The
+LiveKit `Room` lived in `app/call/[callId].tsx` and was disconnected on
+unmount — deliberately, because LiveKit charges for every connected minute
+and tying the room's life to the screen's made it impossible to leave one
+running by accident. It also made it impossible to leave the screen: any
+navigation hung up. The room now lives in `src/lib/callSession.ts`, a plain
+external store the call screen and the new `<OngoingCallBar>` are two views
+of.
+
+The billing rule was restated, not dropped. A room is open only while a row
+is `accepted`, and three independent things close it:
+
+1. `callSession` itself, on the room's `disconnected` and on the far end
+   leaving;
+2. `useCallTerminator`, after any `end_call` — the red button, either view;
+3. `<OngoingCallBar>`, which is mounted for the whole signed-in session and
+   watches the row over Realtime. This is the only one that catches a call
+   the OTHER side ends while minimised, because nothing on this device acts.
+
+Signing out closes it too: the room is attached to a LiveKit identity minted
+for an account, and leaving it connected past that account would bill for a
+call nobody can see or end. Screen unmount is no longer one of the three and
+must not become one again.
+
+Hardware back now minimises instead of being swallowed — except while the
+call is still ringing, where it is still swallowed, because the give-up
+timer for an unanswered call lives in that component and backing out would
+unmount it and leave the other phone ringing with only the server's janitor
+behind it.
+
+**Proximity is a local Expo module, `modules/therahome-proximity`.** Not a
+package: the ones that do this are unmaintained and old-architecture only,
+and this app has already lost a day to a third-party calling library that
+loaded cleanly and then failed at runtime under the New Architecture. The
+whole surface is one boolean, so owning it costs less than trusting it.
+
+Neither platform is asked for a sensor reading. Both are told "a call is in
+progress": iOS gets `UIDevice.isProximityMonitoringEnabled`, Android a
+`PROXIMITY_SCREEN_OFF_WAKE_LOCK` — the same lock the system dialer uses —
+released with `WAIT_FOR_NO_PROXIMITY` so the screen does not light up
+against a cheek the instant the call ends. Reading the raw sensor and
+blacking out a `View` would mean fighting the OS for the screen, and losing
+that fight is a phone that cannot be woken mid-call. It is armed only for a
+connected call with no picture on screen: a video call is being looked at,
+and blanking that would be the bug rather than the fix.
+
+**The network indicator is LiveKit's own measure, worse end wins.** Each
+participant carries a `connectionQuality` computed from packet loss and RTT.
+"Your line is fine, theirs is not" is not a distinction the person holding
+the phone can act on differently — either way, wait or move — so the worse
+of the two is what gets shown, and only when it is `poor` or `lost`.
+"Excellent" on screen is noise.

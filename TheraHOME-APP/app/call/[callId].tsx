@@ -5,13 +5,18 @@
 // any staff, when it is null) is the callee. So a push notification, either
 // incoming sheet and either chat header can all route to the same path.
 //
-// The important behaviour is when it joins the LiveKit room, which is exactly
-// once, when `status` becomes 'accepted'. Never while ringing. LiveKit bills
-// every minute a participant is CONNECTED, so joining early would charge for
-// unanswered calls — on the free tier's 5,000 minutes a month that is the
-// difference between covering the line and not. Waiting is done over Realtime
-// on the `calls` row, which is free.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+// THE SCREEN NO LONGER OWNS THE CALL. The LiveKit room lives in
+// src/lib/callSession.ts, which is what lets the user minimise a call and
+// go and read a message without hanging up — this screen is one of two
+// views of that session, the other being <OngoingCallBar>. The billing rule
+// that used to be enforced by disconnecting on unmount has not been
+// dropped; it moved, and is explained there.
+//
+// Joining still happens exactly once, when `status` becomes 'accepted', and
+// never while ringing: LiveKit bills every minute a participant is
+// connected, so joining early would charge for calls nobody answered. The
+// waiting is done over Realtime on the `calls` row, which is free.
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +28,15 @@ import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
 import { useRingtone } from '@/hooks/useRingtone';
 import { CallVideo, useCallVideoTracks } from '@/components/call/CallVideo';
+import { setProximityBlanking } from '@/lib/proximity';
+import {
+  flipSessionCamera,
+  openCallSession,
+  toggleSessionCamera,
+  toggleSessionMic,
+  toggleSessionSpeaker,
+  useCallSession,
+} from '@/lib/callSession';
 import {
   CALL_IS_OVER,
   RING_TIMEOUT_MS,
@@ -33,21 +47,10 @@ import {
   useCallTerminator,
   useCallerProfile,
 } from '@/hooks/useCalls';
-import {
-  CallUnavailableError,
-  connectCall,
-  disconnectCall,
-  setCallCamera,
-  setCallSpeaker,
-  switchCallCamera,
-  type LiveKitRoom,
-} from '@/lib/livekit';
 
 /** How long the ended state lingers before the screen closes itself, so the
  * reason ("Không có người nghe máy") is readable rather than a flash. */
 const CLOSE_DELAY_MS = 1600;
-
-type MediaState = 'idle' | 'connecting' | 'live' | 'reconnecting' | 'failed' | 'unsupported';
 
 export default function CallScreen() {
   const theme = useTheme();
@@ -71,94 +74,45 @@ export default function CallScreen() {
   const terminate = useCallTerminator(callId);
   const seconds = useCallDuration(call?.answeredAt);
 
-  const [media, setMedia] = useState<MediaState>('idle');
-  const [micOn, setMicOn] = useState(true);
-  // A voice call starts with the camera down and may raise it; a video call
-  // starts with it up. Set once the row is known rather than guessed here.
-  const [cameraOn, setCameraOn] = useState(false);
-  const [speakerOn, setSpeakerOn] = useState(false);
-  const [remoteJoined, setRemoteJoined] = useState(false);
-  const roomRef = useRef<LiveKitRoom | null>(null);
-  const [room, setRoom] = useState<LiveKitRoom | null>(null);
-  // Separate from `roomRef` because the window to guard is the one BEFORE a
-  // room object exists — see the effect below.
-  const connectingRef = useRef(false);
+  // Everything about the media now comes from the session, so reopening a
+  // minimised call shows a live call rather than re-running a connection.
+  const liveSession = useCallSession();
+  const session = liveSession?.callId === callId ? liveSession : null;
+  const media = session?.state ?? 'idle';
+  const room = session?.room ?? null;
+  const micOn = session?.micOn ?? true;
+  const cameraOn = session?.cameraOn ?? false;
+  const speakerOn = session?.speakerOn ?? false;
+  const remoteJoined = session?.remoteJoined ?? false;
+  const quality = session?.quality ?? 'unknown';
 
   // Video is shown whenever a camera is actually publishing, not only when
   // the call was PLACED as video — that is what lets a voice call become a
   // video one mid-conversation.
   const tracks = useCallVideoTracks(room, media === 'live' || media === 'reconnecting');
   // Read by the back handler, which must not re-subscribe on every render.
-  const inCallRef = useRef(false);
+  const canMinimiseRef = useRef(false);
+  const ringingRef = useRef(false);
 
   // The caller hears a quiet ringback while it rings at the other end. The
   // callee's own phone is rung by the incoming sheet, not here.
   useRingtone(!!call && call.status === 'ringing' && isCaller, 'ringback');
 
   // ---------------------------------------------------------------- media
-  // Joins the room on 'accepted' and only then. The guard is a ref, not the
-  // `media` state: two renders can both read 'idle' before the first setState
-  // lands, and joining twice under one identity makes LiveKit evict the first
-  // participant — which the user experiences as the call dropping instantly.
+  // Joins on 'accepted' and only then. `openCallSession` is itself a no-op
+  // for a call it already holds, which is what makes this safe to run again
+  // on every remount — and remounting is exactly what reopening a minimised
+  // call does.
   useEffect(() => {
-    if (!callId || call?.status !== 'accepted' || connectingRef.current || roomRef.current) return;
-    let cancelled = false;
-    connectingRef.current = true;
-    setMedia('connecting');
-    const wanted = call.media === 'video' ? 'video' : 'audio';
-    void connectCall(callId, wanted)
-      .then(({ room: connected, cameraOn: cameraCameUp }) => {
-        if (cancelled) {
-          void disconnectCall(connected);
-          return;
-        }
-        roomRef.current = connected;
-        setRoom(connected);
-        setMedia('live');
-        // A video call starts on the speaker; reflect that in the toggle so
-        // the button does not claim the opposite of what is happening. The
-        // camera flag comes from whether it ACTUALLY came up, not from what
-        // was asked for — on a device whose camera failed, the call carries
-        // on as audio and the button correctly reads "Bật camera".
-        if (wanted === 'video') setSpeakerOn(true);
-        setCameraOn(cameraCameUp);
-        setRemoteJoined(connected.remoteParticipants.size > 0);
-        connected.on('participantConnected', () => setRemoteJoined(true));
-        connected.on('participantDisconnected', () => {
-          setRemoteJoined(false);
-          // The other side left for good — a hangup whose write has not
-          // arrived yet, or a client that died. Ending here releases the line
-          // even if their `end_call` never lands.
-          void terminate('ended', 'remote_left');
-        });
-        // LiveKit reconnects on its own when the network blips; what was
-        // missing was any sign of it, so the picture just froze. 'disconnected'
-        // is the FINAL give-up, not a blip.
-        connected.on('reconnecting', () => { if (!cancelled) setMedia('reconnecting'); });
-        connected.on('reconnected', () => { if (!cancelled) setMedia('live'); });
-        connected.on('disconnected', () => {
-          if (!cancelled) setMedia('failed');
-        });
-      })
-      .catch((error: unknown) => {
-        connectingRef.current = false;
-        if (cancelled) return;
-        setMedia(error instanceof CallUnavailableError ? 'unsupported' : 'failed');
-        if (__DEV__) console.warn('connectCall failed:', error);
-      });
-    return () => { cancelled = true; };
-  }, [callId, call?.status, call?.media, terminate]);
+    if (!callId || call?.status !== 'accepted') return;
+    void openCallSession(callId, call.media === 'video' ? 'video' : 'audio');
+  }, [callId, call?.status, call?.media]);
 
-  // Leaving the room is tied to the screen, not to a status change, so every
-  // way out — red button, swipe back, hardware back, being navigated away —
-  // releases the media and the OS audio session. Without this the participant
-  // stays connected until LiveKit's own peer timeout, still billing.
-  useEffect(() => () => {
-    const open = roomRef.current;
-    roomRef.current = null;
-    connectingRef.current = false;
-    void disconnectCall(open);
-  }, []);
+  // Nothing is disconnected here on unmount. That was the old rule and it is
+  // the one thing this screen must NOT do any more: leaving the screen is
+  // how a call is minimised. The room is closed by useCallTerminator, by the
+  // room's own failure events, and by <OngoingCallBar> when the row goes
+  // terminal — see src/lib/callSession.ts.
 
   // --------------------------------------------------------------- ringing
   // Only the caller runs the give-up timer: if the callee's phone ran one
@@ -198,37 +152,49 @@ export default function CallScreen() {
     return () => clearTimeout(timer);
   }, [isOver, unreadable, isStaff]);
 
-  // Android's hardware back pops this screen, which unmounts it, which
-  // disconnects the room — so a stray back press ended the call outright.
-  // While a call is up, back is swallowed; the red button is the only way
-  // out. (iOS's swipe-back is already off via gestureEnabled on the route.)
-  useEffect(() => {
-    // Subscribed once and left alone: the handler reads the ref, so whether
-    // back is swallowed follows the call's state without this effect having
-    // to tear down and re-add a listener on every render.
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => inCallRef.current);
-    return () => subscription.remove();
-  }, []);
-
   // --------------------------------------------------------------- actions
-  function toggleMic() {
-    if (!roomRef.current) return;
-    const next = !micOn;
-    setMicOn(next);
-    void roomRef.current.localParticipant.setMicrophoneEnabled(next).catch(() => setMicOn(!next));
-  }
+  // Leaves the screen WITHOUT touching the call; <OngoingCallBar> takes over
+  // from here. Memoised so the back handler below can depend on it without
+  // re-subscribing on every render.
+  const minimise = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    // Nothing to go back to — the app was started straight onto this screen
+    // by a notification tap. Land each role where they would have come from.
+    else router.replace(isStaff ? '/chat/admin-conversations' : '/chat/human');
+  }, [isStaff]);
 
-  function toggleCamera() {
-    const next = !cameraOn;
-    setCameraOn(next);
-    void setCallCamera(roomRef.current, next).catch(() => setCameraOn(!next));
-  }
+  // Android's hardware back used to be swallowed outright, because popping
+  // this screen unmounted it and unmounting ended the call. Now it minimises,
+  // the way every other caller behaves.
+  //
+  // While the call is still RINGING it is swallowed as before, and for a
+  // reason worth stating: there is no room to minimise yet, and the give-up
+  // timer that cancels an unanswered call lives in this component. Backing
+  // out would unmount the timer and leave the other phone ringing on with
+  // nothing to stop it but the server's janitor. Huỷ / Từ chối are the way
+  // out of a ringing call.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (canMinimiseRef.current) {
+        minimise();
+        return true;
+      }
+      return ringingRef.current;
+    });
+    return () => subscription.remove();
+  }, [minimise]);
 
-  function toggleSpeaker() {
-    const next = !speakerOn;
-    setSpeakerOn(next);
-    void setCallSpeaker(next).catch(() => setSpeakerOn(!next));
-  }
+  // ------------------------------------------------------------- proximity
+  // Armed only when the phone is plausibly AT an ear: a connected call with
+  // no picture on screen. A video call, or a voice call with a camera up,
+  // is being looked at — blanking it would be the bug rather than the fix.
+  const atEar = media === 'live' && !cameraOn && !tracks.remote;
+  useEffect(() => {
+    if (!atEar) return;
+    setProximityBlanking(true);
+    return () => setProximityBlanking(false);
+  }, [atEar]);
+
 
   // ----------------------------------------------------------------- copy
   const peerName = peerIsSupport
@@ -268,18 +234,12 @@ export default function CallScreen() {
   // Controls stay usable through a reconnect: muting while the socket is
   // re-establishing should still take effect when it comes back.
   const controlsLive = media === 'live' || media === 'reconnecting';
-  inCallRef.current = !!inCall && !isOver;
-  // Driven by whether a picture exists at all, EITHER side's — not by how
-  // the call was placed. So a voice call that turns into a video one switches
-  // to the video stage, and a video call whose far end kills its camera falls
-  // back to the identity card instead of freezing on the last frame.
-  //
-  // `tracks.local` belongs in this condition and was missing from it, which
-  // is the whole of the "camera bật nhưng không thấy hình" report: turning
-  // your own camera on published a track, lit the button up, and then
-  // rendered nothing, because the only <CallVideo> on the screen lived inside
-  // a branch that needed the OTHER side's picture. You could not see yourself
-  // until they turned their camera on too.
+  canMinimiseRef.current = !!inCall && !isOver && controlsLive;
+  ringingRef.current = call?.status === 'ringing';
+  // Driven by whether a picture exists at all, EITHER side's — so a voice
+  // call that turns into a video one switches to the video stage, and a
+  // video call whose far end kills its camera falls back to the identity
+  // card instead of freezing on the last frame.
   const videoStage = inCall && controlsLive && (!!tracks.remote || !!tracks.local);
   // The far end gets the full screen when it has a picture; otherwise your
   // own camera does, the way every other caller behaves while the other side
@@ -287,6 +247,8 @@ export default function CallScreen() {
   const stageTrack = tracks.remote ?? tracks.local;
   const stageIsSelf = !tracks.remote;
   const pipTrack = tracks.remote ? tracks.local : undefined;
+  // Only worth saying when it is bad. "Excellent" on screen is noise.
+  const weakNetwork = controlsLive && (quality === 'poor' || quality === 'lost');
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: videoStage ? '#000' : theme.colors.bgApp }]}>
@@ -328,6 +290,34 @@ export default function CallScreen() {
         </View>
       )}
 
+      {/* Minimise. Only once there is a call worth keeping: while it is still
+          ringing there is nothing behind the screen to go back to. */}
+      {canMinimiseRef.current ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Thu nhỏ cuộc gọi"
+          onPress={minimise}
+          hitSlop={12}
+          style={[styles.minimise, {
+            backgroundColor: videoStage ? 'rgba(255,255,255,0.22)' : theme.colors.bgCard,
+          }]}
+        >
+          <Icon name="chevron-down" size={24} color={videoStage ? '#fff' : theme.colors.textPrimary} />
+        </Pressable>
+      ) : null}
+
+      {/* A weak line is otherwise indistinguishable from a broken app: the
+          voice breaks up, the picture freezes, and nothing admits anything
+          is wrong. LiveKit's own measure of both ends, worse one wins. */}
+      {weakNetwork ? (
+        <View style={[styles.quality, { backgroundColor: quality === 'lost' ? theme.colors.error : theme.colors.warning }]}>
+          <Icon name="wifi-off" size={14} color="#fff" />
+          <Text style={[theme.type.captionSm, styles.qualityText]}>
+            {quality === 'lost' ? 'Mất kết nối mạng' : 'Mạng yếu, cuộc gọi có thể bị ngắt quãng'}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={[styles.controls, videoStage ? styles.controlsOverVideo : null]}>
         {inCall ? (
           // One row for every call. The camera button is always there, so a
@@ -338,16 +328,15 @@ export default function CallScreen() {
           // earpiece, which the video-only layout had made impossible.
           <View style={styles.toggleRow}>
             <ToggleButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? 'Tắt tiếng' : 'Đã tắt tiếng'}
-              active={!micOn} onPress={toggleMic} disabled={!controlsLive} onDark={videoStage} />
+              active={!micOn} onPress={toggleSessionMic} disabled={!controlsLive} onDark={videoStage} />
             <ToggleButton icon={cameraOn ? 'video' : 'video-off'} label={cameraOn ? 'Tắt camera' : 'Bật camera'}
-              active={!cameraOn} onPress={toggleCamera} disabled={!controlsLive} onDark={videoStage} />
+              active={!cameraOn} onPress={toggleSessionCamera} disabled={!controlsLive} onDark={videoStage} />
             {cameraOn ? (
               <ToggleButton icon="switch-camera" label="Đổi camera" active={false}
-                onPress={() => void switchCallCamera(roomRef.current).catch(() => undefined)}
-                disabled={!controlsLive} onDark={videoStage} />
+                onPress={flipSessionCamera} disabled={!controlsLive} onDark={videoStage} />
             ) : null}
             <ToggleButton icon="volume-2" label="Loa ngoài" active={speakerOn}
-              onPress={toggleSpeaker} disabled={!controlsLive} onDark={videoStage} />
+              onPress={toggleSessionSpeaker} disabled={!controlsLive} onDark={videoStage} />
           </View>
         ) : null}
 
@@ -427,11 +416,21 @@ const styles = StyleSheet.create({
   roundWrap: { alignItems: 'center', gap: 8 },
   round: { width: 68, height: 68, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   toggle: { width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
+  minimise: {
+    position: 'absolute', top: 54, left: 16,
+    width: 40, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+  },
+  quality: {
+    position: 'absolute', top: 104, left: 20, right: 20,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999,
+  },
+  qualityText: { color: '#fff', flexShrink: 1 },
   // Own camera, parked top-right the way every video caller does it.
   pip: {
     position: 'absolute', top: 56, right: 16, width: 108, height: 160,
     borderRadius: 14, overflow: 'hidden', borderWidth: 2, backgroundColor: '#111',
   },
-  videoTopBar: { position: 'absolute', top: 58, left: 20, gap: 2 },
+  videoTopBar: { position: 'absolute', top: 58, left: 64, gap: 2 },
   videoText: { color: '#fff', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
 });

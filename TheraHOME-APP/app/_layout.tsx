@@ -16,6 +16,7 @@ import { ThemeProvider, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useIsStaff } from '@/hooks/useWebRoles';
 import { IncomingCallSheet } from '@/components/call/IncomingCallSheet';
+import { OngoingCallBar } from '@/components/call/OngoingCallBar';
 import { useCallKeepBridge } from '@/hooks/useCallKeepBridge';
 import '@/lib/callBackgroundTask';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
@@ -508,6 +509,11 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           device, 2026-10-11. As a sibling of the Stack it is above every
           route, including the chat screens, the day detail and the profile. */}
       <IncomingCallSheet enabled={inApp} userId={userId} isStaff={isStaffUser} />
+      {/* The minimised call, mounted here for the same reason as the sheet
+          above: it has to float over every route, including the chat screens
+          a user minimises a call in order to read. It renders nothing unless
+          a call is actually running. */}
+      <OngoingCallBar enabled={inApp} userId={userId} />
     </View>
   );
 }

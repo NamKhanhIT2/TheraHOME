@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import type { Database } from '@/types/database';
 import { dismissCall, markCallActive } from '@/lib/callkeep';
+import { closeCallSession } from '@/lib/callSession';
 
 export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'missed' | 'busy' | 'ended';
 
@@ -290,6 +291,12 @@ export function useCallTerminator(callId: string | undefined) {
     // at all. Done first, so a failed round trip below still leaves a phone
     // that has stopped ringing.
     dismissCall(id);
+    // And leave the LiveKit room. This is one of the three places that
+    // close a session (see src/lib/callSession.ts) and the most direct: the
+    // user pressed the red button. It is NOT tied to the call screen
+    // unmounting any more, because the screen can be dismissed with the
+    // call still running — that is what minimising is.
+    void closeCallSession(id);
     try {
       await mutateRef.current({ callId: id, status, reason });
     } catch {

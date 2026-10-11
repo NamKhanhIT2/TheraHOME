@@ -164,6 +164,59 @@ export async function disconnectCall(room: LiveKitRoom | null): Promise<void> {
   }
 }
 
+// ------------------------------------------------------------- quality
+//
+// What the user gets told when the call sounds bad. Without it a weak
+// network is indistinguishable from a broken app: the voice breaks up, the
+// picture freezes, and nothing on screen admits that anything is wrong.
+//
+// LiveKit computes this per participant from its own packet loss and RTT.
+// BOTH ends matter and the worse one wins, because "your connection is
+// fine, theirs is not" is not a distinction the person holding the phone
+// can act on differently — either way, wait or move.
+export type CallQuality = 'excellent' | 'good' | 'poor' | 'lost' | 'unknown';
+
+const QUALITY_RANK: Record<CallQuality, number> = {
+  excellent: 0, good: 1, unknown: 2, poor: 3, lost: 4,
+};
+
+function worstQuality(room: LiveKitRoom): CallQuality {
+  let worst: CallQuality = (room.localParticipant.connectionQuality as CallQuality) ?? 'unknown';
+  for (const participant of room.remoteParticipants.values()) {
+    const quality = (participant.connectionQuality as CallQuality) ?? 'unknown';
+    if (QUALITY_RANK[quality] > QUALITY_RANK[worst]) worst = quality;
+  }
+  return worst;
+}
+
+/** The current worse-of-the-two quality. */
+export function readConnectionQuality(room: LiveKitRoom | null): CallQuality {
+  if (!room) return 'unknown';
+  try {
+    return worstQuality(room);
+  } catch {
+    return 'unknown';
+  }
+}
+
+/** Calls back whenever either end's quality changes. Returns an unsubscribe
+ * that is safe to drop — the room is disconnected soon after anyway. */
+export function subscribeConnectionQuality(
+  room: LiveKitRoom,
+  onChange: (quality: CallQuality) => void,
+): () => void {
+  const { client: lkClient } = loadLiveKit();
+  const handler = () => onChange(worstQuality(room));
+  room.on(lkClient.RoomEvent.ConnectionQualityChanged, handler);
+  room.on(lkClient.RoomEvent.ParticipantConnected, handler);
+  room.on(lkClient.RoomEvent.ParticipantDisconnected, handler);
+  return () => {
+    room.off(lkClient.RoomEvent.ConnectionQualityChanged, handler);
+    room.off(lkClient.RoomEvent.ParticipantConnected, handler);
+    room.off(lkClient.RoomEvent.ParticipantDisconnected, handler);
+  };
+}
+
 /** Earpiece ↔ speaker, the one audio control a voice call needs. */
 export async function setCallSpeaker(on: boolean): Promise<void> {
   const { native: lk } = loadLiveKit();
