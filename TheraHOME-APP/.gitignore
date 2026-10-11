@@ -54,3 +54,10 @@ google-play-service-account.json
 # Account credentials the QA scripts generate on your machine — never commit.
 scripts/testers-credentials.csv
 scripts/android-qa-credentials.csv
+
+# Local Expo module build output. The root /android and /ios are ignored
+# already, but a module under modules/ builds into its own tree — and a
+# `git add -A` after an Android build put 165 generated files (1.2MB of
+# Gradle intermediates, .bin caches, merged resources) into a commit.
+modules/*/android/build/
+modules/*/ios/build/

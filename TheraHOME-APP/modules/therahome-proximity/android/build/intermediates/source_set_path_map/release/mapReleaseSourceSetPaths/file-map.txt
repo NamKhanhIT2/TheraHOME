@@ -1,7 +1,0 @@
-ai.therahome.proximity.therahome-proximity-pngs-0 /Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/build/generated/res/pngs/release
-ai.therahome.proximity.therahome-proximity-resValues-1 /Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/build/generated/res/resValues/release
-ai.therahome.proximity.therahome-proximity-mergeReleaseResources-2 /Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
-ai.therahome.proximity.therahome-proximity-mergeReleaseResources-3 /Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
-ai.therahome.proximity.therahome-proximity-release-4 /Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/build/intermediates/merged_res/release/mergeReleaseResources
-ai.therahome.proximity.therahome-proximity-main-5 /Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/src/main/res
-ai.therahome.proximity.therahome-proximity-release-6 /Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/src/release/res
