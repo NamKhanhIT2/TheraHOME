@@ -81,11 +81,22 @@ backend gets built against — see Chat in `docs/backend.md`.
 - **Auth**: three methods, all funneled through the same post-auth gate in
   `app/_layout.tsx`'s `RootNavigator` — no separate navigation logic per
   method (see `docs/auth-and-activation.md`).
-  - **Google**: `src/lib/googleAuth.ts`, the standard Supabase+Expo
-    web-based flow (`expo-web-browser` + `expo-auth-session`'s
-    `QueryParams` helper) — works in plain Expo Go, no native Google
-    Sign-In SDK / EAS dev client needed. **Won't actually work until
-    manual setup is done — see `docs/manual-setup.md`.**
+  - **Google**: `src/lib/googleAuth.ts`. NATIVE since 2026-10-11
+    (`@react-native-google-signin` → `signInWithIdToken`), matching what
+    `appleAuth.ts` already did. The old browser flow put the plumbing on
+    screen twice — iOS's "TheraHOME Wants to Use supabase.co to Sign In"
+    and Google's "Tiếp tục tới <project-ref>.supabase.co" — and neither
+    string is editable while the flow goes through a browser.
+    **That browser flow is still in the file as an automatic fallback**:
+    `signInWithGoogle()` takes the native path only when
+    `extra.googleSignIn.webClientId` is set AND the build carries the
+    native module, so an older binary keeps working. Being native, it does
+    NOT run in Expo Go.
+    **Supabase's Google provider must have "Skip nonce checks" ON.** The
+    free tier of that library has no nonce API at all, while Google's SDK
+    embeds one in the id_token, and Supabase rejects the mismatch with
+    "Passed nonce and nonce in id_token should either both exist or not."
+    See `docs/manual-setup.md`.
   - **Apple**: `src/lib/appleAuth.ts`, native `expo-apple-authentication`
     (chosen over Supabase's web-OAuth Apple flow specifically for App
     Store Guideline 4.8 compliance) → `supabase.auth.signInWithIdToken`.

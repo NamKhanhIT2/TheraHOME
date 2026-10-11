@@ -290,3 +290,31 @@ page if call volume grows.
   `com.apple.developer.usernotifications.time-sensitive` entitlement. Without
   it the level is simply ignored, so the push still arrives — nothing breaks,
   it just does not pierce Focus modes.
+
+## Google sign-in: "Skip nonce checks" must be ON (2026-10-11)
+
+Supabase dashboard → Authentication → Providers → **Google** → enable
+**Skip nonce checks**.
+
+Without it, native Google sign-in fails for every user with a generic
+"Không thể đăng nhập với Google lúc này", and the real reason appears only
+in the project's auth logs:
+
+    invalid request: Passed nonce and nonce in id_token should either
+    both exist or not.
+
+Why it cannot be fixed in code: Supabase's secure path is to hash a raw
+nonce (SHA-256), hand the hash to the provider and the raw value to
+`signInWithIdToken` — exactly what `appleAuth.ts` does. Google's SDK
+generates a nonce internally and embeds it in the id_token, but the free
+tier of `@react-native-google-signin/google-signin` exposes no way to
+supply one (verified against 16.1.5: the string "nonce" appears nowhere in
+the package except its README; the nonce-capable `GoogleOneTapSignIn` is in
+the paid tier). So the two sides can never agree, and the toggle is the
+supported way out.
+
+What it costs: replay protection on the id_token. The token is still signed
+by Google and still checked for signature, audience and expiry, lives one
+hour, and never leaves the device except over TLS to Supabase. Apple
+sign-in is unaffected — the setting is per provider, and `appleAuth.ts`
+keeps its nonce.

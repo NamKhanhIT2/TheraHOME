@@ -61,6 +61,8 @@
     "babel-preset-expo": "~57.0.7",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -69,7 +71,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build:ios:development": "EAS_NO_VCS=1 EAS_PROJECT_ROOT=\"$PWD\" npx eas-cli@latest build --platform ios --profile development --clear-cache"
+    "build:ios:development": "EAS_NO_VCS=1 EAS_PROJECT_ROOT=\"$PWD\" npx eas-cli@latest build --platform ios --profile development --clear-cache",
+    "postinstall": "patch-package"
   },
   "private": true
 }

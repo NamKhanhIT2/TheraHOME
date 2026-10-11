@@ -19,7 +19,12 @@ export default function LoginScreen() {
   }, []);
   async function google() {
     setBusy(true); setError(null);
-    try { await signInWithGoogle(); } catch { setError(t('googleSignInError')); } finally { setBusy(false); }
+    try {
+      await signInWithGoogle();
+    } catch (reason) {
+      if (__DEV__) console.warn('Google sign-in failed:', reason);
+      setError(t('googleSignInError'));
+    } finally { setBusy(false); }
   }
   async function apple() {
     setBusy(true); setError(null);
