@@ -53,6 +53,16 @@ export async function registerUpsaleNotificationActions(): Promise<void> {
 // forever).
 export const ANDROID_CHANNEL_ID = 'default-v2';
 
+// Incoming voice calls get their own channel (dispatch-push sends this id for
+// mode 'call'). Not a cosmetic split: an Android channel is where the user's
+// own sound, vibration and Do-Not-Disturb-override choices live, so CSKH can
+// give a customer call a ringtone loud enough to notice without changing what
+// every other TheraHOME notification sounds like. The insistent vibration
+// pattern is the closest a plain notification gets to a ring — a real one
+// needs a full-screen intent, which costs a native build and a paid signaling
+// plan (see src/components/call/IncomingCallSheet.tsx).
+export const ANDROID_CALL_CHANNEL_ID = 'calls-v1';
+
 async function ensureAndroidChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
@@ -60,6 +70,13 @@ async function ensureAndroidChannel(): Promise<void> {
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 180, 250],
     sound: 'ting.wav',
+  }).catch(() => undefined);
+  await Notifications.setNotificationChannelAsync(ANDROID_CALL_CHANNEL_ID, {
+    name: 'Cuộc gọi đến',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 600, 400, 600, 400, 600],
+    sound: 'ting.wav',
+    bypassDnd: true,
   }).catch(() => undefined);
 }
 

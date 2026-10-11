@@ -4634,3 +4634,116 @@ Kiểm: viết lại `adherence_pct_for` xong, 0 lộ trình lệch so với gi�
 lưu. Ví dụ Admin sẽ hiện: Hùng "93% · 13/14", Hung Vu "71% · 10/14",
 Tung Van Phan "10% · 1/10" (anh này mới tới ngày 10 nên mẫu số là 10, không
 phải 14).
+
+## Voice calling to the CSKH line (2026-10-11)
+
+"Gọi CSKH" in the `chat/human` header. One customer rings one shared support
+line; CSKH answers on their own phone, in the app.
+
+**Why LiveKit, and why free tier.** The three candidates were ZEGOCLOUD,
+Agora and LiveKit. ZEGOCLOUD's per-minute price is the cheapest in the middle
+band, but its ready-made Call Kit (the part that rings) rides on ZIM, whose
+Signaling plan is **US$99/month** — and that $99 buys exactly the pieces this
+repo already has: a Realtime channel and a push pipeline. Agora has the most
+generous recurring free tier for pure voice (10,000 minutes/month vs
+LiveKit's 5,000). LiveKit won on two things neither of the others offers: the
+client components are open source so there is no "pay or build your own UI"
+fork in the road, and it can be self-hosted later on a VPS **without changing
+a line of client code**, which is the only real escape from a per-minute
+vendor. See docs/manual-setup.md for what the free tier actually buys.
+
+**The one rule the whole design turns on.** LiveKit bills every minute a
+participant is *connected to a room*, free tier included. So nobody may sit in
+a room waiting. Ringing happens entirely on a Postgres row + Realtime (free);
+the room is joined only when `status` becomes `accepted`. This is enforced in
+three places so no single bug can start the meter: the client only connects on
+`accepted`, the `livekit-token` function refuses to mint a token for any other
+status, and the call screen disconnects on unmount rather than on a status
+change (so a swipe-back or a hardware-back also releases the room, not just
+the red button). The naive version of this feature — CSKH's app joining a
+room to "listen for calls" — would burn 14,400 minutes a month doing nothing,
+roughly 3× the entire free tier.
+
+**One line, one agent.** Enforced by a partial unique index, not an
+application check; see `calls` in docs/backend.md for why a read-then-insert
+loses the race and how `holds_line` keeps App Review accounts exempt.
+
+**Ringing without a $99 plan, honestly scoped.** CSKH's phone is rung two
+ways: a modal over whichever staff tab they are on (Realtime, instant, free)
+and a push on its own Android channel with iOS `timeSensitive` for when the
+app is not in the foreground. What this deliberately does **not** do is a
+native ring over a locked screen — that needs CallKit + VoIP push on iOS and
+a full-screen intent on Android, which is several days of native work for a
+support line whose phone sits with the app open during working hours. The
+push is the out-of-hours path; tapping it lands on the same call screen.
+
+**Things that bit during the build, recorded so they don't bite again:**
+
+- The `useCallTerminator` "end this call exactly once" guard was first a
+  boolean. That is correct on the call screen, which unmounts between calls,
+  and wrong in `IncomingCallSheet`, which stays mounted for the staff's whole
+  session: declining one call latched the flag and would have silently
+  swallowed the decline of every call after it. It is now keyed by call id.
+- Connecting to the room is guarded by a ref, not by the `media` state. Two
+  renders can both read `media === 'idle'` before the first `setState` lands,
+  and joining twice under the same identity makes LiveKit evict the first
+  participant — which the user experiences as the call dropping the instant
+  it connects.
+- `revoke ... from public, anon` did not keep `expire_stale_calls` off the
+  REST API; a default privilege re-grants EXECUTE to `authenticated` on new
+  public functions. Caught by the database linter right after shipping, fixed
+  by `202610111030_voice_calls_revoke_janitor_from_clients.sql`.
+- Four icon names (`phone-off`, `mic`, `mic-off`, `headphones`) were missing
+  from `src/components/icons/Icon.tsx`'s map and would have silently rendered
+  the placeholder circle — including on the hang-up button.
+- The native modules are required lazily (`src/lib/livekit.ts`). A top-level
+  import would throw while the JS bundle is still evaluating on any build made
+  before they were added, taking the whole app down on launch for a feature
+  the user may never open.
+- **`expo-image-picker`'s `microphonePermission: false` silently deleted the
+  mic permission.** Adding `android.permission.RECORD_AUDIO` to
+  `android.permissions` in app.json was not enough: that plugin option emits
+  `<uses-permission android:name="...RECORD_AUDIO" tools:node="remove"/>`,
+  which wins regardless of who declared the permission. The first prebuild
+  after the feature was written produced a manifest with the mic permission
+  REMOVED — a build that compiles, installs, rings, connects, and then has no
+  audio, with nothing in the logs pointing at the manifest. Fixed by giving
+  that option a real string instead of `false`.
+  `cameraPermission` stays `false` deliberately: the call is audio-only, so no
+  CAMERA permission in the manifest is a third lock on that, alongside the
+  token's `canPublishSources: ['microphone']` and the client never asking for
+  a camera track.
+  Lesson for any future permission here: after changing `app.json`, re-run
+  `npx expo prebuild --platform android --clean` and grep the generated
+  manifest for `tools:node="remove"` — the app.json array is a request, not
+  the result.
+
+### Finishing pass (2026-10-11, same day)
+
+Two gaps closed after the first build went on a device.
+
+**Missed calls were invisible.** The `calls` row existed but no screen read
+it, so a customer ringing an unattended line left no trace for anyone. Every
+terminal status now writes a line into that customer's human chat thread
+(`log_call_to_thread`), which puts it at the top of CSKH's conversation list
+with an unread badge and no new UI. Chat thread, not the `notifications`
+table: the staff shell's Thông báo tab turned out to be a broadcast composer
+rather than an inbox, so a notification row there would never have been seen
+by anyone.
+
+**Staff push had been reaching nobody — since before this feature.**
+Verified on the live database: `dispatch-push` resolved 0 recipients while 3
+accounts could actually answer. It filtered `web_access_contacts.roles`, but
+every enabled, claimed contact row on this project carries an empty roles
+array; the accounts are staff through `profiles.account_type`, which only
+`current_web_roles()` knew about. So the existing "Tin nhắn hỗ trợ mới" push
+had been silently dropping, and the new call push copied the same query and
+the same bug. `staff_user_ids()` is now the one place that answers it and
+both paths read it.
+
+A third thing worth recording because the test, not the code, was wrong
+twice: a direct `UPDATE calls ...` run while impersonating `authenticated`
+silently affects zero rows, because the table deliberately has no UPDATE
+policy. And several inserts inside one transaction share `now()`, so
+`order by created_at desc limit 1` picks arbitrarily among them — use `ctid`
+or read each row back by id when verifying inside a single transaction.

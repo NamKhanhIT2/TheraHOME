@@ -449,6 +449,14 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         <Stack.Protected guard={inApp}>
           <Stack.Screen name="chat/admin-conversations" />
           <Stack.Screen name="chat/admin-thread/[threadId]" />
+          {/* Voice call — also reachable from both shells: the customer opens
+              it from the chat header, CSKH from the incoming-call sheet in
+              (staff)/_layout.tsx. A full-screen modal rather than a push, so
+              it covers the tab bar the way a phone call covers the app. */}
+          <Stack.Screen
+            name="call/[callId]"
+            options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
+          />
           {/* Shared, not patient-only: the staff moderation queue links
               straight to the reported post ((staff)/community.tsx). While
               this sat in the patient block, `isStaffAccount` unregistered it

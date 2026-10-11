@@ -13,6 +13,7 @@ import { registerUpsaleNotificationActions, syncPushTokenIfGranted } from '@/lib
 import { Icon } from '@/components/icons/Icon';
 import { AssistantBubble } from '@/components/AssistantBubble';
 import { ReminderPopup } from '@/components/ReminderPopup';
+import { IncomingCallSheet } from '@/components/call/IncomingCallSheet';
 import { useI18n } from '@/lib/i18n';
 
 const TAB_ITEMS: { name: string; icon: string; label: string }[] = [
@@ -164,6 +165,12 @@ export default function TabsLayout() {
         router.push(data.destination === 'community' ? '/community' : data.destination === 'roadmap' ? '/roadmap' : data.destination === 'home' ? '/home' : '/store');
       } else if (data.type === 'blog') {
         router.push({ pathname: '/community', params: { filter: 'official', content: String(data.type) } });
+      } else if (data.type === 'call') {
+        // A dual-role admin can be rung here too. The call screen works
+        // out from the row whether they are the caller or the staff, so
+        // this one route serves both.
+        if (typeof data.callId === 'string') router.push({ pathname: '/call/[callId]', params: { callId: data.callId } });
+        else router.push('/chat/admin-conversations');
       } else if (data.type === 'chat') {
         router.push('/chat/human');
       } else if (data.type === 'inactivity') {
@@ -207,6 +214,9 @@ export default function TabsLayout() {
           onOpenSupportChat={() => router.push(isStaff ? '/chat/admin-conversations' : '/chat/human')}
         />
       ) : null}
+      {/* Rings a dual-role admin who is using the patient shell. CSKH-only
+          accounts get the same sheet from (staff)/_layout.tsx. */}
+      <IncomingCallSheet enabled={isStaff} />
       {showReminderPrompt && userId ? (
         <ReminderPopup userId={userId} onDone={() => setReminderDoneThisSession(true)} />
       ) : null}

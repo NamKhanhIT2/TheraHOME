@@ -1,0 +1,18 @@
+-- `expire_stale_calls` was meant to be internal — reachable only from inside
+-- `start_call`'s SECURITY DEFINER context, never as an endpoint. The previous
+-- migration said so and revoked from `public` and `anon`, but this project
+-- has a default privilege that grants EXECUTE on new public functions to
+-- `authenticated`, so it was still exposed at /rest/v1/rpc/expire_stale_calls
+-- — caught by the database linter's
+-- `authenticated_security_definer_function_executable` lint right after the
+-- table shipped.
+--
+-- Harmless in practice (it only ends calls already past the ring or session
+-- timeout, which is exactly what the next `start_call` would do anyway) but
+-- it was not what the code claimed, and an endpoint nobody needs should not
+-- exist. `postgres` keeps EXECUTE, which is the role `start_call` runs as, so
+-- the internal `perform` still works.
+--
+-- Worth remembering for any future RPC here: `revoke ... from public, anon`
+-- is NOT enough on this project to keep a function off the REST API.
+revoke all on function public.expire_stale_calls() from authenticated;

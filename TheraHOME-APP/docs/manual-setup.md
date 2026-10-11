@@ -221,3 +221,72 @@ asks for is nowhere in it.
 Nothing else needs configuring. Sign-in by username, the account/profile
 link, and the code verification itself are all in the app and the
 `auth-sign-in` Edge Function, and were verified end to end on 2026-09-08.
+
+## LiveKit for voice calling (2026-10-11) — REQUIRED before "Gọi CSKH" works
+
+The voice-call feature is complete in the app and the database, and the
+`livekit-token` Edge Function returns **503 `livekit_not_configured`** until
+these are done. Nothing here can be done from the repo.
+
+**1. Create a LiveKit Cloud project** — https://cloud.livekit.io, free "Build"
+plan, no card.
+
+**The "project data region" is not a latency setting.** It is fixed at
+creation and cannot be changed, which makes it look important, but it only
+decides where session analytics and (if enabled) recordings are stored. Media
+always routes over the shortest path to the edge nearest each participant, so
+a VN customer connects to a VN/SEA edge whatever this says. Forcing media into
+one region is a separate feature — region pinning — which is Scale-plan only
+and would *raise* latency here, so it is not wanted. A project created with
+`United States` as its data region is fine and needs no migration; nothing
+about this feature stores call media anywhere, since LiveKit does not retain
+it.
+
+From **Manage API keys** (dashboard home) or **Settings → Keys**, create a key
+and copy three values:
+
+- the project URL, `wss://<something>.livekit.cloud`
+- the API key
+- the API secret (shown once)
+
+**2. Set them as Edge Function secrets** — Supabase dashboard → Edge Functions
+→ Secrets: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`. The secret
+must not pass through the repo or a chat; it is the one credential that, if
+leaked, lets anyone mint a token for any room and listen in on any call.
+
+**3. Deploy the two functions** — DONE 2026-10-11: `livekit-token` is live at
+version 1 and `dispatch-push` at version 33 (it gained `mode: 'call'`), both
+with `verify_jwt` on. Source in `supabase/functions/`; redeploy with
+`deploy_edge_function` (same name) after any change. `livekit-token` answers
+503 `livekit_not_configured` until step 2 is done, which is the designed
+behaviour, not a deploy failure.
+
+**4. Rebuild the dev client / TestFlight build.** `@livekit/react-native` and
+`@livekit/react-native-webrtc` are native modules, so no existing build
+contains them — same situation as `react-native-iap`. The app does not crash
+on an old build: `isCallSupported()` hides the call button and the call screen
+explains itself, which is deliberate, but the feature genuinely needs
+`eas build --profile development` (or a new store build) before it can be
+tested at all.
+
+**What the free tier buys.** 5,000 participant-minutes/month and 50GB of
+downstream data, across the whole account. A 1-1 call bills 2
+participant-minutes per minute of conversation, so that is **~2,500 minutes of
+real calling a month** (~83 minutes a day). Voice uses roughly 0.5 MB per
+call-minute, so the 50GB is never the binding limit for audio — the minutes
+run out about 40× sooner. Past 5,000 minutes there is no pay-as-you-go step:
+the next plan is "Ship" at US$50/month (150,000 minutes), so watch the usage
+page if call volume grows.
+
+**Two App Review items this introduces** (iOS):
+
+- `NSMicrophoneUsageDescription` is set, in Vietnamese. Expected.
+- `UIBackgroundModes: ["audio"]` is set so a call survives the phone being
+  pocketed. Apple asks what this is for; the honest answer is an in-app voice
+  call to customer support, which is a legitimate use. If review pushes back,
+  the fallback is dropping the background mode and accepting that the call
+  ends when the app leaves the foreground.
+- `interruptionLevel: 'timeSensitive'` on the call push wants the
+  `com.apple.developer.usernotifications.time-sensitive` entitlement. Without
+  it the level is simply ignored, so the push still arrives — nothing breaks,
+  it just does not pierce Focus modes.

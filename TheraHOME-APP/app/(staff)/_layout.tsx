@@ -3,9 +3,10 @@
 // most important areas per CLAUDE.md. No AssistantBubble/ReminderPopup,
 // both patient-only concepts. See app/_layout.tsx's isStaffAccount gate for
 // how accounts land here instead of (tabs).
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
@@ -13,6 +14,7 @@ import { useWebRoles } from '@/hooks/useWebRoles';
 import { TAB_BAR_BODY_HEIGHT, TAB_BAR_BODY_PADDING_BOTTOM, useTabBarInset } from '@/hooks/useTabBarInset';
 import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/icons/Icon';
+import { IncomingCallSheet } from '@/components/call/IncomingCallSheet';
 
 const STAFF_TAB_ITEMS: { name: string; icon: string; label: string }[] = [
   { name: 'chat', icon: 'message-circle', label: 'Chat' },
@@ -90,6 +92,7 @@ function StaffTabBar({ state, navigation }: Parameters<NonNullable<React.Compone
 }
 
 export default function StaffLayout() {
+  useCallNotificationRouting();
   return (
     <View style={{ flex: 1 }}>
       <StaffHeader />
@@ -98,8 +101,55 @@ export default function StaffLayout() {
         <Tabs.Screen name="community" />
         <Tabs.Screen name="notifications" />
       </Tabs>
+      {/* Everyone in this shell is staff, so the incoming-call sheet is
+          always armed. It is mounted here rather than per-tab so a call
+          reaches CSKH whichever tab they happen to be on. */}
+      <IncomingCallSheet enabled />
     </View>
   );
+}
+
+/**
+ * Opens the right screen when staff tap a notification.
+ *
+ * The patient shell has its own, richer version of this in
+ * (tabs)/_layout.tsx; this shell had none at all, so a tapped notification
+ * just opened the app on whatever tab was last used. Only the two kinds staff
+ * actually receive are handled: a call (the one that is time-critical — a
+ * missed tap here is a missed customer) and a support message.
+ *
+ * Same double-delivery guard as the patient version: a cold launch from a tap
+ * arrives through both the listener and the replay below.
+ */
+function useCallNotificationRouting() {
+  const handledRef = useRef(new Set<string>());
+  useEffect(() => {
+    function open(response: Notifications.NotificationResponse) {
+      const id = response.notification.request.identifier;
+      if (id) {
+        if (handledRef.current.has(id)) return;
+        handledRef.current.add(id);
+      }
+      const data = response.notification.request.content.data ?? {};
+      if (data.type === 'call' && typeof data.callId === 'string') {
+        router.push({ pathname: '/call/[callId]', params: { callId: data.callId } });
+      } else if (data.type === 'chat') {
+        router.push('/chat/admin-conversations');
+      }
+    }
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(open);
+    void Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (!response) return;
+        open(response);
+        void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+      })
+      .catch((error: unknown) => {
+        if (__DEV__) console.warn('Unable to restore the last notification response:', error);
+      });
+    return () => subscription.remove();
+  }, []);
 }
 
 const styles = StyleSheet.create({

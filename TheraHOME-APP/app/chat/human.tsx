@@ -17,6 +17,7 @@ import { ReactionAsset } from '@/components/ReactionAsset';
 import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
 import { ChatComposer, type ChatComposerHandle } from '@/components/chat/ChatComposer';
 import { ChatOfflineBanner } from '@/components/chat/ChatOfflineBanner';
+import { CallButton } from '@/components/chat/CallButton';
 import { resetChatChannelStatus } from '@/lib/chatConnection';
 import { hapticConfirm, hapticPressHold } from '@/lib/haptics';
 import { CHAT_FOLLOW_NEW_MESSAGES } from '@/lib/chatListProps';
@@ -229,7 +230,7 @@ export default function HumanChatScreen() {
   return (
     <ScreenContainer>
       <KeyboardAvoidingView style={styles.flex} behavior="padding">
-        <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}><Pressable onPress={() => router.back()}><Icon name="chevron-left" size={22} color={theme.colors.textPrimary} /></Pressable><Image source={SPECIALIST_IMAGE} style={styles.avatar} resizeMode="cover" /><View><Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportTeamName')}</Text><OnlineIndicator online={specialistOnline} /></View></View>
+        <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}><Pressable onPress={() => router.back()}><Icon name="chevron-left" size={22} color={theme.colors.textPrimary} /></Pressable><Image source={SPECIALIST_IMAGE} style={styles.avatar} resizeMode="cover" /><View style={styles.flex}><Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportTeamName')}</Text><OnlineIndicator online={specialistOnline} /></View><CallButton threadId={threadId} /></View>
         <ChatOfflineBanner />
         {threadQuery.isPending || messagesQuery.isPending ? <View style={styles.loading}><ActivityIndicator color={theme.colors.primary} /></View> : <FlatList ref={listRef} inverted data={items} keyExtractor={(item) => item.id} renderItem={renderMessage} contentContainerStyle={styles.body} keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" maintainVisibleContentPosition={CHAT_FOLLOW_NEW_MESSAGES} onTouchStart={() => composerRef.current?.closeEmojis()} onScrollBeginDrag={() => composerRef.current?.closeEmojis()} onEndReached={() => { if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) void messagesQuery.fetchNextPage(); }} onEndReachedThreshold={0.2} ListHeaderComponent={<View style={styles.listBottomSpacer} />} ListFooterComponent={messagesQuery.isFetchingNextPage ? <ActivityIndicator color={theme.colors.primary} /> : null} ListEmptyComponent={<Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>{t('chatEmptyHint')}</Text>} />}
         <ChatComposer

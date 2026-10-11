@@ -22,6 +22,9 @@ type RequestBody =
       targetMarkets?: Market[]; titleUs?: string; bodyUs?: string; titleMalay?: string; bodyMalay?: string;
     }
   | { mode: 'chat'; threadId: string; senderType: 'user' | 'specialist'; preview?: string; attachment?: boolean }
+  // A customer is ringing the support line. Reaches staff whose app is not
+  // in the foreground — a foreground one is already rung over Realtime.
+  | { mode: 'call'; callId: string }
   // Admin published a roadmap: tell every customer who owns that device.
   | { mode: 'roadmap_ready'; productId: string }
   | { mode: 'social'; event: 'reaction' | 'comment' | 'reply'; postId: string; commentId?: string; parentCommentId?: string; targetType?: 'post' | 'comment'; preview?: string };
@@ -82,6 +85,28 @@ function marketOf(country: unknown, language: Lang): Market {
 
 interface Recipient { id: string; lang: Lang; market: Market }
 interface Message { title: string; body: string }
+
+/**
+ * Every account that should be rung as staff.
+ *
+ * Reads the `staff_user_ids()` RPC rather than querying
+ * `web_access_contacts` here. That query — the one this function used to
+ * inline — missed every real staff account on this project, because they are
+ * staff by `profiles.account_type` and their contact rows carry an empty
+ * `roles` array. The result was zero recipients for support-message pushes.
+ * `current_web_roles()` always honoured both sources; now one function does,
+ * and both callers read it. See 202610111300_staff_user_ids_single_source.sql.
+ */
+// deno-lint-ignore no-explicit-any
+async function staffRecipientIds(admin: any): Promise<string[]> {
+  const { data, error } = await admin.rpc("staff_user_ids");
+  if (error) throw error;
+  // The RPC returns a set of uuids, which PostgREST gives back either as bare
+  // strings or as single-key rows depending on the client version.
+  return (data ?? [])
+    .map((row: unknown) => (typeof row === "string" ? row : (row as { staff_user_ids?: string })?.staff_user_ids))
+    .filter((id: unknown): id is string => typeof id === "string" && id.length > 0);
+}
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -194,6 +219,27 @@ Deno.serve(async (request) => {
         });
       }
       recipientIds = recipientIds.filter((recipientId) => recipientId !== user.id);
+    } else if (input.mode === 'call') {
+      // The row is the authority on who is calling, not the request body: a
+      // client cannot make this ring for a call it did not place.
+      const { data: call, error: callError } = await admin
+        .from('calls')
+        .select('id, caller_id, status, created_at')
+        .eq('id', input.callId)
+        .single();
+      if (callError) throw callError;
+      if (call.caller_id !== user.id) return json({ error: 'caller_required' }, 403);
+      // Nothing to ring for a call that is already answered, declined or
+      // timed out — a late push would wake staff for a finished call.
+      if (call.status !== 'ringing') return json({ sent: 0, reason: 'not_ringing' });
+
+      recipientIds = await staffRecipientIds(admin);
+
+      const { data: caller } = await admin.from('profiles').select('full_name').eq('id', user.id).single();
+      const callerName = caller?.full_name?.trim() || 'Khách hàng';
+      data = { type: 'call', callId: call.id };
+      // Staff read Vietnamese, same as the support-message push below.
+      compose = () => ({ title: 'Cuộc gọi đến', body: `${callerName} đang gọi cho CSKH` });
     } else {
       const { data: thread, error } = await admin.from('chat_threads').select('user_id').eq('id', input.threadId).single();
       if (error) throw error;
@@ -206,15 +252,7 @@ Deno.serve(async (request) => {
         compose = (r) => ({ title: COPY[r.lang].supportTeam, body: isAttachment ? COPY[r.lang].sentImage : rawPreview || COPY[r.lang].newMessage });
       } else {
         if (thread.user_id !== user.id) return json({ error: 'thread_owner_required' }, 403);
-        const { data: staff, error: staffError } = await admin
-          .from('web_access_contacts')
-          .select('claimed_by_user_id, roles')
-          .eq('disabled', false)
-          .not('claimed_by_user_id', 'is', null);
-        if (staffError) throw staffError;
-        recipientIds = (staff ?? [])
-          .filter((contact) => contact.roles?.some((role: string) => role === 'admin' || role === 'cskh'))
-          .map((contact) => contact.claimed_by_user_id as string);
+        recipientIds = await staffRecipientIds(admin);
         // Staff read Vietnamese.
         compose = () => ({ title: 'Tin nhắn hỗ trợ mới', body: isAttachment ? COPY.vi.sentImage : rawPreview || COPY.vi.newMessage });
       }
@@ -241,7 +279,22 @@ Deno.serve(async (request) => {
       const message = compose(recipient);
       if (!message) continue;
       seen.add(row.expo_push_token);
-      messages.push({ to: row.expo_push_token, title: message.title, body: message.body, data, sound: 'ting.wav', channelId: 'default-v2', priority: 'high' });
+      messages.push({
+        to: row.expo_push_token,
+        title: message.title,
+        body: message.body,
+        data,
+        sound: 'ting.wav',
+        // A call rings on its own Android channel, so staff can give it a
+        // louder sound (and a DND override) without touching every other
+        // TheraHOME notification. See ANDROID_CALL_CHANNEL_ID in
+        // src/lib/pushNotifications.ts.
+        channelId: input.mode === 'call' ? 'calls-v1' : 'default-v2',
+        priority: 'high',
+        // iOS: a time-sensitive interruption level breaks through Focus
+        // modes, which is the point of a ringing phone. Ignored elsewhere.
+        ...(input.mode === 'call' ? { interruptionLevel: 'timeSensitive' } : {}),
+      });
     }
     if (!messages.length) return json({ sent: 0 });
 

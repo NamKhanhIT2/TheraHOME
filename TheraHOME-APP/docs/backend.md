@@ -246,6 +246,83 @@ RLS mirrors `agent_approvals`: admin writes, admin-or-cskh reads. These are
 company financials; no policy admits anyone else. Nothing in the mobile app
 reads these tables.
 
+**calls** (added 2026-10-11): the signaling half of voice calling. LiveKit
+carries the audio; this table carries who is calling whom and whether anyone
+picked up, and Realtime on it is what makes the other phone light up.
+Migration: `202610111000_voice_calls.sql` (+ a follow-up revoke,
+`202610111030_...`).
+
+The split is a cost decision, not just tidiness. LiveKit Cloud bills every
+minute a participant is **connected to a room**, free tier included, so
+neither side may join a room while the phone rings — waiting happens on this
+table, which is free, and the room is joined only once `status` reaches
+`accepted`. The Edge Function refuses to mint a token for any other status, so
+that rule is enforced server-side rather than trusted to the client. Rough
+arithmetic: a 1-1 call bills 2 participant-minutes per minute of conversation,
+so the free tier's 5,000/month is ~2,500 minutes of actual calling.
+
+`status` runs `ringing → accepted → ended`, with `declined` / `missed` /
+`busy` as the other terminal states. All writes go through four RPCs —
+`start_call`, `answer_call`, `end_call` and the internal `expire_stale_calls`
+— and the table has **no INSERT or UPDATE policy at all**: a client that could
+write it directly could mark its own call `accepted` without anyone answering,
+or insert a row that walks around the busy gate below. SELECT is the one
+policy (own calls, or everything for admin/cskh).
+
+**One line, one agent.** TheraHOME has a single CSKH line, so at most one call
+may be live. That is not a read-then-insert check — two customers tapping
+"Gọi" in the same second would both read "free". It is the partial unique
+index `calls_one_live_line`, unique over `holds_line` restricted to
+`status in ('ringing','accepted')`, so the second insert loses a unique
+violation inside its own transaction and `start_call` converts that into a
+`busy` row. `holds_line` is what the index keys on (rather than a constant)
+specifically so a row can opt out: `start_call` sets it false for
+`account_type = 'review'`, per the standing App Review rule — a reviewer must
+never be told "đang bận" because a real customer is on the line.
+
+`expire_stale_calls` is the janitor that stops a force-quit app from holding
+the line forever (ringing > 90s → `missed`, accepted > 2h → `ended`). It runs
+at the top of `start_call`, so the line self-heals on the next attempt with no
+cron job. It is internal — and note that `revoke ... from public, anon` was
+**not** enough to keep it off the REST API, because a default privilege
+re-grants EXECUTE on new public functions to `authenticated`; the follow-up
+migration revokes it from that role by name. Any future internal RPC here
+needs the same explicit revoke.
+
+**Every call leaves a trace in the chat thread** (added 2026-10-11,
+`202610111200_...`). `log_call_to_thread()` writes one line into the caller's
+human thread on every terminal status — "📞 Cuộc gọi nhỡ", "📞 Cuộc gọi thoại
+· 01:35", declined, busy. Without it a call nobody answered left no record
+anywhere, which on a one-person line is the likeliest outcome, not an edge
+case. It goes in the chat thread rather than `notifications` because the
+staff shell's "Thông báo" tab is a **broadcast composer, not an inbox** — a
+row there would be written and never seen — while the Chat tab already sorts
+by last activity and counts unread. Attributed to the caller
+(`sender_type = 'user'`) so it counts as unread for staff. No push: CSKH was
+already rung when the call came in. Written from the three RPCs, so a client
+that dies mid-call still leaves the trace (the janitor writes it too), and
+`end_call`'s already-terminal early return keeps the racing second hangup
+from writing a duplicate.
+
+**staff_user_ids()** (added 2026-10-11, `202610111300_...`) — the single
+answer to "who is staff". There had been two: `current_web_roles()` checked a
+`web_access_contacts` grant AND fell back to `profiles.account_type`, while
+`dispatch-push` checked only the contacts table. On this project every
+enabled, claimed contact row has an EMPTY `roles` array and all three real
+staff accounts are staff by `account_type` alone, so the push function
+resolved **zero** recipients — staff had not been getting the "Tin nhắn hỗ
+trợ mới" push at all, well before voice calling existed, and the call push
+inherited the bug by copying the query. Both push paths now read this
+function. Granted to `service_role` only.
+
+App side: `src/hooks/useCalls.ts` (signaling), `src/lib/livekit.ts` (media,
+with the native modules loaded lazily so an older build does not crash on
+launch), `app/call/[callId].tsx` (one screen for both sides — role comes from
+`caller_id`, not the route), `src/components/call/IncomingCallSheet.tsx`
+(CSKH's ringing phone, mounted in both shells' layouts) and
+`src/components/chat/CallButton.tsx` (the customer's entry point, in the
+`chat/human` header).
+
 ## Edge Functions
 
 Three, all on project `nyjvtvmllwbyfokldgtj`. None of their source is
@@ -375,3 +452,34 @@ docs/feature-notes.md). verify_jwt ON + requires an enabled admin/cskh row
 in web_access_contacts claimed by the caller. Uses GROQ_API_KEY (shared
 with chat-ai-reply); returns 503 when unset — callers save VN-only.
 Source: supabase/functions/translate-content/index.ts.
+
+
+**livekit-token** (added 2026-10-11): mints the LiveKit access token for one
+call, for one participant. The only place that holds `LIVEKIT_API_SECRET` —
+shipping it in the app would let anyone mint a token for any room and listen
+in on any call. verify_jwt ON, and it additionally checks that the call row is
+in `accepted` (not `ringing` — that is the billing rule above, enforced here)
+and that the caller is either that call's customer or holds admin/cskh.
+
+The grant it signs is audio-only (`canPublishSources: ['microphone']`), so the
+media server refuses a video track even if a future client build tries to
+publish one — that keeps the feature in the US$0.99/1,000-participant-minute
+audio band by construction instead of by remembering not to turn the camera
+on. The JWT is HS256 signed by hand with Web Crypto rather than via
+`livekit-server-sdk`, to keep a Node-oriented dependency out of the edge
+runtime.
+
+Needs three secrets — `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
+— and returns 503 until they are set (see docs/manual-setup.md). `LIVEKIT_URL`
+is returned to the client along with the token on purpose: the app never
+hardcodes it, so moving the LiveKit project, or pointing at a self-hosted
+server later, is a secret change rather than an app rebuild.
+Source: supabase/functions/livekit-token/index.ts.
+
+**dispatch-push** gained a `mode: 'call'` in the same change: rings the staff
+phones that are *not* in the foreground (a foreground one is already rung over
+Realtime). It re-reads the call row rather than trusting the body, refuses a
+call the requester did not place, and sends nothing for a call that is no
+longer ringing. Call pushes go to their own Android channel (`calls-v1`, so
+CSKH can give them a louder sound and a DND override without touching every
+other notification) with `interruptionLevel: 'timeSensitive'` on iOS.

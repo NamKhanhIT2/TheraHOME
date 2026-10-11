@@ -37,6 +37,7 @@ import {
   Film,
   Funnel,
   Globe,
+  Headphones,
   Heart,
   HeartPulse,
   House,
@@ -53,11 +54,14 @@ import {
   Megaphone,
   MessageCircle,
   MessageSquare,
+  Mic,
+  MicOff,
   Minus,
   Moon,
   Pause,
   Pencil,
   Phone,
+  PhoneOff,
   Plus,
   QrCode,
   RefreshCw,
@@ -117,6 +121,13 @@ const ICONS: Record<string, LucideIcon> = {
   smile: Laugh, // this lucide version renamed "smile" to "face-grinning"/"laugh"
   'map-pin': MapPin,
   phone: Phone,
+  // Voice-call screen (app/call/[callId].tsx) + the chat header's call
+  // button. All four were missing, and the screen's hang-up button is not
+  // something to let fall back to the placeholder circle.
+  'phone-off': PhoneOff,
+  mic: Mic,
+  'mic-off': MicOff,
+  headphones: Headphones,
   'more-horizontal': Ellipsis,
   'user-plus': UserPlus,
   send: Send,

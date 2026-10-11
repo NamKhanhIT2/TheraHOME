@@ -331,6 +331,66 @@ export type Database = {
         }
         Relationships: []
       }
+      calls: {
+        Row: {
+          answered_at: string | null
+          answered_by: string | null
+          caller_id: string
+          created_at: string
+          duration_seconds: number | null
+          end_reason: string | null
+          ended_at: string | null
+          holds_line: boolean
+          id: string
+          room_name: string
+          status: string
+          thread_id: string | null
+        }
+        Insert: {
+          answered_at?: string | null
+          answered_by?: string | null
+          caller_id: string
+          created_at?: string
+          duration_seconds?: number | null
+          end_reason?: string | null
+          ended_at?: string | null
+          holds_line?: boolean
+          id?: string
+          room_name: string
+          status?: string
+          thread_id?: string | null
+        }
+        Update: {
+          answered_at?: string | null
+          answered_by?: string | null
+          caller_id?: string
+          created_at?: string
+          duration_seconds?: number | null
+          end_reason?: string | null
+          ended_at?: string | null
+          holds_line?: boolean
+          id?: string
+          room_name?: string
+          status?: string
+          thread_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_thread_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenge_participants: {
         Row: {
           challenge_id: string
@@ -492,6 +552,13 @@ export type Database = {
             columns: ["reply_to_message_id"]
             isOneToOne: false
             referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_thread_overview"
             referencedColumns: ["id"]
           },
           {
@@ -945,6 +1012,13 @@ export type Database = {
             columns: ["actor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_chat_thread_id_fkey"
+            columns: ["related_chat_thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_thread_overview"
             referencedColumns: ["id"]
           },
           {
@@ -2204,7 +2278,25 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      chat_thread_overview: {
+        Row: {
+          avatar_url: string | null
+          country: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string | null
+          language: string | null
+          last_attachment_path: string | null
+          last_body: string | null
+          last_deleted_at: string | null
+          last_message_at: string | null
+          last_sender_type: string | null
+          unread_count: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       activate_order: {
@@ -2259,6 +2351,29 @@ export type Database = {
       admin_update_user_contact: {
         Args: { p_email: string; p_phone: string; p_user_id: string }
         Returns: undefined
+      }
+      answer_call: {
+        Args: { p_call_id: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          caller_id: string
+          created_at: string
+          duration_seconds: number | null
+          end_reason: string | null
+          ended_at: string | null
+          holds_line: boolean
+          id: string
+          room_name: string
+          status: string
+          thread_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "calls"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       available_day_ids_for: {
         Args: { p_user_program_id: string }
@@ -2322,10 +2437,34 @@ export type Database = {
       }
       current_web_roles: { Args: never; Returns: string[] }
       delete_account: { Args: never; Returns: undefined }
+      end_call: {
+        Args: { p_call_id: string; p_reason?: string; p_status?: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          caller_id: string
+          created_at: string
+          duration_seconds: number | null
+          end_reason: string | null
+          ended_at: string | null
+          holds_line: boolean
+          id: string
+          room_name: string
+          status: string
+          thread_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "calls"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       enqueue_order_activation_contacts: {
         Args: { p_order_id: string }
         Returns: number
       }
+      expire_stale_calls: { Args: never; Returns: number }
       format_community_notification: {
         Args: {
           p_actor_name: string
@@ -2447,6 +2586,29 @@ export type Database = {
           p_title_us?: string
         }
         Returns: undefined
+      }
+      start_call: {
+        Args: { p_thread_id?: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          caller_id: string
+          created_at: string
+          duration_seconds: number | null
+          end_reason: string | null
+          ended_at: string | null
+          holds_line: boolean
+          id: string
+          room_name: string
+          status: string
+          thread_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "calls"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       touch_last_login: { Args: never; Returns: undefined }
       truncate_with_ellipsis: {
