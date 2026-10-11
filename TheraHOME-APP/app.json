@@ -10,14 +10,15 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ai.therahome",
-      "buildNumber": "25",
+      "buildNumber": "26",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "TheraHOME cần quyền micro để bạn gọi thoại cho nhân viên chăm sóc khách hàng.",
         "UIBackgroundModes": [
           "audio"
-        ]
+        ],
+        "NSCameraUsageDescription": "TheraHOME không sử dụng camera. Khai báo này là bắt buộc vì thư viện cuộc gọi thoại có chứa mã camera dùng chung; cuộc gọi với nhân viên hỗ trợ chỉ dùng micro."
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -42,7 +43,8 @@
         "android.permission.FOREGROUND_SERVICE_MICROPHONE"
       ],
       "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW"
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -57,7 +59,7 @@
         "expo-image-picker",
         {
           "photosPermission": "TheraHOME cần quyền truy cập thư viện ảnh để bạn thêm ảnh vào bài viết.",
-          "cameraPermission": false,
+          "cameraPermission": "TheraHOME không sử dụng camera. Khai báo này là bắt buộc vì thư viện cuộc gọi thoại có chứa mã camera dùng chung; cuộc gọi với nhân viên hỗ trợ chỉ dùng micro.",
           "microphonePermission": "TheraHOME cần quyền micro để bạn gọi thoại cho nhân viên chăm sóc khách hàng."
         }
       ],

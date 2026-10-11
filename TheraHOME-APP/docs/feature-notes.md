@@ -4747,3 +4747,37 @@ silently affects zero rows, because the table deliberately has no UPDATE
 policy. And several inserts inside one transaction share `now()`, so
 `order by created_at desc limit 1` picks arbitrarily among them — use `ctid`
 or read each row back by id when verifying inside a single transaction.
+
+### Apple rejected build 25 — ITMS-90683 (2026-10-11)
+
+Upload succeeded, then Apple's automated scan bounced it:
+
+> ITMS-90683: Missing purpose string in Info.plist … must contain an
+> `NSCameraUsageDescription` key
+
+**The audio-only design did not survive contact with Apple's binary scan.**
+The app never opens a camera, the LiveKit token forbids a video track, and
+no camera permission was declared anywhere — but `LiveKitWebRTC.framework`
+*links* camera APIs, and the scan reads the binary, not the intent. Any app
+embedding WebRTC needs the purpose string whether or not it uses a camera.
+
+So iOS now ships `NSCameraUsageDescription`, worded to say plainly that the
+app does not use the camera. It is inert: iOS shows a purpose string only
+when something actually requests that hardware, and nothing here does. The
+locks that still bite are the token's `canPublishSources: ['microphone']`
+(server-side, decisive), the client never creating a video track, and
+Android — which is not subject to this scan — still carrying
+`<uses-permission android:name="…CAMERA" tools:node="remove"/>`.
+
+**And the same app.json trap fired a second time.** Setting
+`ios.infoPlist.NSCameraUsageDescription` did nothing: `expo-image-picker`'s
+`cameraPermission: false` strips the key afterwards, exactly as its
+`microphonePermission: false` had stripped Android's RECORD_AUDIO earlier the
+same day. The plugin option is the only source that reaches the built
+Info.plist, so the string lives there now, with a byte-identical copy left in
+`ios.infoPlist` so it cannot matter which one wins.
+
+The rule, now proven twice: **app.json's permission arrays are a request, not
+the result.** After any permission change, re-run prebuild for BOTH platforms
+and read the generated `Info.plist` / `AndroidManifest.xml` back. A rejected
+upload also consumes its build number — 25 is burned, this went up as 26.
