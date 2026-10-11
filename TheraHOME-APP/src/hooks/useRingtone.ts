@@ -43,6 +43,40 @@ interface AudioPlayerLike {
 }
 
 /**
+ * Puts the audio session into a state where a ring can actually be heard.
+ *
+ * Without this the app never configures its session at all, so iOS leaves it
+ * on the default `soloAmbient` category — the one the ring/silent switch
+ * mutes, and the one iOS drops the moment anything else wants audio. A phone
+ * in a pocket with the switch flipped, which is every phone, rang in total
+ * silence. Android's equivalent is the ringer mode: expo-audio suppresses
+ * playback on silent/vibrate unless told otherwise.
+ *
+ * `playsInSilentMode` is deliberate and not an oversight of the user's
+ * wishes: this is an incoming call on a support line, not a notification
+ * chime. The system ring (CallKit / ConnectionService) behaves the same way.
+ */
+function ringingAudioMode(): Record<string, unknown> {
+  return {
+    playsInSilentMode: true,
+    // Takes audio focus rather than mixing: a ring under someone's music is
+    // not a ring. Also what pauses a podcast while the phone rings.
+    interruptionMode: 'doNotMix',
+    // The ring has to survive the screen locking mid-ring.
+    shouldPlayInBackground: true,
+  };
+}
+
+/** Back to a session that behaves itself for ordinary UI sounds. */
+function idleAudioMode(): Record<string, unknown> {
+  return {
+    playsInSilentMode: false,
+    interruptionMode: 'mixWithOthers',
+    shouldPlayInBackground: false,
+  };
+}
+
+/**
  * Rings while `active` is true, and stops on every way out — answered,
  * declined, timed out, screen unmounted. The cleanup is the important half:
  * a ringtone that outlives its call is worse than no ringtone.
@@ -65,6 +99,7 @@ export function useRingtone(active: boolean, role: 'incoming' | 'ringback' = 'in
         playingRef.current = false;
         try { player?.pause(); } catch { /* player already torn down */ }
         Vibration.cancel();
+        releaseAudioSession();
       }
       return;
     }
@@ -72,6 +107,9 @@ export function useRingtone(active: boolean, role: 'incoming' | 'ringback' = 'in
     playingRef.current = true;
     try {
       if (player) {
+        // Before play(), not after: the category is what decides whether the
+        // first second of the ring is audible.
+        void EXPO_AUDIO?.setAudioModeAsync(ringingAudioMode());
         player.loop = true;
         // Ringback is the caller's own feedback and plays against the
         // earpiece; at full volume it drowns the moment the other side picks
@@ -91,6 +129,26 @@ export function useRingtone(active: boolean, role: 'incoming' | 'ringback' = 'in
       playingRef.current = false;
       try { player?.pause(); } catch { /* already gone */ }
       Vibration.cancel();
+      releaseAudioSession();
     };
   }, [active, role, player]);
+}
+
+/**
+ * Hands the audio session back.
+ *
+ * Ordering matters and is the reason this is a separate function worth a
+ * comment: when a ring stops because the call was ANSWERED, LiveKit is about
+ * to configure the session for a voice call, and whichever of the two writes
+ * last wins. It is always LiveKit — `connectCall` only touches audio after
+ * fetching a token from the Edge Function, a network round trip later than
+ * this. If that ever changes, a call with no sound is the symptom to look
+ * for here first.
+ */
+function releaseAudioSession(): void {
+  try {
+    void EXPO_AUDIO?.setAudioModeAsync(idleAudioMode());
+  } catch {
+    // No audio module in this build; nothing was configured to undo.
+  }
 }

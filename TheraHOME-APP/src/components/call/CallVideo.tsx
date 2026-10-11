@@ -16,12 +16,25 @@
 // are missing (an older binary — see src/lib/livekit.ts), so a voice call on
 // such a build still works and a video one simply shows no picture.
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { requireOptionalNativeModule } from 'expo-modules-core';
+import { NativeModules, StyleSheet, View, type ViewStyle } from 'react-native';
 import type { LiveKitRoom } from '@/lib/livekit';
 
+// `LivekitReactNativeModule` — lowercase k, and the "Module" suffix — is the
+// name the library registers and the key its own LKNativeModule.js reads.
+//
+// This guard asked for 'LiveKitReactNative' (the package name). Nothing is
+// registered under that, so it was null on every device, on every build:
+// <CallVideo> rendered a grey rectangle and `useCallVideoTracks` reported no
+// cameras at all, in either direction. Calls connected, audio worked, the
+// camera button lit up and published a real track — and nobody ever saw a
+// picture. One wrong identifier, no error anywhere, the entire video half of
+// the feature dead. The same mistake, with the same silence, had disabled
+// PushKit in src/lib/voipPush.ts.
+//
+// Both now key off NativeModules with the exact string the library uses, so
+// the guard can only be wrong if the library itself is.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const LK_NATIVE = requireOptionalNativeModule('LiveKitReactNative') ? require('@livekit/react-native') : null;
+const LK_NATIVE = NativeModules.LivekitReactNativeModule ? require('@livekit/react-native') : null;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const LK_CLIENT = LK_NATIVE ? require('livekit-client') : null;
 

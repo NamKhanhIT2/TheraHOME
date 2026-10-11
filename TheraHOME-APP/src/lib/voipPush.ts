@@ -14,11 +14,26 @@
 //
 // So this file is only about registration. The call itself is handled by
 // CallKit and then by useCallKeepBridge, exactly as on Android.
-import { Platform } from 'react-native';
-import { requireOptionalNativeModule } from 'expo-modules-core';
+import { NativeModules, Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 
-const VOIP = requireOptionalNativeModule('RNVoipPushNotification')
+// The guard asks for the module by the EXACT key the library itself reads —
+// `NativeModules.RNVoipPushNotificationManager`, the Objective-C class name,
+// because RNVoipPushNotificationManager.m uses a bare RCT_EXPORT_MODULE().
+//
+// This was `requireOptionalNativeModule('RNVoipPushNotification')`: the pod's
+// name, which is what the library is called everywhere except inside itself.
+// Nothing is registered under that key, so the guard matched nothing and this
+// file silently turned itself off on every iPhone — no PushKit token was ever
+// stored, `voip_tokens` stayed empty (measured: 0 rows), and no locked iPhone
+// could ring. The native half had been working all along: AppDelegate calls
+// voipRegistration() at launch and iOS hands a token back. Nobody was
+// listening for it.
+//
+// Keyed off NativeModules rather than expo-modules-core from now on, for the
+// simple reason that it is the same lookup the library performs: if this is
+// null, `require`ing the library would not have worked either.
+const VOIP = NativeModules.RNVoipPushNotificationManager
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   ? require('react-native-voip-push-notification').default
   : null;

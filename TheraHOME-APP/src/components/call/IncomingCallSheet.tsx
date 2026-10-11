@@ -22,6 +22,7 @@ import { AvatarImg } from '@/components/AvatarImg';
 import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
 import { useRingtone } from '@/hooks/useRingtone';
+import { dismissCall, isSystemRinging, wasAnsweredHere } from '@/lib/callkeep';
 import { useAnswerCall, useCallTerminator, useCallerProfile, useIncomingCall } from '@/hooks/useCalls';
 
 export function IncomingCallSheet({ enabled, userId, isStaff }: {
@@ -41,7 +42,11 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
 
   // Rings while the sheet is up, and the hook's own cleanup stops it on
   // answer, decline, timeout and unmount alike.
-  useRingtone(!!call, 'incoming');
+  //
+  // Silent when the telecom stack is already ringing for this same call — a
+  // push raised the system call screen while the app was alive, and two
+  // ringtones out of one phone sound like a fault rather than a call.
+  useRingtone(!!call && !isSystemRinging(call.id), 'incoming');
 
   // Belt and braces against the ringtone outliving the call: if the row
   // disappears for any reason the component unmounts, and this records that
@@ -50,6 +55,24 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
   useEffect(() => {
     if (call) rungForRef.current = call.id;
   }, [call]);
+
+  // The system may ALSO be ringing for this call — a push raised the telecom
+  // screen while the app happened to be alive in the background. When the
+  // row stops ringing without this device answering (the caller gave up, or
+  // another CSKH phone took it), that screen has to come down too: nothing
+  // else will, and a phone left ringing for a call that no longer exists is
+  // both alarming and, on Android, a blocked line for the NEXT call.
+  //
+  // Only when this device did not answer. Answering also makes the row stop
+  // ringing, and dismissing then would hang up on the live call.
+  const ringingSystemCallRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = ringingSystemCallRef.current;
+    ringingSystemCallRef.current = call?.id ?? null;
+    if (previous && previous !== call?.id && !wasAnsweredHere(previous)) {
+      dismissCall(previous);
+    }
+  }, [call?.id]);
 
   if (!call) return null;
 

@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import type { Database } from '@/types/database';
+import { dismissCall, markCallActive } from '@/lib/callkeep';
 
 export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'missed' | 'busy' | 'ended';
 
@@ -174,6 +175,13 @@ export function useAnswerCall() {
     onSuccess: (call) => {
       queryClient.setQueryData(['call', call.id], call);
       queryClient.invalidateQueries({ queryKey: ['incoming_call'] });
+      // The system may also be ringing for this call — a push raised it while
+      // the app happened to be open, so the user saw both our sheet and the
+      // telecom screen. Answering in the app has to tell the system too, or
+      // Android keeps ringing behind a call that is already connected and
+      // iOS leaves CallKit stuck on "connecting". A no-op when the system
+      // never knew about this call, which is the common case.
+      markCallActive(call.id);
     },
   });
 }
@@ -231,6 +239,13 @@ export function useCallTerminator(callId: string | undefined) {
     const id = callIdRef.current;
     if (!id || endedForRef.current === id) return;
     endedForRef.current = id;
+    // Clear the system call UI for THIS call, whichever way the app is
+    // ending it — declined in the sheet, hung up on the call screen, rung
+    // out. Android will otherwise keep a connection (and its notification)
+    // alive for a call that no longer exists, and the next call may not ring
+    // at all. Done first, so a failed round trip below still leaves a phone
+    // that has stopped ringing.
+    dismissCall(id);
     try {
       await mutateRef.current({ callId: id, status, reason });
     } catch {

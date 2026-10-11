@@ -269,3 +269,32 @@ that rebuild.
 `.env` holds the Supabase URL + publishable (anon) key — safe to keep
 committed, it's client-safe by design (RLS is what actually protects data,
 not key secrecy).
+
+## Guarding an optional native module: use the key the library itself reads
+
+Several files load a native module only if the running binary contains it
+(`src/lib/callkeep.ts`, `src/lib/voipPush.ts`, `src/components/call/CallVideo.tsx`,
+`src/lib/googleAuth.ts`, `src/hooks/useRingtone.ts`). The pattern is right —
+an older TestFlight build must not crash on a module it was built without —
+but the name passed to the guard is a trap, and it cost two shipped features.
+
+A guard with the wrong name is **indistinguishable from a build that lacks
+the module**: it returns null, the feature switches itself off, nothing
+throws, nothing logs, typecheck and lint pass, and the app works perfectly
+except for the part that does not exist. Two of these shipped at once:
+
+| file | guarded on | actually registered as |
+|---|---|---|
+| `CallVideo.tsx` | `LiveKitReactNative` (package name) | `LivekitReactNativeModule` |
+| `voipPush.ts` | `RNVoipPushNotification` (pod name) | `RNVoipPushNotificationManager` |
+
+The first killed every video picture in both directions; the second meant no
+iPhone ever registered a PushKit token, so no locked iPhone could ring.
+
+**The rule:** guard on the exact string the library's own JS reads, found by
+grepping its source for `NativeModules.` / `requireNativeModule(` /
+`TurboModuleRegistry.get`. Not the package name, not the pod name, not the
+Swift/Kotlin class name. For Expo modules it is the `Name("…")` in the native
+definition (`expo-audio` → `ExpoAudio`, not `AudioModule`). If the library
+reads `NativeModules.X`, guard on `NativeModules.X` — then the guard can only
+be wrong when the library is too.

@@ -13,7 +13,7 @@ import { useSession } from '@/hooks/useSession';
 import { useWebRoles } from '@/hooks/useWebRoles';
 import { TAB_BAR_BODY_HEIGHT, TAB_BAR_BODY_PADDING_BOTTOM, useTabBarInset } from '@/hooks/useTabBarInset';
 import { supabase } from '@/lib/supabase';
-import { syncPushTokenIfGranted } from '@/lib/pushNotifications';
+import { registerForPushNotifications } from '@/lib/pushNotifications';
 import { Icon } from '@/components/icons/Icon';
 
 const STAFF_TAB_ITEMS: { name: string; icon: string; label: string }[] = [
@@ -100,15 +100,24 @@ function StaffTabBar({ state, navigation }: Parameters<NonNullable<React.Compone
  * rows in push_tokens for any staff account, which is why no support-message
  * push and no incoming-call push could ever have arrived.
  *
- * Only syncs an ALREADY-granted permission; it never prompts. Staff grant
- * notifications the first time the OS asks, same as anyone else.
+ * It PROMPTS, unlike the patient shell's equivalent. That was the second
+ * half of the same hole: the first version only synced an already-granted
+ * permission, on the assumption that staff would be asked somewhere else —
+ * and nowhere else asks. A CSKH account never passes through onboarding, so
+ * the permission dialog was never shown, the sync found nothing to sync, and
+ * push_tokens still held zero staff rows after the fix. Measured again on
+ * 2026-10-11, after shipping it: still zero.
+ *
+ * Prompting here is also the right place on the merits. The staff shell is
+ * for people being paid to answer the phone; a notification permission is
+ * not an interruption to them, it is the job.
  */
 function useStaffPushToken() {
   const userId = useSession().session?.user.id;
   useEffect(() => {
     if (!userId) return;
-    void syncPushTokenIfGranted(userId).catch((error: unknown) => {
-      if (__DEV__) console.warn('Push-token sync skipped:', error);
+    void registerForPushNotifications(userId).catch((error: unknown) => {
+      if (__DEV__) console.warn('Staff push registration failed:', error);
     });
   }, [userId]);
 }

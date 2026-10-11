@@ -4835,3 +4835,79 @@ entry is down to three: the token's `canPublishSources` built from the row's
 `media` (server-side, decisive), the client not creating a video track on an
 audio call, and the room's own grant. The Android CAMERA block and the
 "we do not use the camera" iOS string are gone, because now the app does.
+
+### Three reports, one root cause each (2026-10-11)
+
+The owner tested the shipped build and reported: camera on but no picture, no
+ringtone on an incoming call, and nothing at all when the app is closed or
+the phone is locked. All three were real, none was a design question, and
+each had a single identifiable cause.
+
+**No picture: a guard with the wrong name.** `CallVideo.tsx` loaded
+`@livekit/react-native` only if `requireOptionalNativeModule('LiveKitReactNative')`
+returned something. The library registers itself as `LivekitReactNativeModule`
+— lowercase k, `Module` suffix — which is the key its own `LKNativeModule.js`
+reads. Nothing is registered under the package name, so the guard was null on
+every device on every build. `<CallVideo>` rendered a grey rectangle and
+`useCallVideoTracks` reported no cameras in either direction, while the rest
+of the call worked: the room connected, audio flowed, the camera button lit
+up and published a real track that nobody could see. No error, no log, clean
+typecheck.
+
+**No lock-screen ring on iOS: the same mistake, in `voipPush.ts`.** Guarded
+on `RNVoipPushNotification` (the pod's name); registered as
+`RNVoipPushNotificationManager` (the ObjC class). So `registerVoipPush()`
+returned a no-op on every iPhone, the PushKit `register` event had no
+listener, and `voip_tokens` held zero rows — measured, and the reason nothing
+could ever ring. The native half had been correct the whole time: AppDelegate
+calls `voipRegistration()` at launch and iOS hands a token straight back. The
+APNs secrets were correct too (probed: the function gets past its own config
+check and fails only on authentication). One identifier was the entire gap.
+
+Both now key off `NativeModules.<exact key>`. See the rule in CLAUDE.md.
+
+**No ringtone: the audio session was never configured.** Nothing in the app
+had ever called `setAudioModeAsync`, so iOS stayed on the default
+`soloAmbient` category — the one the ring/silent switch mutes and the one iOS
+drops the moment another app wants audio. `useRingtone` now sets
+`playsInSilentMode: true`, `interruptionMode: 'doNotMix'` and
+`shouldPlayInBackground: true` before playing, and hands the session back
+when the ring stops. Deliberate, not an oversight of the user's silent
+switch: this is a call on a support line, and CallKit's own ring behaves the
+same way. The restore races LiveKit's own session setup in principle — in
+practice `connectCall` only touches audio after an Edge Function round trip,
+so it always lands last. A call with no sound is the symptom to look for if
+that ever changes.
+
+**Staff still had no push token, after the fix that was supposed to give them
+one.** The previous entry's fix synced an ALREADY-granted permission on the
+assumption staff are asked somewhere else. Nowhere asks: a CSKH account never
+passes through onboarding. Re-measured after shipping it — still zero rows.
+The staff shell now calls `registerForPushNotifications`, which prompts.
+
+**Dismissing a call echoed back as a decline.** Android's `endCall` /
+`endAllCalls` run `Connection.onDisconnect()`, which emits
+`RNCallKeepPerformEndCallAction` — the same event the user tapping Decline
+produces, with nothing to tell them apart. The bridge swept "ghost" calls
+every time the app became active, and answering on the lock screen is exactly
+what brings the app to the foreground: answer, sweep, echo, `end_call`, dead
+call, one round trip after picking up. Fixed on both sides — dismissals
+issued by the app are recorded and their echo swallowed for four seconds, and
+the blanket foreground sweep is gone in favour of dismissing the one call the
+app knows has ended (`useCallTerminator`).
+
+**Also wired, all previously written and never called:** `getInitialEvents`
+(answering from a cold start was lost before JS existed), `hasPhoneAccount`
+(Android keeps the phone account DISABLED until the user flips it in
+Settings, and `displayIncomingCall` silently does nothing until they do — so
+there is now a prompt, once per launch), and `setCurrentCallActive` (the
+system UI stayed on "ringing" behind a connected call). A declined
+phone-account alert no longer aborts setup either: CallKeep rejects its own
+promise when the user taps "Để sau", which used to skip registering the
+background task entirely, so declining once meant never being rung again.
+
+**Still open.** A phone whose app has been KILLED keeps ringing if the caller
+gives up — only a cancel push can reach it, and there is none yet. CallKit
+audio-session hand-off is unverified (iOS may need LiveKit's session started
+from `didActivateAudioSession`). Speaker/earpiece routing still needs a real
+device; the emulator has one audio device.

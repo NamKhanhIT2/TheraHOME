@@ -269,25 +269,45 @@ export default function CallScreen() {
   // re-establishing should still take effect when it comes back.
   const controlsLive = media === 'live' || media === 'reconnecting';
   inCallRef.current = !!inCall && !isOver;
-  // Driven by whether a picture is actually arriving, not by how the call was
-  // placed — so a voice call that turns into a video one switches to the
-  // video stage, and a video call whose far end kills its camera falls back
-  // to the identity card instead of freezing on the last frame.
-  const videoStage = inCall && controlsLive && !!tracks.remote;
+  // Driven by whether a picture exists at all, EITHER side's — not by how
+  // the call was placed. So a voice call that turns into a video one switches
+  // to the video stage, and a video call whose far end kills its camera falls
+  // back to the identity card instead of freezing on the last frame.
+  //
+  // `tracks.local` belongs in this condition and was missing from it, which
+  // is the whole of the "camera bật nhưng không thấy hình" report: turning
+  // your own camera on published a track, lit the button up, and then
+  // rendered nothing, because the only <CallVideo> on the screen lived inside
+  // a branch that needed the OTHER side's picture. You could not see yourself
+  // until they turned their camera on too.
+  const videoStage = inCall && controlsLive && (!!tracks.remote || !!tracks.local);
+  // The far end gets the full screen when it has a picture; otherwise your
+  // own camera does, the way every other caller behaves while the other side
+  // is still audio-only.
+  const stageTrack = tracks.remote ?? tracks.local;
+  const stageIsSelf = !tracks.remote;
+  const pipTrack = tracks.remote ? tracks.local : undefined;
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: videoStage ? '#000' : theme.colors.bgApp }]}>
       {videoStage ? (
         <>
-          <CallVideo trackRef={tracks.remote} style={styles.fill} objectFit="cover" />
-          {tracks.local && cameraOn ? (
+          <CallVideo trackRef={stageTrack} style={styles.fill} objectFit="cover" mirror={stageIsSelf} />
+          {pipTrack ? (
             <View style={[styles.pip, { borderColor: theme.colors.bgCard }]}>
-              <CallVideo trackRef={tracks.local} style={styles.fill} objectFit="cover" mirror />
+              <CallVideo trackRef={pipTrack} style={styles.fill} objectFit="cover" mirror />
             </View>
           ) : null}
           <View style={styles.videoTopBar}>
             <Text style={[theme.type.bodyStrong, styles.videoText]}>{peerName}</Text>
             <Text style={[theme.type.captionSm, styles.videoText]}>{statusLine}</Text>
+            {stageIsSelf ? (
+              // Said out loud, because a screen showing only your own face is
+              // otherwise indistinguishable from a broken call.
+              <Text style={[theme.type.captionSm, styles.videoText]}>
+                {peerName} chưa bật camera
+              </Text>
+            ) : null}
           </View>
         </>
       ) : (

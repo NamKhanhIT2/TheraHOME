@@ -1,10 +1,11 @@
-// Connects Android's telecom UI to this app's call state.
+// Connects the system telecom UI — Android's ConnectionService, iOS's CallKit
+// — to this app's call state.
 //
-// Two systems now know about an incoming call: Android's (raised from the
-// background task, and the only one that can ring a locked phone) and the
-// app's own `calls` row. They have to agree, or the user answers on the lock
-// screen and nothing happens, or hangs up in the app and the system keeps
-// ringing.
+// Two systems now know about an incoming call: the OS's (raised from the
+// background task on Android, from the PushKit callback on iOS, and the only
+// one that can ring a locked phone) and the app's own `calls` row. They have
+// to agree, or the user answers on the lock screen and nothing happens, or
+// hangs up in the app and the system keeps ringing.
 //
 // The contract kept here:
 //   - answering in the system UI    -> answer_call, then open the call screen
@@ -14,15 +15,17 @@
 // Both ends use the call row's id as the telecom UUID, so no mapping table is
 // needed and a stale event can always be matched to a real call.
 import { useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
   bringAppToForeground,
   dismissAllCalls,
   dismissCall,
+  drainInitialCallKeepEvents,
   isCallKeepSupported,
   listenToCallKeep,
+  markCallActive,
+  promptForPhoneAccount,
   setupCallKeep,
 } from '@/lib/callkeep';
 import { registerCallBackgroundTask } from '@/lib/callBackgroundTask';
@@ -44,20 +47,11 @@ export function useCallKeepBridge(enabled: boolean) {
     // task below instead.
     const stopVoip = registerVoipPush();
 
-    void (async () => {
-      const ready = await setupCallKeep();
-      if (!ready || cancelled) return;
-      // Android only — iOS is woken by PushKit, which reports to CallKit in
-      // native code before any JS task could run.
-      await registerCallBackgroundTask();
-      // A phone account that survived a crash can leave a call ringing in the
-      // telecom stack with nothing behind it. Starting clean means the next
-      // real call is not blocked by a ghost.
-      dismissAllCalls();
-    })();
-
-    const unsubscribe = listenToCallKeep({
-      onAnswer: (callId) => {
+    // Named rather than inline, because the SAME two handlers serve both the
+    // live subscription and the replay of events that happened before this
+    // JS existed.
+    const handlers = {
+      onAnswer: (callId: string) => {
         if (!enabledRef.current) return;
         // Answer first, navigate second: the call screen refuses to join a
         // room until the row says 'accepted', so arriving before the RPC has
@@ -72,11 +66,16 @@ export function useCallKeepBridge(enabled: boolean) {
               if (__DEV__) console.warn('answer_call from CallKeep failed:', error.message);
               return;
             }
+            // The system is still showing "ringing" until told otherwise,
+            // and this also records that THIS device took the call, which
+            // stops the incoming sheet from tearing the system UI down a
+            // moment later (see IncomingCallSheet).
+            markCallActive(callId);
             bringAppToForeground();
             router.push({ pathname: '/call/[callId]', params: { callId } });
           });
       },
-      onEnd: (callId) => {
+      onEnd: (callId: string) => {
         if (!enabledRef.current) return;
         // Android fires this for a decline AND after a normal hangup. The RPC
         // is idempotent and refuses to re-end a finished call, so the second
@@ -87,19 +86,49 @@ export function useCallKeepBridge(enabled: boolean) {
           p_reason: 'declined',
         });
       },
-    });
+    };
 
-    // A call the app resolved on its own — answered in the in-app sheet,
-    // cancelled by the caller — must not leave the system still ringing.
-    const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active') dismissAllCalls();
-    });
+    const unsubscribe = listenToCallKeep(handlers);
+
+    void (async () => {
+      await setupCallKeep();
+      if (cancelled) return;
+      // Android only — iOS is woken by PushKit, which reports to CallKit in
+      // native code before any JS task could run.
+      await registerCallBackgroundTask();
+      // Anything the user did on the lock screen before this JS existed,
+      // which is the normal case for a call answered from a cold start:
+      // CallKeep buffers those events and nothing was reading them, so such
+      // an answer landed the user on the home screen with a live call they
+      // could not see. Drained BEFORE the ghost sweep below, or the sweep
+      // would cancel the very call just answered.
+      const { answered } = await drainInitialCallKeepEvents(handlers);
+      if (cancelled) return;
+      // A phone account that survived a crash can leave a call ringing in the
+      // telecom stack with nothing behind it. Starting clean means the next
+      // real call is not blocked by a ghost — unless the reason this app is
+      // running at all is a call just answered on the lock screen, in which
+      // case the "ghost" is the live call and sweeping it would hang up on
+      // the user a second after they picked up.
+      if (!answered) dismissAllCalls();
+      // Registering the phone account is not the same as it being ON, and
+      // Android keeps it off until the user says so in Settings. Asked last
+      // so the dialog never lands on top of a call being restored above.
+      await promptForPhoneAccount();
+    })();
+
+    // There used to be an AppState listener here sweeping every call each
+    // time the app became active. It was wrong twice over: on Android the
+    // sweep echoes back as a decline (see the echo guard in lib/callkeep),
+    // and foregrounding is exactly what answering on the lock screen does —
+    // so the sweep hung up on calls the user had just taken. Clearing the
+    // system UI for a call the app resolved is now done per call, where the
+    // app knows WHICH call ended: useCallTerminator.
 
     return () => {
       cancelled = true;
       unsubscribe();
       stopVoip();
-      appState.remove();
     };
   }, [enabled]);
 }
