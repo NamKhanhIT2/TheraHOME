@@ -13,7 +13,6 @@ import { registerUpsaleNotificationActions, syncPushTokenIfGranted } from '@/lib
 import { Icon } from '@/components/icons/Icon';
 import { AssistantBubble } from '@/components/AssistantBubble';
 import { ReminderPopup } from '@/components/ReminderPopup';
-import { IncomingCallSheet } from '@/components/call/IncomingCallSheet';
 import { useI18n } from '@/lib/i18n';
 
 const TAB_ITEMS: { name: string; icon: string; label: string }[] = [
@@ -214,11 +213,6 @@ export default function TabsLayout() {
           onOpenSupportChat={() => router.push(isStaff ? '/chat/admin-conversations' : '/chat/human')}
         />
       ) : null}
-      {/* Armed for EVERYONE here, not just staff: CSKH can now call a
-          customer back, so a patient's phone has to be able to ring too. The
-          hook filters by direction — staff see calls to the support line, a
-          customer sees only calls addressed to them. */}
-      <IncomingCallSheet enabled userId={userId} isStaff={isStaff} />
       {showReminderPrompt && userId ? (
         <ReminderPopup userId={userId} onDone={() => setReminderDoneThisSession(true)} />
       ) : null}

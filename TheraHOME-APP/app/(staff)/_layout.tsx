@@ -14,7 +14,6 @@ import { useWebRoles } from '@/hooks/useWebRoles';
 import { TAB_BAR_BODY_HEIGHT, TAB_BAR_BODY_PADDING_BOTTOM, useTabBarInset } from '@/hooks/useTabBarInset';
 import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/icons/Icon';
-import { IncomingCallSheet } from '@/components/call/IncomingCallSheet';
 
 const STAFF_TAB_ITEMS: { name: string; icon: string; label: string }[] = [
   { name: 'chat', icon: 'message-circle', label: 'Chat' },
@@ -91,13 +90,6 @@ function StaffTabBar({ state, navigation }: Parameters<NonNullable<React.Compone
   );
 }
 
-/** The sheet needs the signed-in id to tell "ringing for me" from "ringing
- * for someone else"; the shell itself has no reason to know it. */
-function StaffIncomingCall() {
-  const userId = useSession().session?.user.id;
-  return <IncomingCallSheet enabled userId={userId} isStaff />;
-}
-
 export default function StaffLayout() {
   useCallNotificationRouting();
   return (
@@ -108,10 +100,6 @@ export default function StaffLayout() {
         <Tabs.Screen name="community" />
         <Tabs.Screen name="notifications" />
       </Tabs>
-      {/* Everyone in this shell is staff, so the incoming-call sheet is
-          always armed. It is mounted here rather than per-tab so a call
-          reaches CSKH whichever tab they happen to be on. */}
-      <StaffIncomingCall />
     </View>
   );
 }

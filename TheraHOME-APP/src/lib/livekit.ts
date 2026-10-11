@@ -75,7 +75,14 @@ export function isCallSupported(): boolean {
  * intended backstop for the billing rule above, enforced server-side so a
  * client bug cannot quietly start paying for a ringing phone.
  */
-export async function connectCall(callId: string, media: 'audio' | 'video' = 'audio'): Promise<LiveKitRoom> {
+export interface ConnectedCall {
+  room: LiveKitRoom;
+  /** Whether the camera actually came up. False on a video call whose camera
+   * could not be opened — the call still works, with no picture. */
+  cameraOn: boolean;
+}
+
+export async function connectCall(callId: string, media: 'audio' | 'video' = 'audio'): Promise<ConnectedCall> {
   const { native: lk, client: lkClient } = loadLiveKit();
 
   const { data, error } = await supabase.functions.invoke<{ token: string; url: string }>('livekit-token', {
@@ -112,13 +119,10 @@ export async function connectCall(callId: string, media: 'audio' | 'video' = 'au
     videoCaptureDefaults: { resolution: lkClient.VideoPresets.h540.resolution },
   });
 
+  let cameraOn = false;
   try {
     await room.connect(data.url, data.token, { autoSubscribe: true });
     await room.localParticipant.setMicrophoneEnabled(true);
-    // Only after the mic: asking for the camera first puts its permission
-    // prompt in front of the one that matters, and a call with a picture and
-    // no sound is useless.
-    if (media === 'video') await room.localParticipant.setCameraEnabled(true);
   } catch (connectError) {
     // A half-open room and a live audio session would both leak — and the
     // audio session leaking is audible, because the OS keeps the call route
@@ -126,7 +130,23 @@ export async function connectCall(callId: string, media: 'audio' | 'video' = 'au
     await disconnectCall(room);
     throw connectError;
   }
-  return room;
+
+  // The camera gets its OWN try, deliberately outside the one above. It was
+  // inside, which meant a camera that could not be opened — no camera at all,
+  // permission refused, another app holding it — tore down the whole room and
+  // failed the call. A video call on a device with no working camera should
+  // degrade to a voice call, not die. Asked for after the mic so its
+  // permission prompt never lands in front of the one that matters: a call
+  // with a picture and no sound is useless.
+  if (media === 'video') {
+    try {
+      await room.localParticipant.setCameraEnabled(true);
+      cameraOn = true;
+    } catch (cameraError) {
+      if (__DEV__) console.warn('camera unavailable, continuing audio-only:', cameraError);
+    }
+  }
+  return { room, cameraOn };
 }
 
 /** Leaves the room and releases the OS audio session. Safe to call twice, and

@@ -14,6 +14,8 @@ import {
 } from '@expo-google-fonts/inter';
 import { ThemeProvider, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
+import { useIsStaff } from '@/hooks/useWebRoles';
+import { IncomingCallSheet } from '@/components/call/IncomingCallSheet';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -58,6 +60,9 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const theme = useTheme();
   const { session, loading: sessionLoading } = useSession();
   const userId = session?.user.id;
+  // Which calls ring here: the support line for staff, or calls addressed
+  // to this person for everyone else.
+  const isStaffUser = useIsStaff(userId);
   const profileQuery = useProfile(userId);
   const profile = profileQuery.data;
   const profileLoading = !!userId && profileQuery.isPending;
@@ -485,6 +490,17 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
             unconditionally rather than inside either Stack.Protected group. */}
         <Stack.Screen name="profile/legal/[doc]" options={{ presentation: 'modal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'default' }} />
       </Stack>
+      {/* Mounted HERE, above the Stack, and nowhere else.
+          It used to live inside (tabs)/_layout.tsx and (staff)/_layout.tsx,
+          which looked equivalent but is not: every chat screen is a route of
+          THIS stack, pushed on top of those shells. With react-native-screens,
+          a <Modal> belonging to a screen that is no longer on top renders
+          BELOW the top screen — so a call arriving while the user was inside
+          a conversation vibrated (the JS was running fine) and showed
+          nothing, and only appeared once they backed out. Reported from the
+          device, 2026-10-11. As a sibling of the Stack it is above every
+          route, including the chat screens, the day detail and the profile. */}
+      <IncomingCallSheet enabled={inApp} userId={userId} isStaff={isStaffUser} />
     </View>
   );
 }

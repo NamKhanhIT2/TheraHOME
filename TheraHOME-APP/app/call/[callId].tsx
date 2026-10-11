@@ -107,7 +107,7 @@ export default function CallScreen() {
     setMedia('connecting');
     const wanted = call.media === 'video' ? 'video' : 'audio';
     void connectCall(callId, wanted)
-      .then((connected) => {
+      .then(({ room: connected, cameraOn: cameraCameUp }) => {
         if (cancelled) {
           void disconnectCall(connected);
           return;
@@ -116,11 +116,12 @@ export default function CallScreen() {
         setRoom(connected);
         setMedia('live');
         // A video call starts on the speaker; reflect that in the toggle so
-        // the button does not claim the opposite of what is happening.
-        if (wanted === 'video') {
-          setSpeakerOn(true);
-          setCameraOn(true);
-        }
+        // the button does not claim the opposite of what is happening. The
+        // camera flag comes from whether it ACTUALLY came up, not from what
+        // was asked for — on a device whose camera failed, the call carries
+        // on as audio and the button correctly reads "Bật camera".
+        if (wanted === 'video') setSpeakerOn(true);
+        setCameraOn(cameraCameUp);
         setRemoteJoined(connected.remoteParticipants.size > 0);
         connected.on('participantConnected', () => setRemoteJoined(true));
         connected.on('participantDisconnected', () => {
