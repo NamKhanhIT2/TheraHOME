@@ -29,6 +29,7 @@ import {
   disconnectCall,
   readConnectionQuality,
   setCallCamera,
+  setCallMicrophone,
   setCallSpeaker,
   subscribeConnectionQuality,
   switchCallCamera,
@@ -48,6 +49,10 @@ export interface CallSession {
   remoteJoined: boolean;
   micOn: boolean;
   cameraOn: boolean;
+  /** Which way the camera is pointing. Tracked here rather than read back
+   * from the track, because the platform does not reliably report it — see
+   * switchCallCamera in lib/livekit. */
+  facing: 'user' | 'environment';
   speakerOn: boolean;
   quality: CallQuality;
 }
@@ -104,6 +109,7 @@ export async function openCallSession(callId: string, media: 'audio' | 'video'):
     remoteJoined: false,
     micOn: true,
     cameraOn: false,
+    facing: 'user',
     // A video call is held at arm's length, so it opens on the speaker.
     speakerOn: media === 'video',
     quality: 'unknown',
@@ -179,22 +185,39 @@ export function isCallSessionOpen(callId: string): boolean {
 // call fails, because a control that waits for a round trip before showing
 // anything reads as broken.
 
+// Every one of these logs its failure out loud. They used to swallow it in a
+// bare `.catch(() => revert)`, which in a release build is indistinguishable
+// from the button not being wired up at all — and "nút chưa hoạt động" is
+// exactly what came back from the device, with nothing anywhere to say which
+// of the two it was.
+
 export function toggleSessionMic(): void {
   const open = session;
   if (!open?.room) return;
   const next = !open.micOn;
   patch(open.callId, { micOn: next });
-  void open.room.localParticipant.setMicrophoneEnabled(next)
-    .catch(() => patch(open.callId, { micOn: !next }));
+  void setCallMicrophone(open.room, next)
+    .then((actual) => patch(open.callId, { micOn: actual }))
+    .catch((error: unknown) => {
+      console.warn('could not toggle the microphone:', error);
+      patch(open.callId, { micOn: !next });
+    });
 }
 
 export function toggleSessionCamera(): void {
   const open = session;
   if (!open) return;
   const next = !open.cameraOn;
+  // Optimistic so the button answers the finger immediately, then corrected
+  // to whatever the camera actually did. Both halves matter: without the
+  // first the control feels dead, without the second it can lie.
   patch(open.callId, { cameraOn: next });
   void setCallCamera(open.room, next)
-    .catch(() => patch(open.callId, { cameraOn: !next }));
+    .then((actual) => patch(open.callId, { cameraOn: actual }))
+    .catch((error: unknown) => {
+      console.warn('could not toggle the camera:', error);
+      patch(open.callId, { cameraOn: !next });
+    });
 }
 
 export function toggleSessionSpeaker(): void {
@@ -203,9 +226,23 @@ export function toggleSessionSpeaker(): void {
   const next = !open.speakerOn;
   patch(open.callId, { speakerOn: next });
   void setCallSpeaker(next)
-    .catch(() => patch(open.callId, { speakerOn: !next }));
+    .catch((error: unknown) => {
+      console.warn('could not switch the audio output:', error);
+      patch(open.callId, { speakerOn: !next });
+    });
 }
 
+/** Front ↔ back. The new direction is decided HERE and recorded, so the
+ * button alternates even on a device that will not say which way the camera
+ * is currently pointing. */
 export function flipSessionCamera(): void {
-  void switchCallCamera(session?.room ?? null).catch(() => undefined);
+  const open = session;
+  if (!open?.room || !open.cameraOn) return;
+  const next = open.facing === 'user' ? 'environment' : 'user';
+  patch(open.callId, { facing: next });
+  void switchCallCamera(open.room, next)
+    .catch((error: unknown) => {
+      console.warn('could not switch cameras:', error);
+      patch(open.callId, { facing: open.facing });
+    });
 }

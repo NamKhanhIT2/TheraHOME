@@ -5044,3 +5044,40 @@ device.
 The error is now logged unconditionally rather than behind `__DEV__`. That
 is the third time today a swallowed error cost hours — the login screen's
 empty catch, the two native-module guards that failed silently, and this.
+
+### "Các nút chưa hoạt động" (2026-10-11)
+
+Three things, found by reading rather than reproducing — a two-party video
+call cannot be staged from a laptop with one handset signed in.
+
+**Switching cameras could only ever go one way.** It read
+`mediaStreamTrack.getSettings().facingMode` and flipped whatever it found.
+When the platform does not report that setting the comparison
+`undefined === 'environment'` is false, so every press asked for the back
+camera: the first tap looked like it worked and every tap after it did
+nothing. The session now remembers which way the camera points and
+`switchCallCamera` is told where to go. It also falls back from
+`restartTrack` (livekit-client's supported API, renegotiates) to
+`applyConstraints` (react-native-webrtc's in-place swap), because they fail
+on different devices.
+
+**Every control swallowed its own failure.** `.catch(() => revert)` with no
+log is, in a release build, indistinguishable from a button that was never
+wired up — which is exactly the report that came back, with nothing anywhere
+to say which of the two it was. They all log now. Fourth time today.
+
+**And the toggles could lie.** The optimistic flip is right — a control that
+waits for a round trip feels dead — but nothing corrected it afterwards, so
+a `setCameraEnabled` that did not take left the label saying "Bật camera"
+over a camera that was still publishing. `setCallCamera` and
+`setCallMicrophone` now read the state back off the participant and the
+session is patched with the truth.
+
+**Controls get out of the way over video**, as asked and as every other
+caller behaves: tap the picture to hide them, tap again to bring them back,
+and they leave on their own four seconds after the last touch. Only over
+video — on the identity card there is nothing underneath worth revealing,
+and hiding the End button of a call with no picture is just a way to lose
+it. The self-view is `pointerEvents="none"`: it is something to look at, not
+something to press, and it has no business swallowing a tap meant for the
+picture behind it.

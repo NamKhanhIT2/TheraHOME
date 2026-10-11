@@ -16,7 +16,7 @@
 // never while ringing: LiveKit bills every minute a participant is
 // connected, so joining early would charge for calls nobody answered. The
 // waiting is done over Realtime on the `calls` row, which is free.
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -93,6 +93,16 @@ export default function CallScreen() {
   // Read by the back handler, which must not re-subscribe on every render.
   const canMinimiseRef = useRef(false);
   const ringingRef = useRef(false);
+
+  // Over video, the controls get out of the way. Every other caller does
+  // this and the reason is the same: the picture is the point, and a row of
+  // buttons across someone's face is in the way of it. Tap anywhere to bring
+  // them back, and they leave again on their own.
+  const [controlsVisible, setControlsVisible] = useState(true);
+  // Bumped by any interaction, which restarts the timer below — so the
+  // controls never vanish out from under a finger.
+  const [touchedAt, setTouchedAt] = useState(0);
+  const keepControls = useCallback(() => setTouchedAt(Date.now()), []);
 
   // The caller hears a quiet ringback while it rings at the other end. The
   // callee's own phone is rung by the incoming sheet, not here.
@@ -184,6 +194,46 @@ export default function CallScreen() {
     return () => subscription.remove();
   }, [minimise]);
 
+  // ------------------------------------------------------------- chrome
+  // Derived before the effects below, because two of them depend on it.
+  const showAnswerButtons = !!call && call.status === 'ringing' && !isCaller;
+  const inCall = call?.status === 'accepted';
+  // Controls stay usable through a reconnect: muting while the socket is
+  // re-establishing should still take effect when it comes back.
+  const controlsLive = media === 'live' || media === 'reconnecting';
+  canMinimiseRef.current = !!inCall && !isOver && controlsLive;
+  ringingRef.current = call?.status === 'ringing';
+  // Driven by whether a picture exists at all, EITHER side's — so a voice
+  // call that turns into a video one switches to the video stage, and a
+  // video call whose far end kills its camera falls back to the identity
+  // card instead of freezing on the last frame.
+  const videoStage = inCall && controlsLive && (!!tracks.remote || !!tracks.local);
+  // The far end gets the full screen when it has a picture; otherwise your
+  // own camera does, the way every other caller behaves while the other side
+  // is still audio-only.
+  const stageTrack = tracks.remote ?? tracks.local;
+  const stageIsSelf = !tracks.remote;
+  const pipTrack = tracks.remote ? tracks.local : undefined;
+  // Only worth saying when it is bad. "Excellent" on screen is noise.
+  const weakNetwork = controlsLive && (quality === 'poor' || quality === 'lost');
+  // Hidden only ever over video; everywhere else the controls are the screen.
+  const showControls = !videoStage || controlsVisible;
+
+  // Four seconds, measured from the last touch. Only over video: on the
+  // identity card there is nothing underneath worth revealing, and hiding
+  // the End button of a call with no picture would just be a way to lose it.
+  useEffect(() => {
+    if (!videoStage || !controlsVisible) return;
+    const timer = setTimeout(() => setControlsVisible(false), 4000);
+    return () => clearTimeout(timer);
+  }, [videoStage, controlsVisible, touchedAt]);
+
+  // Leaving the video stage — the far end killed its camera, or the call is
+  // winding up — must not strand the controls hidden.
+  useEffect(() => {
+    if (!videoStage) setControlsVisible(true);
+  }, [videoStage]);
+
   // ------------------------------------------------------------- proximity
   // Armed only when the phone is plausibly AT an ear: a connected call with
   // no picture on screen. A video call, or a voice call with a camera up,
@@ -229,27 +279,6 @@ export default function CallScreen() {
     : call?.status === 'ringing' && isCaller ? 'Giữ máy trong khoảng 45 giây nhé.'
     : null;
 
-  const showAnswerButtons = !!call && call.status === 'ringing' && !isCaller;
-  const inCall = call?.status === 'accepted';
-  // Controls stay usable through a reconnect: muting while the socket is
-  // re-establishing should still take effect when it comes back.
-  const controlsLive = media === 'live' || media === 'reconnecting';
-  canMinimiseRef.current = !!inCall && !isOver && controlsLive;
-  ringingRef.current = call?.status === 'ringing';
-  // Driven by whether a picture exists at all, EITHER side's — so a voice
-  // call that turns into a video one switches to the video stage, and a
-  // video call whose far end kills its camera falls back to the identity
-  // card instead of freezing on the last frame.
-  const videoStage = inCall && controlsLive && (!!tracks.remote || !!tracks.local);
-  // The far end gets the full screen when it has a picture; otherwise your
-  // own camera does, the way every other caller behaves while the other side
-  // is still audio-only.
-  const stageTrack = tracks.remote ?? tracks.local;
-  const stageIsSelf = !tracks.remote;
-  const pipTrack = tracks.remote ? tracks.local : undefined;
-  // Only worth saying when it is bad. "Excellent" on screen is noise.
-  const weakNetwork = controlsLive && (quality === 'poor' || quality === 'lost');
-
   return (
     <SafeAreaView style={[styles.root, {
       backgroundColor: videoStage ? '#000' : theme.colors.bgApp,
@@ -263,22 +292,41 @@ export default function CallScreen() {
       {videoStage ? (
         <>
           <CallVideo trackRef={stageTrack} style={styles.fill} objectFit="cover" mirror={stageIsSelf} />
+          {/* The whole picture is one big tap target for showing and hiding
+              the controls. It sits ABOVE the video and BELOW everything
+              else, so a tap on a button is still a tap on that button —
+              React Native hands a touch to the last-drawn view that wants
+              it, and every control is drawn after this. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={controlsVisible ? 'Ẩn các nút điều khiển' : 'Hiện các nút điều khiển'}
+            style={styles.fill}
+            onPress={() => {
+              setControlsVisible((visible) => !visible);
+              keepControls();
+            }}
+          />
           {pipTrack ? (
-            <View style={[styles.pip, { borderColor: theme.colors.bgCard }]}>
+            // pointerEvents none: the self-view is something to look at, not
+            // something to press, and it has no business swallowing a tap
+            // aimed at the picture behind it.
+            <View pointerEvents="none" style={[styles.pip, { borderColor: theme.colors.bgCard }]}>
               <CallVideo trackRef={pipTrack} style={styles.fill} objectFit="cover" mirror />
             </View>
           ) : null}
-          <View style={styles.videoTopBar}>
-            <Text style={[theme.type.bodyStrong, styles.videoText]}>{peerName}</Text>
-            <Text style={[theme.type.captionSm, styles.videoText]}>{statusLine}</Text>
-            {stageIsSelf ? (
-              // Said out loud, because a screen showing only your own face is
-              // otherwise indistinguishable from a broken call.
-              <Text style={[theme.type.captionSm, styles.videoText]}>
-                {peerName} chưa bật camera
-              </Text>
-            ) : null}
-          </View>
+          {showControls ? (
+            <View pointerEvents="none" style={styles.videoTopBar}>
+              <Text style={[theme.type.bodyStrong, styles.videoText]}>{peerName}</Text>
+              <Text style={[theme.type.captionSm, styles.videoText]}>{statusLine}</Text>
+              {stageIsSelf ? (
+                // Said out loud, because a screen showing only your own face
+                // is otherwise indistinguishable from a broken call.
+                <Text style={[theme.type.captionSm, styles.videoText]}>
+                  {peerName} chưa bật camera
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={styles.identity}>
@@ -300,7 +348,7 @@ export default function CallScreen() {
 
       {/* Minimise. Only once there is a call worth keeping: while it is still
           ringing there is nothing behind the screen to go back to. */}
-      {canMinimiseRef.current ? (
+      {canMinimiseRef.current && showControls ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Thu nhỏ cuộc gọi"
@@ -326,6 +374,7 @@ export default function CallScreen() {
         </View>
       ) : null}
 
+      {showControls ? (
       <View style={[styles.controls, videoStage ? styles.controlsOverVideo : null]}>
         {inCall ? (
           // One row for every call. The camera button is always there, so a
@@ -336,15 +385,15 @@ export default function CallScreen() {
           // earpiece, which the video-only layout had made impossible.
           <View style={styles.toggleRow}>
             <ToggleButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? 'Tắt tiếng' : 'Đã tắt tiếng'}
-              active={!micOn} onPress={toggleSessionMic} disabled={!controlsLive} onDark={videoStage} />
+              active={!micOn} onPress={() => { keepControls(); toggleSessionMic(); }} disabled={!controlsLive} onDark={videoStage} />
             <ToggleButton icon={cameraOn ? 'video' : 'video-off'} label={cameraOn ? 'Tắt camera' : 'Bật camera'}
-              active={!cameraOn} onPress={toggleSessionCamera} disabled={!controlsLive} onDark={videoStage} />
+              active={!cameraOn} onPress={() => { keepControls(); toggleSessionCamera(); }} disabled={!controlsLive} onDark={videoStage} />
             {cameraOn ? (
               <ToggleButton icon="switch-camera" label="Đổi camera" active={false}
-                onPress={flipSessionCamera} disabled={!controlsLive} onDark={videoStage} />
+                onPress={() => { keepControls(); flipSessionCamera(); }} disabled={!controlsLive} onDark={videoStage} />
             ) : null}
             <ToggleButton icon="volume-2" label="Loa ngoài" active={speakerOn}
-              onPress={toggleSessionSpeaker} disabled={!controlsLive} onDark={videoStage} />
+              onPress={() => { keepControls(); toggleSessionSpeaker(); }} disabled={!controlsLive} onDark={videoStage} />
           </View>
         ) : null}
 
@@ -362,6 +411,7 @@ export default function CallScreen() {
             onPress={() => { hapticConfirm(); void terminate('ended', 'hangup'); }} />
         )}
       </View>
+      ) : null}
     </SafeAreaView>
   );
 }

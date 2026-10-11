@@ -230,21 +230,62 @@ export async function setCallSpeaker(on: boolean): Promise<void> {
   await lk.AudioSession.selectAudioOutput(deviceId);
 }
 
-/** Camera on/off mid-call — the "turn my video off" button. */
-export async function setCallCamera(room: LiveKitRoom | null, on: boolean): Promise<void> {
-  if (!room) return;
+/**
+ * Camera on/off mid-call, reporting what ACTUALLY happened.
+ *
+ * The return value is read back from the participant rather than assumed
+ * from the argument. A button that flips its own label and then lets the
+ * camera carry on regardless is worse than one that does nothing: the user
+ * believes the camera is off. Reading the truth back costs one property
+ * access and makes the UI incapable of lying about it.
+ */
+export async function setCallCamera(room: LiveKitRoom | null, on: boolean): Promise<boolean> {
+  if (!room) return false;
   await room.localParticipant.setCameraEnabled(on);
+  return room.localParticipant.isCameraEnabled;
 }
 
-/** Front/back camera. LiveKit exposes this on the published track's own
- * capture options rather than on the participant, so it has to be reached
- * through the publication. */
-export async function switchCallCamera(room: LiveKitRoom | null): Promise<void> {
+/** Same contract as the camera: returns the state the microphone is really
+ * in once the call has been made. */
+export async function setCallMicrophone(room: LiveKitRoom | null, on: boolean): Promise<boolean> {
+  if (!room) return false;
+  await room.localParticipant.setMicrophoneEnabled(on);
+  return room.localParticipant.isMicrophoneEnabled;
+}
+
+/**
+ * Points the camera the other way.
+ *
+ * The target is passed IN rather than derived here. It used to read
+ * `mediaStreamTrack.getSettings().facingMode` and flip whatever it found,
+ * which is only as reliable as the platform's willingness to report that
+ * setting — and when it comes back undefined, `undefined === 'environment'`
+ * is false, so every single press asked for the back camera. The first tap
+ * appeared to work and every tap after it did nothing. The session now
+ * remembers which way the camera is facing and this does as it is told.
+ *
+ * Two mechanisms, because they fail differently. `restartTrack` is the
+ * supported livekit-client API and renegotiates properly; `applyConstraints`
+ * is react-native-webrtc's own in-place swap, which needs no renegotiation
+ * and works on devices where restarting a track mid-call does not.
+ */
+export async function switchCallCamera(
+  room: LiveKitRoom | null,
+  facingMode: 'user' | 'environment',
+): Promise<void> {
   const { client: lkClient } = loadLiveKit();
   if (!room) return;
   const publication = room.localParticipant.getTrackPublication(lkClient.Track.Source.Camera);
   const track = publication?.videoTrack;
-  if (!track) return;
-  const current = track.mediaStreamTrack.getSettings().facingMode;
-  await track.restartTrack({ facingMode: current === 'environment' ? 'user' : 'environment' });
+  if (!track) throw new Error('no_camera_track');
+  try {
+    await track.restartTrack({ facingMode });
+  } catch (restartError) {
+    if (__DEV__) console.warn('restartTrack failed, applying constraints instead:', restartError);
+    const native = track.mediaStreamTrack as unknown as {
+      applyConstraints?: (constraints: Record<string, unknown>) => Promise<void>;
+    };
+    if (!native.applyConstraints) throw restartError;
+    await native.applyConstraints({ facingMode });
+  }
 }
