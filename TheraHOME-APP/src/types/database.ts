@@ -335,6 +335,7 @@ export type Database = {
         Row: {
           answered_at: string | null
           answered_by: string | null
+          callee_id: string | null
           caller_id: string
           created_at: string
           duration_seconds: number | null
@@ -342,6 +343,7 @@ export type Database = {
           ended_at: string | null
           holds_line: boolean
           id: string
+          media: string
           room_name: string
           status: string
           thread_id: string | null
@@ -349,6 +351,7 @@ export type Database = {
         Insert: {
           answered_at?: string | null
           answered_by?: string | null
+          callee_id?: string | null
           caller_id: string
           created_at?: string
           duration_seconds?: number | null
@@ -356,6 +359,7 @@ export type Database = {
           ended_at?: string | null
           holds_line?: boolean
           id?: string
+          media?: string
           room_name: string
           status?: string
           thread_id?: string | null
@@ -363,6 +367,7 @@ export type Database = {
         Update: {
           answered_at?: string | null
           answered_by?: string | null
+          callee_id?: string | null
           caller_id?: string
           created_at?: string
           duration_seconds?: number | null
@@ -370,6 +375,7 @@ export type Database = {
           ended_at?: string | null
           holds_line?: boolean
           id?: string
+          media?: string
           room_name?: string
           status?: string
           thread_id?: string | null
@@ -2357,6 +2363,7 @@ export type Database = {
         Returns: {
           answered_at: string | null
           answered_by: string | null
+          callee_id: string | null
           caller_id: string
           created_at: string
           duration_seconds: number | null
@@ -2364,6 +2371,7 @@ export type Database = {
           ended_at: string | null
           holds_line: boolean
           id: string
+          media: string
           room_name: string
           status: string
           thread_id: string | null
@@ -2442,6 +2450,7 @@ export type Database = {
         Returns: {
           answered_at: string | null
           answered_by: string | null
+          callee_id: string | null
           caller_id: string
           created_at: string
           duration_seconds: number | null
@@ -2449,6 +2458,7 @@ export type Database = {
           ended_at: string | null
           holds_line: boolean
           id: string
+          media: string
           room_name: string
           status: string
           thread_id: string | null
@@ -2500,6 +2510,10 @@ export type Database = {
           milestone_days: number
           user_id: string
         }[]
+      }
+      log_call_to_thread: {
+        Args: { p_call: Database["public"]["Tables"]["calls"]["Row"] }
+        Returns: undefined
       }
       lookup_order: {
         Args: { p_email?: string; p_phone?: string }
@@ -2587,11 +2601,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      staff_user_ids: { Args: never; Returns: string[] }
       start_call: {
-        Args: { p_thread_id?: string }
+        Args: { p_callee_id?: string; p_media?: string; p_thread_id?: string }
         Returns: {
           answered_at: string | null
           answered_by: string | null
+          callee_id: string | null
           caller_id: string
           created_at: string
           duration_seconds: number | null
@@ -2599,6 +2615,7 @@ export type Database = {
           ended_at: string | null
           holds_line: boolean
           id: string
+          media: string
           room_name: string
           status: string
           thread_id: string | null

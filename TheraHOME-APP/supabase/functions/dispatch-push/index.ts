@@ -224,22 +224,42 @@ Deno.serve(async (request) => {
       // client cannot make this ring for a call it did not place.
       const { data: call, error: callError } = await admin
         .from('calls')
-        .select('id, caller_id, status, created_at')
+        .select('id, caller_id, callee_id, status, media')
         .eq('id', input.callId)
         .single();
       if (callError) throw callError;
       if (call.caller_id !== user.id) return json({ error: 'caller_required' }, 403);
       // Nothing to ring for a call that is already answered, declined or
-      // timed out — a late push would wake staff for a finished call.
+      // timed out — a late push would wake someone for a finished call.
       if (call.status !== 'ringing') return json({ sent: 0, reason: 'not_ringing' });
 
-      recipientIds = await staffRecipientIds(admin);
-
-      const { data: caller } = await admin.from('profiles').select('full_name').eq('id', user.id).single();
-      const callerName = caller?.full_name?.trim() || 'Khách hàng';
+      const isVideo = call.media === 'video';
       data = { type: 'call', callId: call.id };
-      // Staff read Vietnamese, same as the support-message push below.
-      compose = () => ({ title: 'Cuộc gọi đến', body: `${callerName} đang gọi cho CSKH` });
+
+      if (call.callee_id) {
+        // CSKH is calling a customer back. Ringing every staff phone here —
+        // which is what this branch did before two-way calling — would wake
+        // the whole team and never reach the person actually being called.
+        recipientIds = [call.callee_id as string];
+        compose = (r) => ({
+          title: isVideo ? 'TheraHOME đang gọi video' : 'TheraHOME đang gọi cho bạn',
+          body: r.lang === 'en'
+            ? 'TheraHOME support is calling you'
+            : r.lang === 'ms'
+              ? 'Sokongan TheraHOME sedang menghubungi anda'
+              : 'Nhân viên chăm sóc khách hàng đang gọi, mở ứng dụng để trả lời',
+        });
+      } else {
+        // A customer ringing the support line: every staff phone.
+        recipientIds = await staffRecipientIds(admin);
+        const { data: caller } = await admin.from('profiles').select('full_name').eq('id', user.id).single();
+        const callerName = caller?.full_name?.trim() || 'Khách hàng';
+        // Staff read Vietnamese, same as the support-message push below.
+        compose = () => ({
+          title: isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi đến',
+          body: `${callerName} đang gọi cho CSKH`,
+        });
+      }
     } else {
       const { data: thread, error } = await admin.from('chat_threads').select('user_id').eq('id', input.threadId).single();
       if (error) throw error;

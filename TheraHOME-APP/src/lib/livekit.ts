@@ -75,7 +75,7 @@ export function isCallSupported(): boolean {
  * intended backstop for the billing rule above, enforced server-side so a
  * client bug cannot quietly start paying for a ringing phone.
  */
-export async function connectCall(callId: string): Promise<LiveKitRoom> {
+export async function connectCall(callId: string, media: 'audio' | 'video' = 'audio'): Promise<LiveKitRoom> {
   const { native: lk, client: lkClient } = loadLiveKit();
 
   const { data, error } = await supabase.functions.invoke<{ token: string; url: string }>('livekit-token', {
@@ -84,28 +84,41 @@ export async function connectCall(callId: string): Promise<LiveKitRoom> {
   if (error) throw error;
   if (!data?.token || !data?.url) throw new Error('livekit_token_missing');
 
-  // Voice-call audio routing: earpiece-first on Android (a phone call belongs
-  // at the ear, not on speaker), and the communication preset so the OS
-  // applies echo cancellation and ducks other audio.
+  // Audio routing. A voice call belongs at the ear; a video call is held at
+  // arm's length and must start on the speaker, the way every other video
+  // caller behaves. The communication preset keeps echo cancellation on in
+  // both cases — speakerphone without it feeds the far end its own voice.
+  const speakerFirst = media === 'video';
   await lk.AudioSession.configureAudio({
     android: {
-      preferredOutputList: ['bluetooth', 'headset', 'earpiece', 'speaker'],
+      preferredOutputList: speakerFirst
+        ? ['bluetooth', 'headset', 'speaker', 'earpiece']
+        : ['bluetooth', 'headset', 'earpiece', 'speaker'],
       audioTypeOptions: lk.AndroidAudioTypePresets.communication,
     },
-    ios: { defaultOutput: 'earpiece' },
+    ios: { defaultOutput: speakerFirst ? 'speaker' : 'earpiece' },
   });
   await lk.AudioSession.startAudioSession();
 
   const room = new lkClient.Room({
-    // Audio only. The token forbids a camera track anyway; saying so here
-    // stops the client from even asking for camera permission.
-    adaptiveStream: false,
-    dynacast: false,
+    // On a video call, adaptiveStream drops the resolution of a track whose
+    // view is small or hidden, and dynacast stops publishing layers nobody is
+    // watching. Both cut bandwidth, which is the free tier's OTHER limit
+    // (50GB downstream) and the one video actually presses against.
+    adaptiveStream: media === 'video',
+    dynacast: media === 'video',
+    ...(media === 'video'
+      ? { videoCaptureDefaults: { resolution: lkClient.VideoPresets.h540.resolution } }
+      : {}),
   });
 
   try {
     await room.connect(data.url, data.token, { autoSubscribe: true });
     await room.localParticipant.setMicrophoneEnabled(true);
+    // Only after the mic: asking for the camera first puts its permission
+    // prompt in front of the one that matters, and a call with a picture and
+    // no sound is useless.
+    if (media === 'video') await room.localParticipant.setCameraEnabled(true);
   } catch (connectError) {
     // A half-open room and a live audio session would both leak — and the
     // audio session leaking is audible, because the OS keeps the call route
@@ -142,4 +155,23 @@ export async function setCallSpeaker(on: boolean): Promise<void> {
     ? (on ? 'force_speaker' : 'default')
     : (on ? 'speaker' : 'earpiece');
   await lk.AudioSession.selectAudioOutput(deviceId);
+}
+
+/** Camera on/off mid-call — the "turn my video off" button. */
+export async function setCallCamera(room: LiveKitRoom | null, on: boolean): Promise<void> {
+  if (!room) return;
+  await room.localParticipant.setCameraEnabled(on);
+}
+
+/** Front/back camera. LiveKit exposes this on the published track's own
+ * capture options rather than on the participant, so it has to be reached
+ * through the publication. */
+export async function switchCallCamera(room: LiveKitRoom | null): Promise<void> {
+  const { client: lkClient } = loadLiveKit();
+  if (!room) return;
+  const publication = room.localParticipant.getTrackPublication(lkClient.Track.Source.Camera);
+  const track = publication?.videoTrack;
+  if (!track) return;
+  const current = track.mediaStreamTrack.getSettings().facingMode;
+  await track.restartTrack({ facingMode: current === 'environment' ? 'user' : 'environment' });
 }

@@ -13,11 +13,17 @@
 //   - the requester must be that call's customer, or hold admin/cskh.
 // Anything else gets a 403 and no token, so a leaked call id is worthless.
 //
-// The grant is audio-only: `canPublishSources: ['microphone']`. The media
-// server refuses a video track from this token even if a future client build
-// tries to publish one, which keeps the feature inside the audio price band
-// (US$0.99 vs $3.99 per 1,000 participant-minutes) by construction rather
-// than by remembering not to turn the camera on.
+// The grant is built from the CALL ROW's `media`, not from anything the
+// client asks for: an audio call gets `canPublishSources: ['microphone']` and
+// the media server refuses a camera track from that token, so a call placed
+// as voice cannot quietly become a video one.
+//
+// (An earlier version of this comment claimed audio-only kept the feature in
+// a cheaper price band, quoting US$0.99 vs $3.99 per 1,000 participant
+// minutes. That is ZEGOCLOUD's and Agora's model, not LiveKit's — LiveKit
+// Cloud bills connection minutes regardless of media type. What video
+// actually costs here is downstream bandwidth, the free tier's other limit,
+// which `adaptiveStream`/`dynacast` on the client are there to hold down.)
 //
 // The JWT is signed here by hand with Web Crypto instead of pulling in
 // livekit-server-sdk. It is sixty lines of HS256 against a documented claim
@@ -67,7 +73,8 @@ async function mintAccessToken({
   identity,
   name,
   room,
-}: { identity: string; name: string; room: string }): Promise<string> {
+  sources,
+}: { identity: string; name: string; room: string; sources: string[] }): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = base64UrlJson({ alg: "HS256", typ: "JWT" });
   const payload = base64UrlJson({
@@ -83,8 +90,8 @@ async function mintAccessToken({
       roomJoin: true,
       canSubscribe: true,
       canPublish: true,
-      // The whole audio-only guarantee, enforced server-side.
-      canPublishSources: ["microphone"],
+      // Enforced server-side from the row, not from the request.
+      canPublishSources: sources,
       canPublishData: false,
       // Nobody may reconfigure or list rooms with a client token.
       roomCreate: false,
@@ -146,7 +153,7 @@ Deno.serve(async (request: Request) => {
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: call, error: callError } = await admin
     .from("calls")
-    .select("id, room_name, status, caller_id")
+    .select("id, room_name, status, caller_id, callee_id, media")
     .eq("id", callId)
     .maybeSingle();
   if (callError) return json({ error: "lookup_failed", detail: callError.message }, 500);
@@ -159,7 +166,13 @@ Deno.serve(async (request: Request) => {
 
   const { data: roles } = await callerClient.rpc("current_web_roles");
   const isStaff = Array.isArray(roles) && (roles.includes("admin") || roles.includes("cskh"));
-  if (!isStaff && call.caller_id !== user.id) return json({ error: "not_a_participant" }, 403);
+  // Who may join: either end of the call, plus any staff when the call is
+  // addressed to the support line. Staff are NOT admitted to a call between
+  // two other named people.
+  const isParticipant = call.caller_id === user.id
+    || call.callee_id === user.id
+    || (call.callee_id === null && isStaff);
+  if (!isParticipant) return json({ error: "not_a_participant" }, 403);
 
   // Identity doubles as the role marker the other side renders from, so the
   // customer's screen can label the remote participant without a second
@@ -175,6 +188,9 @@ Deno.serve(async (request: Request) => {
     ? "TheraHOME CSKH"
     : (profile?.full_name?.trim() || "Khách hàng");
 
-  const token = await mintAccessToken({ identity, name, room: call.room_name });
-  return json({ token, url: LIVEKIT_URL, room: call.room_name, identity });
+  const sources = call.media === "video"
+    ? ["microphone", "camera"]
+    : ["microphone"];
+  const token = await mintAccessToken({ identity, name, room: call.room_name, sources });
+  return json({ token, url: LIVEKIT_URL, room: call.room_name, identity, media: call.media });
 });

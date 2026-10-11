@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ai.therahome",
-      "buildNumber": "26",
+      "buildNumber": "27",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -18,7 +18,7 @@
         "UIBackgroundModes": [
           "audio"
         ],
-        "NSCameraUsageDescription": "TheraHOME không sử dụng camera. Khai báo này là bắt buộc vì thư viện cuộc gọi thoại có chứa mã camera dùng chung; cuộc gọi với nhân viên hỗ trợ chỉ dùng micro."
+        "NSCameraUsageDescription": "TheraHOME cần quyền camera để bạn gọi video với nhân viên chăm sóc khách hàng."
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -26,7 +26,7 @@
     },
     "android": {
       "package": "ai.therahome",
-      "versionCode": 7,
+      "versionCode": 8,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0169ED",
@@ -40,11 +40,11 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.CAMERA"
       ],
       "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.CAMERA"
+        "android.permission.SYSTEM_ALERT_WINDOW"
       ]
     },
     "web": {
@@ -59,7 +59,7 @@
         "expo-image-picker",
         {
           "photosPermission": "TheraHOME cần quyền truy cập thư viện ảnh để bạn thêm ảnh vào bài viết.",
-          "cameraPermission": "TheraHOME không sử dụng camera. Khai báo này là bắt buộc vì thư viện cuộc gọi thoại có chứa mã camera dùng chung; cuộc gọi với nhân viên hỗ trợ chỉ dùng micro.",
+          "cameraPermission": "TheraHOME cần quyền camera để bạn gọi video với nhân viên chăm sóc khách hàng.",
           "microphonePermission": "TheraHOME cần quyền micro để bạn gọi thoại cho nhân viên chăm sóc khách hàng."
         }
       ],

@@ -214,9 +214,11 @@ export default function TabsLayout() {
           onOpenSupportChat={() => router.push(isStaff ? '/chat/admin-conversations' : '/chat/human')}
         />
       ) : null}
-      {/* Rings a dual-role admin who is using the patient shell. CSKH-only
-          accounts get the same sheet from (staff)/_layout.tsx. */}
-      <IncomingCallSheet enabled={isStaff} />
+      {/* Armed for EVERYONE here, not just staff: CSKH can now call a
+          customer back, so a patient's phone has to be able to ring too. The
+          hook filters by direction — staff see calls to the support line, a
+          customer sees only calls addressed to them. */}
+      <IncomingCallSheet enabled userId={userId} isStaff={isStaff} />
       {showReminderPrompt && userId ? (
         <ReminderPopup userId={userId} onDone={() => setReminderDoneThisSession(true)} />
       ) : null}

@@ -18,10 +18,17 @@ import type { Database } from '@/types/database';
 
 export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'missed' | 'busy' | 'ended';
 
+export type CallMedia = 'audio' | 'video';
+
 export interface CallRow {
   id: string;
   roomName: string;
   callerId: string;
+  /** Who the call is FOR. null means "the support line" — any staff may
+   * answer, which is the customer-initiated direction. Set means that one
+   * person, which is how CSKH calls a customer back. */
+  calleeId: string | null;
+  media: CallMedia;
   answeredBy: string | null;
   threadId: string | null;
   status: CallStatus;
@@ -50,6 +57,8 @@ function toCallRow(row: Database['public']['Tables']['calls']['Row']): CallRow {
     id: row.id,
     roomName: row.room_name,
     callerId: row.caller_id,
+    calleeId: row.callee_id ?? null,
+    media: (row.media === 'video' ? 'video' : 'audio') as CallMedia,
     answeredBy: row.answered_by ?? null,
     threadId: row.thread_id ?? null,
     status: row.status as CallStatus,
@@ -104,13 +113,25 @@ export function useCall(callId: string | undefined) {
 /** The customer taps "Gọi". Resolves to the created row — which may come back
  * with status 'busy' when the single CSKH line is already taken; that is an
  * ordinary outcome, not an error. */
+export interface StartCallInput {
+  threadId?: string | null;
+  /** Omit for a customer calling the support line. Staff pass the customer's
+   * id to call them back; the RPC refuses any other value. */
+  calleeId?: string | null;
+  media?: CallMedia;
+}
+
 export function useStartCall() {
   return useMutation({
-    mutationFn: async (threadId?: string | null): Promise<CallRow> => {
-      // `undefined`, not null: the generated signature types this argument
-      // as optional (it has a SQL default), so sending null fails the type
-      // and sending nothing lets the default apply.
-      const { data, error } = await supabase.rpc('start_call', { p_thread_id: threadId ?? undefined });
+    mutationFn: async (input: StartCallInput = {}): Promise<CallRow> => {
+      // `undefined`, not null: these arguments are optional in the generated
+      // signature (they have SQL defaults), so sending null fails the type
+      // while sending nothing lets the default apply.
+      const { data, error } = await supabase.rpc('start_call', {
+        p_thread_id: input.threadId ?? undefined,
+        p_callee_id: input.calleeId ?? undefined,
+        p_media: input.media ?? 'audio',
+      });
       if (error) throw error;
       const call = toCallRow(data);
 
@@ -213,20 +234,31 @@ export function useCallTerminator(callId: string | undefined) {
 }
 
 /**
- * CSKH side: the one call currently ringing, if any.
+ * The one call currently ringing FOR THIS USER, if any.
  *
- * Unfiltered on purpose — there is a single support line, so "is anything
- * ringing" is the whole question, and the table's RLS already restricts this
- * query to staff. Watches INSERT as well as UPDATE: an INSERT is a new call
- * arriving, an UPDATE is the caller giving up while the sheet is open.
+ * Serves both directions, which is why it needs to know who is asking:
+ *   staff    → calls addressed to the support line (`callee_id is null`).
+ *   customer → calls addressed to them by name (`callee_id = me`).
+ *
+ * A customer must never be shown a call ringing on the support line, and
+ * staff must never be shown a private call between two other people, so this
+ * filters rather than relying on RLS alone — RLS admits staff to every row.
+ *
+ * Watches INSERT as well as UPDATE: an INSERT is a new call arriving, an
+ * UPDATE is the other side giving up while the sheet is open.
  */
-export function useIncomingCall(enabled: boolean) {
+export function useIncomingCall({ enabled, userId, isStaff }: {
+  enabled: boolean;
+  userId: string | undefined;
+  isStaff: boolean;
+}) {
   const queryClient = useQueryClient();
-  const key = ['incoming_call'] as const;
+  const key = ['incoming_call', isStaff ? 'line' : userId] as const;
+  const armed = enabled && !!userId;
 
   useRealtimeSync({
-    enabled,
-    channelName: 'incoming_call',
+    enabled: armed,
+    channelName: `incoming_call_${isStaff ? 'line' : userId}`,
     bind: (channel) =>
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, () =>
         queryClient.invalidateQueries({ queryKey: key }),
@@ -238,22 +270,29 @@ export function useIncomingCall(enabled: boolean) {
     queryKey: key,
     queryFn: async (): Promise<CallRow | null> => {
       // Only genuinely fresh rings. A row older than the ring timeout is one
-      // the janitor has not swept yet; showing it would ring CSKH's phone for
-      // a customer who hung up minutes ago.
+      // the janitor has not swept yet; showing it would ring a phone for a
+      // caller who gave up minutes ago.
       const since = new Date(Date.now() - RING_TIMEOUT_MS).toISOString();
-      const { data, error } = await supabase
+      let query = supabase
         .from('calls')
         .select('*')
         .eq('status', 'ringing')
-        .gte('created_at', since)
+        .gte('created_at', since);
+      query = isStaff ? query.is('callee_id', null) : query.eq('callee_id', userId!);
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return data ? toCallRow(data) : null;
+      const call = data ? toCallRow(data) : null;
+      // Never ring someone for their own outgoing call. Staff placing a call
+      // to a customer would otherwise match their own row the moment the
+      // customer's side is also staff (a dual-role admin testing on two
+      // accounts), and the sheet would open over their own call screen.
+      return call && call.callerId !== userId ? call : null;
     },
-    enabled,
-    refetchInterval: enabled ? 5000 : false,
+    enabled: armed,
+    refetchInterval: armed ? 5000 : false,
   });
 }
 

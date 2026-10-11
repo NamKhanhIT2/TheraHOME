@@ -1,17 +1,17 @@
-// The call screen — one screen for both sides of a voice call.
+// The call screen — one screen for both sides, voice or video.
 //
 // Which role it is playing comes from the data, not the route: the person
-// whose id matches `caller_id` is the customer, anyone else here is CSKH. So
-// a push notification, the incoming sheet and the "Gọi" button can all route
-// to the same path and the screen works out what to show.
+// whose id matches `caller_id` is the caller, whoever `callee_id` names (or
+// any staff, when it is null) is the callee. So a push notification, either
+// incoming sheet and either chat header can all route to the same path.
 //
 // The important behaviour is when it joins the LiveKit room, which is exactly
-// once, when `status` becomes 'accepted'. Never while ringing. LiveKit Cloud
-// bills participant-minutes from the moment a client connects, so joining
-// early would charge for every unanswered call — and on the free tier's 5,000
-// minutes a month that is the difference between covering the line and not.
-// Waiting is done over Realtime on the `calls` row, which is free.
-import React, { useEffect, useRef, useState } from 'react';
+// once, when `status` becomes 'accepted'. Never while ringing. LiveKit bills
+// every minute a participant is CONNECTED, so joining early would charge for
+// unanswered calls — on the free tier's 5,000 minutes a month that is the
+// difference between covering the line and not. Waiting is done over Realtime
+// on the `calls` row, which is free.
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +21,8 @@ import { useIsStaff } from '@/hooks/useWebRoles';
 import { AvatarImg } from '@/components/AvatarImg';
 import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
+import { useRingtone } from '@/hooks/useRingtone';
+import { CallVideo, useCallVideoTracks } from '@/components/call/CallVideo';
 import {
   CALL_IS_OVER,
   RING_TIMEOUT_MS,
@@ -35,7 +37,9 @@ import {
   CallUnavailableError,
   connectCall,
   disconnectCall,
+  setCallCamera,
   setCallSpeaker,
+  switchCallCamera,
   type LiveKitRoom,
 } from '@/lib/livekit';
 
@@ -53,53 +57,70 @@ export default function CallScreen() {
 
   const callQuery = useCall(callId);
   const call = callQuery.data ?? null;
-  const callerProfile = useCallerProfile(call?.callerId);
+  const isVideo = call?.media === 'video';
+  const isCaller = !!call && call.callerId === userId;
+  const isOver = !!call && CALL_IS_OVER.includes(call.status);
+
+  // The far end. A call with no `callee_id` is addressed to the support line,
+  // so for its caller the other party is TheraHOME rather than a person.
+  const peerIsSupport = !!call && isCaller && call.calleeId === null;
+  const peerId = call ? (isCaller ? call.calleeId : call.callerId) : undefined;
+  const peerProfile = useCallerProfile(peerIsSupport ? undefined : peerId ?? undefined);
+
   const answerCall = useAnswerCall();
   const terminate = useCallTerminator(callId);
+  const seconds = useCallDuration(call?.answeredAt);
 
   const [media, setMedia] = useState<MediaState>('idle');
   const [micOn, setMicOn] = useState(true);
+  const [cameraOn, setCameraOn] = useState(true);
   const [speakerOn, setSpeakerOn] = useState(false);
   const [remoteJoined, setRemoteJoined] = useState(false);
   const roomRef = useRef<LiveKitRoom | null>(null);
-  // Separate from `roomRef` because the window that has to be guarded is the
-  // one BEFORE a room object exists — see the effect below.
+  const [room, setRoom] = useState<LiveKitRoom | null>(null);
+  // Separate from `roomRef` because the window to guard is the one BEFORE a
+  // room object exists — see the effect below.
   const connectingRef = useRef(false);
 
-  const isCaller = !!call && call.callerId === userId;
-  const isOver = !!call && CALL_IS_OVER.includes(call.status);
-  const seconds = useCallDuration(call?.answeredAt);
+  const tracks = useCallVideoTracks(room, isVideo && media === 'live');
+
+  // The caller hears a quiet ringback while it rings at the other end. The
+  // callee's own phone is rung by the incoming sheet, not here.
+  useRingtone(!!call && call.status === 'ringing' && isCaller, 'ringback');
 
   // ---------------------------------------------------------------- media
   // Joins the room on 'accepted' and only then. The guard is a ref, not the
-  // `media` state: two renders can both read `media === 'idle'` before the
-  // first setState lands, and connecting twice puts two participants in the
-  // room under the same identity — LiveKit evicts the first, which the user
-  // experiences as the call dropping the instant it connects.
+  // `media` state: two renders can both read 'idle' before the first setState
+  // lands, and joining twice under one identity makes LiveKit evict the first
+  // participant — which the user experiences as the call dropping instantly.
   useEffect(() => {
     if (!callId || call?.status !== 'accepted' || connectingRef.current || roomRef.current) return;
     let cancelled = false;
     connectingRef.current = true;
     setMedia('connecting');
-    void connectCall(callId)
-      .then((room) => {
+    const wanted = call.media === 'video' ? 'video' : 'audio';
+    void connectCall(callId, wanted)
+      .then((connected) => {
         if (cancelled) {
-          void disconnectCall(room);
+          void disconnectCall(connected);
           return;
         }
-        roomRef.current = room;
+        roomRef.current = connected;
+        setRoom(connected);
         setMedia('live');
-        setRemoteJoined(room.remoteParticipants.size > 0);
-        room.on('participantConnected', () => setRemoteJoined(true));
-        room.on('participantDisconnected', () => {
+        // A video call starts on the speaker; reflect that in the toggle so
+        // the button does not claim the opposite of what is happening.
+        if (wanted === 'video') setSpeakerOn(true);
+        setRemoteJoined(connected.remoteParticipants.size > 0);
+        connected.on('participantConnected', () => setRemoteJoined(true));
+        connected.on('participantDisconnected', () => {
           setRemoteJoined(false);
-          // The other side left for good — a hangup whose database write has
-          // not arrived yet, or a client that died. Either way this call is
-          // over; ending it here means the line is released even if their
-          // `end_call` never lands.
+          // The other side left for good — a hangup whose write has not
+          // arrived yet, or a client that died. Ending here releases the line
+          // even if their `end_call` never lands.
           void terminate('ended', 'remote_left');
         });
-        room.on('disconnected', () => {
+        connected.on('disconnected', () => {
           if (!cancelled) setMedia('failed');
         });
       })
@@ -110,24 +131,23 @@ export default function CallScreen() {
         if (__DEV__) console.warn('connectCall failed:', error);
       });
     return () => { cancelled = true; };
-  }, [callId, call?.status, terminate]);
+  }, [callId, call?.status, call?.media, terminate]);
 
   // Leaving the room is tied to the screen, not to a status change, so every
-  // way out of here — red button, swipe back, hardware back, being navigated
-  // away — releases the media and the OS audio session. Without this the
-  // participant stays connected until LiveKit's own peer timeout and keeps
-  // billing minutes for a call that is visibly over.
+  // way out — red button, swipe back, hardware back, being navigated away —
+  // releases the media and the OS audio session. Without this the participant
+  // stays connected until LiveKit's own peer timeout, still billing.
   useEffect(() => () => {
-    const room = roomRef.current;
+    const open = roomRef.current;
     roomRef.current = null;
     connectingRef.current = false;
-    void disconnectCall(room);
+    void disconnectCall(open);
   }, []);
 
   // --------------------------------------------------------------- ringing
-  // The caller gives up after RING_TIMEOUT_MS. Only the caller runs this
-  // timer: if CSKH's phone ran one too, a brief network stall on their side
-  // would cancel a call the customer is still happily waiting on.
+  // Only the caller runs the give-up timer: if the callee's phone ran one
+  // too, a brief network stall there would cancel a call the caller is still
+  // happily waiting on.
   useEffect(() => {
     if (!isCaller || call?.status !== 'ringing') return;
     const elapsed = Date.now() - new Date(call.createdAt).getTime();
@@ -136,8 +156,8 @@ export default function CallScreen() {
   }, [isCaller, call?.status, call?.createdAt, terminate]);
 
   // An unanswered call must not keep ringing because the caller backgrounded
-  // the app mid-ring. Once connected, backgrounding is left alone on purpose
-  // — a voice call is expected to continue when the phone is pocketed.
+  // the app mid-ring. Once connected, backgrounding is left alone on purpose:
+  // a call is expected to continue when the phone is pocketed.
   useEffect(() => {
     if (!isCaller) return;
     const subscription = AppState.addEventListener('change', (state) => {
@@ -147,18 +167,16 @@ export default function CallScreen() {
     return () => subscription.remove();
   }, [isCaller, callQuery.data?.status, terminate]);
 
-  // Close once it is over, after a beat so the outcome is readable. A call
-  // that cannot be read at all (a stale push, or someone else's call id that
-  // RLS hides) gets the same treatment rather than leaving a dead screen with
-  // an End button that can never work.
+  // A call that cannot be read at all (a stale push, or an id RLS hides) gets
+  // the same treatment as one that is over, rather than leaving a dead screen
+  // with an End button that can never work.
   const unreadable = !callQuery.isPending && !call;
   useEffect(() => {
     if (!isOver && !unreadable) return;
     const timer = setTimeout(() => {
       if (router.canGoBack()) router.back();
-      // Cold start straight onto this screen from a notification tap: there
-      // is nothing to go back to, so land each role in the place they would
-      // have come from.
+      // Cold start straight onto this screen from a notification tap: nothing
+      // to go back to, so land each role where they would have come from.
       else router.replace(isStaff ? '/chat/admin-conversations' : '/chat/human');
     }, CLOSE_DELAY_MS);
     return () => clearTimeout(timer);
@@ -166,11 +184,16 @@ export default function CallScreen() {
 
   // --------------------------------------------------------------- actions
   function toggleMic() {
-    const room = roomRef.current;
-    if (!room) return;
+    if (!roomRef.current) return;
     const next = !micOn;
     setMicOn(next);
-    void room.localParticipant.setMicrophoneEnabled(next).catch(() => setMicOn(!next));
+    void roomRef.current.localParticipant.setMicrophoneEnabled(next).catch(() => setMicOn(!next));
+  }
+
+  function toggleCamera() {
+    const next = !cameraOn;
+    setCameraOn(next);
+    void setCallCamera(roomRef.current, next).catch(() => setCameraOn(!next));
   }
 
   function toggleSpeaker() {
@@ -179,106 +202,109 @@ export default function CallScreen() {
     void setCallSpeaker(next).catch(() => setSpeakerOn(!next));
   }
 
-  function hangUp() {
-    hapticConfirm();
-    void terminate('ended', 'hangup');
-  }
-
-  function decline() {
-    hapticConfirm();
-    void terminate('declined', 'declined');
-  }
-
-  function answer() {
-    hapticConfirm();
-    if (callId) answerCall.mutate(callId);
-  }
-
   // ----------------------------------------------------------------- copy
-  const peerName = isCaller ? 'TheraHOME CSKH' : callerProfile.data?.fullName ?? 'Khách hàng';
-  const peerAvatar = isCaller ? null : callerProfile.data?.avatarUrl ?? null;
+  const peerName = peerIsSupport
+    ? 'TheraHOME CSKH'
+    : (peerProfile.data?.fullName ?? (isStaff ? 'Khách hàng' : 'TheraHOME CSKH'));
 
-  const statusLine = (() => {
+  const statusLine = useMemo(() => {
     if (!call) return callQuery.isPending ? 'Đang kết nối…' : 'Không tìm thấy cuộc gọi';
     switch (call.status) {
       case 'ringing':
-        return isCaller ? 'Đang gọi…' : 'Cuộc gọi đến';
+        return isCaller ? 'Đang gọi…' : (isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi đến');
       case 'accepted':
-        if (media === 'unsupported') return 'Bản cài đặt này chưa hỗ trợ gọi thoại';
-        if (media === 'failed') return 'Mất kết nối âm thanh';
-        if (media !== 'live') return 'Đang kết nối âm thanh…';
+        if (media === 'unsupported') return 'Bản cài đặt này chưa hỗ trợ gọi';
+        if (media === 'failed') return 'Mất kết nối';
+        if (media !== 'live') return 'Đang kết nối…';
         return remoteJoined ? formatCallDuration(seconds) : 'Đang chờ đầu kia vào…';
       case 'busy':
         return 'Tổng đài đang có cuộc gọi khác';
       case 'declined':
         return isCaller ? 'Cuộc gọi bị từ chối' : 'Đã từ chối';
       case 'missed':
-        return isCaller ? 'Không có người nghe máy' : 'Khách đã ngắt máy';
+        return isCaller ? 'Không có người nghe máy' : 'Đã ngắt máy';
       case 'ended':
         return call.durationSeconds ? `Đã kết thúc · ${formatCallDuration(call.durationSeconds)}` : 'Đã kết thúc';
     }
-  })();
+  }, [call, callQuery.isPending, isCaller, isVideo, media, remoteJoined, seconds]);
 
-  const hint = (() => {
-    if (call?.status === 'busy') return 'Bạn có thể nhắn tin, CSKH sẽ gọi lại ngay khi xong cuộc hiện tại.';
-    if (media === 'unsupported') return 'Cần cập nhật ứng dụng lên bản mới nhất để dùng tính năng gọi.';
-    if (call?.status === 'ringing' && isCaller) return 'Giữ máy trong khoảng 45 giây nhé.';
-    return null;
-  })();
+  const hint =
+    call?.status === 'busy' ? 'Bạn có thể nhắn tin, CSKH sẽ gọi lại ngay khi xong cuộc hiện tại.'
+    : media === 'unsupported' ? 'Cần cập nhật ứng dụng lên bản mới nhất để dùng tính năng gọi.'
+    : call?.status === 'ringing' && isCaller ? 'Giữ máy trong khoảng 45 giây nhé.'
+    : null;
 
-  // An unreadable call offers no controls at all — it is already closing.
-  const showAnswerButtons = !!call && call.status === 'ringing' && isStaff && !isCaller;
-  const showInCallControls = call?.status === 'accepted';
+  const showAnswerButtons = !!call && call.status === 'ringing' && !isCaller;
+  const inCall = call?.status === 'accepted';
+  // The remote picture only takes over once it is actually arriving; until
+  // then the identity card reads better than a black rectangle.
+  const videoStage = isVideo && inCall && media === 'live' && !!tracks.remote;
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: theme.colors.bgApp }]}>
-      <View style={styles.identity}>
-        {peerAvatar || !isCaller ? (
-          <AvatarImg size={104} uri={peerAvatar} />
-        ) : (
-          <View style={[styles.brandAvatar, { backgroundColor: theme.colors.primaryTint10 }]}>
-            <Icon name="headphones" size={44} color={theme.colors.primary} />
-          </View>
-        )}
-        <Text style={[theme.type.h1, styles.name, { color: theme.colors.textPrimary }]}>{peerName}</Text>
-        <View style={styles.statusRow}>
-          {call?.status === 'accepted' && media === 'connecting' ? (
-            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+    <SafeAreaView style={[styles.root, { backgroundColor: videoStage ? '#000' : theme.colors.bgApp }]}>
+      {videoStage ? (
+        <>
+          <CallVideo trackRef={tracks.remote} style={styles.fill} objectFit="cover" />
+          {tracks.local && cameraOn ? (
+            <View style={[styles.pip, { borderColor: theme.colors.bgCard }]}>
+              <CallVideo trackRef={tracks.local} style={styles.fill} objectFit="cover" mirror />
+            </View>
           ) : null}
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary }]}>{statusLine}</Text>
+          <View style={styles.videoTopBar}>
+            <Text style={[theme.type.bodyStrong, styles.videoText]}>{peerName}</Text>
+            <Text style={[theme.type.captionSm, styles.videoText]}>{statusLine}</Text>
+          </View>
+        </>
+      ) : (
+        <View style={styles.identity}>
+          {peerIsSupport ? (
+            <View style={[styles.brandAvatar, { backgroundColor: theme.colors.primaryTint10 }]}>
+              <Icon name="headphones" size={44} color={theme.colors.primary} />
+            </View>
+          ) : (
+            <AvatarImg size={104} uri={peerProfile.data?.avatarUrl} />
+          )}
+          <Text style={[theme.type.h1, styles.name, { color: theme.colors.textPrimary }]}>{peerName}</Text>
+          <View style={styles.statusRow}>
+            {inCall && media === 'connecting' ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : null}
+            <Text style={[theme.type.body, { color: theme.colors.textSecondary }]}>{statusLine}</Text>
+          </View>
+          {hint ? <Text style={[theme.type.captionSm, styles.hint, { color: theme.colors.textMuted }]}>{hint}</Text> : null}
         </View>
-        {hint ? (
-          <Text style={[theme.type.captionSm, styles.hint, { color: theme.colors.textMuted }]}>{hint}</Text>
-        ) : null}
-      </View>
+      )}
 
-      <View style={styles.controls}>
-        {showInCallControls ? (
+      <View style={[styles.controls, videoStage ? styles.controlsOverVideo : null]}>
+        {inCall ? (
           <View style={styles.toggleRow}>
-            <ToggleButton
-              icon={micOn ? 'mic' : 'mic-off'}
-              label={micOn ? 'Tắt tiếng' : 'Đã tắt tiếng'}
-              active={!micOn}
-              onPress={toggleMic}
-              disabled={media !== 'live'}
-            />
-            <ToggleButton
-              icon="volume-2"
-              label="Loa ngoài"
-              active={speakerOn}
-              onPress={toggleSpeaker}
-              disabled={media !== 'live'}
-            />
+            <ToggleButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? 'Tắt tiếng' : 'Đã tắt tiếng'}
+              active={!micOn} onPress={toggleMic} disabled={media !== 'live'} onDark={videoStage} />
+            {isVideo ? (
+              <>
+                <ToggleButton icon={cameraOn ? 'video' : 'video-off'} label={cameraOn ? 'Tắt camera' : 'Bật camera'}
+                  active={!cameraOn} onPress={toggleCamera} disabled={media !== 'live'} onDark={videoStage} />
+                <ToggleButton icon="switch-camera" label="Đổi camera" active={false}
+                  onPress={() => void switchCallCamera(roomRef.current).catch(() => undefined)}
+                  disabled={media !== 'live' || !cameraOn} onDark={videoStage} />
+              </>
+            ) : (
+              <ToggleButton icon="volume-2" label="Loa ngoài" active={speakerOn}
+                onPress={toggleSpeaker} disabled={media !== 'live'} onDark={videoStage} />
+            )}
           </View>
         ) : null}
 
         {showAnswerButtons ? (
           <View style={styles.answerRow}>
-            <RoundButton color={theme.colors.error} icon="phone-off" label="Từ chối" onPress={decline} />
-            <RoundButton color={theme.colors.success} icon="phone" label="Trả lời" onPress={answer} disabled={answerCall.isPending} />
+            <RoundButton color={theme.colors.error} icon="phone-off" label="Từ chối"
+              onPress={() => { hapticConfirm(); void terminate('declined', 'declined'); }} />
+            <RoundButton color={theme.colors.success} icon={isVideo ? 'video' : 'phone'} label="Trả lời"
+              disabled={answerCall.isPending}
+              onPress={() => { hapticConfirm(); if (callId) answerCall.mutate(callId); }} />
           </View>
         ) : isOver || unreadable ? null : (
-          <RoundButton color={theme.colors.error} icon="phone-off" label={call?.status === 'ringing' && isCaller ? 'Huỷ' : 'Kết thúc'} onPress={hangUp} />
+          <RoundButton color={theme.colors.error} icon="phone-off"
+            label={call?.status === 'ringing' && isCaller ? 'Huỷ' : 'Kết thúc'}
+            onPress={() => { hapticConfirm(); void terminate('ended', 'hangup'); }} />
         )}
       </View>
     </SafeAreaView>
@@ -291,13 +317,8 @@ function RoundButton({ color, icon, label, onPress, disabled }: {
   const theme = useTheme();
   return (
     <View style={styles.roundWrap}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        disabled={disabled}
-        onPress={onPress}
-        style={({ pressed }) => [styles.round, { backgroundColor: color, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 }]}
-      >
+      <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress}
+        style={({ pressed }) => [styles.round, { backgroundColor: color, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 }]}>
         <Icon name={icon} size={30} color="#fff" />
       </Pressable>
       <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>{label}</Text>
@@ -305,45 +326,54 @@ function RoundButton({ color, icon, label, onPress, disabled }: {
   );
 }
 
-function ToggleButton({ icon, label, active, onPress, disabled }: {
-  icon: string; label: string; active: boolean; onPress: () => void; disabled?: boolean;
+function ToggleButton({ icon, label, active, onPress, disabled, onDark }: {
+  icon: string; label: string; active: boolean; onPress: () => void; disabled?: boolean; onDark?: boolean;
 }) {
   const theme = useTheme();
+  // Over video these sit on an unpredictable picture, so they get a
+  // translucent chip rather than the themed card colour.
+  const background = active
+    ? (onDark ? '#fff' : theme.colors.textPrimary)
+    : (onDark ? 'rgba(255,255,255,0.22)' : theme.colors.bgCard);
+  const tint = active ? (onDark ? '#000' : theme.colors.bgCard) : (onDark ? '#fff' : theme.colors.textPrimary);
   return (
     <View style={styles.roundWrap}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: active }}
-        accessibilityLabel={label}
-        disabled={disabled}
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.toggle,
-          {
-            backgroundColor: active ? theme.colors.textPrimary : theme.colors.bgCard,
-            borderColor: theme.colors.divider,
-            opacity: disabled ? 0.45 : pressed ? 0.85 : 1,
-          },
-        ]}
-      >
-        <Icon name={icon} size={24} color={active ? theme.colors.bgCard : theme.colors.textPrimary} />
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} accessibilityLabel={label}
+        disabled={disabled} onPress={onPress}
+        style={({ pressed }) => [styles.toggle, {
+          backgroundColor: background,
+          borderColor: onDark ? 'transparent' : theme.colors.divider,
+          opacity: disabled ? 0.45 : pressed ? 0.85 : 1,
+        }]}>
+        <Icon name={icon} size={24} color={tint} />
       </Pressable>
-      <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>{label}</Text>
+      <Text style={[theme.type.captionSm, { color: onDark ? 'rgba(255,255,255,0.85)' : theme.colors.textSecondary }]}>
+        {label}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 32 },
+  fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   identity: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   brandAvatar: { width: 104, height: 104, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   name: { textAlign: 'center' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   hint: { textAlign: 'center', paddingHorizontal: 24, marginTop: 4 },
   controls: { gap: 28, alignItems: 'center' },
-  toggleRow: { flexDirection: 'row', gap: 40 },
+  controlsOverVideo: { paddingBottom: 8 },
+  toggleRow: { flexDirection: 'row', gap: 24 },
   answerRow: { flexDirection: 'row', gap: 56 },
   roundWrap: { alignItems: 'center', gap: 8 },
   round: { width: 68, height: 68, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   toggle: { width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
+  // Own camera, parked top-right the way every video caller does it.
+  pip: {
+    position: 'absolute', top: 56, right: 16, width: 108, height: 160,
+    borderRadius: 14, overflow: 'hidden', borderWidth: 2, backgroundColor: '#111',
+  },
+  videoTopBar: { position: 'absolute', top: 58, left: 20, gap: 2 },
+  videoText: { color: '#fff', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
 });

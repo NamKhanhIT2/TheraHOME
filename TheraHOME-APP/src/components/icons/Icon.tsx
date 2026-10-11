@@ -93,6 +93,9 @@ import {
   VolumeX,
   WifiOff,
   X,
+  Video,
+  VideoOff,
+  SwitchCamera,
   Zap,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -128,6 +131,11 @@ const ICONS: Record<string, LucideIcon> = {
   mic: Mic,
   'mic-off': MicOff,
   headphones: Headphones,
+  // Video calling (2026-10-11): the call screen's camera toggle and the
+  // incoming sheet's answer button, which shows a camera for a video call.
+  video: Video,
+  'video-off': VideoOff,
+  'switch-camera': SwitchCamera,
   'more-horizontal': Ellipsis,
   'user-plus': UserPlus,
   send: Send,
