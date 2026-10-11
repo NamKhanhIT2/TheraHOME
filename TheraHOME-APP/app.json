@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ai.therahome",
-      "buildNumber": "28",
+      "buildNumber": "29",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -26,7 +26,7 @@
     },
     "android": {
       "package": "ai.therahome",
-      "versionCode": 9,
+      "versionCode": 10,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0169ED",
@@ -93,7 +93,13 @@
         }
       ],
       "expo-audio",
-      "@livekit/react-native-expo-plugin"
+      "@livekit/react-native-expo-plugin",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.880262966797-l7r5e4bf6jlan3gdiqlj7kv09ggo2821"
+        }
+      ]
     ],
     "extra": {
       "router": {},
@@ -101,8 +107,8 @@
         "projectId": "cfa99e0f-0190-4b68-8079-a9644a70403c"
       },
       "googleSignIn": {
-        "webClientId": "",
-        "iosClientId": ""
+        "webClientId": "880262966797-72authj1p9s3s287nj5or005cickdj0u.apps.googleusercontent.com",
+        "iosClientId": "880262966797-l7r5e4bf6jlan3gdiqlj7kv09ggo2821.apps.googleusercontent.com"
       }
     },
     "owner": "khanhnam"
