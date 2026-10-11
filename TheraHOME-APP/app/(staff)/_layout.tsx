@@ -13,6 +13,7 @@ import { useSession } from '@/hooks/useSession';
 import { useWebRoles } from '@/hooks/useWebRoles';
 import { TAB_BAR_BODY_HEIGHT, TAB_BAR_BODY_PADDING_BOTTOM, useTabBarInset } from '@/hooks/useTabBarInset';
 import { supabase } from '@/lib/supabase';
+import { syncPushTokenIfGranted } from '@/lib/pushNotifications';
 import { Icon } from '@/components/icons/Icon';
 
 const STAFF_TAB_ITEMS: { name: string; icon: string; label: string }[] = [
@@ -90,7 +91,30 @@ function StaffTabBar({ state, navigation }: Parameters<NonNullable<React.Compone
   );
 }
 
+/**
+ * Registers this device's push token for a staff account.
+ *
+ * The patient shell has done this since Phase 6, in (tabs)/_layout.tsx. This
+ * shell never did, and a CSKH-only account never visits the patient shell —
+ * so staff have had NO push token on file, ever. Measured 2026-10-11: zero
+ * rows in push_tokens for any staff account, which is why no support-message
+ * push and no incoming-call push could ever have arrived.
+ *
+ * Only syncs an ALREADY-granted permission; it never prompts. Staff grant
+ * notifications the first time the OS asks, same as anyone else.
+ */
+function useStaffPushToken() {
+  const userId = useSession().session?.user.id;
+  useEffect(() => {
+    if (!userId) return;
+    void syncPushTokenIfGranted(userId).catch((error: unknown) => {
+      if (__DEV__) console.warn('Push-token sync skipped:', error);
+    });
+  }, [userId]);
+}
+
 export default function StaffLayout() {
+  useStaffPushToken();
   useCallNotificationRouting();
   return (
     <View style={{ flex: 1 }}>
