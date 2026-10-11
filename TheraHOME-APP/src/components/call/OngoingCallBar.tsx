@@ -50,6 +50,9 @@ export function OngoingCallBar({ enabled, userId }: {
   if (!session || !enabled) return null;
   return (
     <ActiveCall
+      // Keyed so a second call gets fresh hooks rather than inheriting the
+      // first one's Realtime subscription and duration tick.
+      key={session.callId}
       callId={session.callId}
       userId={userId}
       micOn={session.micOn}

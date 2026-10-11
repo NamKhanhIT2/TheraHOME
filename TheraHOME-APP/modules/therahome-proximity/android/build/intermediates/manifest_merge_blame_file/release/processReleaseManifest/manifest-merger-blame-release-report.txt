@@ -1,0 +1,15 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="ai.therahome.proximity" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6    <!--
+7       The proximity lock is a wake lock, so it needs this. Declared here
+8       rather than only in app.json so the module carries its own
+9       requirement and cannot be broken by an edit to the app's list.
+10    -->
+11    <uses-permission android:name="android.permission.WAKE_LOCK" />
+11-->/Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/src/main/AndroidManifest.xml:5:3-66
+11-->/Users/macos/Documents/TheraHome/TheraHOME-APP/modules/therahome-proximity/android/src/main/AndroidManifest.xml:5:20-63
+12
+13</manifest>
