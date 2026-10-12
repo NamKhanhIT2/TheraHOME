@@ -2371,6 +2371,54 @@ export type Database = {
           },
         ]
       }
+      user_subscriptions: {
+        Row: {
+          auto_renewing: boolean | null
+          created_at: string
+          current_period_end: string | null
+          id: string
+          plan_code: string
+          platform: string
+          product_id: string
+          purchased_at: string
+          revoked_at: string | null
+          status: string
+          store_subscription_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_renewing?: boolean | null
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          plan_code: string
+          platform: string
+          product_id: string
+          purchased_at?: string
+          revoked_at?: string | null
+          status?: string
+          store_subscription_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_renewing?: boolean | null
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          plan_code?: string
+          platform?: string
+          product_id?: string
+          purchased_at?: string
+          revoked_at?: string | null
+          status?: string
+          store_subscription_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       voip_tokens: {
         Row: {
           platform: string
@@ -2522,6 +2570,7 @@ export type Database = {
           product_name: string
         }[]
       }
+      active_plan_code: { Args: never; Returns: string }
       adherence_pct_for: {
         Args: { p_user_program_id: string }
         Returns: number

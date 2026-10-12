@@ -19,7 +19,12 @@ export type AppConfigKey =
   // (and re-shown when tapping an already-answered survey). Seeded in vi/en/ms
   // in app_config; admins edit it in WEB Admin's "Nội dung ứng dụng" tab.
   | 'survey_suggestion_title'
-  | 'survey_suggestion_body';
+  | 'survey_suggestion_body'
+  // The upgrade card on Home (src/components/UpgradeCard.tsx). Seeded in
+  // vi/en/ms; blank makes the card fall back to the highlighted plan's own
+  // name and tagline, so it is never an empty box.
+  | 'upgrade_card_title'
+  | 'upgrade_card_body';
 
 const DEFAULTS: Record<AppConfigKey, string> = {
   // Empty on purpose: TheraHOME has no hotline yet (2026-09-04), and a
@@ -36,6 +41,11 @@ const DEFAULTS: Record<AppConfigKey, string> = {
   // resort if both the row and the caller's fallback are missing.
   survey_suggestion_title: '',
   survey_suggestion_body: '',
+  // Empty on purpose: UpgradeCard falls back to the highlighted plan's own
+  // name and tagline, which is better copy than anything hardcoded here
+  // could be — it already matches whatever is on sale.
+  upgrade_card_title: '',
+  upgrade_card_body: '',
 };
 
 interface ConfigRow {

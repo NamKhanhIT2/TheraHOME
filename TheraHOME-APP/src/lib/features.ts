@@ -32,3 +32,27 @@ const IAP_ENABLED_IOS = true;
 // google_product_id configured. iOS stays off until its own build.
 const IAP_ENABLED_ANDROID = true;
 export const IAP_ENABLED = Platform.OS === 'android' ? IAP_ENABLED_ANDROID : IAP_ENABLED_IOS;
+
+/**
+ * The subscription ladder's BUY buttons (app/subscription.tsx). The screen
+ * itself is always reachable — a free user is meant to read what the paid
+ * tiers contain; this only controls whether anything can be bought.
+ *
+ * False because buying would grant nothing yet. The purchase path is built
+ * (verify-subscription + user_subscriptions + active_plan_code()), but no
+ * feature currently ASKS active_plan_code() anything: chấm dáng tập still
+ * allows 4 clips a month to everybody, chat AI is unlimited for everybody,
+ * and the call button has no tier check. Selling a tier that changes nothing
+ * is both a refund waiting to happen and an App Review rejection.
+ *
+ * Note this is not the only gate: `canBuy` in useSubscription also requires
+ * the store to have RETURNED the product, so a product id typed into WEB
+ * Admin's "Gói đăng ký" tab can never light up a button on its own. Copy is
+ * copy.
+ *
+ * Flip order (see docs/manual-setup.md "Subscriptions"): create the
+ * subscription products on both stores → set their ids per plan in WEB
+ * Admin → make the three paid features consult `active_plan_code()` → THEN
+ * this, in that same build.
+ */
+export const SUBSCRIPTIONS_ENABLED = false;

@@ -2,11 +2,19 @@
 //
 // Every word on these cards — names, taglines, badges, prices, benefit lines
 // and their icons — comes from `subscription_plans` and is edited in WEB
-// Admin's "Gói đăng ký" tab. Nothing about the offer is written here, so a
-// price change needs no store release.
+// Admin's "Gói đăng ký" tab, so the offer changes without a store release.
+// The one thing the admin text does NOT decide is the price actually
+// charged: when the store knows the product, its own `displayPrice` wins,
+// because that is the number the buyer's card will see.
+//
+// Buying goes through src/hooks/useSubscription.ts. A card's button is only
+// live when BOTH the build says subscriptions are on (SUBSCRIPTIONS_ENABLED)
+// and the store has returned that product — so a product id typed into WEB
+// Admin cannot, by itself, offer a purchase that would fail.
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,28 +25,23 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/theme';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
+import { useSession } from '@/hooks/useSession';
 import { useSubscriptionPlans, type SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
+import { useActivePlanCode, useSubscriptionPurchase, type SubscriptionPurchaseState } from '@/hooks/useSubscription';
 
-/**
- * Whether a paid tier can actually be bought. False, and not a placeholder:
- * no subscription product exists in App Store Connect or Play Console,
- * nothing verifies a recurring receipt server-side, and no table records who
- * holds which tier. There is no purchase to start, so every paid card says
- * "Sắp mở" — which is true — and no button pretends otherwise.
- *
- * Deliberately a constant here rather than keyed off the product id in WEB
- * Admin: typing an id into the "Gói đăng ký" tab is editing copy, and copy
- * must not be able to light up a buy button on its own. Flip this in the
- * same change that adds the purchase call and the entitlement check, not
- * before.
- */
-const CAN_BUY_A_SUBSCRIPTION = false;
+/** Apple's standard EULA. An auto-renewable subscription must link Terms of
+ * Use from the screen that sells it, and this is the document that applies
+ * unless a custom EULA is uploaded in App Store Connect — the same link
+ * every other App Store subscription screen points at. Android has no
+ * equivalent, so there the link goes to TheraHOME's own terms. */
+const APPLE_STANDARD_EULA = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 /** Card width leaves both neighbours peeking, so it reads as a row to swipe
  * rather than a single page. */
@@ -46,16 +49,19 @@ const CARD_GAP = 12;
 const PEEK = 36;
 
 /** One shared empty array, so `query.data ?? NO_PLANS` keeps the same
- * reference between renders — a fresh `[]` would re-run the landing effect
- * below on every render. */
+ * reference between renders — a fresh `[]` would make every memo and effect
+ * downstream see a change on every render. */
 const NO_PLANS: SubscriptionPlan[] = [];
 
 export default function SubscriptionScreen() {
   const theme = useTheme();
   const { t } = useI18n();
   const { width } = useWindowDimensions();
+  const { session } = useSession();
   const query = useSubscriptionPlans();
   const plans = query.data ?? NO_PLANS;
+  const activePlanCode = useActivePlanCode(session?.user.id).data ?? null;
+  const store = useSubscriptionPurchase(plans);
 
   const cardWidth = width - PEEK * 2;
   const stride = cardWidth + CARD_GAP;
@@ -63,7 +69,9 @@ export default function SubscriptionScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const [active, setActive] = useState(0);
   // Open on the tier Admin marked as the one to try, not on the free one.
-  // Done once per load (not on every render) so a swipe is never yanked back.
+  // Guarded by the list's identity, not by a boolean, so it runs once per
+  // list and a swipe is never yanked back — and in an effect, not in render,
+  // because it scrolls a ref that only exists after the first paint.
   const landedOn = useRef<string | null>(null);
   useEffect(() => {
     if (!plans.length) return;
@@ -71,8 +79,10 @@ export default function SubscriptionScreen() {
     if (landedOn.current === key) return;
     landedOn.current = key;
     const index = Math.max(0, plans.findIndex((plan) => plan.highlighted));
-    setActive(index);
-    if (index > 0) scrollRef.current?.scrollTo({ x: index * stride, animated: false });
+    if (index > 0) {
+      setActive(index);
+      scrollRef.current?.scrollTo({ x: index * stride, animated: false });
+    }
   }, [plans, stride]);
 
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -80,9 +90,34 @@ export default function SubscriptionScreen() {
     setActive(Math.min(Math.max(index, 0), Math.max(plans.length - 1, 0)));
   }
 
+  // Restore and the renewal disclosure both describe buying, so neither
+  // belongs on screen while nothing can be bought.
+  const anythingBuyable = plans.some((plan) => store.canBuy(plan));
+  const storeName = Platform.OS === 'android' ? 'Google Play' : 'App Store';
+
+  function openTerms() {
+    if (Platform.OS === 'ios') {
+      void WebBrowser.openBrowserAsync(APPLE_STANDARD_EULA);
+      return;
+    }
+    router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'terms' } });
+  }
+
   return (
     <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={t('plansTitle')} />
+      <BackBar
+        onBack={() => router.back()}
+        title={t('plansTitle')}
+        right={
+          anythingBuyable ? (
+            <Pressable onPress={store.restore} disabled={store.restoring || store.verifying} hitSlop={8}>
+              <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>
+                {t('restorePurchase')}
+              </Text>
+            </Pressable>
+          ) : undefined
+        }
+      />
       {query.isPending ? (
         <View style={styles.centered}>
           <ActivityIndicator color={theme.colors.primary} />
@@ -127,7 +162,13 @@ export default function SubscriptionScreen() {
             contentContainerStyle={{ paddingHorizontal: PEEK, gap: CARD_GAP, alignItems: 'stretch' }}
           >
             {plans.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} width={cardWidth} />
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                width={cardWidth}
+                store={store}
+                isCurrent={activePlanCode ? plan.code === activePlanCode : plan.isFree}
+              />
             ))}
           </ScrollView>
 
@@ -147,12 +188,34 @@ export default function SubscriptionScreen() {
             </View>
           ) : null}
 
+          {/* Three different things in three different tones: money on its
+              way (not an error), a refunded or lapsed subscription, and an
+              actual failure. One place for all of them, under the carousel —
+              a message inside a card would scroll out of sight. */}
+          {store.paymentPending ? (
+            <Text style={[theme.type.captionSm, styles.notice, { color: theme.colors.warning }]}>{t('purchasePending')}</Text>
+          ) : store.purchaseError ? (
+            <Text style={[theme.type.captionSm, styles.notice, { color: theme.colors.error }]}>
+              {store.purchaseError === 'restore_not_found'
+                ? t('restoreNotFound')
+                : store.purchaseError === 'purchase_revoked'
+                  ? t('purchaseRefunded')
+                  : store.purchaseError === 'subscription_expired'
+                    ? t('plansExpired')
+                    : store.purchaseError === 'claimed_by_other'
+                      ? t('purchaseClaimedByOther')
+                      : t('purchaseFailed')}
+            </Text>
+          ) : null}
+
+          {anythingBuyable ? (
+            <Text style={[theme.type.captionSm, styles.notice, { color: theme.colors.textMuted }]}>
+              {t('plansAutoRenewNote', { store: storeName })}
+            </Text>
+          ) : null}
+
           <View style={styles.footerRow}>
-            <Pressable
-              style={styles.footerItem}
-              hitSlop={6}
-              onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'terms' } })}
-            >
+            <Pressable style={styles.footerItem} hitSlop={6} onPress={openTerms}>
               <Icon name="file-text" size={13} color={theme.colors.textMuted} />
               <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]} numberOfLines={1}>
                 {t('terms')}
@@ -176,10 +239,26 @@ export default function SubscriptionScreen() {
   );
 }
 
-function PlanCard({ plan, width }: { plan: SubscriptionPlan; width: number }) {
+function PlanCard({
+  plan,
+  width,
+  store,
+  isCurrent,
+}: {
+  plan: SubscriptionPlan;
+  width: number;
+  store: SubscriptionPurchaseState;
+  isCurrent: boolean;
+}) {
   const theme = useTheme();
   const { t } = useI18n();
-  const canBuy = CAN_BUY_A_SUBSCRIPTION && !plan.isFree && !!plan.storeProductId;
+  const product = store.productFor(plan);
+  const canBuy = store.canBuy(plan) && !isCurrent;
+  const busy = store.pendingPlanCode === plan.code || (store.verifying && store.pendingPlanCode === plan.code);
+  // The store's price beats the admin label: it is the real amount in the
+  // buyer's own currency, and it stays right after a price change on the
+  // store side that nobody remembered to mirror in WEB Admin.
+  const priceLabel = product?.displayPrice ?? plan.priceLabel;
 
   return (
     // The badge straddles the card's top border, so the wrapper carries the
@@ -209,9 +288,9 @@ function PlanCard({ plan, width }: { plan: SubscriptionPlan; width: number }) {
           </Text>
         ) : null}
 
-        {plan.priceLabel ? (
+        {priceLabel ? (
           <View style={styles.priceRow}>
-            <Text style={[theme.type.h1, { color: theme.colors.primary, fontSize: 30, lineHeight: 36 }]}>{plan.priceLabel}</Text>
+            <Text style={[theme.type.h1, { color: theme.colors.primary, fontSize: 30, lineHeight: 36 }]}>{priceLabel}</Text>
             {plan.periodLabel ? (
               <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>/{plan.periodLabel}</Text>
             ) : null}
@@ -231,19 +310,22 @@ function PlanCard({ plan, width }: { plan: SubscriptionPlan; width: number }) {
           ))}
         </View>
 
-        {/* "Gói hiện tại của bạn" on the free tier is a statement about
-            today, not a lookup: nobody can hold a paid tier yet, so everyone
-            is on the free one. The moment a purchase can succeed this has to
-            read the user's entitlement instead of `isFree`. */}
         <Button
           variant={canBuy ? 'primary' : 'secondary'}
           disabled={!canBuy}
+          loading={busy}
           style={{ width: '100%', marginTop: 20 }}
-          onPress={canBuy ? () => { /* the purchase call lands here with CAN_BUY_A_SUBSCRIPTION */ } : undefined}
+          onPress={canBuy ? () => store.buy(plan) : undefined}
         >
-          {plan.isFree ? t('plansCurrentPlan') : canBuy ? t('plansChoose') : t('plansComingSoon')}
+          {isCurrent
+            ? t('plansCurrentPlan')
+            : canBuy
+              ? t('plansChoose')
+              : store.verifying
+                ? t('purchaseVerifying')
+                : t('plansComingSoon')}
         </Button>
-        {!plan.isFree && !canBuy ? (
+        {!isCurrent && !canBuy ? (
           <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, textAlign: 'center', marginTop: 8 }]}>
             {t('plansComingSoonHint')}
           </Text>
@@ -278,6 +360,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     marginBottom: 20,
     lineHeight: 21,
+  },
+  notice: {
+    textAlign: 'center',
+    paddingHorizontal: 32,
+    marginTop: 16,
+    lineHeight: 18,
   },
   card: {
     padding: 20,

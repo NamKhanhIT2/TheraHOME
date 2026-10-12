@@ -32,6 +32,7 @@ import { AvatarImg } from '@/components/AvatarImg';
 import { ProductDropdown } from '@/components/ProductDropdown';
 import { PainChart } from '@/components/PainChart';
 import { WaterCard } from '@/components/WaterCard';
+import { UpgradeCard } from '@/components/UpgradeCard';
 import { HeroProgressBar } from '@/components/HeroProgressBar';
 import { useI18n } from '@/lib/i18n';
 
@@ -385,6 +386,14 @@ export default function HomeScreen() {
         </Animated.View>
         </Reanimated.View>
         ) : null}
+
+        {/* Hides itself when no paid tier is configured or the user already
+            holds one — see src/components/UpgradeCard.tsx. */}
+        <Reanimated.View entering={fadeUpEntering(170)}>
+        <Animated.View style={softParallax(15)}>
+          <UpgradeCard userId={userId} />
+        </Animated.View>
+        </Reanimated.View>
 
         <Reanimated.View entering={fadeUpEntering(200)} style={{ marginTop: 16 }}>
         <View style={styles.sectionHeader}>

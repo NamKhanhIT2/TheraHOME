@@ -34,6 +34,21 @@ const FIELD_META: Record<string, { label: string; help: string; localized: boole
     localized: false,
     placeholder: "support@therahomeai.com",
   },
+  upgrade_card_title: {
+    label: 'Thẻ "Nâng cấp" trên Trang chủ — tiêu đề',
+    help:
+      "Thẻ mời nâng cấp gói, nằm trên Trang chủ dưới mục Lộ trình. Thẻ tự ẩn với người đã có gói trả phí. " +
+      "Để trống thì thẻ dùng tên của gói đang được đánh dấu nổi bật trong tab Gói đăng ký.",
+    localized: true,
+    placeholder: "Ví dụ: Nâng cấp để tập đúng hơn",
+  },
+  upgrade_card_body: {
+    label: 'Thẻ "Nâng cấp" trên Trang chủ — nội dung',
+    help: "Hai đến ba dòng. Để trống thì thẻ dùng mô tả ngắn của gói nổi bật.",
+    localized: true,
+    multiline: true,
+    placeholder: "Mở khoá chấm dáng tập qua video, chat AI không giới hạn...",
+  },
   home_intro_video_url: {
     label: 'Link video nút "Hướng dẫn nhanh" (Trang chủ)',
     help: "Nút nằm cạnh 'Bắt đầu hôm nay' trên Trang chủ. Có thể đặt link riêng cho từng thị trường.",

@@ -318,3 +318,133 @@ by Google and still checked for signature, audience and expiry, lives one
 hour, and never leaves the device except over TLS to Supabase. Apple
 sign-in is unaffected — the setting is per provider, and `appleAuth.ts`
 keeps its nonce.
+
+## Subscriptions (2026-10-12) — REQUIRED before the "Chọn gói" buttons work
+
+Everything in code is done: `subscription_plans` (the offer, edited in WEB
+Admin → "Gói đăng ký"), `user_subscriptions` (who holds what),
+`active_plan_code()` (the one place that decides whether a tier is still
+valid), the `verify-subscription` Edge Function, and the paywall at
+`app/subscription.tsx`.
+
+The buy buttons are off, behind **two** independent gates, both of which
+must open:
+
+1. `SUBSCRIPTIONS_ENABLED` in `src/lib/features.ts` — false. A build-time
+   switch, same shape as `IAP_ENABLED`.
+2. The store must RETURN the product. `canBuy` in
+   `src/hooks/useSubscription.ts` requires a product that came back from
+   StoreKit / Play Billing, so a product id typed into WEB Admin can never
+   on its own offer a purchase that would fail.
+
+### Step 0 — decide what each tier actually changes (do this FIRST)
+
+Nothing currently asks `active_plan_code()` anything. Today chấm dáng tập
+allows 4 clips a month to everybody (`form_review_monthly_allowance()`),
+chat AI is unlimited for everybody, and the call button has no tier check.
+
+**Selling a tier before this is done means taking money for nothing** — a
+refund queue, and an App Review rejection under 3.1.1 ("in-app purchase must
+unlock features or functionality"). Decide, for each of the three paid
+features, what the free tier gets and what each paid tier gets, then change
+the server-side functions to consult `active_plan_code()`.
+
+Note this is also where the free tier's allowance gets decided, the question
+left open on 2026-10-12: 4 clips a month free for everyone (today), or fewer
+free and the 4 moved behind "Đồng hành".
+
+### Step 1 — Apple: create the subscription products
+
+App Store Connect → the app → **Subscriptions**.
+
+1. Create a **Subscription Group** (one group, e.g. "TheraHOME"). Tiers in
+   the same group can be upgraded/downgraded between; tiers in different
+   groups can be held at the same time, which is not what you want.
+2. Inside it, create one **auto-renewable subscription** per paid plan:
+   - Reference Name: `Đồng hành` / `Chuyên sâu`
+   - Product ID: `neckplus_companion_monthly` /
+     `neckplus_intensive_monthly` (any stable string; it goes into WEB
+     Admin verbatim)
+   - Duration: 1 month
+   - Price: pick the Vietnam price; App Store Connect fills every other
+     country itself.
+3. Each one needs, or it stays in "Missing Metadata" and never appears in
+   the app: a **localised display name + description**, a **review
+   screenshot**, and the group's **Ranking** order set.
+4. The **Paid Applications Agreement** must be active — it already is (the
+   phase-unlock products are live).
+
+No new secret: `verify-subscription` reuses `APPLE_ISSUER_ID`,
+`APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` and `APPLE_BUNDLE_ID`, already set for
+`verify-apple-purchase`.
+
+### Step 2 — Google Play: create the subscription products
+
+Play Console → the app → **Monetise** → **Subscriptions**.
+
+1. **Create subscription** per paid plan. Product ID
+   (`neckplus_companion_monthly`), name, description.
+2. Add a **base plan** — this is the part people miss. A subscription with
+   no base plan returns nothing to the app. Auto-renewing, billing period
+   P1M, then set the price per region and **Activate** both the base plan
+   and the subscription.
+3. The app reads the base plan's **offer token** from the product the store
+   returns and passes it back on purchase (Play rejects a subscription
+   purchase without one). This is automatic — it is only listed here so a
+   missing base plan is recognisable: the button stays "Sắp mở".
+
+No new secret either: it reuses `GOOGLE_SERVICE_ACCOUNT_EMAIL`,
+`GOOGLE_SERVICE_ACCOUNT_KEY` and `GOOGLE_PLAY_PACKAGE_NAME`.
+
+### Step 3 — deploy the Edge Function
+
+```
+npx supabase functions deploy verify-subscription --project-ref nyjvtvmllwbyfokldgtj
+```
+
+Then confirm in the dashboard that it is **not** set to skip JWT
+verification: it binds the subscription to the caller's own session, so an
+unauthenticated call must be rejected.
+
+### Step 4 — put the product ids into WEB Admin
+
+Admin → **Gói đăng ký** → Sửa, per plan: "Mã sản phẩm Apple" and "Mã sản
+phẩm Google". Exactly the strings from steps 1 and 2.
+
+The price fields in that tab stay as a fallback only — once a store knows
+the product, the app shows the store's own price, which is what the card
+will actually be charged.
+
+### Step 5 — flip the switch and build
+
+`SUBSCRIPTIONS_ENABLED = true` in `src/lib/features.ts`, in the same build
+as step 0's gate changes. A subscription is a native purchase, so it needs a
+real build on each platform; it cannot be tested in Expo Go.
+
+### Step 6 — test with real store sandboxes
+
+- **iOS**: a **Sandbox Apple Account** (App Store Connect → Users and
+  Access → Sandbox) signed in on the device under Settings → App Store →
+  Sandbox Account. In sandbox a month renews every 5 minutes and
+  auto-renews 6 times, which is how to watch a renewal land —
+  `verify-subscription` should update the SAME `user_subscriptions` row and
+  push `current_period_end` forward, never add a second row.
+- **Android**: add the Google account as a **Licence tester** (Play Console
+  → Setup → Licence testing) and install from a track that account can
+  reach. Test purchases are free and renew every few minutes.
+- Check both: `select * from user_subscriptions` has one row per
+  subscription, and `select active_plan_code()` as that user returns the
+  plan code.
+
+### Still missing after all six steps
+
+A **renewal/cancellation webhook**. Right now the row only updates when the
+app asks — which it does on every open of the subscription screen (the
+silent catch-up in `useSubscription`), so a lapsed subscription stops
+granting on its own (`active_plan_code()` checks the date) and a renewal is
+picked up next time the user opens the app. What is NOT picked up without the
+app opening is a refund or a cancellation, the same gap
+`sync-apple-refunds` / `sync-voided-purchases` close for phase unlocks.
+Apple App Store Server Notifications V2 and Google's Real-time Developer
+Notifications are the proper fix; worth doing before volume, not before
+launch.
