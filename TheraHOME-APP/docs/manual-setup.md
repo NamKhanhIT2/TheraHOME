@@ -337,22 +337,27 @@ must open:
    StoreKit / Play Billing, so a product id typed into WEB Admin can never
    on its own offer a purchase that would fail.
 
-### Step 0 — decide what each tier actually changes (do this FIRST)
+### Step 0 — what each tier changes — DONE 2026-10-12/13
 
-Nothing currently asks `active_plan_code()` anything. Today chấm dáng tập
-allows 4 clips a month to everybody (`form_review_monthly_allowance()`),
-chat AI is unlimited for everybody, and the call button has no tier check.
+This was the blocker: selling a tier that changes nothing is a refund queue
+and an App Review rejection under 3.1.1. All seven benefit lines now have
+something behind them.
 
-**Selling a tier before this is done means taking money for nothing** — a
-refund queue, and an App Review rejection under 3.1.1 ("in-app purchase must
-unlock features or functionality"). Decide, for each of the three paid
-features, what the free tier gets and what each paid tier gets, then change
-the server-side functions to consult `active_plan_code()`.
+| | no plan | Premium | Plus | Trọn Đời |
+|---|---|---|---|---|
+| chat AI | 2/day | 20/day | 30/day | 40/day |
+| 1-1 calls | none | unlimited | unlimited | unlimited |
+| form checks | none | 200 MB/mo | 500 MB/mo | 500 MB/mo |
+| weekly report | — | yes | yes | yes |
+| habit reminder | — | yes | yes | yes |
+| device discount | — | — | 10% | 15% |
+| priority reply | — | CSKH sees the tier badge in chat | | |
 
-There is no free row on the paywall any more (owner 2026-10-12: Premium,
-Premium Plus, Premium Trọn Đời), but there are still non-subscribers — anyone
-who owns a device and has activated it. What THEY get is the other half of
-this decision, and today it is everything.
+Enforced by `ai_chat_daily_allowance()`, `start_call`,
+`request_form_review`, `dispatch-weekly-reports`,
+`suggested_reminder_hour()`, `subscription_plans.perk_discount_code` and
+`chat_thread_overview.plan_code`. Every number is editable in WEB Admin →
+Gói đăng ký → "Hạn mức của gói".
 
 ### Step 1 — Apple: create the subscription products
 
@@ -361,17 +366,25 @@ App Store Connect → the app → **Subscriptions**.
 1. Create a **Subscription Group** (one group, e.g. "TheraHOME"). Tiers in
    the same group can be upgraded/downgraded between; tiers in different
    groups can be held at the same time, which is not what you want.
-2. Inside it, create one **auto-renewable subscription** per renewing plan:
-   - Reference Name: `Premium` / `Premium Plus`
-   - Product ID: `neckplus_premium_monthly` /
-     `neckplus_premium_plus_monthly` (any stable string; it goes into WEB
-     Admin verbatim)
-   - Duration: 1 month
-   - Price: pick the Vietnam price; App Store Connect fills every other
-     country itself.
+2. Inside it, create one **auto-renewable subscription** per renewing plan.
+   The two durations are DIFFERENT, and this is the easiest thing to get
+   wrong:
+
+   | | Product ID | Duration | VN price |
+   |---|---|---|---|
+   | Premium | `neckplus_premium_monthly` | **1 month** | 99.000₫ |
+   | Premium Plus | `neckplus_premium_plus_quarterly` | **3 months** | 199.000₫ |
+
+   Set the Vietnam price and App Store Connect fills every other country
+   itself. If Apple has no tier at exactly 99.000₫ or 199.000₫, take the
+   nearest and **put that number back into WEB Admin** — the price label and
+   `price_amount_vnd` (which the revenue panel sums) both live there, and a
+   price that disagrees with the store makes the reconciliation panel lie.
 3. Each one needs, or it stays in "Missing Metadata" and never appears in
    the app: a **localised display name + description**, a **review
-   screenshot**, and the group's **Ranking** order set.
+   screenshot**, and the group's **Ranking** order set (put Premium Plus
+   above Premium — the ranking is what Apple uses to decide which way an
+   upgrade goes).
 4. The **Paid Applications Agreement** must be active — it already is (the
    phase-unlock products are live).
 
@@ -398,12 +411,22 @@ No new secret: `verify-subscription` reuses `APPLE_ISSUER_ID`,
 
 Play Console → the app → **Monetise** → **Subscriptions**.
 
-1. **Create subscription** per renewing plan. Product ID
-   (`neckplus_premium_monthly`), name, description.
-2. Add a **base plan** — this is the part people miss. A subscription with
-   no base plan returns nothing to the app. Auto-renewing, billing period
-   P1M, then set the price per region and **Activate** both the base plan
-   and the subscription.
+1. **Create subscription** per renewing plan, with the SAME product ids used
+   on Apple so WEB Admin holds one string per plan per store and they are
+   easy to compare: `neckplus_premium_monthly` and
+   `neckplus_premium_plus_quarterly`.
+2. Add a **base plan** to each — this is the part people miss. A
+   subscription with no base plan returns nothing to the app, and the button
+   stays "Sắp mở" with no error anywhere. Auto-renewing, then:
+
+   | subscription | base plan billing period |
+   |---|---|
+   | `neckplus_premium_monthly` | **P1M** |
+   | `neckplus_premium_plus_quarterly` | **P3M** |
+
+   Set the price per region, then **Activate the base plan AND the
+   subscription** — two separate buttons, and an inactive base plan behaves
+   exactly like a missing one.
 3. The app reads the base plan's **offer token** from the product the store
    returns and passes it back on purchase (Play rejects a subscription
    purchase without one). This is automatic — it is only listed here so a
@@ -430,6 +453,15 @@ Redeploy after any change to it:
 npx supabase functions deploy verify-subscription --project-ref nyjvtvmllwbyfokldgtj
 ```
 
+### Step 3b — create the two Shopify discount codes
+
+Admin → Gói đăng ký seeds `THERAPLUS10` (10%) and `THERALIFE15` (15%), and
+the app shows the code to whoever holds that tier. **Nothing validates it.**
+Create both in Shopify (Discounts → Amount off products, percentage, no
+minimum) or change the codes in WEB Admin to ones that already exist. A code
+that does not work is read by the customer as a broken promise, which is
+worse than not offering one.
+
 ### Step 4 — put the product ids into WEB Admin
 
 Admin → **Gói đăng ký** → Sửa, per plan: "Mã sản phẩm Apple" and "Mã sản
@@ -441,9 +473,14 @@ will actually be charged.
 
 ### Step 5 — flip the switch and build
 
-`SUBSCRIPTIONS_ENABLED = true` in `src/lib/features.ts`, in the same build
-as step 0's gate changes. A subscription is a native purchase, so it needs a
-real build on each platform; it cannot be tested in Expo Go.
+`SUBSCRIPTIONS_ENABLED = true` in `src/lib/features.ts`. Step 0 is already
+done, so this is now the only code change left. A subscription is a native
+purchase, so it needs a real build on each platform; it cannot be tested in
+Expo Go.
+
+Flipping it alone cannot break anything: `canBuy` ALSO requires the store to
+have returned the product, so on a platform where the products do not exist
+yet the buttons stay "Sắp mở".
 
 ### Step 6 — test with real store sandboxes
 
