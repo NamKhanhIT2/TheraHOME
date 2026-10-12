@@ -5145,3 +5145,57 @@ with no caption is the worst thing this screen can show, because the user
 cannot tell a bad line from a crashed app. Reconnecting or a lost line
 brings the controls back and the auto-hide timer does not start again until
 it has passed.
+
+### "Tôi tập thế này đúng chưa?" — chấm bài tập qua video (2026-10-12)
+
+The one question somebody doing rehab alone at home cannot answer, and the
+one no amount of software answers for them. The customer records a clip of
+themselves doing a day's exercise; a specialist watches it and writes back.
+
+**Almost nothing new travels.** The clip is an ordinary attachment in the
+customer's existing support thread — `chat_messages.attachment_path` already
+carried video, and `useChat` already distinguished video from image by
+extension — so the upload, the signed URL, the push, the unread badge, the
+reply and the whole staff conversation screen are the ones that already
+work, and none of it was re-implemented. What a chat cannot carry is the two
+things `form_reviews` holds: WHICH exercise the clip is of, and whether
+anyone has dealt with it yet.
+
+That is also why the review row points AT a message rather than owning the
+video. `sendChatMessageRequest` now returns the id it inserted, which is the
+only change the chat needed.
+
+**The three steps are deliberately not atomic.** Upload, post, then file the
+review. If the first two fail nothing has happened and the customer retries.
+If the REVIEW fails — over the allowance, say — the clip is already in the
+conversation where a specialist can see it. The worst case is a video in a
+chat, which is a perfectly ordinary thing for a chat to contain; deleting a
+clip somebody just recorded because a counter said no is worse.
+
+**The allowance is a server-side function, not a client constant.**
+`form_review_monthly_allowance()` returns 4 and `form_review_max_pending()`
+returns 1, and the client READS them rather than knowing them, so what the
+customer is told and what the server enforces cannot drift. The monthly one
+is the lever a paid tier will pull; the pending one is operational — a queue
+one person can flood is a queue that starves everyone else.
+
+**The table has no INSERT or UPDATE policy at all.** Every transition goes
+through `request_form_review` / `complete_form_review`, which is what makes
+"your own clip", "staff only" and the allowance real rather than advisory.
+Verified against production in rolled-back transactions: the happy path
+files a pending row; a second clip while one waits is refused; the same clip
+twice is refused; a non-staff caller cannot complete one; and the fifth clip
+in a month is refused with `monthly_allowance_reached`.
+
+**The "Đã chấm" button is in the thread, not in a queue screen.** The work
+happens in the conversation — watch the clip, type the answer — so the
+button that says it is done belongs where it cannot be ticked by somebody
+who has not actually replied.
+
+**Still open:** there is no separate push when a review is marked reviewed.
+The specialist's reply is itself a chat message, which already pushes, so
+the customer hears about it — but a clip answered with no written reply
+would update the card silently. Staff discoverability is the conversation
+list's unread badge plus the clip's caption ("Nhờ chuyên viên xem giúp em
+bài tập Ngày N"); if clips start getting missed, a pending count belongs on
+the staff conversations header.

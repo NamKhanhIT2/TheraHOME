@@ -16,6 +16,7 @@ import { Icon } from '@/components/icons/Icon';
 import { RemoteImage } from '@/components/ui/RemoteImage';
 import { AvatarImg } from '@/components/AvatarImg';
 import { CallButton } from '@/components/chat/CallButton';
+import { FormReviewBanner } from '@/components/chat/FormReviewBanner';
 import { ChatMediaViewer } from '@/components/ChatMediaViewer';
 import { ReactionAsset } from '@/components/ReactionAsset';
 import { hapticConfirm, hapticPressHold } from '@/lib/haptics';
@@ -202,6 +203,8 @@ export default function AdminChatThreadScreen() {
               direction rather than a call to the support line. */}
           <CallButton threadId={threadId} calleeId={patientQuery.data?.userId} />
         </View>
+        {/* What this clip is of, and a way to say it has been dealt with. */}
+        <FormReviewBanner threadId={threadId} enabled={!!staffUserId} />
         {messagesQuery.isPending ? <View style={styles.loading}><ActivityIndicator color={theme.colors.primary} /></View> : <FlatList ref={listRef} inverted data={messages} keyExtractor={(item) => item.id} renderItem={renderMessage} contentContainerStyle={styles.body} keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" maintainVisibleContentPosition={CHAT_FOLLOW_NEW_MESSAGES} onTouchStart={() => setShowEmojis(false)} onScrollBeginDrag={() => setShowEmojis(false)} onEndReached={() => { if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) void messagesQuery.fetchNextPage(); }} onEndReachedThreshold={0.2} ListHeaderComponent={<View style={styles.listBottomSpacer} />} ListFooterComponent={messagesQuery.isFetchingNextPage ? <ActivityIndicator color={theme.colors.primary} /> : null} ListEmptyComponent={<Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>Chưa có tin nhắn nào.</Text>} />}
         {context ? <View style={[styles.context, { backgroundColor: theme.colors.bgCardAlt, borderLeftColor: theme.colors.primary }]}><View style={styles.flex}><Text style={[styles.contextTitle, { color: theme.colors.primary }]}>Đang trả lời</Text><Text numberOfLines={1} style={{ color: theme.colors.textSecondary }}>{context.body || 'Ảnh'}</Text></View><Pressable onPress={() => setReplyingTo(null)}><Icon name="x" size={18} color={theme.colors.textMuted} /></Pressable></View> : null}
         {showEmojis ? <View style={[styles.emojiBar, { borderTopColor: theme.colors.divider }]}>{COMPOSER_EMOJIS.map((emoji) => <Pressable key={emoji} onPress={() => setText((value) => value + emoji)}><Text style={styles.composerEmoji}>{emoji}</Text></Pressable>)}</View> : null}

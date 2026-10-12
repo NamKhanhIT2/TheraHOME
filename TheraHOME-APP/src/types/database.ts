@@ -2217,6 +2217,54 @@ export type Database = {
         }
         Relationships: []
       }
+      form_reviews: {
+        Row: {
+          created_at: string
+          day_label: string | null
+          day_number: number | null
+          id: string
+          message_id: string
+          program_day_id: string | null
+          reply_message_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          thread_id: string
+          user_id: string
+          user_program_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          day_label?: string | null
+          day_number?: number | null
+          id?: string
+          message_id: string
+          program_day_id?: string | null
+          reply_message_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          thread_id: string
+          user_id: string
+          user_program_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          day_label?: string | null
+          day_number?: number | null
+          id?: string
+          message_id?: string
+          program_day_id?: string | null
+          reply_message_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          thread_id?: string
+          user_id?: string
+          user_program_id?: string | null
+        }
+        Relationships: []
+      }
       water_logs: {
         Row: {
           cups_logged: number
@@ -2583,6 +2631,26 @@ export type Database = {
       record_local_reminder_notification: {
         Args: { p_body: string; p_destination?: string; p_title: string }
         Returns: string
+      }
+      complete_form_review: {
+        Args: { p_review_id: string; p_reply_message_id?: string }
+        Returns: Database["public"]["Tables"]["form_reviews"]["Row"]
+      }
+      form_review_max_pending: { Args: Record<PropertyKey, never>; Returns: number }
+      form_review_monthly_allowance: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      request_form_review: {
+        Args: {
+          p_day_label?: string
+          p_day_number?: number
+          p_message_id: string
+          p_program_day_id?: string
+          p_thread_id: string
+          p_user_program_id?: string
+        }
+        Returns: Database["public"]["Tables"]["form_reviews"]["Row"]
       }
       register_push_token: {
         Args: { p_device?: string; p_token: string }

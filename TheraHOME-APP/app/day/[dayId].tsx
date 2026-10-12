@@ -13,6 +13,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { PainScaleModal } from '@/components/PainScaleModal';
+import { FormReviewCard } from '@/components/day/FormReviewCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
@@ -407,6 +408,18 @@ export default function DayDetailScreen() {
               <Icon name="external-link" size={18} color={theme.colors.primary} />
               <Text numberOfLines={1} style={[theme.type.button, { color: theme.colors.primary }]}>{supportToolsLabel}</Text>
             </Pressable>
+          ) : null}
+          {/* "Tôi tập thế này đúng chưa?" — a clip of this exercise, sent to
+              a specialist. Only on a day the customer can actually do: there
+              is nothing to film on a locked one. */}
+          {!progressLocked ? (
+            <FormReviewCard
+              userId={userId}
+              userProgramId={userProgramId}
+              programDayId={programDayId}
+              dayNumber={d.id}
+              dayLabel={d.phase}
+            />
           ) : null}
         </View>
       </ScrollView>

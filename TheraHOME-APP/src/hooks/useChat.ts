@@ -183,12 +183,15 @@ export async function sendChatMessageRequest({
   kind: ChatKind;
   senderType: 'user' | 'specialist';
   input: string | SendChatMessageInput;
-}): Promise<void> {
+  /** The id of the message that was written. Callers that only send and
+   * forget ignore it; the form-review flow needs it, because the review row
+   * has to point AT the clip rather than describe it. */
+}): Promise<string> {
   const message: SendChatMessageInput = typeof input === 'string' ? { body: input } : input;
   const attachmentPath = message.attachmentPath ?? (message.attachmentLocalUri
     ? await uploadChatAttachment(userId, threadId, message.attachmentLocalUri, message.attachmentMimeType ?? undefined, message.attachmentWidth, message.attachmentHeight)
     : null);
-  const { error } = await supabase
+  const { data: inserted, error } = await supabase
     .from('chat_messages')
     .insert({
       thread_id: threadId,
@@ -197,7 +200,9 @@ export async function sendChatMessageRequest({
       body: message.body,
       attachment_path: attachmentPath,
       reply_to_message_id: message.replyToMessageId ?? null,
-    });
+    })
+    .select('id')
+    .single();
   if (error) throw error;
 
   if (kind !== 'ai') {
@@ -207,6 +212,8 @@ export async function sendChatMessageRequest({
       if (pushError && __DEV__) console.warn('dispatch-push failed:', pushError);
     });
   }
+
+  return inserted.id;
 }
 
 /**
