@@ -851,6 +851,97 @@ export type Database = {
         }
         Relationships: []
       }
+      form_reviews: {
+        Row: {
+          created_at: string
+          day_label: string | null
+          day_number: number | null
+          id: string
+          message_id: string
+          program_day_id: string | null
+          reply_message_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          thread_id: string
+          user_id: string
+          user_program_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          day_label?: string | null
+          day_number?: number | null
+          id?: string
+          message_id: string
+          program_day_id?: string | null
+          reply_message_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          thread_id: string
+          user_id: string
+          user_program_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          day_label?: string | null
+          day_number?: number | null
+          id?: string
+          message_id?: string
+          program_day_id?: string | null
+          reply_message_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          thread_id?: string
+          user_id?: string
+          user_program_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_reviews_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_reviews_program_day_id_fkey"
+            columns: ["program_day_id"]
+            isOneToOne: false
+            referencedRelation: "program_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_reviews_reply_message_id_fkey"
+            columns: ["reply_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_reviews_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_thread_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_reviews_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_reviews_user_program_id_fkey"
+            columns: ["user_program_id"]
+            isOneToOne: false
+            referencedRelation: "user_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hidden_community_comments: {
         Row: {
           comment_id: string
@@ -1947,6 +2038,90 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          active: boolean
+          apple_product_id: string | null
+          badge_en: string | null
+          badge_ms: string | null
+          badge_vi: string | null
+          code: string
+          created_at: string
+          features: Json
+          google_product_id: string | null
+          highlighted: boolean
+          id: string
+          name_en: string | null
+          name_ms: string | null
+          name_vi: string
+          period_label_en: string | null
+          period_label_ms: string | null
+          period_label_vi: string | null
+          price_label_en: string | null
+          price_label_ms: string | null
+          price_label_vi: string | null
+          sort_order: number
+          tagline_en: string | null
+          tagline_ms: string | null
+          tagline_vi: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          apple_product_id?: string | null
+          badge_en?: string | null
+          badge_ms?: string | null
+          badge_vi?: string | null
+          code: string
+          created_at?: string
+          features?: Json
+          google_product_id?: string | null
+          highlighted?: boolean
+          id?: string
+          name_en?: string | null
+          name_ms?: string | null
+          name_vi: string
+          period_label_en?: string | null
+          period_label_ms?: string | null
+          period_label_vi?: string | null
+          price_label_en?: string | null
+          price_label_ms?: string | null
+          price_label_vi?: string | null
+          sort_order?: number
+          tagline_en?: string | null
+          tagline_ms?: string | null
+          tagline_vi?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          apple_product_id?: string | null
+          badge_en?: string | null
+          badge_ms?: string | null
+          badge_vi?: string | null
+          code?: string
+          created_at?: string
+          features?: Json
+          google_product_id?: string | null
+          highlighted?: boolean
+          id?: string
+          name_en?: string | null
+          name_ms?: string | null
+          name_vi?: string
+          period_label_en?: string | null
+          period_label_ms?: string | null
+          period_label_vi?: string | null
+          price_label_en?: string | null
+          price_label_ms?: string | null
+          price_label_vi?: string | null
+          sort_order?: number
+          tagline_en?: string | null
+          tagline_ms?: string | null
+          tagline_vi?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       system_notification_templates: {
         Row: {
           body: string
@@ -2217,54 +2392,6 @@ export type Database = {
         }
         Relationships: []
       }
-      form_reviews: {
-        Row: {
-          created_at: string
-          day_label: string | null
-          day_number: number | null
-          id: string
-          message_id: string
-          program_day_id: string | null
-          reply_message_id: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-          thread_id: string
-          user_id: string
-          user_program_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          day_label?: string | null
-          day_number?: number | null
-          id?: string
-          message_id: string
-          program_day_id?: string | null
-          reply_message_id?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          thread_id: string
-          user_id: string
-          user_program_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          day_label?: string | null
-          day_number?: number | null
-          id?: string
-          message_id?: string
-          program_day_id?: string | null
-          reply_message_id?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          thread_id?: string
-          user_id?: string
-          user_program_id?: string | null
-        }
-        Relationships: []
-      }
       water_logs: {
         Row: {
           cups_logged: number
@@ -2473,6 +2600,30 @@ export type Database = {
         }
         Returns: undefined
       }
+      complete_form_review: {
+        Args: { p_reply_message_id?: string; p_review_id: string }
+        Returns: {
+          created_at: string
+          day_label: string | null
+          day_number: number | null
+          id: string
+          message_id: string
+          program_day_id: string | null
+          reply_message_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          thread_id: string
+          user_id: string
+          user_program_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "form_reviews"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       contains_unsafe_community_content: {
         Args: { p_text: string }
         Returns: boolean
@@ -2544,6 +2695,8 @@ export type Database = {
         Returns: number
       }
       expire_stale_calls: { Args: never; Returns: number }
+      form_review_max_pending: { Args: never; Returns: number }
+      form_review_monthly_allowance: { Args: never; Returns: number }
       format_community_notification: {
         Args: {
           p_actor_name: string
@@ -2632,15 +2785,11 @@ export type Database = {
         Args: { p_body: string; p_destination?: string; p_title: string }
         Returns: string
       }
-      complete_form_review: {
-        Args: { p_review_id: string; p_reply_message_id?: string }
-        Returns: Database["public"]["Tables"]["form_reviews"]["Row"]
+      register_push_token: {
+        Args: { p_device?: string; p_token: string }
+        Returns: undefined
       }
-      form_review_max_pending: { Args: Record<PropertyKey, never>; Returns: number }
-      form_review_monthly_allowance: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      register_voip_token: { Args: { p_token: string }; Returns: undefined }
       request_form_review: {
         Args: {
           p_day_label?: string
@@ -2650,13 +2799,28 @@ export type Database = {
           p_thread_id: string
           p_user_program_id?: string
         }
-        Returns: Database["public"]["Tables"]["form_reviews"]["Row"]
+        Returns: {
+          created_at: string
+          day_label: string | null
+          day_number: number | null
+          id: string
+          message_id: string
+          program_day_id: string | null
+          reply_message_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          thread_id: string
+          user_id: string
+          user_program_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "form_reviews"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      register_push_token: {
-        Args: { p_device?: string; p_token: string }
-        Returns: undefined
-      }
-      register_voip_token: { Args: { p_token: string }; Returns: undefined }
       resolve_thera_login_email: {
         Args: { p_username: string }
         Returns: string

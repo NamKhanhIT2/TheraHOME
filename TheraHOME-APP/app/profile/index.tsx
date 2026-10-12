@@ -15,6 +15,10 @@ import { Icon } from '@/components/icons/Icon';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 
 const MENU: { icon: string; labelKey: TranslationKey; route: string }[] = [
+  // The subscription ladder (app/subscription.tsx). First row on purpose:
+  // it is the only entrance to it, and a free user is meant to be able to
+  // read what the paid tiers contain.
+  { icon: 'crown', labelKey: 'plansUpgrade', route: '/subscription' },
   { icon: 'pencil', labelKey: 'editProfile', route: '/profile/edit' },
   { icon: 'bell', labelKey: 'workoutReminders', route: '/profile/notifications-settings' },
   { icon: 'grid', labelKey: 'accountSettings', route: '/profile/account' },
