@@ -93,6 +93,11 @@ export default function SubscriptionScreen() {
   // Restore and the renewal disclosure both describe buying, so neither
   // belongs on screen while nothing can be bought.
   const anythingBuyable = plans.some((plan) => store.canBuy(plan));
+  // The renewal disclosure is specifically about auto-renewing products.
+  // Premium Trọn Đời does not renew, so saying it does would be a false
+  // statement about the thing being sold — the opposite of what the rule is
+  // for.
+  const anyRenewingBuyable = plans.some((plan) => plan.billing === 'subscription' && store.canBuy(plan));
   const storeName = Platform.OS === 'android' ? 'Google Play' : 'App Store';
 
   function openTerms() {
@@ -167,7 +172,7 @@ export default function SubscriptionScreen() {
                 plan={plan}
                 width={cardWidth}
                 store={store}
-                isCurrent={activePlanCode ? plan.code === activePlanCode : plan.isFree}
+                isCurrent={plan.code === activePlanCode}
               />
             ))}
           </ScrollView>
@@ -208,7 +213,7 @@ export default function SubscriptionScreen() {
             </Text>
           ) : null}
 
-          {anythingBuyable ? (
+          {anyRenewingBuyable ? (
             <Text style={[theme.type.captionSm, styles.notice, { color: theme.colors.textMuted }]}>
               {t('plansAutoRenewNote', { store: storeName })}
             </Text>

@@ -18,6 +18,7 @@ import {
   ErrorCode,
   getAvailablePurchases as fetchOwnedPurchases,
   type Purchase,
+  type Product,
   type ProductSubscription,
 } from 'react-native-iap';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -84,8 +85,10 @@ const TERMINAL_VERIFY_ERRORS = new Set([
 export interface SubscriptionPurchaseState {
   connected: boolean;
   /** The store's own product for a plan — `displayPrice` is the real price
-   * in the buyer's currency, which beats any label typed into WEB Admin. */
-  productFor: (plan: SubscriptionPlan) => ProductSubscription | null;
+   * in the buyer's currency, which beats any label typed into WEB Admin.
+   * Looked up in the renewing list or the one-off list depending on the
+   * plan's `billing`, because the store keeps them apart. */
+  productFor: (plan: SubscriptionPlan) => ProductSubscription | Product | null;
   /** True once the store has confirmed this plan exists and is buyable. A
    * product id typed into WEB Admin that does not exist in the store simply
    * never shows up here, so copy alone can never enable a buy button. */
@@ -226,7 +229,7 @@ export function useSubscriptionPurchase(
     [planForProduct, queryClient, settle],
   );
 
-  const { connected, subscriptions, fetchProducts, requestPurchase, finishTransaction } = useIAP({
+  const { connected, products, subscriptions, fetchProducts, requestPurchase, finishTransaction } = useIAP({
     onPurchaseSuccess: (purchase) => {
       requestedRef.current = null;
       setPendingPlanCode(null);
@@ -253,25 +256,47 @@ export function useSubscriptionPurchase(
     },
   });
 
-  // One request for every plan's SKU. Joined into a string so the effect
-  // compares by value — `plans` is a fresh array on most renders.
-  const skuKey = plans
+  // TWO requests, because the stores keep renewing and one-off products in
+  // separate catalogues: a 'subs' query will not return a Non-Consumable and
+  // an 'in-app' query will not return a subscription. Asking the wrong way
+  // looks exactly like a product that does not exist.
+  //
+  // Joined into strings so the effect compares by value — `plans` is a fresh
+  // array on most renders.
+  const subsKey = plans
+    .filter((plan) => plan.billing === 'subscription')
+    .map((plan) => plan.storeProductId)
+    .filter(Boolean)
+    .join(',');
+  const oneOffKey = plans
+    .filter((plan) => plan.billing === 'lifetime')
     .map((plan) => plan.storeProductId)
     .filter(Boolean)
     .join(',');
   useEffect(() => {
-    if (!connected || !skuKey) return;
-    void fetchProducts({ skus: skuKey.split(','), type: 'subs' }).catch((e: unknown) => {
-      // A SKU the store does not know is simply omitted, so this only fires
-      // on a real failure — and it must not reject into nothing.
-      if (__DEV__) console.warn('fetchProducts(subs) failed:', e);
-    });
-  }, [connected, skuKey, fetchProducts]);
+    if (!connected) return;
+    // A SKU the store does not know is simply omitted rather than thrown, so
+    // these only reject on a real failure — and must not reject into
+    // nothing.
+    if (subsKey) {
+      void fetchProducts({ skus: subsKey.split(','), type: 'subs' }).catch((e: unknown) => {
+        if (__DEV__) console.warn('fetchProducts(subs) failed:', e);
+      });
+    }
+    if (oneOffKey) {
+      void fetchProducts({ skus: oneOffKey.split(','), type: 'in-app' }).catch((e: unknown) => {
+        if (__DEV__) console.warn('fetchProducts(in-app) failed:', e);
+      });
+    }
+  }, [connected, subsKey, oneOffKey, fetchProducts]);
 
   const productFor = useCallback(
-    (plan: SubscriptionPlan) =>
-      (plan.storeProductId ? subscriptions.find((product) => product.id === plan.storeProductId) : undefined) ?? null,
-    [subscriptions],
+    (plan: SubscriptionPlan): ProductSubscription | Product | null => {
+      if (!plan.storeProductId) return null;
+      const list: (ProductSubscription | Product)[] = plan.billing === 'lifetime' ? products : subscriptions;
+      return list.find((product) => product.id === plan.storeProductId) ?? null;
+    },
+    [products, subscriptions],
   );
 
   // Two independent gates, both required. SUBSCRIPTIONS_ENABLED says we have
@@ -280,8 +305,7 @@ export function useSubscriptionPurchase(
   // the first without the second would offer a product id that 404s, and the
   // second without the first would sell a tier that grants nothing.
   const canBuy = useCallback(
-    (plan: SubscriptionPlan) =>
-      SUBSCRIPTIONS_ENABLED && !plan.isFree && !!plan.storeProductId && connected && !!productFor(plan),
+    (plan: SubscriptionPlan) => SUBSCRIPTIONS_ENABLED && !!plan.storeProductId && connected && !!productFor(plan),
     [connected, productFor],
   );
 
@@ -298,10 +322,23 @@ export function useSubscriptionPurchase(
       setPurchaseError(null);
       setPaymentPending(false);
 
+      // A one-off purchase is asked for as 'in-app' and carries no offers.
+      // Sending subscriptionOffers with it, or asking for it as 'subs', is
+      // rejected by Play.
+      if (plan.billing === 'lifetime') {
+        requestPurchase({ request: { apple: { sku }, google: { skus: [sku] } }, type: 'in-app' }).catch((e: unknown) => {
+          requestedRef.current = null;
+          setPendingPlanCode(null);
+          setPurchaseError(e instanceof Error ? e.message : 'purchase_failed');
+          if (__DEV__) console.warn('requestPurchase(in-app) failed:', e);
+        });
+        return;
+      }
+
       // Android needs the base plan's offer token, and it only exists on the
       // product the store just returned — which is exactly why `canBuy`
       // requires a fetched product rather than a configured id.
-      const offers = (product.subscriptionOffers ?? [])
+      const offers = ((product as ProductSubscription).subscriptionOffers ?? [])
         .map((offer) => offer.offerTokenAndroid)
         .filter((token): token is string => !!token);
 
@@ -364,10 +401,10 @@ export function useSubscriptionPurchase(
   // still sitting in the store account.
   const caughtUpRef = useRef(false);
   useEffect(() => {
-    if (!connected || !skuKey || caughtUpRef.current) return;
+    if (!connected || (!subsKey && !oneOffKey) || caughtUpRef.current) return;
     caughtUpRef.current = true;
     void claimOwned({ announce: false });
-  }, [connected, skuKey, claimOwned]);
+  }, [connected, subsKey, oneOffKey, claimOwned]);
 
   useEffect(() => {
     if (ownedRetry === 0 || handledOwnedRef.current === ownedRetry) return;

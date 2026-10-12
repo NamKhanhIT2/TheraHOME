@@ -349,9 +349,10 @@ unlock features or functionality"). Decide, for each of the three paid
 features, what the free tier gets and what each paid tier gets, then change
 the server-side functions to consult `active_plan_code()`.
 
-Note this is also where the free tier's allowance gets decided, the question
-left open on 2026-10-12: 4 clips a month free for everyone (today), or fewer
-free and the 4 moved behind "Đồng hành".
+There is no free row on the paywall any more (owner 2026-10-12: Premium,
+Premium Plus, Premium Trọn Đời), but there are still non-subscribers — anyone
+who owns a device and has activated it. What THEY get is the other half of
+this decision, and today it is everything.
 
 ### Step 1 — Apple: create the subscription products
 
@@ -360,10 +361,10 @@ App Store Connect → the app → **Subscriptions**.
 1. Create a **Subscription Group** (one group, e.g. "TheraHOME"). Tiers in
    the same group can be upgraded/downgraded between; tiers in different
    groups can be held at the same time, which is not what you want.
-2. Inside it, create one **auto-renewable subscription** per paid plan:
-   - Reference Name: `Đồng hành` / `Chuyên sâu`
-   - Product ID: `neckplus_companion_monthly` /
-     `neckplus_intensive_monthly` (any stable string; it goes into WEB
+2. Inside it, create one **auto-renewable subscription** per renewing plan:
+   - Reference Name: `Premium` / `Premium Plus`
+   - Product ID: `neckplus_premium_monthly` /
+     `neckplus_premium_plus_monthly` (any stable string; it goes into WEB
      Admin verbatim)
    - Duration: 1 month
    - Price: pick the Vietnam price; App Store Connect fills every other
@@ -374,6 +375,21 @@ App Store Connect → the app → **Subscriptions**.
 4. The **Paid Applications Agreement** must be active — it already is (the
    phase-unlock products are live).
 
+**Premium Trọn Đời does NOT go here.** It is bought once, so it is a
+**Non-Consumable** under **In-App Purchases**, not a subscription, and it
+must not be put in the subscription group — a product in a group is
+something the buyer can be moved off, which is the opposite of "trọn đời".
+Create it as:
+   - Type: **Non-Consumable**
+   - Product ID: `neckplus_premium_lifetime`
+   - Price: the one-off price.
+
+The plan row says which kind it is (`billing_type`, set from the "Loại thanh
+toán" picker in WEB Admin), and both the app and the Edge Function read that
+rather than guessing: the app asks StoreKit for it as `in-app`, and the
+function verifies it against the product endpoint. Get the picker wrong and
+the store returns nothing, so the button simply stays "Sắp mở".
+
 No new secret: `verify-subscription` reuses `APPLE_ISSUER_ID`,
 `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` and `APPLE_BUNDLE_ID`, already set for
 `verify-apple-purchase`.
@@ -382,8 +398,8 @@ No new secret: `verify-subscription` reuses `APPLE_ISSUER_ID`,
 
 Play Console → the app → **Monetise** → **Subscriptions**.
 
-1. **Create subscription** per paid plan. Product ID
-   (`neckplus_companion_monthly`), name, description.
+1. **Create subscription** per renewing plan. Product ID
+   (`neckplus_premium_monthly`), name, description.
 2. Add a **base plan** — this is the part people miss. A subscription with
    no base plan returns nothing to the app. Auto-renewing, billing period
    P1M, then set the price per region and **Activate** both the base plan
@@ -393,18 +409,26 @@ Play Console → the app → **Monetise** → **Subscriptions**.
    purchase without one). This is automatic — it is only listed here so a
    missing base plan is recognisable: the button stays "Sắp mở".
 
+**Premium Trọn Đời goes somewhere else again**: Play Console → Monetise →
+**In-app products** (not Subscriptions), one **one-time product**
+(`neckplus_premium_lifetime`), priced and **Activated**. A one-time product
+has no base plan and no offer token.
+
 No new secret either: it reuses `GOOGLE_SERVICE_ACCOUNT_EMAIL`,
 `GOOGLE_SERVICE_ACCOUNT_KEY` and `GOOGLE_PLAY_PACKAGE_NAME`.
 
-### Step 3 — deploy the Edge Function
+### Step 3 — deploy the Edge Function — DONE 2026-10-12
+
+Deployed (version 2, `verify_jwt` on) and smoke-tested: an empty body answers
+`400 missing_required_field`, and a call carrying only the anon key answers
+`401 unauthorized` — which is the point, since it binds the purchase to the
+caller's own session rather than to anything the client sends.
+
+Redeploy after any change to it:
 
 ```
 npx supabase functions deploy verify-subscription --project-ref nyjvtvmllwbyfokldgtj
 ```
-
-Then confirm in the dashboard that it is **not** set to skip JWT
-verification: it binds the subscription to the caller's own session, so an
-unauthenticated call must be rejected.
 
 ### Step 4 — put the product ids into WEB Admin
 
@@ -435,6 +459,26 @@ real build on each platform; it cannot be tested in Expo Go.
 - Check both: `select * from user_subscriptions` has one row per
   subscription, and `select active_plan_code()` as that user returns the
   plan code.
+
+For **Premium Trọn Đời** there is no renewal to watch: buy it once and check
+that `user_subscriptions` holds one row with `current_period_end` null and
+`active_plan_code()` returns `premium_lifetime`. The null is deliberate —
+`active_plan_code()` reads "no end date" as still valid, which is what makes
+forever work without a special case.
+
+### One business note on Trọn Đời, not a technical one
+
+A one-off price against benefits that cost money every month is an open
+liability: `premium_lifetime` currently promises 2 video sessions and 12
+form checks a month, for ever, for 4.990.000đ. That is roughly 12 months of
+Premium Plus, so a buyer who stays three years is served at a loss, and the
+only lever left afterwards is reducing what was promised.
+
+Three ways out, all editable in WEB Admin without a build: price it nearer
+24–36 months of Premium Plus; cap the human services in total rather than
+per month ("24 buổi gọi video", not "2 mỗi tháng"); or keep the one-off tier
+to the automated side (chat AI, reports, roadmap) and sell consultations
+separately. The seeded numbers are a starting point, not a recommendation.
 
 ### Still missing after all six steps
 

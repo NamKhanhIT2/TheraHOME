@@ -21,10 +21,17 @@ export interface PlanFeature {
   text: string;
 }
 
+export type PlanBilling = 'subscription' | 'lifetime';
+
 export interface SubscriptionPlan {
   id: string;
   /** Stable key — what code should match on, never the display name. */
   code: string;
+  /** Which KIND of product this is at the store. 'lifetime' is bought once
+   * (Apple Non-Consumable / Play one-time product), so it is requested with
+   * type 'in-app', has no renewal and never expires — nothing about it is a
+   * subscription except the name of the table it lands in. */
+  billing: PlanBilling;
   highlighted: boolean;
   name: string;
   tagline: string;
@@ -32,17 +39,17 @@ export interface SubscriptionPlan {
   priceLabel: string;
   periodLabel: string;
   features: PlanFeature[];
-  /** The product id for THIS platform, or '' when the tier has none here.
-   * A tier with none on either platform is the free/base one. */
+  /** The product id for THIS platform, or '' when the tier has none here —
+   * either because it is not sold on this platform or because nobody has
+   * created it in the store console yet. Those two cases look the same from
+   * here, and both mean "cannot be bought", which is all the screen needs. */
   storeProductId: string;
-  /** True when no store product exists on either platform — the tier
-   * everybody is already on, rather than one that cannot be bought yet. */
-  isFree: boolean;
 }
 
 interface PlanRow {
   id: string;
   code: string;
+  billing_type: string;
   highlighted: boolean;
   name_vi: string;
   name_en: string | null;
@@ -97,7 +104,7 @@ export function useSubscriptionPlans() {
       const { data, error } = await supabase
         .from('subscription_plans')
         .select(
-          'id, code, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id',
+          'id, code, billing_type, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id',
         )
         .eq('active', true)
         .order('sort_order');
@@ -108,6 +115,11 @@ export function useSubscriptionPlans() {
         return {
           id: row.id,
           code: row.code,
+          // Anything unrecognised reads as a subscription: that is the
+          // stricter of the two (it asks the store for a renewing product
+          // and will simply not find one) rather than offering a one-off
+          // purchase for something that renews.
+          billing: row.billing_type === 'lifetime' ? ('lifetime' as const) : ('subscription' as const),
           highlighted: row.highlighted,
           name: localized(language, row.name_vi, row.name_en, row.name_ms),
           tagline: localized(language, row.tagline_vi, row.tagline_en, row.tagline_ms),
@@ -121,7 +133,6 @@ export function useSubscriptionPlans() {
             '',
           features: readFeatures(row.features, language),
           storeProductId: Platform.OS === 'android' ? google : apple,
-          isFree: !apple && !google,
         };
       });
     },

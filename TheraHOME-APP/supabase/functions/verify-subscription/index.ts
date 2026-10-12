@@ -2,7 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { SignJWT, importPKCS8, decodeJwt } from "npm:jose@5";
 
-// Subscription counterpart of verify-apple-purchase / verify-google-purchase.
+// Counterpart of verify-apple-purchase / verify-google-purchase for the
+// paywall tiers in `subscription_plans` — both the renewing ones and the
+// one-off "trọn đời" one.
 //
 // Those two handle one-off phase unlocks, which are permanent once granted.
 // A subscription is not: it has a period that ends, it renews on its own,
@@ -12,6 +14,13 @@ import { SignJWT, importPKCS8, decodeJwt } from "npm:jose@5";
 // purchaseToken) so a renewal updates the same row instead of piling up a
 // row a month. Whether that row still grants anything is decided on read,
 // by public.active_plan_code().
+//
+// A 'lifetime' plan goes through the same table and the same identity rules,
+// but it is NOT a subscription at either store: Apple sells it as a
+// Non-Consumable and Google as a one-time product, which means a different
+// Play endpoint (Apple's transactions endpoint serves both). Its row simply
+// carries no current_period_end, and active_plan_code() treats a null end
+// date as still valid — so "forever" needs no special case anywhere else.
 //
 // It reuses the same two sets of store credentials the phase-unlock
 // functions already use — no new secret is needed:
@@ -235,6 +244,81 @@ async function verifyWithGoogle(purchaseToken: string, expectedProductId: string
   };
 }
 
+interface ProductPurchase {
+  purchaseState?: number; // 0 purchased, 1 canceled, 2 pending
+  acknowledgementState?: number; // 0 yet to be acknowledged, 1 acknowledged
+  orderId?: string;
+  purchaseTimeMillis?: string;
+  productId?: string;
+}
+
+/** Play's one-time products live behind a different endpoint with a
+ * different vocabulary: a numeric purchaseState instead of the v2
+ * subscription states, and no expiry at all. Same trust boundary — the call
+ * is scoped to OUR package AND the expected product id, so a token minted
+ * for anything else 404s. */
+async function verifyGoogleOneOff(purchaseToken: string, expectedProductId: string): Promise<StoreVerdict | { error: string; status: number }> {
+  if (!GOOGLE_SERVICE_ACCOUNT_KEY || !GOOGLE_PLAY_PACKAGE_NAME) {
+    return { error: "google_auth_setup_invalid", status: 500 };
+  }
+  let accessToken: string;
+  try {
+    accessToken = await buildGoogleAccessToken();
+  } catch (e) {
+    console.error("buildGoogleAccessToken failed — check GOOGLE_* secrets:", e);
+    return { error: "google_auth_setup_invalid", status: 500 };
+  }
+
+  const base = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(GOOGLE_PLAY_PACKAGE_NAME)}`;
+  const url = `${base}/purchases/products/${encodeURIComponent(expectedProductId)}/tokens/${encodeURIComponent(purchaseToken)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) return { error: "purchase_not_found", status: 400 };
+  const purchase = (await res.json()) as ProductPurchase;
+
+  if (purchase.purchaseState === 2) {
+    return {
+      storeSubscriptionId: purchaseToken,
+      productId: expectedProductId,
+      purchasedAt: new Date().toISOString(),
+      currentPeriodEnd: null,
+      autoRenewing: false,
+      state: "pending",
+    };
+  }
+  if (purchase.purchaseState !== 0) return { error: "purchase_not_valid", status: 400 };
+  if (purchase.productId && purchase.productId !== expectedProductId) {
+    return { error: "product_id_mismatch", status: 400 };
+  }
+
+  // Acknowledge as soon as we have granted — Google auto-refunds an
+  // unacknowledged purchase after three days, which would leave our row
+  // saying "active" over money that went back. Non-fatal: the client's
+  // finishTransaction acknowledges too.
+  if (purchase.acknowledgementState === 0) {
+    try {
+      const ack = await fetch(`${url}:acknowledge`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!ack.ok) console.error("one-off acknowledge failed:", ack.status, await ack.text());
+    } catch (e) {
+      console.error("one-off acknowledge failed:", e);
+    }
+  }
+
+  return {
+    storeSubscriptionId: purchaseToken,
+    productId: purchase.productId ?? expectedProductId,
+    purchasedAt: purchase.purchaseTimeMillis ? new Date(Number(purchase.purchaseTimeMillis)).toISOString() : new Date().toISOString(),
+    // No end date, ever. active_plan_code() reads null as "the store did not
+    // say", which for a product that never expires is exactly right.
+    currentPeriodEnd: null,
+    autoRenewing: false,
+    state: "active",
+  };
+}
+
 // ----------------------------------------------------------------- main ----
 
 Deno.serve(async (req: Request) => {
@@ -275,16 +359,25 @@ Deno.serve(async (req: Request) => {
 
   const { data: plan, error: planError } = await adminClient
     .from("subscription_plans")
-    .select("code, apple_product_id, google_product_id")
+    .select("code, billing_type, apple_product_id, google_product_id")
     .eq("code", planCode)
     .maybeSingle();
   if (planError) return jsonResponse({ error: planError.message }, 500);
   const expectedProductId = platform === "android" ? plan?.google_product_id : plan?.apple_product_id;
   if (!expectedProductId) return jsonResponse({ error: "plan_not_purchasable" }, 400);
 
+  // Which KIND of product this is comes from the plan row, never from the
+  // client: asking Play for a subscription when the product is a one-off
+  // (or the reverse) 404s, and that would read as "no such purchase".
+  const isLifetime = plan?.billing_type === "lifetime";
   const verdict =
     platform === "android"
-      ? await verifyWithGoogle(purchaseToken, expectedProductId)
+      ? isLifetime
+        ? await verifyGoogleOneOff(purchaseToken, expectedProductId)
+        : await verifyWithGoogle(purchaseToken, expectedProductId)
+      // Apple's transactions endpoint serves non-consumables and
+      // subscriptions alike; a non-consumable simply has no expiresDate, so
+      // verifyWithApple already resolves it to an open-ended period.
       : await verifyWithApple(transactionId, expectedProductId);
   if ("error" in verdict) return jsonResponse({ error: verdict.error }, verdict.status);
 

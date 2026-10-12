@@ -2045,6 +2045,7 @@ export type Database = {
           badge_en: string | null
           badge_ms: string | null
           badge_vi: string | null
+          billing_type: string
           code: string
           created_at: string
           features: Json
@@ -2072,6 +2073,7 @@ export type Database = {
           badge_en?: string | null
           badge_ms?: string | null
           badge_vi?: string | null
+          billing_type?: string
           code: string
           created_at?: string
           features?: Json
@@ -2099,6 +2101,7 @@ export type Database = {
           badge_en?: string | null
           badge_ms?: string | null
           badge_vi?: string | null
+          billing_type?: string
           code?: string
           created_at?: string
           features?: Json

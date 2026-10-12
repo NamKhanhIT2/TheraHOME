@@ -2920,9 +2920,16 @@ export interface PlanFeature {
   ms: string;
 }
 
+/** 'lifetime' is bought once, not renewed. It is a different PRODUCT TYPE at
+ * both stores (Apple Non-Consumable, Play one-time product), so the app asks
+ * for it differently and the server verifies it against a different
+ * endpoint — this is not a cosmetic label. */
+export type PlanBilling = "subscription" | "lifetime";
+
 export interface SubscriptionPlanAdmin {
   id: string;
   code: string;
+  billing: PlanBilling;
   sortOrder: number;
   active: boolean;
   highlighted: boolean;
@@ -2969,13 +2976,14 @@ export async function fetchSubscriptionPlans(): Promise<SubscriptionPlanAdmin[]>
   const { data, error } = await supabase
     .from("subscription_plans")
     .select(
-      "id, code, sort_order, active, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id",
+      "id, code, billing_type, sort_order, active, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id",
     )
     .order("sort_order");
   if (error) throw error;
   return (data ?? []).map((r) => ({
     id: r.id,
     code: r.code,
+    billing: r.billing_type === "lifetime" ? "lifetime" : "subscription",
     sortOrder: r.sort_order,
     active: r.active,
     highlighted: r.highlighted,
@@ -3005,6 +3013,7 @@ export async function fetchSubscriptionPlans(): Promise<SubscriptionPlanAdmin[]>
 export async function saveSubscriptionPlan(plan: SubscriptionPlanAdmin) {
   const payload = {
     code: plan.code.trim(),
+    billing_type: plan.billing,
     sort_order: plan.sortOrder,
     active: plan.active,
     highlighted: plan.highlighted,

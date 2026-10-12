@@ -22,6 +22,7 @@ import {
   reorderSubscriptionPlans,
   type SubscriptionPlanAdmin,
   type PlanFeature,
+  type PlanBilling,
 } from "@/lib/db";
 import { translateDrafts } from "@/lib/translate";
 
@@ -65,6 +66,7 @@ function emptyPlan(sortOrder: number): SubscriptionPlanAdmin {
   return {
     id: "new",
     code: "",
+    billing: "subscription",
     sortOrder,
     active: true,
     highlighted: false,
@@ -431,6 +433,23 @@ export function SubscriptionPlansView() {
                       </div>
                     </div>
                     <div>
+                      <FieldLabel>Loại thanh toán</FieldLabel>
+                      <select
+                        value={draft.billing}
+                        onChange={(e) => setDraft({ ...draft, billing: e.target.value as PlanBilling })}
+                        style={inputStyle}
+                      >
+                        <option value="subscription">Thuê bao — tự gia hạn</option>
+                        <option value="lifetime">Trọn đời — trả một lần</option>
+                      </select>
+                      <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 6 }}>
+                        Không chỉ là nhãn: hai loại này là hai kiểu sản phẩm khác nhau trên store. Trọn đời phải tạo bằng
+                        Non-Consumable (Apple) / sản phẩm một lần (Google), không nằm trong nhóm thuê bao.
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
+                    <div>
                       <FieldLabel>Hiển thị nổi bật</FieldLabel>
                       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-primary)", marginTop: 8 }}>
                         <input
@@ -506,7 +525,8 @@ export function SubscriptionPlansView() {
                 <MissingTranslationNote languages={missing} />
               </div>
               <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 3 }}>
-                {plan.code}{plan.taglineVi ? ` · ${plan.taglineVi}` : ""}
+                {plan.code} · {plan.billing === "lifetime" ? "trả một lần" : "tự gia hạn"}
+                {plan.taglineVi ? ` · ${plan.taglineVi}` : ""}
               </div>
             </td>
             <td style={{ padding: "14px 20px", whiteSpace: "nowrap" }}>

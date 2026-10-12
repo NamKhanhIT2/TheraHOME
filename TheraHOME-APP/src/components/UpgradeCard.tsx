@@ -8,8 +8,9 @@
 // app_config-backed string follows.
 //
 // It hides itself in the two cases where it would be wrong rather than
-// useful: when there is no paid tier configured at all, and when the user
-// already holds one.
+// useful: when no tier is configured at all, and when the user already holds
+// one. Every tier is paid now (there is no free row on the paywall), so
+// holding ANY tier is reason enough to stop advertising.
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -27,13 +28,12 @@ export function UpgradeCard({ userId }: { userId: string | undefined }) {
   const plans = useSubscriptionPlans().data ?? [];
   const activePlanCode = useActivePlanCode(userId).data ?? null;
 
-  const paidPlans = plans.filter((plan) => !plan.isFree);
-  if (paidPlans.length === 0) return null;
+  if (plans.length === 0) return null;
   // Already paying for something — this card would be selling them what they
   // have. The ladder stays reachable from Hồ sơ either way.
-  if (activePlanCode && paidPlans.some((plan) => plan.code === activePlanCode)) return null;
+  if (activePlanCode) return null;
 
-  const feature = plans.find((plan) => plan.highlighted) ?? paidPlans[0];
+  const feature = plans.find((plan) => plan.highlighted) ?? plans[0];
   const title = get('upgrade_card_title') || feature.name;
   const body = get('upgrade_card_body') || feature.tagline;
 
