@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleS
 import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
-import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
+import { useProfile, useUpdateProfile, useSuggestedReminderHour } from '@/hooks/useProfile';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { registerForPushNotifications, scheduleDailyReminder, scheduleEveningReminder } from '@/lib/pushNotifications';
@@ -97,6 +97,10 @@ export default function NotificationsSettingsScreen() {
   const userId = session?.user.id;
   const profileQuery = useProfile(userId);
   const updateProfile = useUpdateProfile(userId);
+  // Null unless the customer holds a paid tier AND has finished enough
+  // sessions for an hour to be a habit — both decided server-side.
+  const suggestedHour = useSuggestedReminderHour(userId).data ?? null;
+  const suggestedTime = suggestedHour === null ? '' : `${String(suggestedHour).padStart(2, '0')}:00`;
   // Accessible day (IAP-locked phases excluded) of the SELECTED program,
   // matching app/_layout.tsx's reminder scheduling — never advertises a
   // locked day, and with several programs follows the one the user views.
@@ -199,6 +203,21 @@ export default function NotificationsSettingsScreen() {
         <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
           <ToggleRow icon="sun" title={t('morning')} sub={t('reminderSubtitle')} value={remind} onChange={setRemind} isLast={!remind} />
           {remind ? <TimeRow icon="clock" title={t('reminderTime')} value={remindTime} onChange={setRemindTime} isLast={false} /> : null}
+          {/* "Nhắc tập theo thói quen của riêng bạn" — the server returns a
+              suggestion only for a paid tier, and only once there are enough
+              finished sessions for the word "habit" to mean anything. Hidden
+              when it already matches, so it is an offer and never a nag. */}
+          {remind && suggestedHour !== null && suggestedTime !== remindTime ? (
+            <Pressable onPress={() => setRemindTime(suggestedTime)} style={[styles.suggestRow, { borderTopColor: theme.colors.divider }]}>
+              <Icon name="sparkles" size={16} color={theme.colors.primary} />
+              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, flex: 1 }]}>
+                {t('reminderHabitSuggest', { time: suggestedTime })}
+              </Text>
+              <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>
+                {t('reminderHabitApply', { time: suggestedTime })}
+              </Text>
+            </Pressable>
+          ) : null}
           <ToggleRow icon="moon" title={t('evening')} sub={t('reminderSubtitle')} value={remindEvening} onChange={(v) => void setRemindEvening(v)} isLast={!remindEvening} />
           {remindEvening ? <TimeRow icon="clock" title={t('reminderTime')} value={remindEveningTime} onChange={setRemindEveningTime} isLast /> : null}
         </View>
@@ -248,6 +267,14 @@ export default function NotificationsSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  suggestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+  },
   loadingBox: {
     flex: 1,
     alignItems: 'center',

@@ -44,6 +44,10 @@ export interface SubscriptionPlan {
    * created it in the store console yet. Those two cases look the same from
    * here, and both mean "cannot be bought", which is all the screen needs. */
   storeProductId: string;
+  /** A Shopify discount this tier includes, shown only to whoever holds it.
+   * Empty when the tier has none. */
+  perkDiscountPercent: number | null;
+  perkDiscountCode: string;
 }
 
 interface PlanRow {
@@ -69,6 +73,8 @@ interface PlanRow {
   features: unknown;
   apple_product_id: string | null;
   google_product_id: string | null;
+  perk_discount_percent: number | null;
+  perk_discount_code: string | null;
 }
 
 /** Each localized field falls back to Vietnamese on its own, so a half-
@@ -104,7 +110,7 @@ export function useSubscriptionPlans() {
       const { data, error } = await supabase
         .from('subscription_plans')
         .select(
-          'id, code, billing_type, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id',
+          'id, code, billing_type, highlighted, perk_discount_percent, perk_discount_code, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id',
         )
         .eq('active', true)
         .order('sort_order');
@@ -133,6 +139,8 @@ export function useSubscriptionPlans() {
             '',
           features: readFeatures(row.features, language),
           storeProductId: Platform.OS === 'android' ? google : apple,
+          perkDiscountPercent: row.perk_discount_percent ?? null,
+          perkDiscountCode: row.perk_discount_code?.trim() ?? '',
         };
       });
     },

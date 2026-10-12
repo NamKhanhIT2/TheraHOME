@@ -2380,7 +2380,7 @@ function attachmentKindOf(path: string | null): "image" | "video" | null {
 export async function fetchChatThreads(): Promise<ChatThread[]> {
   const { data, error } = await supabase
     .from("chat_thread_overview")
-    .select("id, user_id, full_name, email, avatar_url, language, country, last_message_at, last_body, last_sender_type, last_attachment_path, last_deleted_at, unread_count")
+    .select("id, user_id, full_name, email, avatar_url, language, country, last_message_at, last_body, last_sender_type, last_attachment_path, last_deleted_at, unread_count, plan_code, plan_name, plan_rank")
     .order("last_message_at", { ascending: false });
   if (error) throw error;
 
@@ -2399,6 +2399,9 @@ export async function fetchChatThreads(): Promise<ChatThread[]> {
     lastFrom: t.last_sender_type === "specialist" ? "admin" : "user",
     lastAttachmentKind: attachmentKindOf(t.last_attachment_path),
     lastDeleted: !!t.last_deleted_at,
+    planCode: t.plan_code ?? null,
+    planName: t.plan_name ?? null,
+    planRank: t.plan_rank ?? null,
   }));
 }
 
@@ -2958,6 +2961,11 @@ export interface SubscriptionPlanAdmin {
   aiChatPerDay: string;
   callMinutesPerMonth: string;
   formReviewMbPerMonth: string;
+  /** Shopify discount shown in the app to holders of this tier. The code has
+   * to exist in Shopify — nothing here validates it, and a code that does
+   * not work reads to the customer as a broken promise. */
+  perkDiscountPercent: string;
+  perkDiscountCode: string;
 }
 
 /** `features` arrives as whatever jsonb holds, which is only a PlanFeature[]
@@ -2983,7 +2991,7 @@ export async function fetchSubscriptionPlans(): Promise<SubscriptionPlanAdmin[]>
   const { data, error } = await supabase
     .from("subscription_plans")
     .select(
-      "id, code, billing_type, sort_order, active, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id, ai_chat_per_day, call_minutes_per_month, form_review_mb_per_month",
+      "id, code, billing_type, sort_order, active, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id, ai_chat_per_day, call_minutes_per_month, form_review_mb_per_month, perk_discount_percent, perk_discount_code",
     )
     .order("sort_order");
   if (error) throw error;
@@ -3015,6 +3023,8 @@ export async function fetchSubscriptionPlans(): Promise<SubscriptionPlanAdmin[]>
     aiChatPerDay: r.ai_chat_per_day?.toString() ?? "",
     callMinutesPerMonth: r.call_minutes_per_month?.toString() ?? "",
     formReviewMbPerMonth: r.form_review_mb_per_month?.toString() ?? "",
+    perkDiscountPercent: r.perk_discount_percent?.toString() ?? "",
+    perkDiscountCode: r.perk_discount_code ?? "",
   }));
 }
 
@@ -3064,6 +3074,8 @@ export async function saveSubscriptionPlan(plan: SubscriptionPlanAdmin) {
     ai_chat_per_day: numberOrNull(plan.aiChatPerDay),
     call_minutes_per_month: numberOrNull(plan.callMinutesPerMonth),
     form_review_mb_per_month: numberOrNull(plan.formReviewMbPerMonth),
+    perk_discount_percent: numberOrNull(plan.perkDiscountPercent),
+    perk_discount_code: plan.perkDiscountCode.trim().toUpperCase() || null,
     updated_at: new Date().toISOString(),
   };
   if (plan.id === "new") {

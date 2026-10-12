@@ -94,6 +94,8 @@ function emptyPlan(sortOrder: number): SubscriptionPlanAdmin {
     aiChatPerDay: "",
     callMinutesPerMonth: "",
     formReviewMbPerMonth: "",
+    perkDiscountPercent: "",
+    perkDiscountCode: "",
   };
 }
 
@@ -537,6 +539,31 @@ export function SubscriptionPlansView() {
                           inputMode="numeric"
                           style={inputStyle}
                         />
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, marginTop: 14 }}>
+                      <div>
+                        <FieldLabel>Giảm giá thiết bị (%)</FieldLabel>
+                        <input
+                          value={draft.perkDiscountPercent}
+                          onChange={(e) => setDraft({ ...draft, perkDiscountPercent: e.target.value })}
+                          placeholder="trống = không có"
+                          inputMode="numeric"
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <FieldLabel>Mã giảm giá Shopify</FieldLabel>
+                        <input
+                          value={draft.perkDiscountCode}
+                          onChange={(e) => setDraft({ ...draft, perkDiscountCode: e.target.value })}
+                          placeholder="THERAPLUS10"
+                          style={inputStyle}
+                        />
+                        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 6 }}>
+                          <strong>Phải tạo mã này trong Shopify trước.</strong> App chỉ hiện mã cho người đang giữ gói, không
+                          kiểm tra được nó có hiệu lực hay không — mã sai thì khách đọc ra một lời hứa bị gãy.
+                        </div>
                       </div>
                     </div>
                     <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 8 }}>

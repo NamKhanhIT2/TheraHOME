@@ -2068,6 +2068,8 @@ export type Database = {
           period_label_ms: string | null
           period_label_vi: string | null
           period_months: number | null
+          perk_discount_code: string | null
+          perk_discount_percent: number | null
           price_amount_vnd: number | null
           price_label_en: string | null
           price_label_ms: string | null
@@ -2101,6 +2103,8 @@ export type Database = {
           period_label_ms?: string | null
           period_label_vi?: string | null
           period_months?: number | null
+          perk_discount_code?: string | null
+          perk_discount_percent?: number | null
           price_amount_vnd?: number | null
           price_label_en?: string | null
           price_label_ms?: string | null
@@ -2134,6 +2138,8 @@ export type Database = {
           period_label_ms?: string | null
           period_label_vi?: string | null
           period_months?: number | null
+          perk_discount_code?: string | null
+          perk_discount_percent?: number | null
           price_amount_vnd?: number | null
           price_label_en?: string | null
           price_label_ms?: string | null
@@ -2566,6 +2572,9 @@ export type Database = {
           last_deleted_at: string | null
           last_message_at: string | null
           last_sender_type: string | null
+          plan_code: string | null
+          plan_name: string | null
+          plan_rank: number | null
           unread_count: number | null
           user_id: string | null
         }
@@ -2864,6 +2873,7 @@ export type Database = {
           title: string
         }[]
       }
+      plan_code_for: { Args: { p_user: string }; Returns: string }
       product_order_count: { Args: { p_product_id: string }; Returns: number }
       profile_language: { Args: { p_user_id: string }; Returns: string }
       provision_product_for_user: {
@@ -2977,6 +2987,7 @@ export type Database = {
         }
       }
       subscription_ops_overview: { Args: never; Returns: Json }
+      suggested_reminder_hour: { Args: never; Returns: number }
       touch_last_login: { Args: never; Returns: undefined }
       truncate_with_ellipsis: {
         Args: { p_max: number; p_text: string }
@@ -2984,6 +2995,7 @@ export type Database = {
       }
       username_is_wellformed: { Args: { p_username: string }; Returns: boolean }
       voip_tokens_for: { Args: { p_user_ids: string[] }; Returns: string[] }
+      weekly_progress_for: { Args: { p_user: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never

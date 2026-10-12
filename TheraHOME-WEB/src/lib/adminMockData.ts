@@ -240,5 +240,14 @@ export interface ChatThread {
   lastAttachmentKind?: "image" | "video" | null;
   lastDeleted?: boolean;
   unreadCount?: number;
+  /** The paid tier this customer holds, or null. Shown as a badge because
+   * "Chuyên viên trả lời ưu tiên trong 2 giờ" and "Hỗ trợ ưu tiên 24/7" are
+   * sold on the paywall, and nobody could honour them while the chat list
+   * gave no sign of who had paid. */
+  planName?: string | null;
+  planCode?: string | null;
+  /** The plan's position in the ladder, for sorting the queue by who is owed
+   * the fastest answer. Higher is a higher tier. */
+  planRank?: number | null;
 }
 

@@ -26,6 +26,34 @@ const CHAT_MARKET_TABS: Array<[ChatMarketFilter, string]> = [
   ["US", "UK"],
   ["MALAY", "ML"],
 ];
+/** The customer's paid tier, or nothing.
+ *
+ * "Chuyên viên trả lời ưu tiên trong 2 giờ làm việc" and "Hỗ trợ ưu tiên
+ * 24/7" are sold on the paywall, and until now the chat list gave no sign of
+ * who had paid for them — so they were promises nobody could keep even
+ * wanting to. This is the whole mechanism: see the badge, answer that one
+ * first.
+ */
+function PlanBadge({ thread, compact = false }: { thread: ChatThread; compact?: boolean }) {
+  if (!thread.planName) return null;
+  return (
+    <span
+      title={`Khách đang dùng gói ${thread.planName} — ưu tiên trả lời`}
+      style={{
+        fontSize: compact ? 10.5 : 11.5,
+        fontWeight: 700,
+        padding: compact ? "1px 6px" : "2px 8px",
+        borderRadius: 999,
+        color: "#fff",
+        background: "var(--color-primary)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {thread.planName}
+    </span>
+  );
+}
+
 function LangBadge({ thread, compact = false }: { thread: ChatThread; compact?: boolean }) {
   const lang = thread.language ?? "vi";
   const highlight = lang !== "vi";
@@ -576,6 +604,7 @@ export function ChatView() {
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
                   <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 6 }}>
                     {t.user}
+                    <PlanBadge thread={t} compact />
                     {t.language && t.language !== "vi" ? <LangBadge thread={t} compact /> : null}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{t.time}</div>
@@ -595,6 +624,7 @@ export function ChatView() {
             <Avatar name={active.user} color={active.avatarColor} src={active.avatarUrl} size={36} />
             <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
               {active.user}
+              <PlanBadge thread={active} />
               <LangBadge thread={active} />
             </div>
             {canAskNotify ? (

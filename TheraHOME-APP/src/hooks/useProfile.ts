@@ -131,3 +131,29 @@ export async function uploadAvatarImage(userId: string, localUri: string): Promi
   if (error) throw error;
   return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
+
+/**
+ * The hour this customer usually finishes a session, or null.
+ *
+ * Backs "Nhắc tập theo thói quen của riêng bạn": the daily reminder has
+ * always fired at a time the user typed in once, probably on day one, which
+ * is a guess rather than a habit. This lets the settings screen offer their
+ * OWN hour instead.
+ *
+ * The server returns null for anyone without a paid tier and for anyone with
+ * fewer than four completed sessions — the gate and the "is this even a
+ * habit yet" test both live in `suggested_reminder_hour()`, so there is
+ * nothing here to forget.
+ */
+export function useSuggestedReminderHour(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['suggested_reminder_hour', userId],
+    queryFn: async (): Promise<number | null> => {
+      const { data, error } = await supabase.rpc('suggested_reminder_hour');
+      if (error) throw error;
+      return typeof data === 'number' ? data : null;
+    },
+    enabled: !!userId,
+    staleTime: 60 * 60_000,
+  });
+}

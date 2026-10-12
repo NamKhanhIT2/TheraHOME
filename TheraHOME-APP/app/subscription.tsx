@@ -335,6 +335,21 @@ function PlanCard({
             {t('plansComingSoonHint')}
           </Text>
         ) : null}
+
+        {/* The discount this tier includes, shown ONLY to whoever holds it —
+            a code everybody can read is a public discount, not a benefit.
+            Nothing here validates it: it has to exist in Shopify, which is
+            said beside the field in WEB Admin. */}
+        {isCurrent && plan.perkDiscountCode ? (
+          <View style={[styles.perk, { borderColor: theme.colors.primary, borderRadius: theme.radius.md }]}>
+            <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
+              {t('plansPerkDiscount', { percent: String(plan.perkDiscountPercent ?? '') })}
+            </Text>
+            <Text style={[theme.type.bodyStrong, { color: theme.colors.primary, letterSpacing: 1 }]} selectable>
+              {plan.perkDiscountCode}
+            </Text>
+          </View>
+        ) : null}
       </View>
       {plan.badge ? (
         <View style={styles.badgeRow} pointerEvents="none">
@@ -390,6 +405,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     maxWidth: '80%',
+  },
+  perk: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    gap: 2,
   },
   priceRow: {
     flexDirection: 'row',
