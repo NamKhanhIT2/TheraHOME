@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -853,6 +853,7 @@ export type Database = {
       }
       form_reviews: {
         Row: {
+          clip_deleted_at: string | null
           created_at: string
           day_label: string | null
           day_number: number | null
@@ -869,6 +870,7 @@ export type Database = {
           video_bytes: number | null
         }
         Insert: {
+          clip_deleted_at?: string | null
           created_at?: string
           day_label?: string | null
           day_number?: number | null
@@ -885,6 +887,7 @@ export type Database = {
           video_bytes?: number | null
         }
         Update: {
+          clip_deleted_at?: string | null
           created_at?: string
           day_label?: string | null
           day_number?: number | null
@@ -2659,7 +2662,6 @@ export type Database = {
       }
       call_minutes_allowance: { Args: never; Returns: number }
       call_minutes_used_this_month: { Args: never; Returns: number }
-      call_runaway_ceiling: { Args: never; Returns: number }
       claim_user_access_contact: {
         Args: { p_contact: string }
         Returns: {
@@ -2680,6 +2682,7 @@ export type Database = {
       complete_form_review: {
         Args: { p_reply_message_id?: string; p_review_id: string }
         Returns: {
+          clip_deleted_at: string | null
           created_at: string
           day_label: string | null
           day_number: number | null
@@ -2880,6 +2883,7 @@ export type Database = {
           p_user_program_id?: string
         }
         Returns: {
+          clip_deleted_at: string | null
           created_at: string
           day_label: string | null
           day_number: number | null

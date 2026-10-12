@@ -528,9 +528,9 @@ export function SubscriptionPlansView() {
                       </div>
                     </div>
                     <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 8 }}>
-                      Số buổi gọi không bị giới hạn — chỉ tổng số phút. Số clip chấm bài cũng không bị giới hạn — chỉ tổng dung
-                      lượng; một clip 15 giây nặng khoảng 5 MB, nên 200 MB ≈ 40 clip. Gọi &quot;vô hạn&quot; vẫn đi qua mức chặn
-                      chống lạm dụng trong <code>call_runaway_ceiling()</code> (hiện 600 phút/tháng).
+                      Số buổi gọi và số clip đều không bị giới hạn — chỉ tổng số phút và tổng dung lượng. Một clip 15 giây nặng
+                      khoảng 5 MB, nên 200 MB ≈ 40 clip. Cả ba gói đang để gọi &quot;vô hạn&quot; (ô phút để trống), nghĩa là
+                      không có mức chặn nào phía sau: hạn mức miễn phí của LiveKit là khoảng 41 giờ gọi mỗi tháng cho toàn bộ app.
                     </div>
                   </div>
                 </div>

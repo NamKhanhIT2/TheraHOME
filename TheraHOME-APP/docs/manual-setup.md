@@ -466,19 +466,59 @@ that `user_subscriptions` holds one row with `current_period_end` null and
 `active_plan_code()` reads "no end date" as still valid, which is what makes
 forever work without a special case.
 
-### One business note on Trọn Đời, not a technical one
+### The limits, and where the money runs out
 
-A one-off price against benefits that cost money every month is an open
-liability: `premium_lifetime` currently promises 2 video sessions and 12
-form checks a month, for ever, for 4.990.000đ. That is roughly 12 months of
-Premium Plus, so a buyer who stays three years is served at a loss, and the
-only lever left afterwards is reducing what was promised.
+Set by the owner on 2026-10-12, enforced from `subscription_plans` (see
+migration 202610121800) and editable in WEB Admin → Gói đăng ký → Hạn mức:
 
-Three ways out, all editable in WEB Admin without a build: price it nearer
-24–36 months of Premium Plus; cap the human services in total rather than
-per month ("24 buổi gọi video", not "2 mỗi tháng"); or keep the one-off tier
-to the automated side (chat AI, reports, roadmap) and sell consultations
-separately. The seeded numbers are a starting point, not a recommendation.
+| | no plan | Premium | Plus | Trọn Đời |
+|---|---|---|---|---|
+| chat AI | 2/day | 20/day | 30/day | 40/day |
+| calls | — | unlimited | unlimited | unlimited |
+| form checks | — | 200 MB/mo | 500 MB/mo | 500 MB/mo |
+
+Sessions and clips are uncapped on purpose: the cost is per minute and per
+megabyte, so that is what the budget counts. Prices are 99.000đ a month,
+199.000đ for three months, and 1.990.000đ once.
+
+What that costs at FULL usage, which almost nobody reaches. A minute of 1-1
+video is ~25 MB of LiveKit egress and 2 participant-minutes; on the Ship
+plan that is $0.0005/min and $0.12/GB. A form check is ~5 MB stored plus
+~10 MB of egress (specialist watches once, customer maybe once).
+
+The two ceilings to watch, in the order they will be hit:
+
+- **LiveKit free is 5,000 participant-minutes a month** — about 41 hours of
+  1-1 calling for the whole app. With calls unlimited this is the first
+  thing that will bind, and the answer is the Ship plan.
+- **Supabase free file storage is 1 GB, a hard cap that disrupts service**
+  rather than billing an overage. The clip pruner below is what keeps this
+  away: it holds the standing total near half a month of uploads instead of
+  every clip ever sent. The owner's position (2026-10-12) is that the
+  monthly quotas will not actually be used up and Pro can wait — which the
+  pruner is what makes true. Watch it; Pro is $25/month and 100 GB.
+
+A single account calling continuously is the one case neither ceiling warns
+about in advance: aggregate growth is visible, one abusive account is not,
+and it could spend the month's call capacity in a couple of days. There is
+deliberately no per-account cap (see 202610122000); if it ever happens, the
+fix belongs next to whatever notices.
+
+### Clip retention — DONE 2026-10-12
+
+`prune-form-review-clips` (deployed, `verify_jwt` off, shared-secret
+header) deletes a form-check video 14 days after it is graded or rejected,
+clears the carrying message's `attachment_path` so the chat shows a message
+rather than a broken thumbnail, and stamps `form_reviews.clip_deleted_at`.
+The review row and the specialist's written answer are kept — that is the
+part the customer paid for. A review still `pending` keeps its clip whatever
+its age.
+
+Scheduled by pg_cron at 04:10 UTC (11:10 Hanoi), reusing the
+`voided_cron_secret` Vault value, so nothing new had to be set up by hand.
+Verified end to end through the cron's own call path: `200 {"ok":true,
+"pruned":0,"freedBytes":0}` with no reviews on file, and `401` for a caller
+without the secret.
 
 ### Still missing after all six steps
 
