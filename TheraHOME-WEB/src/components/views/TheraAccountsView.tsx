@@ -185,6 +185,18 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
   const passwordsMatch = password === confirmPassword;
   const canSubmit = !!fullName.trim() && usernameValid && emailValid && passwordStrong && passwordsMatch && !submitting;
 
+  // Why the button is off. It used to just sit there greyed with nothing on
+  // screen explaining it — and the four ways a Vietnamese admin trips it are
+  // all invisible: a space in the username, Vietnamese accents in it, under
+  // three characters, or a mistyped confirmation. Measured on the real form
+  // 2026-10-12: every one of those disabled the button and printed nothing.
+  const missing: string[] = [];
+  if (!fullName.trim()) missing.push("tên hiển thị");
+  if (!usernameValid) missing.push(username.trim() ? "username hợp lệ" : "username");
+  if (!emailValid) missing.push("email đúng định dạng");
+  if (!passwordStrong) missing.push("mật khẩu đủ mạnh");
+  else if (!passwordsMatch) missing.push("hai ô mật khẩu khớp nhau");
+
   async function submit() {
     if (!canSubmit) return;
     setSubmitting(true);
@@ -266,8 +278,10 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ví dụ: App Review iOS" style={{ ...inputStyle, marginBottom: 14 }} />
       <FieldLabel>Username</FieldLabel>
       <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 6 }} />
-      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
-        Tên hiển thị trong app / cộng đồng — <b>có thể trùng</b> với tài khoản khác. Không dùng để đăng nhập.
+      <div style={{ fontSize: 12, color: username.trim() && !usernameValid ? "var(--error)" : "var(--text-muted)", marginBottom: 14 }}>
+        {username.trim() && !usernameValid
+          ? "Username chỉ được gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang — từ 3 đến 32 ký tự. Không dấu cách, không dấu tiếng Việt."
+          : <>Tên hiển thị trong app / cộng đồng — <b>có thể trùng</b> với tài khoản khác. Không dùng để đăng nhập.</>}
       </div>
       <FieldLabel>Email (tùy chọn)</FieldLabel>
       <input
@@ -346,6 +360,15 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       ) : null}
       <FieldLabel>Ghi chú</FieldLabel>
       <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+
+      {/* Sits directly above the footer, so the greyed-out button always has
+          its reason next to it. Only after something has been typed — an
+          untouched form does not need telling off. */}
+      {missing.length && (fullName || username || password) ? (
+        <div style={{ marginTop: 14, padding: "9px 12px", borderRadius: 10, background: "rgba(185,134,11,0.10)", border: "1px solid rgba(185,134,11,0.35)", fontSize: 12.5, color: "var(--text-primary)", lineHeight: 1.5 }}>
+          Chưa tạo được — còn thiếu: <b>{missing.join(", ")}</b>.
+        </div>
+      ) : null}
     </Modal>
   );
 }
