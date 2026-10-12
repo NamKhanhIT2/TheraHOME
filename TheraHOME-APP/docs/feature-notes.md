@@ -5081,3 +5081,67 @@ and hiding the End button of a call with no picture is just a way to lose
 it. The self-view is `pointerEvents="none"`: it is something to look at, not
 something to press, and it has no business swallowing a tap meant for the
 picture behind it.
+
+### The self-view, the picture quality, and what a call screen looks like (2026-10-12)
+
+**"Đổi camera thì ô nhỏ bị đơ, trong khi máy bên kia vẫn thấy đổi."** Both
+halves of that sentence are the diagnosis. `restartTrack` stops the old
+MediaStreamTrack and acquires a new one, so the far end sees the change
+immediately — it is a new track on the wire. The local preview had no reason
+to think anything had happened: same publication, same participant, same
+object identities all the way down, so React never re-rendered and the
+RTCView went on showing the last frame of a track that had stopped.
+
+The session now carries a `cameraEpoch`, bumped whenever the local camera
+track is replaced, and the preview is keyed on it. A new camera gets a new
+view rather than an old one nobody told. It costs a frame of black, which is
+what a camera switch looks like anyway.
+
+**"Màn hình lớn đang lấy video chất lượng thấp đúng không?"** Yes.
+adaptiveStream asks for a layer matched to the view's size in PHYSICAL
+pixels and livekit-client reads React Native's pixel ratio correctly, so a
+full-screen view on a 3x phone asks for about 1170x2532 — and then gets the
+best the sender has, which was capped at 960x540 by
+`videoCaptureDefaults`. 540p stretched over a modern phone is exactly as
+soft as it looked. Now 720p: about 1.7 Mbps on the top simulcast layer, so
+50GB of downstream is ~3,900 call-minutes, still well past the 2,500
+call-minutes the connection-minute allowance runs out at. The binding limit
+does not move, so the picture may as well be sharp.
+
+**The video was never full-bleed.** An absolutely positioned child is laid
+out inside its parent's padding, and the picture was a child of a
+SafeAreaView padded 24pt each side and 32pt top and bottom. Against a black
+background the inset was invisible; it just looked like a video that did not
+quite fill the phone. The screen is two layers now: the picture in an
+unpadded outer view, and everything a finger or an eye needs in an inner
+SafeAreaView marked `box-none`, so a tap that lands on none of it falls
+through to the picture — which is what hides the controls.
+
+**The big frame is the other person.** Always: their picture when they have
+one, their face and name on black when they do not. The first version put
+whichever camera existed into the big frame, so a call where only you had
+switched your camera on filled the screen with your own face. Tapping the
+small window swaps them, which is the one case where your own camera belongs
+in the big frame.
+
+**The self-view can be dragged**, and springs to whichever corner it was let
+go nearest — `src/components/call/CallPip.tsx`, built on PanResponder and
+Animated rather than adding a gesture library for sixty lines. On Messenger
+and Zalo the little window is in the way exactly when something important is
+underneath it, and the learned response is to flick it aside; a self-view
+that cannot be moved makes people hold the phone differently instead.
+
+**Mirroring follows the camera.** A mirrored rear camera shows the world
+back to front, with every sign and every face in it reversed.
+
+**The screen does not lock during a call.** Both platforms lock on their own
+idle timeout no matter what is on screen, and a video call watched without
+touching anything hits it every time. Added to the local native module
+rather than as a dependency — `isIdleTimerDisabled` on iOS,
+FLAG_KEEP_SCREEN_ON on Android, additive to files that already compile.
+
+**And the chrome never hides while something is wrong.** A frozen picture
+with no caption is the worst thing this screen can show, because the user
+cannot tell a bad line from a crashed app. Reconnecting or a lost line
+brings the controls back and the auto-hide timer does not start again until
+it has passed.

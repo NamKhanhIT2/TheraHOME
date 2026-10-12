@@ -22,11 +22,24 @@ public class TheraHomeProximityModule: Module {
     }
     .runOnQueue(.main)
 
+    // Stops the screen locking itself in the middle of a call.
+    //
+    // iOS dims and then locks after its idle timeout no matter what is on
+    // screen, and a video call watched without touching anything hits that
+    // timeout every time. Every caller disables the idle timer for the
+    // duration; this is that.
+    AsyncFunction("setKeepAwake") { (enabled: Bool) -> Bool in
+      UIApplication.shared.isIdleTimerDisabled = enabled
+      return UIApplication.shared.isIdleTimerDisabled == enabled
+    }
+    .runOnQueue(.main)
+
     // A reload, a crash recovery, or the app being torn down mid-call must
-    // not leave the sensor armed.
+    // not leave the sensor armed or the screen pinned awake.
     OnDestroy {
       DispatchQueue.main.async {
         UIDevice.current.isProximityMonitoringEnabled = false
+        UIApplication.shared.isIdleTimerDisabled = false
       }
     }
   }

@@ -53,6 +53,21 @@ export interface CallSession {
    * from the track, because the platform does not reliably report it — see
    * switchCallCamera in lib/livekit. */
   facing: 'user' | 'environment';
+  /**
+   * Bumped every time the local camera track is replaced.
+   *
+   * Switching cameras calls `restartTrack`, which stops the old
+   * MediaStreamTrack and acquires a new one. The far end sees the change
+   * immediately — it is a new track on the wire — but the LOCAL preview
+   * showed the last frame of the dead track and stayed there. The React
+   * tree had no reason to think anything had happened: same publication,
+   * same participant, same object identities all the way down.
+   *
+   * The call screen uses this as the preview's React `key`, so a new camera
+   * gets a new view rather than an old one nobody told. Costs a frame of
+   * black, which is what a camera switch looks like anyway.
+   */
+  cameraEpoch: number;
   speakerOn: boolean;
   quality: CallQuality;
 }
@@ -110,6 +125,7 @@ export async function openCallSession(callId: string, media: 'audio' | 'video'):
     micOn: true,
     cameraOn: false,
     facing: 'user',
+    cameraEpoch: 0,
     // A video call is held at arm's length, so it opens on the speaker.
     speakerOn: media === 'video',
     quality: 'unknown',
@@ -126,6 +142,7 @@ export async function openCallSession(callId: string, media: 'audio' | 'video'):
     patch(callId, {
       room,
       state: 'live',
+      cameraEpoch: 1,
       // Whether the camera ACTUALLY came up, not what was asked for: on a
       // device whose camera failed the call carries on as audio and the
       // button correctly reads "Bật camera".
@@ -213,7 +230,11 @@ export function toggleSessionCamera(): void {
   // first the control feels dead, without the second it can lie.
   patch(open.callId, { cameraOn: next });
   void setCallCamera(open.room, next)
-    .then((actual) => patch(open.callId, { cameraOn: actual }))
+    .then((actual) => patch(open.callId, {
+      cameraOn: actual,
+      // Turning the camera back on is also a new track to render.
+      cameraEpoch: actual ? open.cameraEpoch + 1 : open.cameraEpoch,
+    }))
     .catch((error: unknown) => {
       console.warn('could not toggle the camera:', error);
       patch(open.callId, { cameraOn: !next });
@@ -241,6 +262,7 @@ export function flipSessionCamera(): void {
   const next = open.facing === 'user' ? 'environment' : 'user';
   patch(open.callId, { facing: next });
   void switchCallCamera(open.room, next)
+    .then(() => patch(open.callId, { cameraEpoch: open.cameraEpoch + 1 }))
     .catch((error: unknown) => {
       console.warn('could not switch cameras:', error);
       patch(open.callId, { facing: open.facing });

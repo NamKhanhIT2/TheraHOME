@@ -2,6 +2,7 @@ package ai.therahome.proximity
 
 import android.content.Context
 import android.os.PowerManager
+import android.view.WindowManager
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -32,6 +33,21 @@ class TheraHomeProximityModule : Module() {
 
     AsyncFunction("setEnabled") { enabled: Boolean ->
       if (enabled) acquire() else release()
+    }
+
+    // Stops the screen locking itself in the middle of a call. FLAG_KEEP_SCREEN_ON
+    // is the window flag the system dialer and every video app uses; it
+    // needs the Activity's window and the UI thread.
+    AsyncFunction("setKeepAwake") { enabled: Boolean ->
+      val activity = appContext.currentActivity ?: return@AsyncFunction false
+      activity.runOnUiThread {
+        if (enabled) {
+          activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+          activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+      }
+      true
     }
 
     // A reload or a teardown mid-call must not leave the lock held: the

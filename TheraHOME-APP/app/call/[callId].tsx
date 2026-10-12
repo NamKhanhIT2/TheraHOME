@@ -28,7 +28,8 @@ import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
 import { useRingtone } from '@/hooks/useRingtone';
 import { CallVideo, useCallVideoTracks } from '@/components/call/CallVideo';
-import { setProximityBlanking } from '@/lib/proximity';
+import { CallPip } from '@/components/call/CallPip';
+import { setCallScreenAwake, setProximityBlanking } from '@/lib/callScreen';
 import {
   flipSessionCamera,
   openCallSession,
@@ -83,6 +84,8 @@ export default function CallScreen() {
   const micOn = session?.micOn ?? true;
   const cameraOn = session?.cameraOn ?? false;
   const speakerOn = session?.speakerOn ?? false;
+  const facing = session?.facing ?? 'user';
+  const cameraEpoch = session?.cameraEpoch ?? 0;
   const remoteJoined = session?.remoteJoined ?? false;
   const quality = session?.quality ?? 'unknown';
 
@@ -103,6 +106,9 @@ export default function CallScreen() {
   // controls never vanish out from under a finger.
   const [touchedAt, setTouchedAt] = useState(0);
   const keepControls = useCallback(() => setTouchedAt(Date.now()), []);
+  // Tapping the self-view puts it in the big frame and the other person in
+  // the corner — the same gesture, and the same result, as on Messenger.
+  const [swapped, setSwapped] = useState(false);
 
   // The caller hears a quiet ringback while it rings at the other end. The
   // callee's own phone is rung by the incoming sheet, not here.
@@ -205,28 +211,64 @@ export default function CallScreen() {
   ringingRef.current = call?.status === 'ringing';
   // Driven by whether a picture exists at all, EITHER side's — so a voice
   // call that turns into a video one switches to the video stage, and a
-  // video call whose far end kills its camera falls back to the identity
-  // card instead of freezing on the last frame.
+  // call where nobody has a camera stays on the plain identity screen.
   const videoStage = inCall && controlsLive && (!!tracks.remote || !!tracks.local);
-  // The far end gets the full screen when it has a picture; otherwise your
-  // own camera does, the way every other caller behaves while the other side
-  // is still audio-only.
-  const stageTrack = tracks.remote ?? tracks.local;
-  const stageIsSelf = !tracks.remote;
-  const pipTrack = tracks.remote ? tracks.local : undefined;
+
+  // THE BIG FRAME IS THE OTHER PERSON. Always — their picture when they have
+  // one, their face and name on black when they do not. Your own camera is
+  // always the small window.
+  //
+  // The first version put whichever camera existed into the big frame, so a
+  // video call where only you had switched your camera on filled the screen
+  // with your own face. That is not how any caller behaves, and it is
+  // disorienting for the obvious reason: the big frame is where you look to
+  // see who you are talking to.
+  //
+  // Tapping the small window swaps them, which is the one case where your
+  // own camera belongs in the big frame — checking what you are showing.
+  const canSwap = !!tracks.remote && !!tracks.local;
+  const mainTrack = swapped ? tracks.local : tracks.remote;
+  const pipTrack = swapped ? tracks.remote : tracks.local;
+  const mainIsSelf = swapped;
+  // A track that goes away under a swap would leave the two frames the wrong
+  // way round for the rest of the call.
+  useEffect(() => {
+    if (swapped && !canSwap) setSwapped(false);
+  }, [swapped, canSwap]);
+  // The local preview is keyed on the camera epoch, so a camera switch gets
+  // a new view instead of the last frame of the track that was stopped.
+  const mainKey = mainIsSelf ? `self-${cameraEpoch}` : 'peer';
+  const pipKey = mainIsSelf ? 'peer' : `self-${cameraEpoch}`;
+  // Mirroring is for a front camera only. A mirrored rear camera shows the
+  // world back to front, and every sign and every face in it is reversed.
+  const selfMirrored = facing === 'user';
   // Only worth saying when it is bad. "Excellent" on screen is noise.
   const weakNetwork = controlsLive && (quality === 'poor' || quality === 'lost');
   // Hidden only ever over video; everywhere else the controls are the screen.
+  //
+  // And never while something is wrong. A frozen picture with no caption is
+  // the worst thing this screen can show: the user cannot tell a bad line
+  // from a crashed app. Whenever the call is reconnecting or the line has
+  // dropped, the chrome comes back and says so.
+  const troubled = media === 'reconnecting' || quality === 'lost';
   const showControls = !videoStage || controlsVisible;
 
   // Four seconds, measured from the last touch. Only over video: on the
   // identity card there is nothing underneath worth revealing, and hiding
   // the End button of a call with no picture would just be a way to lose it.
   useEffect(() => {
-    if (!videoStage || !controlsVisible) return;
+    // Not while the call is in trouble: see `troubled` above.
+    if (!videoStage || !controlsVisible || troubled) return;
     const timer = setTimeout(() => setControlsVisible(false), 4000);
     return () => clearTimeout(timer);
-  }, [videoStage, controlsVisible, touchedAt]);
+  }, [videoStage, controlsVisible, touchedAt, troubled]);
+
+  // Trouble brings the chrome back whether it was asked for or not, and the
+  // timer above does not start again until the trouble has passed — so the
+  // explanation does not blink out of existence the instant things recover.
+  useEffect(() => {
+    if (troubled) setControlsVisible(true);
+  }, [troubled]);
 
   // Leaving the video stage — the far end killed its camera, or the call is
   // winding up — must not strand the controls hidden.
@@ -244,6 +286,15 @@ export default function CallScreen() {
     setProximityBlanking(true);
     return () => setProximityBlanking(false);
   }, [atEar]);
+
+  // And the screen does not lock while a call is up — including while it is
+  // still ringing, because watching "Đang gọi…" is exactly the kind of
+  // waiting the idle timer interrupts.
+  useEffect(() => {
+    if (isOver || unreadable) return;
+    setCallScreenAwake(true);
+    return () => setCallScreenAwake(false);
+  }, [isOver, unreadable]);
 
 
   // ----------------------------------------------------------------- copy
@@ -280,18 +331,42 @@ export default function CallScreen() {
     : null;
 
   return (
-    <SafeAreaView style={[styles.root, {
-      backgroundColor: videoStage ? '#000' : theme.colors.bgApp,
-      // On the video stage EVERY other element is absolutely positioned —
-      // the picture, the PiP, the name — so the controls are the only child
-      // left in flow, and `space-between` put that single child at the TOP,
-      // on top of the far end's face and overlapping the PiP. Reported from
-      // the device the first time video ever actually rendered.
-      justifyContent: videoStage ? 'flex-end' : 'space-between',
-    }]}>
+    // TWO LAYERS, and the split matters.
+    //
+    // The picture is a child of the OUTER view, which has no padding, so it
+    // reaches every edge of the screen. It used to be a child of the padded
+    // SafeAreaView, and an absolutely positioned child is laid out inside
+    // its parent's padding — so the video sat in a box inset by 24pt each
+    // side and 32pt top and bottom. Against a black background nobody could
+    // see the inset; it just looked like a video that did not quite fill
+    // the phone.
+    //
+    // Everything a finger or an eye needs — the buttons, the name, the
+    // minimise control — lives in the inner SafeAreaView, where the padding
+    // and the notch are respected. `box-none` on it lets a tap that lands
+    // on none of those fall through to the picture underneath, which is
+    // what hides the controls.
+    <View style={[styles.root, { backgroundColor: videoStage ? '#000' : theme.colors.bgApp }]}>
       {videoStage ? (
         <>
-          <CallVideo trackRef={stageTrack} style={styles.fill} objectFit="cover" mirror={stageIsSelf} />
+          {mainTrack ? (
+            <CallVideo key={mainKey} trackRef={mainTrack} style={styles.fill}
+              objectFit="cover" mirror={mainIsSelf && selfMirrored} />
+          ) : (
+            // Their camera is off and yours is on. Their face and name, on
+            // black — the frame still belongs to them.
+            <View style={[styles.fill, styles.peerStage]}>
+              {peerIsSupport ? (
+                <View style={[styles.brandAvatar, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+                  <Icon name="headphones" size={44} color="#fff" />
+                </View>
+              ) : (
+                <AvatarImg size={104} uri={peerProfile.data?.avatarUrl} />
+              )}
+              <Text style={[theme.type.h2, styles.videoText]}>{peerName}</Text>
+              <Text style={[theme.type.caption, styles.videoTextDim]}>Camera đang tắt</Text>
+            </View>
+          )}
           {/* The whole picture is one big tap target for showing and hiding
               the controls. It sits ABOVE the video and BELOW everything
               else, so a tap on a button is still a tap on that button —
@@ -306,28 +381,20 @@ export default function CallScreen() {
               keepControls();
             }}
           />
-          {pipTrack ? (
-            // pointerEvents none: the self-view is something to look at, not
-            // something to press, and it has no business swallowing a tap
-            // aimed at the picture behind it.
-            <View pointerEvents="none" style={[styles.pip, { borderColor: theme.colors.bgCard }]}>
-              <CallVideo trackRef={pipTrack} style={styles.fill} objectFit="cover" mirror />
-            </View>
-          ) : null}
-          {showControls ? (
-            <View pointerEvents="none" style={styles.videoTopBar}>
-              <Text style={[theme.type.bodyStrong, styles.videoText]}>{peerName}</Text>
-              <Text style={[theme.type.captionSm, styles.videoText]}>{statusLine}</Text>
-              {stageIsSelf ? (
-                // Said out loud, because a screen showing only your own face
-                // is otherwise indistinguishable from a broken call.
-                <Text style={[theme.type.captionSm, styles.videoText]}>
-                  {peerName} chưa bật camera
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
         </>
+      ) : null}
+
+      <SafeAreaView
+        pointerEvents="box-none"
+        style={[styles.content, { justifyContent: videoStage ? 'flex-end' : 'space-between' }]}
+      >
+      {videoStage ? (
+        showControls ? (
+          <View pointerEvents="none" style={styles.videoTopBar}>
+            <Text style={[theme.type.bodyStrong, styles.videoText]}>{peerName}</Text>
+            <Text style={[theme.type.captionSm, styles.videoText]}>{statusLine}</Text>
+          </View>
+        ) : null
       ) : (
         <View style={styles.identity}>
           {peerIsSupport ? (
@@ -375,7 +442,7 @@ export default function CallScreen() {
       ) : null}
 
       {showControls ? (
-      <View style={[styles.controls, videoStage ? styles.controlsOverVideo : null]}>
+      <View pointerEvents="box-none" style={[styles.controls, videoStage ? styles.controlsOverVideo : null]}>
         {inCall ? (
           // One row for every call. The camera button is always there, so a
           // voice call can become a video one; "đổi camera" only appears once
@@ -412,7 +479,18 @@ export default function CallScreen() {
         )}
       </View>
       ) : null}
-    </SafeAreaView>
+      </SafeAreaView>
+
+      {/* Last, so it floats over everything — and outside the padded layer,
+          because it moves in screen coordinates. Its own bounds keep it
+          clear of the controls, so being on top cannot block them. */}
+      {videoStage && pipTrack ? (
+        <CallPip onPress={canSwap ? () => { keepControls(); setSwapped((on) => !on); } : undefined}>
+          <CallVideo key={pipKey} trackRef={pipTrack} style={styles.fill}
+            objectFit="cover" mirror={!mainIsSelf && selfMirrored} />
+        </CallPip>
+      ) : null}
+    </View>
   );
 }
 
@@ -460,7 +538,8 @@ function ToggleButton({ icon, label, active, onPress, disabled, onDark }: {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 32 },
+  root: { flex: 1 },
+  content: { flex: 1, paddingHorizontal: 24, paddingVertical: 32 },
   fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   identity: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   brandAvatar: { width: 104, height: 104, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
@@ -468,6 +547,7 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   hint: { textAlign: 'center', paddingHorizontal: 24, marginTop: 4 },
   controls: { gap: 28, alignItems: 'center' },
+  // box-none so a tap in the gaps between buttons reaches the picture.
   controlsOverVideo: { paddingBottom: 8 },
   toggleRow: { flexDirection: 'row', gap: 24 },
   answerRow: { flexDirection: 'row', gap: 56 },
@@ -475,20 +555,19 @@ const styles = StyleSheet.create({
   round: { width: 68, height: 68, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   toggle: { width: 58, height: 58, borderRadius: 999, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
   minimise: {
-    position: 'absolute', top: 54, left: 16,
+    position: 'absolute', top: 0, left: 0,
     width: 40, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
   },
   quality: {
-    position: 'absolute', top: 104, left: 20, right: 20,
+    position: 'absolute', top: 52, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999,
   },
   qualityText: { color: '#fff', flexShrink: 1 },
-  // Own camera, parked top-right the way every video caller does it.
-  pip: {
-    position: 'absolute', top: 56, right: 16, width: 108, height: 160,
-    borderRadius: 14, overflow: 'hidden', borderWidth: 2, backgroundColor: '#111',
-  },
-  videoTopBar: { position: 'absolute', top: 58, left: 64, gap: 2 },
+  // Their side of the call when they have no camera: the big frame still
+  // belongs to them.
+  peerStage: { alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#111' },
+  videoTopBar: { position: 'absolute', top: 4, left: 52, right: 120, gap: 2 },
   videoText: { color: '#fff', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
+  videoTextDim: { color: 'rgba(255,255,255,0.65)' },
 });

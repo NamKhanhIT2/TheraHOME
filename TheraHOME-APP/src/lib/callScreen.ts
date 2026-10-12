@@ -1,3 +1,6 @@
+// What the screen does during a call: blanking at the ear, and not locking
+// itself while you are watching someone.
+//
 // "Don't hang up with your cheek."
 //
 // During a voice call the phone is against an ear, and a live touchscreen
@@ -19,6 +22,7 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 // and PushKit for an entire release (see CLAUDE.md).
 const PROXIMITY = requireOptionalNativeModule<{
   setEnabled: (enabled: boolean) => Promise<boolean>;
+  setKeepAwake: (enabled: boolean) => Promise<boolean>;
 }>('TheraHomeProximity');
 
 /** False on a build made before the module existed, and on web. */
@@ -37,5 +41,26 @@ export function setProximityBlanking(enabled: boolean): void {
   if (!PROXIMITY) return;
   void PROXIMITY.setEnabled(enabled).catch((error: unknown) => {
     if (__DEV__) console.warn('proximity blanking unavailable:', error);
+  });
+}
+
+/**
+ * Keeps the screen on for the length of a call.
+ *
+ * Both platforms lock the screen on their own idle timeout no matter what
+ * is on it, and a video call watched without touching anything hits that
+ * timeout every time — the picture goes dark mid-sentence and the user is
+ * left tapping to get their own call back. Every caller disables it for the
+ * duration. On an audio call it matters just as much, for a less obvious
+ * reason: the proximity blanking above is not the screen locking, and a
+ * phone that locks under your ear comes back wanting a passcode.
+ *
+ * Paired with a `false` on the way out, without exception — a device left
+ * in this state never sleeps again.
+ */
+export function setCallScreenAwake(enabled: boolean): void {
+  if (!PROXIMITY?.setKeepAwake) return;
+  void PROXIMITY.setKeepAwake(enabled).catch((error: unknown) => {
+    console.warn('could not hold the screen awake:', error);
   });
 }

@@ -114,9 +114,33 @@ export async function connectCall(callId: string, media: 'audio' | 'video' = 'au
     // the one video actually presses against. On for every call, not just
     // video ones, because a voice call can now raise its camera mid-
     // conversation and would otherwise publish at full rate.
+    //
+    // adaptiveStream is also what makes MINIMISING a call cheap: the video
+    // view unmounts, LiveKit sees no element observing the track, and the
+    // subscription pauses until the call screen comes back.
     adaptiveStream: true,
     dynacast: true,
-    videoCaptureDefaults: { resolution: lkClient.VideoPresets.h540.resolution },
+    // 720p, not 540p.
+    //
+    // The owner's report was "hình như màn hình lớn đang lấy video chất
+    // lượng thấp đúng không?" and it was right, though not for the reason
+    // it looks like. adaptiveStream asks for a layer matched to the view's
+    // size in PHYSICAL pixels — livekit-client reads React Native's pixel
+    // ratio correctly, so a full-screen view on a 3x phone asks for roughly
+    // 1170x2532. It then gets the best the sender has, and the sender was
+    // capped at 960x540. A 540p stream stretched over a modern phone screen
+    // is exactly as soft as it looked.
+    //
+    // 720p costs about 1.7 Mbps on the top simulcast layer, so 50GB of
+    // downstream is ~3,900 call-minutes — still well past the 2,500
+    // call-minutes the connection-minute allowance runs out at. The binding
+    // limit does not move, so the picture may as well be sharp. Simulcast
+    // (on by default) keeps the lower layers available for weak networks.
+    videoCaptureDefaults: { resolution: lkClient.VideoPresets.h720.resolution },
+    publishDefaults: {
+      videoEncoding: lkClient.VideoPresets.h720.encoding,
+      simulcast: true,
+    },
   });
 
   let cameraOn = false;
