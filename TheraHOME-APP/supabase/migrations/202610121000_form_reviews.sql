@@ -66,8 +66,27 @@ create policy "read own or staff form_reviews" on public.form_reviews
  * number the paid tier will raise. Both sides read it, so the count the
  * customer is shown and the count the server enforces cannot drift apart.
  */
+-- Per caller, not a flat constant: the App Review account passes through
+-- this gate like every other one ([[review-account-is-unrestricted]]), and
+-- this is the function a paid tier will widen. STABLE + SECURITY DEFINER
+-- because it reads auth.uid() and the profile behind RLS. The signature
+-- never changes, so raising the number for a subscriber will be a migration
+-- and not a release.
 create or replace function public.form_review_monthly_allowance()
-returns integer language sql immutable as $$ select 4 $$;
+returns integer
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when exists (
+      select 1 from public.profiles
+       where id = auth.uid() and account_type = 'review'
+    ) then 9999
+    else 4
+  end
+$$;
 
 /** At most one clip may be waiting at a time. Not a billing limit — an
  * operational one: a queue where one person can file ten videos is a queue
@@ -182,6 +201,7 @@ revoke all on function public.request_form_review(uuid, uuid, uuid, uuid, intege
 grant execute on function public.request_form_review(uuid, uuid, uuid, uuid, integer, text) to authenticated;
 revoke all on function public.complete_form_review(uuid, uuid) from public, anon;
 grant execute on function public.complete_form_review(uuid, uuid) to authenticated;
+revoke all on function public.form_review_monthly_allowance() from public, anon;
 grant execute on function public.form_review_monthly_allowance() to authenticated;
 grant execute on function public.form_review_max_pending() to authenticated;
 
