@@ -35,6 +35,19 @@ const LANGUAGE_RULE: Record<Lang, string> = {
   ms: "PERATURAN BAHASA (mengatasi sebarang arahan bahasa di atas): pengguna menggunakan aplikasi dalam Bahasa Melayu — sentiasa balas dalam Bahasa Melayu. Jika pengguna menulis dalam bahasa lain, balas dalam bahasa yang mereka gunakan.",
 };
 
+// Sent INSTEAD of a Groq reply once the day's allowance is spent. It is
+// inserted as a normal assistant message rather than returned as an error on
+// purpose: the user's own message is already in the thread by the time this
+// function runs, so an error would leave it sitting there unanswered and the
+// app would say "Chưa nhận được câu trả lời" — which blames the connection
+// for a limit. A message in the conversation explains itself, and does so
+// even on a build that knows nothing about quotas.
+const LIMIT_MESSAGE: Record<Lang, string> = {
+  vi: 'Hôm nay bạn đã dùng hết {n} lượt chat với trợ lý AI. Lượt mới sẽ có từ 0h. Nếu cần hỗ trợ ngay, bạn nhấn "Chat với Chuyên gia TheraHOME" nhé.',
+  en: 'You have used all {n} AI assistant messages for today. More become available at midnight. If you need help right away, tap "Chat with a TheraHOME specialist".',
+  ms: 'Anda telah menggunakan kesemua {n} mesej pembantu AI untuk hari ini. Mesej baharu tersedia pada tengah malam. Jika perlukan bantuan segera, tekan "Sembang dengan Pakar TheraHOME".',
+};
+
 const FALLBACK_MESSAGE: Record<Lang, string> = {
   vi: 'Xin lỗi, trợ lý AI đang gặp sự cố kết nối. Bạn có thể thử lại sau ít phút, hoặc nhấn "Chat với Chuyên gia TheraHOME" để được hỗ trợ trực tiếp.',
   en: 'Sorry, the AI assistant is having connection trouble. Please try again in a few minutes, or tap "Chat with a TheraHOME specialist" for direct support.',
@@ -114,7 +127,45 @@ Deno.serve(async (req: Request) => {
   // `sender_type='user'` rows through for the `authenticated` role).
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const [systemPrompt, lang] = await Promise.all([getSystemPrompt(adminClient), getUserLanguage(adminClient, thread.user_id)]);
+  const lang = await getUserLanguage(adminClient, thread.user_id);
+
+  // The day's allowance, decided by the caller's tier. Both numbers come from
+  // the database through the CALLER's own client, so `auth.uid()` inside them
+  // is the person who sent the message and nothing here can be told
+  // otherwise.
+  //
+  // `>` and not `>=`: the user's message was inserted by the app before this
+  // function was invoked, so by now it is already counted. Spending the
+  // twentieth of twenty should still be answered; the twenty-first is the one
+  // that is over.
+  const [allowanceResult, usedResult] = await Promise.all([
+    userClient.rpc("ai_chat_daily_allowance"),
+    userClient.rpc("ai_chat_used_today"),
+  ]);
+  if (allowanceResult.error || usedResult.error) {
+    // Do NOT fail the reply over a broken quota read — answering for free is
+    // the cheaper mistake, and an outage here would silence the assistant for
+    // everybody.
+    console.error("quota check failed (answering anyway):", allowanceResult.error ?? usedResult.error);
+  } else {
+    const allowance = allowanceResult.data as number | null;
+    const used = Number(usedResult.data ?? 0);
+    // null = unlimited (review and staff accounts).
+    if (allowance !== null && used > allowance) {
+      const { error: noticeError } = await adminClient
+        .from("chat_messages")
+        .insert({ thread_id: threadId, sender_type: "ai", body: LIMIT_MESSAGE[lang].replace("{n}", String(allowance)) });
+      if (noticeError) {
+        console.error("could not post the limit notice:", noticeError);
+        return new Response(JSON.stringify({ error: noticeError.message }), { status: 500 });
+      }
+      return new Response(JSON.stringify({ ok: true, limited: true, allowance, used, lang }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  const systemPrompt = await getSystemPrompt(adminClient);
   const replyText = await getGroqReply(`${systemPrompt.trim()}\n\n${LANGUAGE_RULE[lang]}`, history as HistoryRow[], lang);
 
   const { error: insertError } = await adminClient

@@ -3086,3 +3086,93 @@ export async function reorderSubscriptionPlans(ids: string[]) {
     if (error) throw error;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Subscription operations: money taken, and what the infrastructure is doing
+// ---------------------------------------------------------------------------
+//
+// One RPC, one document — see `subscription_ops_overview()`. The money side
+// counts BILLING PERIODS against each plan's `price_amount_vnd`, which makes
+// it a reconciliation aid and not an accounting record: the authoritative
+// figures are the payout reports in App Store Connect and Play Console, net
+// of the store's cut, tax and currency conversion. The panel says so on
+// screen, because a number that looks like revenue will be read as revenue.
+
+export interface SubscriptionOpsPlan {
+  code: string;
+  name: string;
+  billingType: string;
+  priceAmountVnd: number | null;
+  periodMonths: number | null;
+  /** Holding it right now (not refunded, not lapsed). */
+  holdersLive: number;
+  /** Ever bought it, including refunded and lapsed. */
+  holdersEver: number;
+  /** Billing periods inferred from purchased_at → current_period_end. */
+  periodsPaid: number;
+  grossVnd: number;
+}
+
+export interface SubscriptionOps {
+  generatedAt: string;
+  plans: SubscriptionOpsPlan[];
+  revenue: {
+    grossVnd: number;
+    netVndEstimate: number;
+    newThisMonth: number;
+    refunded: number;
+    lapsed: number;
+  };
+  infra: {
+    storageBytes: number;
+    storageLimitBytes: number;
+    clipBytesLive: number;
+    clipsPending: number;
+    clipsPruned: number;
+    callMinutesThisMonth: number;
+    participantMinutesLimit: number;
+    aiMessagesThisMonth: number;
+  };
+}
+
+/** Admin only — the RPC raises `admin_required` for anyone else. */
+export async function fetchSubscriptionOps(): Promise<SubscriptionOps> {
+  const { data, error } = await supabase.rpc("subscription_ops_overview");
+  if (error) throw error;
+  const raw = (data ?? {}) as Record<string, never>;
+  const plans = Array.isArray(raw.plans) ? (raw.plans as Record<string, unknown>[]) : [];
+  const revenue = (raw.revenue ?? {}) as Record<string, unknown>;
+  const infra = (raw.infra ?? {}) as Record<string, unknown>;
+  const num = (value: unknown) => Number(value ?? 0) || 0;
+  return {
+    generatedAt: String(raw.generated_at ?? ""),
+    plans: plans.map((plan) => ({
+      code: String(plan.code ?? ""),
+      name: String(plan.name ?? ""),
+      billingType: String(plan.billing_type ?? "subscription"),
+      priceAmountVnd: plan.price_amount_vnd == null ? null : num(plan.price_amount_vnd),
+      periodMonths: plan.period_months == null ? null : num(plan.period_months),
+      holdersLive: num(plan.holders_live),
+      holdersEver: num(plan.holders_ever),
+      periodsPaid: num(plan.periods_paid),
+      grossVnd: num(plan.gross_vnd),
+    })),
+    revenue: {
+      grossVnd: num(revenue.gross_vnd),
+      netVndEstimate: num(revenue.net_vnd_estimate),
+      newThisMonth: num(revenue.new_this_month),
+      refunded: num(revenue.refunded),
+      lapsed: num(revenue.lapsed),
+    },
+    infra: {
+      storageBytes: num(infra.storage_bytes),
+      storageLimitBytes: num(infra.storage_limit_bytes),
+      clipBytesLive: num(infra.clip_bytes_live),
+      clipsPending: num(infra.clips_pending),
+      clipsPruned: num(infra.clips_pruned),
+      callMinutesThisMonth: num(infra.call_minutes_this_month),
+      participantMinutesLimit: num(infra.participant_minutes_limit),
+      aiMessagesThisMonth: num(infra.ai_messages_this_month),
+    },
+  };
+}

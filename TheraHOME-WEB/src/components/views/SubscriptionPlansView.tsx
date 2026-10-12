@@ -10,6 +10,7 @@
 // delivers. The warning under the table says so to whoever is editing.
 import { Fragment, useState, useEffect } from "react";
 import { TableShell } from "@/components/ui/TableShell";
+import { SectionCard } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { PrimaryBtn, GhostBtn, Badge, FieldLabel, inputStyle, PillTabs, MissingTranslationNote } from "@/components/ui/primitives";
@@ -23,6 +24,8 @@ import {
   type SubscriptionPlanAdmin,
   type PlanFeature,
   type PlanBilling,
+  fetchSubscriptionOps,
+  type SubscriptionOps,
 } from "@/lib/db";
 import { translateDrafts } from "@/lib/translate";
 
@@ -105,8 +108,15 @@ export function SubscriptionPlansView() {
   const [deleting, setDeleting] = useState<SubscriptionPlanAdmin | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [ops, setOps] = useState<SubscriptionOps | null>(null);
 
   function reload() {
+    // Reloaded with the plans because editing a price changes every number in
+    // the panel. A failure here must not hide the editor: the panel is for
+    // watching, the table is for working.
+    void fetchSubscriptionOps()
+      .then(setOps)
+      .catch(() => setOps(null));
     return fetchSubscriptionPlans()
       .then(setPlans)
       .catch(() => pushToast("Không thể tải danh sách gói"));
@@ -281,7 +291,9 @@ export function SubscriptionPlansView() {
   const label = lang === "vi" ? "VN" : lang === "en" ? "UK" : "ML";
 
   return (
-    <TableShell
+    <div>
+      {ops ? <OpsPanel ops={ops} /> : null}
+      <TableShell
       subtitle="Các gói hiển thị trên màn hình nâng cấp của app. Sửa ở đây là app cập nhật trong ít phút, không cần bản build mới."
       action={<PrimaryBtn icon="plus" onClick={() => { setDraft(emptyPlan(plans.length + 1)); setLang("vi"); }}>Thêm gói</PrimaryBtn>}
       columns={["Thứ tự", "Gói", "Giá", "Quyền lợi", "Sản phẩm store", "Trạng thái", "Thao tác"]}
@@ -624,7 +636,111 @@ export function SubscriptionPlansView() {
           </tr>
         );
       })}
-    </TableShell>
+      </TableShell>
+    </div>
+  );
+}
+
+const vnd = (amount: number) => amount.toLocaleString("vi-VN") + "đ";
+const mb = (bytes: number) => (bytes / 1048576).toFixed(0) + " MB";
+
+/** A used-of-limit bar. `warnAt` is the fraction where it turns amber — the
+ * point of this panel is to see a ceiling coming, not to discover it. */
+function Meter({ label, used, limit, note, warnAt = 0.7 }: { label: string; used: number; limit: number; note: string; warnAt?: number }) {
+  const fraction = limit > 0 ? Math.min(1, used / limit) : 0;
+  const colour = fraction >= 0.9 ? "var(--error)" : fraction >= warnAt ? "#B8740E" : "var(--color-primary)";
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6 }}>
+        <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{label}</span>
+        <span style={{ color: colour, fontWeight: 700 }}>{Math.round(fraction * 100)}%</span>
+      </div>
+      <div style={{ height: 7, borderRadius: 999, background: "var(--bg-card-alt)", overflow: "hidden" }}>
+        <div style={{ width: `${fraction * 100}%`, height: "100%", background: colour, borderRadius: 999 }} />
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 5 }}>{note}</div>
+    </div>
+  );
+}
+
+function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", marginTop: 2 }}>{value}</div>
+      {note ? <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>{note}</div> : null}
+    </div>
+  );
+}
+
+function OpsPanel({ ops }: { ops: SubscriptionOps }) {
+  const { revenue, infra, plans } = ops;
+  const holders = plans.reduce((total, plan) => total + plan.holdersLive, 0);
+  // LiveKit meters PARTICIPANT minutes and a 1-1 call has two of them, so the
+  // quota drains twice as fast as the call clock reads. Showing call minutes
+  // against the 5,000 would understate it by half.
+  const participantMinutes = infra.callMinutesThisMonth * 2;
+
+  return (
+    <div style={{ display: "grid", gap: 18, marginBottom: 22 }}>
+      <SectionCard title="Tiền đã thu">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+          <Stat label="Đang có gói" value={String(holders)} note={`${revenue.newThisMonth} người mua trong tháng này`} />
+          <Stat label="Tổng đã thu" value={vnd(revenue.grossVnd)} note="giá niêm yết × số kỳ đã trả" />
+          <Stat label="Sau phí store" value={vnd(revenue.netVndEstimate)} note="trừ ước tính 15%" />
+          <Stat label="Hoàn tiền / hết hạn" value={`${revenue.refunded} / ${revenue.lapsed}`} note="đã hoàn tiền / đã hết hạn" />
+        </div>
+        {holders === 0 ? (
+          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--divider)" }}>
+            Chưa có ai mua gói. Các số sẽ chạy ngay khi có giao dịch đầu tiên được máy chủ xác minh.
+          </div>
+        ) : (
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--divider)", display: "grid", gap: 8 }}>
+            {plans.filter((plan) => plan.holdersEver > 0).map((plan) => (
+              <div key={plan.code} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{plan.name}</span>
+                <span style={{ color: "var(--text-secondary)" }}>
+                  {plan.holdersLive} đang dùng · {plan.holdersEver} từng mua · {plan.periodsPaid} kỳ · {vnd(plan.grossVnd)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 14, lineHeight: 1.6 }}>
+          <strong>Đây là số để đối soát, không phải số kế toán.</strong> Nó đếm số kỳ đã trả nhân giá niêm yết đặt trong tab
+          này. Tiền thật nằm ở báo cáo thanh toán của App Store Connect và Play Console — đã trừ phí store, thuế và quy đổi
+          tiền cho người mua ngoài Việt Nam. Dùng bảng này để so với báo cáo đó và phát hiện khi hai bên lệch nhau.
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Hạ tầng — còn bao nhiêu trước khi phải nâng cấp">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
+          <Meter
+            label="Dung lượng file (Supabase free)"
+            used={infra.storageBytes}
+            limit={infra.storageLimitBytes}
+            note={`${mb(infra.storageBytes)} / ${mb(infra.storageLimitBytes)} · video chấm bài đang giữ: ${mb(infra.clipBytesLive)}`}
+          />
+          <Meter
+            label="Phút gọi (LiveKit free)"
+            used={participantMinutes}
+            limit={infra.participantMinutesLimit}
+            note={`${infra.callMinutesThisMonth} phút gọi tháng này = ${participantMinutes} participant-minute / ${infra.participantMinutesLimit}`}
+          />
+          <Stat
+            label="Chat AI tháng này"
+            value={String(infra.aiMessagesThisMonth)}
+            note="tin nhắn người dùng gửi · Groq, chưa có ngưỡng cứng"
+          />
+        </div>
+        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 16, lineHeight: 1.6 }}>
+          Dung lượng là <strong>hard cap</strong>: vượt 1 GB thì Supabase ngắt dịch vụ chứ không tính thêm tiền — nên nâng lên
+          Pro ($25/tháng, 100 GB) <em>trước</em> khi đầy. Video chấm bài tự xoá 14 ngày sau khi chấm xong, nên con số đang giữ
+          chỉ bằng khoảng nửa tháng upload ({infra.clipsPending} clip đang chờ chấm, {infra.clipsPruned} clip đã xoá). Hết phút
+          LiveKit thì cuộc gọi mới không kết nối được — lên plan Ship khi thanh này chạm 70%.
+        </div>
+      </SectionCard>
+    </div>
   );
 }
 

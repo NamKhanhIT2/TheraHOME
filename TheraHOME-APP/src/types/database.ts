@@ -2067,6 +2067,8 @@ export type Database = {
           period_label_en: string | null
           period_label_ms: string | null
           period_label_vi: string | null
+          period_months: number | null
+          price_amount_vnd: number | null
           price_label_en: string | null
           price_label_ms: string | null
           price_label_vi: string | null
@@ -2098,6 +2100,8 @@ export type Database = {
           period_label_en?: string | null
           period_label_ms?: string | null
           period_label_vi?: string | null
+          period_months?: number | null
+          price_amount_vnd?: number | null
           price_label_en?: string | null
           price_label_ms?: string | null
           price_label_vi?: string | null
@@ -2129,6 +2133,8 @@ export type Database = {
           period_label_en?: string | null
           period_label_ms?: string | null
           period_label_vi?: string | null
+          period_months?: number | null
+          price_amount_vnd?: number | null
           price_label_en?: string | null
           price_label_ms?: string | null
           price_label_vi?: string | null
@@ -2970,6 +2976,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      subscription_ops_overview: { Args: never; Returns: Json }
       touch_last_login: { Args: never; Returns: undefined }
       truncate_with_ellipsis: {
         Args: { p_max: number; p_text: string }
