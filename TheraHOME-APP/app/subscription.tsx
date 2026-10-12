@@ -89,11 +89,12 @@ export default function SubscriptionScreen() {
     setActive(Math.min(Math.max(index, 0), Math.max(plans.length - 1, 0)));
   }
 
-  // The renewal disclosure is specifically about auto-renewing products.
-  // Premium Trọn Đời does not renew, so printing it under a one-off purchase
-  // would be a false statement about the thing being sold.
-  const anyRenewingBuyable = plans.some((plan) => plan.billing === 'subscription' && store.canBuy(plan));
-  const storeName = Platform.OS === 'android' ? 'Google Play' : 'App Store';
+  // No renewal sentence on this screen (owner 2026-10-13). What Apple
+  // requires in the binary for an auto-renewable subscription is four
+  // things — the plan's title, its length, its price, and working links to
+  // the Terms of Use and the privacy policy — and all four are still here:
+  // the name, the period beside the price, the price itself, and the two
+  // links in the footer.
 
   function openTerms() {
     if (Platform.OS === 'ios') {
@@ -210,10 +211,6 @@ export default function SubscriptionScreen() {
                     : store.purchaseError === 'claimed_by_other'
                       ? t('purchaseClaimedByOther')
                       : t('purchaseFailed')}
-            </Text>
-          ) : anyRenewingBuyable ? (
-            <Text style={[theme.type.captionSm, styles.notice, { color: theme.colors.textMuted }]} numberOfLines={2}>
-              {t('plansAutoRenewNote', { store: storeName })}
             </Text>
           ) : null}
 
