@@ -22,6 +22,8 @@ import {
   useFormReviewForDay,
   useSubmitFormReview,
 } from '@/hooks/useFormReview';
+import { usePlanGate } from '@/hooks/usePlanGate';
+import { useI18n, type TranslationKey } from '@/lib/i18n';
 
 /** Long enough to show a full movement, short enough that nobody films a
  * monologue and short enough to upload on a phone network. Both platforms
@@ -35,23 +37,18 @@ import {
 const MAX_SECONDS = 15;
 
 /** The server raises these as Postgres exceptions; the customer should read
- * the reason, not the error code. Anything unrecognised falls through to a
- * generic line rather than showing raw SQL. */
-function explain(message: string): string {
-  if (message.includes('review_already_pending')) {
-    return 'Bạn đang có một video chờ chuyên viên xem. Đợi nhận xét rồi gửi tiếp nhé.';
-  }
-  if (message.includes('monthly_allowance_reached')) {
-    return 'Bạn đã dùng hết dung lượng video của tháng này.';
-  }
-  if (message.includes('clip_too_large')) {
-    return 'Video này nặng quá. Quay lại ngắn hơn giúp em nhé.';
-  }
-  if (message.includes('plan_required')) {
-    return 'Tính năng chấm bài tập có trong các gói Premium.';
-  }
-  if (message.includes('attachment_required')) return 'Video chưa gửi được, bạn thử quay lại nhé.';
-  return 'Chưa gửi được video. Kiểm tra kết nối mạng rồi thử lại giúp em.';
+ * the reason, not the error code.
+ *
+ * Returns a translation KEY, not a sentence: this is module scope and has no
+ * hook, and the card is read in Vietnamese, English and Malay. Anything
+ * unrecognised falls through to a generic line rather than showing raw SQL. */
+function explain(message: string): TranslationKey {
+  if (message.includes('review_already_pending')) return 'formReviewErrPending';
+  if (message.includes('monthly_allowance_reached')) return 'formReviewErrQuota';
+  if (message.includes('clip_too_large')) return 'formReviewErrTooLarge';
+  if (message.includes('plan_required')) return 'formReviewErrNeedsPlan';
+  if (message.includes('attachment_required')) return 'formReviewErrNoFile';
+  return 'formReviewErrGeneric';
 }
 
 export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber, dayLabel }: {
@@ -63,7 +60,9 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
 }) {
   const theme = useTheme();
   const threadQuery = useChatThread('human', userId);
-  const { remainingMb, remainingClips, isLoading } = useFormReviewAllowance(userId);
+  const { allowanceMb, remainingMb, remainingClips, isLoading } = useFormReviewAllowance(userId);
+  const askForPlan = usePlanGate();
+  const { t } = useI18n();
   const reviewForThisDay = useFormReviewForDay(userId, programDayId);
   const submit = useSubmitFormReview();
   const [busy, setBusy] = useState(false);
@@ -75,8 +74,8 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
       Alert.alert(
-        'Cần quyền camera',
-        'Để quay video bài tập, bạn bật quyền camera cho TheraHOME trong Cài đặt nhé.',
+        t('formReviewCameraTitle'),
+        t('formReviewCameraBody'),
       );
       return;
     }
@@ -104,18 +103,18 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
         dayLabel,
       });
       Alert.alert(
-        'Đã gửi cho chuyên viên',
-        'Chuyên viên sẽ xem và nhận xét trong phần Chat với chuyên gia.',
-        [{ text: 'Để sau' }, { text: 'Mở chat', onPress: openChat }],
+        t('formReviewSentTitle'),
+        t('formReviewSentBody'),
+        [{ text: t('later') }, { text: t('formReviewOpenChat'), onPress: openChat }],
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn('form review submit failed:', message);
-      Alert.alert('Chưa gửi được', explain(message));
+      Alert.alert(t('formReviewFailedTitle'), t(explain(message)));
     } finally {
       setBusy(false);
     }
-  }, [userId, threadQuery.data, submit, userProgramId, programDayId, dayNumber, dayLabel, openChat]);
+  }, [userId, threadQuery.data, submit, userProgramId, programDayId, dayNumber, dayLabel, openChat, t]);
 
   if (!userId || isLoading) return null;
 
@@ -134,10 +133,42 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
           color={answered ? theme.colors.success : theme.colors.textSecondary} />
         <View style={styles.text}>
           <Text style={[theme.type.bodyStrong, { color: answered ? theme.colors.success : theme.colors.textPrimary }]}>
-            {answered ? 'Chuyên viên đã nhận xét' : 'Đang chờ chuyên viên xem'}
+            {answered ? t('formReviewReviewed') : t('formReviewWaiting')}
           </Text>
           <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
-            {answered ? 'Chạm để đọc nhận xét' : 'Thường trong vài giờ làm việc'}
+            {answered ? t('formReviewTapToRead') : t('formReviewUsuallyHours')}
+          </Text>
+        </View>
+        <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+      </Pressable>
+    );
+  }
+
+  // ------------------------------------------------- no plan: show, explain
+  // A customer with no subscription has an allowance of 0, which is NOT the
+  // same as having used theirs up — saying "hết dung lượng tháng này" to
+  // somebody who never had any is nonsense, and it was on screen until now.
+  //
+  // The card stays visible and tappable on purpose: seeing what a plan buys
+  // is how anybody decides to buy one, and the tap explains itself instead
+  // of doing nothing.
+  if (allowanceMb <= 0) {
+    return (
+      <Pressable
+        onPress={() => askForPlan('featureFormReview')}
+        style={({ pressed }) => [styles.card, {
+          backgroundColor: theme.colors.bgCardAlt,
+          borderColor: theme.colors.borderLight,
+          opacity: pressed ? 0.85 : 1,
+        }]}
+      >
+        <Icon name="crown" size={19} color={theme.colors.primary} />
+        <View style={styles.text}>
+          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>
+            {t('formReviewTitle')}
+          </Text>
+          <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
+            {t('planLockedHint')}
           </Text>
         </View>
         <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
@@ -146,19 +177,18 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
   }
 
   // ----------------------------------------------- blocked, and say why
-  // A disabled button with no reason reads as a broken button. Only one
-  // reason left: the month's video budget. Having a clip already waiting is
-  // no longer a block — several may queue (see useFormReviewAllowance).
+  // A disabled button with no reason reads as a broken button. One reason
+  // left now: the month's video budget, for somebody who DOES have a plan.
   if (remainingMb <= 0) {
     return (
       <View style={[styles.card, { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight }]}>
         <Icon name="video-off" size={19} color={theme.colors.textMuted} />
         <View style={styles.text}>
           <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>
-            Chấm bài tập qua video
+            {t('formReviewTitle')}
           </Text>
           <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
-            Hết dung lượng video tháng này. Đầu tháng sau sẽ có lại.
+            {t('formReviewExhausted')}
           </Text>
         </View>
       </View>
@@ -183,12 +213,12 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
       )}
       <View style={styles.text}>
         <Text style={[theme.type.bodyStrong, { color: theme.colors.primaryDark }]}>
-          {busy ? 'Đang gửi video…' : 'Nhờ chuyên viên chấm bài tập'}
+          {busy ? t('formReviewSending') : t('formReviewAsk')}
         </Text>
         <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
           {busy
-            ? 'Giữ ứng dụng mở tới khi gửi xong'
-            : `Quay ${MAX_SECONDS} giây bạn đang tập · còn khoảng ${remainingClips} clip tháng này`}
+            ? t('formReviewKeepOpen')
+            : t('formReviewRecordHint', { seconds: MAX_SECONDS, clips: remainingClips })}
         </Text>
       </View>
       {busy ? null : <Icon name="chevron-right" size={18} color={theme.colors.primary} />}

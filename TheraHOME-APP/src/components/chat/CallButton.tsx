@@ -22,6 +22,8 @@ import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
 import { useStartCall, type CallMedia } from '@/hooks/useCalls';
 import { isCallSupported } from '@/lib/livekit';
+import { useI18n } from '@/lib/i18n';
+import { usePlanGate } from '@/hooks/usePlanGate';
 
 export function CallButton({ threadId, calleeId }: {
   threadId: string | undefined;
@@ -30,7 +32,9 @@ export function CallButton({ threadId, calleeId }: {
   calleeId?: string | null;
 }) {
   const theme = useTheme();
+  const { t } = useI18n();
   const startCall = useStartCall();
+  const askForPlan = usePlanGate();
   const [supported] = React.useState(isCallSupported);
 
   if (!supported) return null;
@@ -42,7 +46,23 @@ export function CallButton({ threadId, calleeId }: {
       { threadId: threadId ?? null, calleeId: calleeId ?? null, media },
       {
         onSuccess: (call) => router.push({ pathname: '/call/[callId]', params: { callId: call.id } }),
-        onError: () => Alert.alert('Không gọi được', 'Vui lòng kiểm tra kết nối mạng rồi thử lại.'),
+        // `start_call` refuses a caller with no plan, and separately one who
+        // has spent a finite minute allowance. Both used to surface as
+        // "kiểm tra kết nối mạng" — blaming the network for a decision the
+        // server made on purpose, which leaves the customer retrying
+        // something that will never work.
+        onError: (error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes('plan_required')) {
+            askForPlan('featureCall');
+            return;
+          }
+          if (message.includes('call_minutes_exhausted')) {
+            Alert.alert(t('callFailedTitle'), t('callMinutesUsedUp'));
+            return;
+          }
+          Alert.alert(t('callFailedTitle'), t('callFailedBody'));
+        },
       },
     );
   }
@@ -51,7 +71,7 @@ export function CallButton({ threadId, calleeId }: {
     <View style={styles.row}>
       <HeaderCallButton
         icon="video"
-        label="Gọi video"
+        label={t('callVideoLabel')}
         busy={startCall.isPending}
         onPress={() => place('video')}
         tint={theme.colors.primary}
@@ -59,7 +79,7 @@ export function CallButton({ threadId, calleeId }: {
       />
       <HeaderCallButton
         icon="phone"
-        label="Gọi thoại"
+        label={t('callVoiceLabel')}
         busy={startCall.isPending}
         onPress={() => place('audio')}
         tint={theme.colors.primary}
