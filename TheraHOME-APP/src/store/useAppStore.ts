@@ -58,6 +58,9 @@ interface AppState {
   // agree before first use). Persisted so it's asked exactly once.
   aiConsentAccepted: boolean;
   acceptAiConsent: () => void;
+  /** The customer ticked "Không hiển thị lại" on the upgrade prompt. */
+  upgradePromptMuted: boolean;
+  muteUpgradePrompt: () => void;
   // True from confirming a password-reset code until the new password is
   // saved. verifyOtp('recovery') creates a live session, which would
   // otherwise drop the user straight into the app — this keeps the
@@ -116,6 +119,12 @@ export const useAppStore = create<AppState>()(
 
       aiConsentAccepted: false,
       acceptAiConsent: () => set({ aiConsentAccepted: true }),
+
+      // "Không hiển thị lại" on the upgrade prompt. Same shape as
+      // hasSeenReminderPrompt: persisted, so a customer who says no once is
+      // not asked again on the next launch.
+      upgradePromptMuted: false,
+      muteUpgradePrompt: () => set({ upgradePromptMuted: true }),
       recoveringPassword: false,
       setRecoveringPassword: (value) => set({ recoveringPassword: value }),
     }),
@@ -132,6 +141,7 @@ export const useAppStore = create<AppState>()(
         selectedProductId: s.selectedProductId,
         hasSeenReminderPrompt: s.hasSeenReminderPrompt,
         aiConsentAccepted: s.aiConsentAccepted,
+        upgradePromptMuted: s.upgradePromptMuted,
       }),
       // Re-checks the device locale against the *persisted* state once
       // rehydration actually completes (not at module-load time, before

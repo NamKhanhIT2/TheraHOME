@@ -33,6 +33,7 @@ import { ProductDropdown } from '@/components/ProductDropdown';
 import { PainChart } from '@/components/PainChart';
 import { WaterCard } from '@/components/WaterCard';
 import { UpgradeCard } from '@/components/UpgradeCard';
+import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import { HeroProgressBar } from '@/components/HeroProgressBar';
 import { useI18n } from '@/lib/i18n';
 
@@ -420,6 +421,10 @@ export default function HomeScreen() {
         </Reanimated.View>
       </Animated.ScrollView>
       </Reanimated.View>
+      {/* Decides for itself whether to appear: after a first finished
+          session, for somebody with no plan, once per app launch, and never
+          again once they tick "không hiển thị lại". */}
+      <UpgradePromptModal userId={userId} daysDone={days.filter((d) => d.status === 'done').length} />
       {requestDayGate.pendingDay !== null ? (
         <PainScaleModal
           dayId={requestDayGate.pendingDay}
