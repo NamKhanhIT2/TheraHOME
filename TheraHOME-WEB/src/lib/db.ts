@@ -2900,3 +2900,157 @@ export async function saveSiteContentRows(patch: Partial<SiteContent>): Promise<
     if (error) throw error;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Subscription plans (subscription_plans) — the paywall ladder in the app
+// ---------------------------------------------------------------------------
+//
+// Copy only. Saving here changes what the paywall SAYS, never what a user is
+// allowed to do: the quotas quoted in the feature lines are enforced by their
+// own server-side functions (chấm dáng tập, for instance, by
+// `form_review_monthly_allowance()`), so raising a number in this editor
+// without changing that function makes the app promise more than it gives.
+
+export interface PlanFeature {
+  /** An Icon name valid in BOTH web and app icon sets — see ICON_CHOICES in
+   * SubscriptionPlansView. Empty renders a check mark. */
+  icon: string;
+  vi: string;
+  en: string;
+  ms: string;
+}
+
+export interface SubscriptionPlanAdmin {
+  id: string;
+  code: string;
+  sortOrder: number;
+  active: boolean;
+  highlighted: boolean;
+  nameVi: string;
+  nameEn: string;
+  nameMs: string;
+  taglineVi: string;
+  taglineEn: string;
+  taglineMs: string;
+  badgeVi: string;
+  badgeEn: string;
+  badgeMs: string;
+  priceLabelVi: string;
+  priceLabelEn: string;
+  priceLabelMs: string;
+  periodLabelVi: string;
+  periodLabelEn: string;
+  periodLabelMs: string;
+  features: PlanFeature[];
+  appleProductId: string;
+  googleProductId: string;
+}
+
+/** `features` arrives as whatever jsonb holds, which is only a PlanFeature[]
+ * by convention — a hand-edited row could hold anything. Coerce rather than
+ * cast, so one bad row cannot blank the editor. */
+function readFeatures(value: unknown): PlanFeature[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => {
+    const item = (entry ?? {}) as Record<string, unknown>;
+    return {
+      icon: typeof item.icon === "string" ? item.icon : "",
+      vi: typeof item.vi === "string" ? item.vi : "",
+      en: typeof item.en === "string" ? item.en : "",
+      ms: typeof item.ms === "string" ? item.ms : "",
+    };
+  });
+}
+
+export async function fetchSubscriptionPlans(): Promise<SubscriptionPlanAdmin[]> {
+  // One string literal, not a concatenation: supabase-js derives the row type
+  // from the literal text of this argument, and a `const` built with `+`
+  // widens to `string`, which types every field as an error object instead.
+  const { data, error } = await supabase
+    .from("subscription_plans")
+    .select(
+      "id, code, sort_order, active, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id",
+    )
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    code: r.code,
+    sortOrder: r.sort_order,
+    active: r.active,
+    highlighted: r.highlighted,
+    nameVi: r.name_vi,
+    nameEn: r.name_en ?? "",
+    nameMs: r.name_ms ?? "",
+    taglineVi: r.tagline_vi ?? "",
+    taglineEn: r.tagline_en ?? "",
+    taglineMs: r.tagline_ms ?? "",
+    badgeVi: r.badge_vi ?? "",
+    badgeEn: r.badge_en ?? "",
+    badgeMs: r.badge_ms ?? "",
+    priceLabelVi: r.price_label_vi ?? "",
+    priceLabelEn: r.price_label_en ?? "",
+    priceLabelMs: r.price_label_ms ?? "",
+    periodLabelVi: r.period_label_vi ?? "",
+    periodLabelEn: r.period_label_en ?? "",
+    periodLabelMs: r.period_label_ms ?? "",
+    features: readFeatures(r.features),
+    appleProductId: r.apple_product_id ?? "",
+    googleProductId: r.google_product_id ?? "",
+  }));
+}
+
+/** `id: "new"` inserts. Empty EN/MS fields clear the override — the app then
+ * shows the Vietnamese text in those markets, per field. */
+export async function saveSubscriptionPlan(plan: SubscriptionPlanAdmin) {
+  const payload = {
+    code: plan.code.trim(),
+    sort_order: plan.sortOrder,
+    active: plan.active,
+    highlighted: plan.highlighted,
+    name_vi: plan.nameVi.trim(),
+    name_en: plan.nameEn.trim() || null,
+    name_ms: plan.nameMs.trim() || null,
+    tagline_vi: plan.taglineVi.trim() || null,
+    tagline_en: plan.taglineEn.trim() || null,
+    tagline_ms: plan.taglineMs.trim() || null,
+    badge_vi: plan.badgeVi.trim() || null,
+    badge_en: plan.badgeEn.trim() || null,
+    badge_ms: plan.badgeMs.trim() || null,
+    price_label_vi: plan.priceLabelVi.trim() || null,
+    price_label_en: plan.priceLabelEn.trim() || null,
+    price_label_ms: plan.priceLabelMs.trim() || null,
+    // NOT `|| null` — "" is a real value here: it is how the free tier says
+    // "no period at all" rather than falling back to the Vietnamese.
+    period_label_vi: plan.periodLabelVi.trim(),
+    period_label_en: plan.periodLabelEn.trim(),
+    period_label_ms: plan.periodLabelMs.trim(),
+    // Lines with no Vietnamese are dropped: an empty bullet renders as a
+    // lone tick in the app.
+    features: plan.features
+      .filter((f) => f.vi.trim())
+      .map((f) => ({ icon: f.icon.trim(), vi: f.vi.trim(), en: f.en.trim(), ms: f.ms.trim() })),
+    apple_product_id: plan.appleProductId.trim() || null,
+    google_product_id: plan.googleProductId.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  if (plan.id === "new") {
+    const { error } = await supabase.from("subscription_plans").insert(payload);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase.from("subscription_plans").update(payload).eq("id", plan.id);
+  if (error) throw error;
+}
+
+export async function deleteSubscriptionPlan(id: string) {
+  await runDelete(supabase.from("subscription_plans").delete().eq("id", id).select("id"));
+}
+
+/** Persists a new order after a move up/down. */
+export async function reorderSubscriptionPlans(ids: string[]) {
+  for (let index = 0; index < ids.length; index++) {
+    const { error } = await supabase.from("subscription_plans").update({ sort_order: index + 1 }).eq("id", ids[index]);
+    if (error) throw error;
+  }
+}

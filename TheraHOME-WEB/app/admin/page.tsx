@@ -7,6 +7,7 @@ import { DashboardView } from "@/components/views/DashboardView";
 import { UsersView } from "@/components/views/UsersView";
 import { RoutineView } from "@/components/views/RoutineView";
 import { ProductsView } from "@/components/views/ProductsView";
+import { SubscriptionPlansView } from "@/components/views/SubscriptionPlansView";
 import { ActivationView } from "@/components/views/ActivationView";
 import { AIPromptsView } from "@/components/views/AIPromptsView";
 import { NotificationsAdminView } from "@/components/views/NotificationsAdminView";
@@ -29,6 +30,7 @@ export default function AdminPage() {
             {active === "users" && <UsersView role="admin" />}
             {active === "exercises" && <RoutineView />}
             {active === "products" && <ProductsView />}
+            {active === "subscription-plans" && <SubscriptionPlansView />}
             {active === "activation" && <ActivationView />}
             {active === "site-content" && <SiteContentView />}
             {active === "app-content" && <AppContentView />}

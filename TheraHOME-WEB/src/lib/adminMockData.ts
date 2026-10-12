@@ -16,6 +16,10 @@ export const NAV_ADMIN: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "grid" },
   { id: "exercises", label: "Lộ trình", icon: "route" },
   { id: "products", label: "Sản Phẩm", icon: "box" },
+  // subscription_plans — nội dung các gói trả phí trên màn hình nâng cấp của
+  // app (tên, giá, quyền lợi). Chỉ là nội dung: sửa ở đây không cấp quyền cho
+  // ai, hạn mức thật vẫn nằm ở các hàm phía server.
+  { id: "subscription-plans", label: "Gói đăng ký", icon: "star" },
   // Per-product activation contacts, CSKH-managed — cũng có mặt ở NAV_CARE.
   { id: "activation", label: "Kích hoạt", icon: "shield" },
   {
