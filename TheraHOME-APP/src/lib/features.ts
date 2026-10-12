@@ -55,4 +55,10 @@ export const IAP_ENABLED = Platform.OS === 'android' ? IAP_ENABLED_ANDROID : IAP
  * Admin → make the three paid features consult `active_plan_code()` → THEN
  * this, in that same build.
  */
-export const SUBSCRIPTIONS_ENABLED = false;
+// Flipped 2026-10-13 for build 35. Safe on its own: `canBuy` in
+// useSubscription also requires the store to have RETURNED the product, so on
+// a platform whose products do not exist yet (Android has none at all, and
+// Apple's are still being created) every button stays "Sắp mở". Step 0 of
+// docs/manual-setup.md is done — all seven benefit lines are enforced — so
+// this no longer sells anything that does nothing.
+export const SUBSCRIPTIONS_ENABLED = true;
