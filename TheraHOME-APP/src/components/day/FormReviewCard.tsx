@@ -26,7 +26,13 @@ import {
 /** Long enough to show a full movement, short enough that nobody films a
  * monologue and short enough to upload on a phone network. Both platforms
  * enforce it in their own camera UI, so it cannot be exceeded. */
-const MAX_SECONDS = 20;
+// 15 seconds at quality 0.5, not 20 at 0.7 — about 5 MB a clip instead of
+// ~12 MB. The monthly budget is denominated in megabytes now
+// (form_review_mb_allowance()), so the encode settings decide how many
+// clips 200 MB buys: ~40 at these numbers, ~16 at the old ones. Fifteen
+// seconds is long enough to see one neck-and-shoulder movement, which is
+// what a specialist is grading — this is not a film.
+const MAX_SECONDS = 15;
 
 /** The server raises these as Postgres exceptions; the customer should read
  * the reason, not the error code. Anything unrecognised falls through to a
@@ -36,7 +42,13 @@ function explain(message: string): string {
     return 'Bạn đang có một video chờ chuyên viên xem. Đợi nhận xét rồi gửi tiếp nhé.';
   }
   if (message.includes('monthly_allowance_reached')) {
-    return 'Bạn đã dùng hết lượt chấm bài tập của tháng này.';
+    return 'Bạn đã dùng hết dung lượng video của tháng này.';
+  }
+  if (message.includes('clip_too_large')) {
+    return 'Video này nặng quá. Quay lại ngắn hơn giúp em nhé.';
+  }
+  if (message.includes('plan_required')) {
+    return 'Tính năng chấm bài tập có trong các gói Premium.';
   }
   if (message.includes('attachment_required')) return 'Video chưa gửi được, bạn thử quay lại nhé.';
   return 'Chưa gửi được video. Kiểm tra kết nối mạng rồi thử lại giúp em.';
@@ -51,7 +63,7 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
 }) {
   const theme = useTheme();
   const threadQuery = useChatThread('human', userId);
-  const { remaining, pending, isLoading } = useFormReviewAllowance(userId);
+  const { remainingMb, remainingClips, isLoading } = useFormReviewAllowance(userId);
   const reviewForThisDay = useFormReviewForDay(userId, programDayId);
   const submit = useSubmitFormReview();
   const [busy, setBusy] = useState(false);
@@ -74,7 +86,7 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['videos'],
       videoMaxDuration: MAX_SECONDS,
-      quality: 0.7,
+      quality: 0.5,
     });
     if (result.canceled || !result.assets?.length) return;
     const asset = result.assets[0];
@@ -134,9 +146,10 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
   }
 
   // ----------------------------------------------- blocked, and say why
-  // A disabled button with no reason reads as a broken button.
-  const blocked = pending ? 'pending' : remaining <= 0 ? 'allowance' : null;
-  if (blocked) {
+  // A disabled button with no reason reads as a broken button. Only one
+  // reason left: the month's video budget. Having a clip already waiting is
+  // no longer a block — several may queue (see useFormReviewAllowance).
+  if (remainingMb <= 0) {
     return (
       <View style={[styles.card, { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight }]}>
         <Icon name="video-off" size={19} color={theme.colors.textMuted} />
@@ -145,9 +158,7 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
             Chấm bài tập qua video
           </Text>
           <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
-            {blocked === 'pending'
-              ? `Bạn đang có video Ngày ${pending?.dayNumber ?? ''} chờ nhận xét.`
-              : 'Hết lượt tháng này. Lượt mới có vào đầu tháng sau.'}
+            Hết dung lượng video tháng này. Đầu tháng sau sẽ có lại.
           </Text>
         </View>
       </View>
@@ -177,7 +188,7 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
         <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
           {busy
             ? 'Giữ ứng dụng mở tới khi gửi xong'
-            : `Quay ${MAX_SECONDS} giây bạn đang tập · còn ${remaining} lượt tháng này`}
+            : `Quay ${MAX_SECONDS} giây bạn đang tập · còn khoảng ${remainingClips} clip tháng này`}
         </Text>
       </View>
       {busy ? null : <Icon name="chevron-right" size={18} color={theme.colors.primary} />}

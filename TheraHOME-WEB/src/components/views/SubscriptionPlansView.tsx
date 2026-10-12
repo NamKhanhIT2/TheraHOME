@@ -88,6 +88,9 @@ function emptyPlan(sortOrder: number): SubscriptionPlanAdmin {
     features: [],
     appleProductId: "",
     googleProductId: "",
+    aiChatPerDay: "",
+    callMinutesPerMonth: "",
+    formReviewMbPerMonth: "",
   };
 }
 
@@ -484,6 +487,52 @@ export function SubscriptionPlansView() {
                   <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 6 }}>
                     Thiếu mã của nền tảng nào thì app ẩn nút mua trên nền tảng đó, thay vì mở một giao dịch không thể hoàn tất.
                   </div>
+
+                  <div style={{ marginTop: 20, borderTop: "1px solid var(--divider)", paddingTop: 16 }}>
+                    <FieldLabel>Hạn mức của gói</FieldLabel>
+                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 10 }}>
+                      Đây là số mà máy chủ thực sự kiểm tra, không phải chữ hiển thị. Nhớ sửa dòng quyền lợi ở trên cho khớp —
+                      thẻ ghi một con số mà hệ thống cho một con số khác là lỗi người dùng nhìn thấy đầu tiên.
+                      Để trống = không giới hạn. Nhập 0 = không có quyền dùng.
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                      <div>
+                        <FieldLabel>Chat AI (lượt/ngày)</FieldLabel>
+                        <input
+                          value={draft.aiChatPerDay}
+                          onChange={(e) => setDraft({ ...draft, aiChatPerDay: e.target.value })}
+                          placeholder="trống = vô hạn"
+                          inputMode="numeric"
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <FieldLabel>Gọi video (phút/tháng)</FieldLabel>
+                        <input
+                          value={draft.callMinutesPerMonth}
+                          onChange={(e) => setDraft({ ...draft, callMinutesPerMonth: e.target.value })}
+                          placeholder="trống = vô hạn"
+                          inputMode="numeric"
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <FieldLabel>Chấm dáng tập (MB/tháng)</FieldLabel>
+                        <input
+                          value={draft.formReviewMbPerMonth}
+                          onChange={(e) => setDraft({ ...draft, formReviewMbPerMonth: e.target.value })}
+                          placeholder="trống = vô hạn"
+                          inputMode="numeric"
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 8 }}>
+                      Số buổi gọi không bị giới hạn — chỉ tổng số phút. Số clip chấm bài cũng không bị giới hạn — chỉ tổng dung
+                      lượng; một clip 15 giây nặng khoảng 5 MB, nên 200 MB ≈ 40 clip. Gọi &quot;vô hạn&quot; vẫn đi qua mức chặn
+                      chống lạm dụng trong <code>call_runaway_ceiling()</code> (hiện 600 phút/tháng).
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </Modal>
@@ -533,7 +582,12 @@ export function SubscriptionPlansView() {
               <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{plan.priceLabelVi || "—"}</div>
               {plan.periodLabelVi ? <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{plan.periodLabelVi}</div> : null}
             </td>
-            <td style={{ padding: "14px 20px", fontSize: 13, color: "var(--text-secondary)" }}>{plan.features.length} mục</td>
+            <td style={{ padding: "14px 20px", fontSize: 13, color: "var(--text-secondary)" }}>
+              {plan.features.length} mục
+              <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3, whiteSpace: "nowrap" }}>
+                {plan.aiChatPerDay || "∞"} AI/ngày · {plan.callMinutesPerMonth || "∞"} phút · {plan.formReviewMbPerMonth || "∞"} MB
+              </div>
+            </td>
             <td style={{ padding: "14px 20px" }}>
               <div style={{ display: "flex", gap: 6 }}>
                 {plan.appleProductId ? (

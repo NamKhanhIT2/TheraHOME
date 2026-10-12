@@ -90,37 +90,58 @@ export function useMyFormReviews(userId: string | undefined) {
   return query;
 }
 
-/** How many are left this month, read from the server's own number. */
+/** Roughly what one clip weighs at the capture settings in FormReviewCard
+ * (15 seconds, quality 0.5). Only ever used to turn megabytes into a count a
+ * person can understand — the budget itself is bytes, which is why the label
+ * says "khoảng". */
+export const CLIP_MB = 5;
+
+/** The month's video budget, in megabytes, with both halves read from the
+ * server.
+ *
+ * The limit is bytes rather than occasions because that is what it costs: a
+ * clip takes Supabase storage and egress, and a count of clips says nothing
+ * about either. The owner's instruction was to cap consumption and leave the
+ * number of submissions open, so somebody may send one every day.
+ *
+ * Both numbers come from `form_review_mb_allowance()` and
+ * `form_review_mb_used_this_month()`, not from arithmetic here: the month
+ * boundary is Asia/Ho_Chi_Minh server-side, and the device's own clock would
+ * disagree for anybody travelling. */
 export function useFormReviewAllowance(userId: string | undefined) {
   const reviews = useMyFormReviews(userId);
-  const allowanceQuery = useQuery({
-    queryKey: ['form_review_allowance'],
-    queryFn: async (): Promise<number> => {
-      const { data, error } = await supabase.rpc('form_review_monthly_allowance');
-      if (error) throw error;
-      return typeof data === 'number' ? data : 0;
+  const quotaQuery = useQuery({
+    queryKey: ['form_review_quota', userId],
+    queryFn: async (): Promise<{ allowanceMb: number; usedMb: number }> => {
+      const [allowance, used] = await Promise.all([
+        supabase.rpc('form_review_mb_allowance'),
+        supabase.rpc('form_review_mb_used_this_month'),
+      ]);
+      if (allowance.error) throw allowance.error;
+      if (used.error) throw used.error;
+      return { allowanceMb: Number(allowance.data ?? 0), usedMb: Number(used.data ?? 0) };
     },
-    staleTime: 1000 * 60 * 60,
+    enabled: !!userId,
+    staleTime: 60_000,
   });
 
-  const allowance = allowanceQuery.data ?? 0;
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
+  const allowanceMb = quotaQuery.data?.allowanceMb ?? 0;
+  const usedMb = quotaQuery.data?.usedMb ?? 0;
+  const remainingMb = Math.max(0, allowanceMb - usedMb);
   const rows = reviews.data ?? [];
-  const usedThisMonth = rows.filter(
-    (r) => r.status !== 'cancelled' && new Date(r.createdAt) >= startOfMonth,
-  ).length;
-  const pending = rows.find((r) => r.status === 'pending') ?? null;
 
   return {
-    allowance,
-    usedThisMonth,
-    remaining: Math.max(0, allowance - usedThisMonth),
-    /** At most one may be waiting at a time — a queue one person can flood is
-     * a queue that starves everyone else. */
-    pending,
-    isLoading: reviews.isPending || allowanceQuery.isPending,
+    allowanceMb,
+    usedMb,
+    remainingMb,
+    /** Approximate clips left, for a label. Floor, so it never promises one
+     * more than the budget can hold. */
+    remainingClips: Math.floor(remainingMb / CLIP_MB),
+    /** Still surfaced so the card can say a clip is being looked at, but no
+     * longer a cap: several may wait at once now (owner 2026-10-12 — CSKH
+     * answers everything, so the byte budget is the only limit). */
+    pending: rows.find((r) => r.status === 'pending') ?? null,
+    isLoading: reviews.isPending || quotaQuery.isPending,
   };
 }
 

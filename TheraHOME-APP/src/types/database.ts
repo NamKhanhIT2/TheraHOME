@@ -866,6 +866,7 @@ export type Database = {
           thread_id: string
           user_id: string
           user_program_id: string | null
+          video_bytes: number | null
         }
         Insert: {
           created_at?: string
@@ -881,6 +882,7 @@ export type Database = {
           thread_id: string
           user_id: string
           user_program_id?: string | null
+          video_bytes?: number | null
         }
         Update: {
           created_at?: string
@@ -896,6 +898,7 @@ export type Database = {
           thread_id?: string
           user_id?: string
           user_program_id?: string | null
+          video_bytes?: number | null
         }
         Relationships: [
           {
@@ -2041,14 +2044,17 @@ export type Database = {
       subscription_plans: {
         Row: {
           active: boolean
+          ai_chat_per_day: number | null
           apple_product_id: string | null
           badge_en: string | null
           badge_ms: string | null
           badge_vi: string | null
           billing_type: string
+          call_minutes_per_month: number | null
           code: string
           created_at: string
           features: Json
+          form_review_mb_per_month: number | null
           google_product_id: string | null
           highlighted: boolean
           id: string
@@ -2069,14 +2075,17 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          ai_chat_per_day?: number | null
           apple_product_id?: string | null
           badge_en?: string | null
           badge_ms?: string | null
           badge_vi?: string | null
           billing_type?: string
+          call_minutes_per_month?: number | null
           code: string
           created_at?: string
           features?: Json
+          form_review_mb_per_month?: number | null
           google_product_id?: string | null
           highlighted?: boolean
           id?: string
@@ -2097,14 +2106,17 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          ai_chat_per_day?: number | null
           apple_product_id?: string | null
           badge_en?: string | null
           badge_ms?: string | null
           badge_vi?: string | null
           billing_type?: string
+          call_minutes_per_month?: number | null
           code?: string
           created_at?: string
           features?: Json
+          form_review_mb_per_month?: number | null
           google_product_id?: string | null
           highlighted?: boolean
           id?: string
@@ -2606,6 +2618,8 @@ export type Database = {
         Args: { p_email: string; p_phone: string; p_user_id: string }
         Returns: undefined
       }
+      ai_chat_daily_allowance: { Args: never; Returns: number }
+      ai_chat_used_today: { Args: never; Returns: number }
       answer_call: {
         Args: { p_call_id: string }
         Returns: {
@@ -2635,6 +2649,17 @@ export type Database = {
         Args: { p_user_program_id: string }
         Returns: string[]
       }
+      baseline_limits: {
+        Args: never
+        Returns: {
+          ai_chat_per_day: number
+          call_minutes_per_month: number
+          form_review_mb_per_month: number
+        }[]
+      }
+      call_minutes_allowance: { Args: never; Returns: number }
+      call_minutes_used_this_month: { Args: never; Returns: number }
+      call_runaway_ceiling: { Args: never; Returns: number }
       claim_user_access_contact: {
         Args: { p_contact: string }
         Returns: {
@@ -2668,6 +2693,7 @@ export type Database = {
           thread_id: string
           user_id: string
           user_program_id: string | null
+          video_bytes: number | null
         }
         SetofOptions: {
           from: "*"
@@ -2748,6 +2774,8 @@ export type Database = {
       }
       expire_stale_calls: { Args: never; Returns: number }
       form_review_max_pending: { Args: never; Returns: number }
+      form_review_mb_allowance: { Args: never; Returns: number }
+      form_review_mb_used_this_month: { Args: never; Returns: number }
       form_review_monthly_allowance: { Args: never; Returns: number }
       format_community_notification: {
         Args: {
@@ -2865,6 +2893,7 @@ export type Database = {
           thread_id: string
           user_id: string
           user_program_id: string | null
+          video_bytes: number | null
         }
         SetofOptions: {
           from: "*"

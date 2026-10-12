@@ -2951,6 +2951,13 @@ export interface SubscriptionPlanAdmin {
   features: PlanFeature[];
   appleProductId: string;
   googleProductId: string;
+  /** Limits this tier grants. "" means unlimited — the column is nullable
+   * and the server reads NULL as no cap (calls additionally pass through
+   * call_runaway_ceiling(), see that function). Kept as strings so an empty
+   * box is distinguishable from a typed 0, which means "none at all". */
+  aiChatPerDay: string;
+  callMinutesPerMonth: string;
+  formReviewMbPerMonth: string;
 }
 
 /** `features` arrives as whatever jsonb holds, which is only a PlanFeature[]
@@ -2976,7 +2983,7 @@ export async function fetchSubscriptionPlans(): Promise<SubscriptionPlanAdmin[]>
   const { data, error } = await supabase
     .from("subscription_plans")
     .select(
-      "id, code, billing_type, sort_order, active, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id",
+      "id, code, billing_type, sort_order, active, highlighted, name_vi, name_en, name_ms, tagline_vi, tagline_en, tagline_ms, badge_vi, badge_en, badge_ms, price_label_vi, price_label_en, price_label_ms, period_label_vi, period_label_en, period_label_ms, features, apple_product_id, google_product_id, ai_chat_per_day, call_minutes_per_month, form_review_mb_per_month",
     )
     .order("sort_order");
   if (error) throw error;
@@ -3005,7 +3012,18 @@ export async function fetchSubscriptionPlans(): Promise<SubscriptionPlanAdmin[]>
     features: readFeatures(r.features),
     appleProductId: r.apple_product_id ?? "",
     googleProductId: r.google_product_id ?? "",
+    aiChatPerDay: r.ai_chat_per_day?.toString() ?? "",
+    callMinutesPerMonth: r.call_minutes_per_month?.toString() ?? "",
+    formReviewMbPerMonth: r.form_review_mb_per_month?.toString() ?? "",
   }));
+}
+
+/** "" and anything non-numeric become NULL (unlimited); "0" stays 0. */
+function numberOrNull(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
 }
 
 /** `id: "new"` inserts. Empty EN/MS fields clear the override — the app then
@@ -3041,6 +3059,11 @@ export async function saveSubscriptionPlan(plan: SubscriptionPlanAdmin) {
       .map((f) => ({ icon: f.icon.trim(), vi: f.vi.trim(), en: f.en.trim(), ms: f.ms.trim() })),
     apple_product_id: plan.appleProductId.trim() || null,
     google_product_id: plan.googleProductId.trim() || null,
+    // An empty box is NULL (unlimited), not 0 (nothing) — `Number("")` is 0,
+    // which would silently turn "no cap" into "no access".
+    ai_chat_per_day: numberOrNull(plan.aiChatPerDay),
+    call_minutes_per_month: numberOrNull(plan.callMinutesPerMonth),
+    form_review_mb_per_month: numberOrNull(plan.formReviewMbPerMonth),
     updated_at: new Date().toISOString(),
   };
   if (plan.id === "new") {
