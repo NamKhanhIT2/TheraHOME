@@ -24,6 +24,7 @@ import { useStartCall, type CallMedia } from '@/hooks/useCalls';
 import { isCallSupported } from '@/lib/livekit';
 import { useI18n } from '@/lib/i18n';
 import { usePlanGate } from '@/hooks/usePlanGate';
+import { errorMessage } from '@/lib/errorMessage';
 
 export function CallButton({ threadId, calleeId }: {
   threadId: string | undefined;
@@ -51,8 +52,13 @@ export function CallButton({ threadId, calleeId }: {
         // "kiểm tra kết nối mạng" — blaming the network for a decision the
         // server made on purpose, which leaves the customer retrying
         // something that will never work.
+        //
+        // `errorMessage`, not `error instanceof Error`: an RPC error is the
+        // parsed response body, a plain object, so the instanceof guard read
+        // "[object Object]" and every refusal fell through to the network
+        // line. Build 37 shipped with exactly that — see lib/errorMessage.ts.
         onError: (error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = errorMessage(error);
           if (message.includes('plan_required')) {
             askForPlan('featureCall');
             return;

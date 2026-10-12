@@ -24,6 +24,7 @@ import {
 } from '@/hooks/useFormReview';
 import { usePlanGate } from '@/hooks/usePlanGate';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
+import { errorMessage } from '@/lib/errorMessage';
 
 /** Long enough to show a full movement, short enough that nobody films a
  * monologue and short enough to upload on a phone network. Both platforms
@@ -108,7 +109,7 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
         [{ text: t('later') }, { text: t('formReviewOpenChat'), onPress: openChat }],
       );
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       console.warn('form review submit failed:', message);
       Alert.alert(t('formReviewFailedTitle'), t(explain(message)));
     } finally {

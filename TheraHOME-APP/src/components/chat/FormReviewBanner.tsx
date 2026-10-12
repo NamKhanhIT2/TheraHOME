@@ -15,6 +15,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { useCompleteFormReview, usePendingFormReviewForThread } from '@/hooks/useFormReview';
+import { errorMessage } from '@/lib/errorMessage';
 
 export function FormReviewBanner({ threadId, enabled }: {
   threadId: string | undefined;
@@ -57,7 +58,7 @@ export function FormReviewBanner({ threadId, enabled }: {
                 onPress: () => {
                   complete.mutate({ reviewId: pending.id }, {
                     onError: (error: unknown) => {
-                      const message = error instanceof Error ? error.message : String(error);
+                      const message = errorMessage(error);
                       console.warn('complete_form_review failed:', message);
                       Alert.alert('Không đánh dấu được', 'Thử lại giúp em nhé.');
                     },
