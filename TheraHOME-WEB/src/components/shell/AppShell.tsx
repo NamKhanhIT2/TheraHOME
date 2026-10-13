@@ -13,6 +13,7 @@ import { useWebAccess } from "@/components/AccessGate";
 import { pushToast, ToastHost } from "@/components/ui/Toast";
 import { Icon } from "@/components/ui/Icon";
 import { HEADER_ACCESSORY_SLOT_ID } from "@/components/shell/HeaderAccessory";
+import { StaffAlertCenter } from "@/components/shell/StaffAlertCenter";
 import type { NavItem } from "@/lib/adminMockData";
 
 export function AppShell({
@@ -33,7 +34,11 @@ export function AppShell({
   const { roles, email, signOut } = useWebAccess();
   const [active, setActive] = useState(initialActive);
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
-  const item = navItems.flatMap((n) => n.children?.length ? [n, ...n.children] : [n]).find((n) => n.id === active) || navItems[0];
+  const flatNav = navItems.flatMap((n) => n.children?.length ? [n, ...n.children] : [n]);
+  const item = flatNav.find((n) => n.id === active) || navItems[0];
+  // Which tabs this surface can actually show. CSKH has no "Gói đăng ký",
+  // so a subscription alert must not try to navigate there.
+  const navIds = flatNav.map((n) => n.id);
   const hasBothRoles = roles.includes("admin") && roles.includes("cskh");
 
   return (
@@ -142,9 +147,12 @@ export function AppShell({
             >
               <Icon name="home" size={16} color="currentColor" />
             </Link>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: "#fff", border: "1px solid var(--border-input)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="bell" size={16} color="var(--text-secondary)" />
-            </div>
+            {/* Was a static icon drawn by the mock: no count, no panel, no
+                data behind it. It now carries the work queue, and it lives
+                in the SHELL so a customer messaging — or a clip arriving, or
+                somebody buying a plan — reaches whoever is staffing the
+                console whatever tab they happen to be on. */}
+            <StaffAlertCenter activeTab={active} navIds={navIds} onOpenTab={setActive} />
           </div>
         </div>
         <div style={{ padding: "0 32px 40px" }}>{children(active, setActive)}</div>

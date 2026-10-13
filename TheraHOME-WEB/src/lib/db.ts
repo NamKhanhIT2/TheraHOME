@@ -3134,6 +3134,8 @@ export interface SubscriptionOps {
     newThisMonth: number;
     refunded: number;
     lapsed: number;
+    /** Plans an admin handed out. Entitle like a sale, counted as none. */
+    granted: number;
   };
   infra: {
     storageBytes: number;
@@ -3175,6 +3177,7 @@ export async function fetchSubscriptionOps(): Promise<SubscriptionOps> {
       newThisMonth: num(revenue.new_this_month),
       refunded: num(revenue.refunded),
       lapsed: num(revenue.lapsed),
+      granted: num(revenue.granted),
     },
     infra: {
       storageBytes: num(infra.storage_bytes),
@@ -3187,4 +3190,166 @@ export async function fetchSubscriptionOps(): Promise<SubscriptionOps> {
       aiMessagesThisMonth: num(infra.ai_messages_this_month),
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Who holds a plan, and granting one by hand
+// ---------------------------------------------------------------------------
+//
+// The aggregates above answer "is this working". They cannot answer the
+// question support actually gets — "I paid and the app says I didn't" — which
+// needs the one customer's row.
+
+export interface SubscriptionHolder {
+  subscriptionId: string;
+  userId: string;
+  fullName: string | null;
+  email: string | null;
+  phone: string | null;
+  planCode: string;
+  planName: string | null;
+  billingType: string | null;
+  priceAmountVnd: number | null;
+  platform: string;
+  productId: string | null;
+  storeSubscriptionId: string | null;
+  status: string;
+  autoRenewing: boolean;
+  purchasedAt: string | null;
+  currentPeriodEnd: string | null;
+  revokedAt: string | null;
+  /** The same test the app applies — a period that ended is not live however
+   * `status` reads, which is exactly the discrepancy support is looking for. */
+  isLive: boolean;
+}
+
+export async function fetchSubscriptionHolders(limit = 200): Promise<SubscriptionHolder[]> {
+  const { data, error } = await supabase.rpc("subscription_holders", { p_limit: limit });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    subscriptionId: String(row.subscription_id ?? ""),
+    userId: String(row.user_id ?? ""),
+    fullName: (row.full_name as string) ?? null,
+    email: (row.email as string) ?? null,
+    phone: (row.phone as string) ?? null,
+    planCode: String(row.plan_code ?? ""),
+    planName: (row.plan_name as string) ?? null,
+    billingType: (row.billing_type as string) ?? null,
+    priceAmountVnd: row.price_amount_vnd == null ? null : Number(row.price_amount_vnd),
+    platform: String(row.platform ?? ""),
+    productId: (row.product_id as string) ?? null,
+    storeSubscriptionId: (row.store_subscription_id as string) ?? null,
+    status: String(row.status ?? ""),
+    autoRenewing: !!row.auto_renewing,
+    purchasedAt: (row.purchased_at as string) ?? null,
+    currentPeriodEnd: (row.current_period_end as string) ?? null,
+    revokedAt: (row.revoked_at as string) ?? null,
+    isLive: !!row.is_live,
+  }));
+}
+
+/** Admin only. `months` is ignored for a lifetime plan, which never ends. */
+export async function grantSubscription(userId: string, planCode: string, months: number | null, note: string) {
+  const { error } = await supabase.rpc("admin_grant_subscription", {
+    p_user: userId,
+    p_plan_code: planCode,
+    p_months: months ?? undefined,
+    p_note: note || undefined,
+  });
+  if (error) throw error;
+}
+
+/** Admin only. Keeps the row — the record is what any later argument rests on. */
+export async function revokeSubscription(subscriptionId: string) {
+  const { error } = await supabase.rpc("admin_revoke_subscription", { p_id: subscriptionId });
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// The CSKH work queue
+// ---------------------------------------------------------------------------
+
+export type StaffAlertKind = "chat" | "form_review" | "subscription" | "subscription_refund";
+
+export interface StaffAlert {
+  id: string;
+  kind: StaffAlertKind;
+  customerId: string | null;
+  title: string;
+  body: string | null;
+  threadId: string | null;
+  formReviewId: string | null;
+  subscriptionId: string | null;
+  /** How many times this same thing happened before anyone answered. */
+  eventCount: number;
+  createdAt: string;
+  lastEventAt: string;
+}
+
+function toStaffAlert(row: Record<string, unknown>): StaffAlert {
+  return {
+    id: String(row.id ?? ""),
+    kind: (row.kind as StaffAlertKind) ?? "chat",
+    customerId: (row.customer_id as string) ?? null,
+    title: String(row.title ?? ""),
+    body: (row.body as string) ?? null,
+    threadId: (row.thread_id as string) ?? null,
+    formReviewId: (row.form_review_id as string) ?? null,
+    subscriptionId: (row.subscription_id as string) ?? null,
+    eventCount: Number(row.event_count ?? 1) || 1,
+    createdAt: String(row.created_at ?? ""),
+    lastEventAt: String(row.last_event_at ?? row.created_at ?? ""),
+  };
+}
+
+export async function fetchOpenStaffAlerts(limit = 50): Promise<StaffAlert[]> {
+  const { data, error } = await supabase
+    .from("staff_alerts")
+    .select("id, kind, customer_id, title, body, thread_id, form_review_id, subscription_id, event_count, created_at, last_event_at")
+    .is("handled_at", null)
+    .order("last_event_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(toStaffAlert);
+}
+
+/** Reads one row the Realtime payload named. The payload itself carries the
+ * columns, but only for an INSERT — an UPDATE that bumps event_count sends
+ * the same shape and this keeps one parser for both. */
+export async function fetchStaffAlert(id: string): Promise<StaffAlert | null> {
+  const { data, error } = await supabase
+    .from("staff_alerts")
+    .select("id, kind, customer_id, title, body, thread_id, form_review_id, subscription_id, event_count, created_at, last_event_at")
+    .eq("id", id)
+    .is("handled_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toStaffAlert(data as Record<string, unknown>) : null;
+}
+
+export async function handleStaffAlert(id: string) {
+  const { error } = await supabase.rpc("handle_staff_alert", { p_id: id });
+  if (error) throw error;
+}
+
+/** Name/email/phone search for the grant picker. Deliberately not
+ * `fetchAppUsers()`, which joins programs, orders and adherence for every
+ * account in the project — this needs ten rows and three columns. */
+export async function searchCustomers(query: string, limit = 8): Promise<Array<{ id: string; name: string | null; email: string | null; phone: string | null }>> {
+  const term = query.trim();
+  if (term.length < 2) return [];
+  const pattern = `%${term}%`;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, phone")
+    .is("deleted_at", null)
+    .or(`full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`)
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    name: (row.full_name as string) ?? null,
+    email: (row.email as string) ?? null,
+    phone: (row.phone as string) ?? null,
+  }));
 }
