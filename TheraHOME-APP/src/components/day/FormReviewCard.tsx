@@ -26,23 +26,49 @@ import { usePlanGate } from '@/hooks/usePlanGate';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 import { errorMessage } from '@/lib/errorMessage';
 
-/** Long enough to show a full movement, short enough to upload on a phone
- * network. Both platforms enforce it in their own camera UI, so it cannot be
- * exceeded. */
-// Thirty seconds, raised from fifteen (owner 2026-10-13: fifteen was too
-// short). At quality 0.5 that is roughly 10 MB a clip rather than 5, which
-// is what CLIP_MB in hooks/useFormReview.ts has to agree with — the card
-// tells the customer how many clips they have left by dividing the month's
-// megabytes by that number, so the two constants are one decision in two
-// files and must move together.
-//
-// Headroom checked rather than assumed: the server rejects a clip over a
-// quarter of the monthly budget (50 MB on Premium, 125 MB above it) and the
-// chat-attachments bucket caps a file at 50 MB. Ten is nowhere near either.
-// What it does halve is how many fit in a month — 20 on Premium's 200 MB,
-// 50 on 500 MB — and a 14-day programme cannot produce 20 days of clips, so
-// the budget is still not the binding limit.
-const MAX_SECONDS = 30;
+/** Long enough to show a full movement at a normal tempo — a minute, raised
+ * from fifteen seconds (owner 2026-10-13). Both platforms enforce it in
+ * their own camera UI, so it cannot be exceeded. */
+const MAX_SECONDS = 60;
+
+/** iOS: transcode to 540p H.264 + AAC instead of uploading what the camera
+ * recorded.
+ *
+ * This is the setting that makes a minute affordable, and its absence was a
+ * real defect rather than a missing nicety. `quality` does NOT apply to
+ * video — expo-image-picker's Swift only ever passes it to
+ * `jpegData(compressionQuality:)`, and with the default
+ * `videoExportPreset: .passthrough` MediaHandler streams the full-size
+ * original. So the old `quality: 0.5` compressed nothing: a clip arrived at
+ * whatever the phone's camera was set to, which on an iPhone recording 4K is
+ * several hundred megabytes a minute — over the chat-attachments bucket's own
+ * 50 MB file limit, so the upload would simply have failed.
+ *
+ * Nothing had ever exercised it: `form_reviews` and the bucket both held zero
+ * video rows, so the "~5 MB a clip" in the comment this replaces was an
+ * estimate, never a measurement, and it was wrong.
+ *
+ * 960x540 is Apple's AVAssetExportPreset960x540: roughly 2 Mbit/s, so about
+ * 15 MB a minute, and 540p is ample for judging a neck-and-shoulder
+ * movement. ANDROID HAS NO EQUIVALENT in this library — the camera intent
+ * takes no quality option — so an Android clip is still whatever the device
+ * recorded, which is what the size guard below is for.
+ *
+ * CLIP_MB in hooks/useFormReview.ts must agree with the number above: the
+ * card divides the month's megabytes by it to say how many clips are left,
+ * so the two are one decision in two files. */
+const VIDEO_PRESET = ImagePicker.VideoExportPreset.H264_960x540;
+
+/** Refuse before uploading, not after.
+ *
+ * The bucket rejects anything over 50 MB and `request_form_review` rejects a
+ * clip over a quarter of the monthly budget. Both of those fire AFTER the
+ * file has gone up, which on a phone network means spending several minutes
+ * and a chunk of someone's data on an upload that was never going to be
+ * accepted. `uploadChatAttachment` also reads the whole file into an
+ * ArrayBuffer, so a huge one is a memory problem before it is a quota
+ * problem. 45 MB leaves headroom under the bucket's 50. */
+const MAX_UPLOAD_MB = 45;
 
 /** The server raises these as Postgres exceptions; the customer should read
  * the reason, not the error code.
@@ -93,10 +119,23 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['videos'],
       videoMaxDuration: MAX_SECONDS,
-      quality: 0.5,
+      videoExportPreset: VIDEO_PRESET,
     });
     if (result.canceled || !result.assets?.length) return;
     const asset = result.assets[0];
+
+    // `fileSize` is reported for video on both platforms, though Android
+    // leaves it null when the content resolver does not know — in which case
+    // this waves the clip through rather than blocking on ignorance.
+    const sizeMb = asset.fileSize ? asset.fileSize / 1048576 : null;
+    if (sizeMb !== null && sizeMb > MAX_UPLOAD_MB) {
+      Alert.alert(t('formReviewFailedTitle'), t('formReviewErrTooLarge'));
+      return;
+    }
+    if (sizeMb !== null && sizeMb > remainingMb) {
+      Alert.alert(t('formReviewFailedTitle'), t('formReviewErrQuota'));
+      return;
+    }
 
     setBusy(true);
     try {
@@ -122,7 +161,7 @@ export function FormReviewCard({ userId, userProgramId, programDayId, dayNumber,
     } finally {
       setBusy(false);
     }
-  }, [userId, threadQuery.data, submit, userProgramId, programDayId, dayNumber, dayLabel, openChat, t]);
+  }, [userId, threadQuery.data, submit, userProgramId, programDayId, dayNumber, dayLabel, openChat, remainingMb, t]);
 
   if (!userId || isLoading) return null;
 

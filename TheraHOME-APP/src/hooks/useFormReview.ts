@@ -90,15 +90,20 @@ export function useMyFormReviews(userId: string | undefined) {
   return query;
 }
 
-/** Roughly what one clip weighs at the capture settings in FormReviewCard
- * (30 seconds, quality 0.5). Only ever used to turn megabytes into a count a
- * person can understand — the budget itself is bytes, which is why the label
- * says "khoảng".
+/** Roughly what one clip weighs at the capture settings in FormReviewCard:
+ * 60 seconds exported through Apple's 960x540 H.264 preset, about 2 Mbit/s.
+ * Only ever used to turn megabytes into a count a person can understand —
+ * the budget itself is bytes, which is why the label says "khoảng".
  *
- * Must move whenever MAX_SECONDS there moves, or the card over-promises:
- * at 5 it would have told a Premium customer "còn khoảng 40 lần" for a
- * budget that now holds 20. */
-export const CLIP_MB = 10;
+ * Must move whenever MAX_SECONDS or VIDEO_PRESET there moves, or the card
+ * over-promises: left at 5 it would tell a Premium customer "còn khoảng 40
+ * lần" for a budget that holds 13.
+ *
+ * iOS only, strictly speaking. Android has no transcode in
+ * expo-image-picker, so an Android clip can be heavier and the count there
+ * is optimistic — which is why the label says "khoảng" and why the real
+ * limit is enforced in bytes on the server. */
+export const CLIP_MB = 15;
 
 /** The month's video budget, in megabytes, with both halves read from the
  * server.
