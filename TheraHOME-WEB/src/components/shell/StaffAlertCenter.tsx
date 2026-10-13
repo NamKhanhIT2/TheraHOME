@@ -33,6 +33,7 @@ const TABS_FOR: Record<StaffAlertKind, string[]> = {
   form_review: ["chat"],
   subscription: ["subscription-plans", "subscribers"],
   subscription_refund: ["subscription-plans", "subscribers"],
+  coin_gift: ["coins"],
 };
 
 function tabFor(kind: StaffAlertKind, navIds: string[]): string | null {
@@ -44,6 +45,7 @@ const ICON_FOR: Record<StaffAlertKind, string> = {
   form_review: "film",
   subscription: "star",
   subscription_refund: "triangle-alert",
+  coin_gift: "sparkles",
 };
 
 const LABEL_FOR: Record<StaffAlertKind, string> = {
@@ -51,6 +53,7 @@ const LABEL_FOR: Record<StaffAlertKind, string> = {
   form_review: "Chấm dáng tập",
   subscription: "Đăng ký gói",
   subscription_refund: "Hoàn tiền",
+  coin_gift: "Quà tặng xu",
 };
 
 /** A short two-tone chime, synthesised rather than shipped as a file: no

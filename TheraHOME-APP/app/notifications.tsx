@@ -105,7 +105,13 @@ export default function NotificationInboxScreen() {
 
   function openNotification(notification: NotificationRow) {
     if (!notification.read) markRead.mutate(notification.id);
-    if (notification.type === 'chat' && notification.relatedChatThreadId) {
+    // Checked before `type`, not inside it: the xu notifications ride on an
+    // existing type on purpose (a brand-new one renders as a blank row in
+    // every build already in the wild), so the destination is the only thing
+    // that identifies them.
+    if (notification.destination === 'coins') {
+      router.push('/coins');
+    } else if (notification.type === 'chat' && notification.relatedChatThreadId) {
       router.push('/chat/human');
     } else if (notification.type === 'blog' && notification.relatedArticleId) {
       router.push({ pathname: '/community/article/[articleId]', params: { articleId: notification.relatedArticleId } });

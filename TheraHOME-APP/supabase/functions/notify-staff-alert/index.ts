@@ -9,9 +9,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // `dispatch-push` mode 'chat' already reaches staff. A subscription reaches
 // nobody — which is the gap the owner named on 2026-10-13.
 //
-// So this handles SUBSCRIPTION alerts only. Pushing for the other kinds here
-// would double up with dispatch-push, and two notifications for one message
-// is worse than one.
+// So this handles the kinds nothing else pushes: subscriptions, refunds, and
+// a xu gift claim. Pushing chat or form_review here would double up with
+// dispatch-push, and two notifications for one message is worse than one.
 //
 // Called by a trigger through pg_net, never by the app — same shared-secret
 // pattern as the cron functions, reusing the same Vault value so there is
@@ -69,7 +69,10 @@ Deno.serve(async (req: Request) => {
   if (!alert) return jsonResponse({ ok: true, skipped: "gone" });
   // Somebody got there first in the second it took to arrive here.
   if (alert.handled_at) return jsonResponse({ ok: true, skipped: "handled" });
-  if (alert.kind !== "subscription" && alert.kind !== "subscription_refund") {
+  // Chat and form_review are left out because `dispatch-push` already reaches
+  // staff for both and two notifications for one message is worse than one.
+  const PUSHED = ["subscription", "subscription_refund", "coin_gift"];
+  if (!PUSHED.includes(alert.kind as string)) {
     return jsonResponse({ ok: true, skipped: "kind" });
   }
 

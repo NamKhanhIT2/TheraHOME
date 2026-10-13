@@ -20,6 +20,7 @@ export const NAV_ADMIN: NavItem[] = [
   // app (tên, giá, quyền lợi). Chỉ là nội dung: sửa ở đây không cấp quyền cho
   // ai, hạn mức thật vẫn nằm ở các hàm phía server.
   { id: "subscription-plans", label: "Gói đăng ký", icon: "star" },
+  { id: "coins", label: "Xu & quà tặng", icon: "sparkles" },
   // Per-product activation contacts, CSKH-managed — cũng có mặt ở NAV_CARE.
   { id: "activation", label: "Kích hoạt", icon: "shield" },
   {
@@ -79,6 +80,8 @@ export const NAV_CARE: NavItem[] = [
   // edits plan copy and grants plans, and `subscription_holders()` is the
   // only part of it RLS lets a cskh caller read.
   { id: "subscribers", label: "Người đăng ký", icon: "star" },
+  // CSKH posts the parcels, so the xu list belongs on their surface too.
+  { id: "coins", label: "Xu & quà tặng", icon: "sparkles" },
   { id: "users", label: "User", icon: "users" },
 ];
 

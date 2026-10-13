@@ -19,6 +19,9 @@ const MENU: { icon: string; labelKey: TranslationKey; route: string }[] = [
   // it is the only entrance to it, and a free user is meant to be able to
   // read what the paid tiers contain.
   { icon: 'crown', labelKey: 'plansUpgrade', route: '/subscription' },
+  // Directly under the plans, because the xu programme is a benefit OF a
+  // plan — a row floating lower down would read as a separate product.
+  { icon: 'star', labelKey: 'coinsNavLabel', route: '/coins' },
   { icon: 'pencil', labelKey: 'editProfile', route: '/profile/edit' },
   { icon: 'bell', labelKey: 'workoutReminders', route: '/profile/notifications-settings' },
   { icon: 'grid', labelKey: 'accountSettings', route: '/profile/account' },

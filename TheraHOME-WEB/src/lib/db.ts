@@ -3269,7 +3269,7 @@ export async function revokeSubscription(subscriptionId: string) {
 // The CSKH work queue
 // ---------------------------------------------------------------------------
 
-export type StaffAlertKind = "chat" | "form_review" | "subscription" | "subscription_refund";
+export type StaffAlertKind = "chat" | "form_review" | "subscription" | "subscription_refund" | "coin_gift";
 
 export interface StaffAlert {
   id: string;
@@ -3408,4 +3408,74 @@ export async function completeFormReview(reviewId: string, replyMessageId?: stri
     p_reply_message_id: replyMessageId ?? undefined,
   });
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Chương trình tặng xu
+// ---------------------------------------------------------------------------
+
+export interface CoinHolder {
+  userId: string;
+  fullName: string | null;
+  email: string | null;
+  phone: string | null;
+  planCode: string | null;
+  balance: number;
+  daysClaimed: number;
+  streakClaimed: number;
+  lastEarnedAt: string | null;
+  /** Set when the customer asked for the gift — the moment it becomes work. */
+  giftClaimedAt: string | null;
+  giftFulfilledAt: string | null;
+}
+
+export async function fetchCoinHolders(limit = 200): Promise<CoinHolder[]> {
+  const { data, error } = await supabase.rpc("coin_holders", { p_limit: limit });
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    userId: String(row.user_id ?? ""),
+    fullName: (row.full_name as string) ?? null,
+    email: (row.email as string) ?? null,
+    phone: (row.phone as string) ?? null,
+    planCode: (row.plan_code as string) ?? null,
+    balance: Number(row.balance ?? 0),
+    daysClaimed: Number(row.days_claimed ?? 0),
+    streakClaimed: Number(row.streak_claimed ?? 0),
+    lastEarnedAt: (row.last_earned_at as string) ?? null,
+    giftClaimedAt: (row.gift_claimed_at as string) ?? null,
+    giftFulfilledAt: (row.gift_fulfilled_at as string) ?? null,
+  }));
+}
+
+/** Staff only. Also closes the work-queue item for that customer. */
+export async function fulfilCoinGift(userId: string, note?: string) {
+  const { error } = await supabase.rpc("fulfil_coin_gift", { p_user: userId, p_note: note || undefined });
+  if (error) throw error;
+}
+
+export interface CoinSettings {
+  active: boolean;
+  coinsPerDay: number;
+  coinsPerStreak: number;
+  streakMilestones: number[];
+  giftThreshold: number;
+  planCodes: string[];
+}
+
+export async function fetchCoinSettings(): Promise<CoinSettings | null> {
+  const { data, error } = await supabase
+    .from("coin_settings")
+    .select("active, coins_per_day, coins_per_streak, streak_milestones, gift_threshold, plan_codes")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as Record<string, unknown>;
+  return {
+    active: !!row.active,
+    coinsPerDay: Number(row.coins_per_day ?? 0),
+    coinsPerStreak: Number(row.coins_per_streak ?? 0),
+    streakMilestones: (row.streak_milestones as number[]) ?? [],
+    giftThreshold: Number(row.gift_threshold ?? 0),
+    planCodes: (row.plan_codes as string[]) ?? [],
+  };
 }

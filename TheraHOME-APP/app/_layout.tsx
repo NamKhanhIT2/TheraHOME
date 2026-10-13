@@ -443,6 +443,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="day/[dayId]" />
           <Stack.Screen name="paywall/[phaseId]" />
           <Stack.Screen name="subscription" />
+          <Stack.Screen name="coins" />
           <Stack.Screen name="profile/index" />
           <Stack.Screen name="profile/edit" />
           <Stack.Screen name="profile/notifications-settings" />

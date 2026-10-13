@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { PainScaleModal } from '@/components/PainScaleModal';
 import { FormReviewCard } from '@/components/day/FormReviewCard';
+import { DayCoinCard } from '@/components/day/DayCoinCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
@@ -412,6 +413,12 @@ export default function DayDetailScreen() {
           {/* "Tôi tập thế này đúng chưa?" — a clip of this exercise, sent to
               a specialist. Only on a day the customer can actually do: there
               is nothing to film on a locked one. */}
+          {/* The xu for finishing this day. Above the form-check card because
+              it belongs to the day just completed, while that one is a
+              request about it. */}
+          {!progressLocked ? (
+            <DayCoinCard userProgramId={userProgramId} programDayId={programDayId} />
+          ) : null}
           {!progressLocked ? (
             <FormReviewCard
               userId={userId}

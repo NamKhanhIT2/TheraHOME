@@ -603,6 +603,117 @@ export type Database = {
         }
         Relationships: []
       }
+      coin_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          kind: string
+          note: string | null
+          program_day_id: string | null
+          streak_milestone: number | null
+          user_id: string
+          user_program_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          kind: string
+          note?: string | null
+          program_day_id?: string | null
+          streak_milestone?: number | null
+          user_id: string
+          user_program_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          program_day_id?: string | null
+          streak_milestone?: number | null
+          user_id?: string
+          user_program_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coin_entries_program_day_id_fkey"
+            columns: ["program_day_id"]
+            isOneToOne: false
+            referencedRelation: "program_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coin_entries_user_program_id_fkey"
+            columns: ["user_program_id"]
+            isOneToOne: false
+            referencedRelation: "user_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coin_gift_claims: {
+        Row: {
+          balance_at_claim: number
+          claimed_at: string
+          fulfilled_at: string | null
+          fulfilled_by: string | null
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          balance_at_claim: number
+          claimed_at?: string
+          fulfilled_at?: string | null
+          fulfilled_by?: string | null
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          balance_at_claim?: number
+          claimed_at?: string
+          fulfilled_at?: string | null
+          fulfilled_by?: string | null
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coin_settings: {
+        Row: {
+          active: boolean
+          coins_per_day: number
+          coins_per_streak: number
+          gift_threshold: number
+          id: boolean
+          plan_codes: string[]
+          streak_milestones: number[]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          coins_per_day?: number
+          coins_per_streak?: number
+          gift_threshold?: number
+          id?: boolean
+          plan_codes?: string[]
+          streak_milestones?: number[]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          coins_per_day?: number
+          coins_per_streak?: number
+          gift_threshold?: number
+          id?: boolean
+          plan_codes?: string[]
+          streak_milestones?: number[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       comment_likes: {
         Row: {
           comment_id: string
@@ -1951,6 +2062,86 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_alerts: {
+        Row: {
+          body: string | null
+          created_at: string
+          customer_id: string | null
+          dedupe_key: string
+          event_count: number
+          form_review_id: string | null
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          kind: string
+          last_event_at: string
+          subscription_id: string | null
+          thread_id: string | null
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          customer_id?: string | null
+          dedupe_key: string
+          event_count?: number
+          form_review_id?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          kind: string
+          last_event_at?: string
+          subscription_id?: string | null
+          thread_id?: string | null
+          title: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          customer_id?: string | null
+          dedupe_key?: string
+          event_count?: number
+          form_review_id?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          kind?: string
+          last_event_at?: string
+          subscription_id?: string | null
+          thread_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_alerts_form_review_id_fkey"
+            columns: ["form_review_id"]
+            isOneToOne: false
+            referencedRelation: "form_reviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_alerts_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "user_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_alerts_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_thread_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_alerts_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_categories: {
         Row: {
           group_key: string
@@ -2628,6 +2819,59 @@ export type Database = {
           product_name: string
         }[]
       }
+      admin_grant_subscription: {
+        Args: {
+          p_months?: number
+          p_note?: string
+          p_plan_code: string
+          p_user: string
+        }
+        Returns: {
+          auto_renewing: boolean | null
+          created_at: string
+          current_period_end: string | null
+          id: string
+          plan_code: string
+          platform: string
+          product_id: string
+          purchased_at: string
+          revoked_at: string | null
+          status: string
+          store_subscription_id: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_revoke_subscription: {
+        Args: { p_id: string }
+        Returns: {
+          auto_renewing: boolean | null
+          created_at: string
+          current_period_end: string | null
+          id: string
+          plan_code: string
+          platform: string
+          product_id: string
+          purchased_at: string
+          revoked_at: string | null
+          status: string
+          store_subscription_id: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_set_user_phase: {
         Args: { p_phase_id: string; p_user_program_id: string }
         Returns: undefined
@@ -2677,6 +2921,15 @@ export type Database = {
       }
       call_minutes_allowance: { Args: never; Returns: number }
       call_minutes_used_this_month: { Args: never; Returns: number }
+      claim_coin_gift: { Args: never; Returns: Json }
+      claim_day_coins: {
+        Args: { p_program_day_id: string; p_user_program_id: string }
+        Returns: number
+      }
+      claim_streak_coins: {
+        Args: { p_milestone: number; p_user_program_id: string }
+        Returns: number
+      }
       claim_user_access_contact: {
         Args: { p_contact: string }
         Returns: {
@@ -2686,6 +2939,26 @@ export type Database = {
           programs_granted: number
         }[]
       }
+      coin_balance: { Args: never; Returns: number }
+      coin_days_done: { Args: { p_user_program_id: string }; Returns: number }
+      coin_holders: {
+        Args: { p_limit?: number }
+        Returns: {
+          balance: number
+          days_claimed: number
+          email: string
+          full_name: string
+          gift_claimed_at: string
+          gift_fulfilled_at: string
+          last_earned_at: string
+          phone: string
+          plan_code: string
+          streak_claimed: number
+          user_id: string
+        }[]
+      }
+      coin_overview: { Args: { p_user_program_id?: string }; Returns: Json }
+      coin_programme_eligible: { Args: never; Returns: boolean }
       complete_day: {
         Args: {
           p_pain_score: number
@@ -2810,6 +3083,23 @@ export type Database = {
           title: string
         }[]
       }
+      fulfil_coin_gift: {
+        Args: { p_note?: string; p_user: string }
+        Returns: {
+          balance_at_claim: number
+          claimed_at: string
+          fulfilled_at: string | null
+          fulfilled_by: string | null
+          note: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "coin_gift_claims"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_community_profile: {
         Args: { p_user_id: string }
         Returns: {
@@ -2830,6 +3120,31 @@ export type Database = {
           milestone_days: number
           user_id: string
         }[]
+      }
+      handle_staff_alert: {
+        Args: { p_id: string }
+        Returns: {
+          body: string | null
+          created_at: string
+          customer_id: string | null
+          dedupe_key: string
+          event_count: number
+          form_review_id: string | null
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          kind: string
+          last_event_at: string
+          subscription_id: string | null
+          thread_id: string | null
+          title: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_alerts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       log_call_to_thread: {
         Args: { p_call: Database["public"]["Tables"]["calls"]["Row"] }
@@ -2878,6 +3193,19 @@ export type Database = {
       profile_language: { Args: { p_user_id: string }; Returns: string }
       provision_product_for_user: {
         Args: { p_product_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      raise_staff_alert: {
+        Args: {
+          p_body: string
+          p_customer: string
+          p_dedupe_key: string
+          p_form_review?: string
+          p_kind: string
+          p_subscription?: string
+          p_thread?: string
+          p_title: string
+        }
         Returns: undefined
       }
       record_local_reminder_notification: {
@@ -2985,6 +3313,29 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      subscription_holders: {
+        Args: { p_limit?: number }
+        Returns: {
+          auto_renewing: boolean
+          billing_type: string
+          current_period_end: string
+          email: string
+          full_name: string
+          is_live: boolean
+          phone: string
+          plan_code: string
+          plan_name: string
+          platform: string
+          price_amount_vnd: number
+          product_id: string
+          purchased_at: string
+          revoked_at: string
+          status: string
+          store_subscription_id: string
+          subscription_id: string
+          user_id: string
+        }[]
       }
       subscription_ops_overview: { Args: never; Returns: Json }
       suggested_reminder_hour: { Args: never; Returns: number }
