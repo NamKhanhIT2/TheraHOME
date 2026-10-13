@@ -57,7 +57,7 @@ export default function CoinsScreen() {
     hapticConfirm();
     claimStreak.mutate(
       { userProgramId: program.userProgramId, milestone },
-      { onError: (e: unknown) => Alert.alert(t('coinsTitle'), t(explainCoinError(e) as TranslationKey)) },
+      { onError: (e: unknown) => Alert.alert(t('coinsTitle'), t(explainCoinError(e))) },
     );
   }
 
@@ -71,7 +71,7 @@ export default function CoinsScreen() {
           hapticConfirm();
           claimGift.mutate(undefined, {
             onSuccess: () => Alert.alert(t('coinGiftRequestedTitle'), t('coinGiftRequestedBody')),
-            onError: (e: unknown) => Alert.alert(t('coinsTitle'), t(explainCoinError(e) as TranslationKey)),
+            onError: (e: unknown) => Alert.alert(t('coinsTitle'), t(explainCoinError(e))),
           });
         },
       },

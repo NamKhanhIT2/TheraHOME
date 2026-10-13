@@ -13,6 +13,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { errorMessage } from '@/lib/errorMessage';
+import type { TranslationKey } from '@/lib/i18n';
 
 export interface ClaimableDay {
   programDayId: string;
@@ -185,7 +186,7 @@ export function useCoinHistory(enabled = true) {
  * `instanceof Error`: a PostgREST failure is a plain object, and reading it
  * with the instanceof guard is exactly the bug that made the paywall blame
  * the network for a decision the server had made on purpose. */
-export function explainCoinError(error: unknown): string {
+export function explainCoinError(error: unknown): TranslationKey {
   const message = errorMessage(error);
   if (message.includes('plan_required')) return 'coinErrPlan';
   if (message.includes('already_claimed')) return 'coinErrAlready';

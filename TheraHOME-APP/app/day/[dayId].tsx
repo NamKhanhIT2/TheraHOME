@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { PainScaleModal } from '@/components/PainScaleModal';
 import { FormReviewCard } from '@/components/day/FormReviewCard';
-import { DayCoinCard } from '@/components/day/DayCoinCard';
+import { DayCoinCard, StreakCoinBanner } from '@/components/day/DayCoinCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
@@ -417,8 +417,9 @@ export default function DayDetailScreen() {
               it belongs to the day just completed, while that one is a
               request about it. */}
           {!progressLocked ? (
-            <DayCoinCard userProgramId={userProgramId} programDayId={programDayId} />
+            <DayCoinCard userProgramId={userProgramId} programDayId={programDayId} dayDone={d.status === 'done'} />
           ) : null}
+          {!progressLocked ? <StreakCoinBanner userProgramId={userProgramId} /> : null}
           {!progressLocked ? (
             <FormReviewCard
               userId={userId}

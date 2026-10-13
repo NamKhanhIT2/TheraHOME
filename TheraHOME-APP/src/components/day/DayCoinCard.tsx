@@ -14,12 +14,17 @@ import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
-import { useI18n, type TranslationKey } from '@/lib/i18n';
-import { useClaimDayCoins, useCoinOverview, explainCoinError } from '@/hooks/useCoins';
+import { useI18n } from '@/lib/i18n';
+import { useClaimDayCoins, useClaimStreakCoins, useCoinOverview, explainCoinError } from '@/hooks/useCoins';
 
-export function DayCoinCard({ userProgramId, programDayId }: {
+export function DayCoinCard({ userProgramId, programDayId, dayDone }: {
   userProgramId: string | undefined;
   programDayId: string | undefined;
+  /** Whether THIS day is finished. Required, and not inferable from
+   * `claimableDays`: a day that is merely unfinished is also absent from
+   * that list, and treating absence as "already collected" told somebody who
+   * had not trained yet that their xu was gone. */
+  dayDone: boolean;
 }) {
   const theme = useTheme();
   const { t } = useI18n();
@@ -27,6 +32,9 @@ export function DayCoinCard({ userProgramId, programDayId }: {
   const claim = useClaimDayCoins();
 
   if (!userProgramId || !programDayId || !overview.active) return null;
+  // Nothing to say about a day that has not been done. The card appears the
+  // moment it is.
+  if (!dayDone) return null;
 
   const claimable = overview.claimableDays.some((d) => d.programDayId === programDayId);
 
@@ -71,7 +79,7 @@ export function DayCoinCard({ userProgramId, programDayId }: {
       { userProgramId: userProgramId!, programDayId: programDayId! },
       {
         onError: (error: unknown) => {
-          Alert.alert(t('coinsTitle'), t(explainCoinError(error) as TranslationKey));
+          Alert.alert(t('coinsTitle'), t(explainCoinError(error)));
         },
       },
     );
@@ -97,6 +105,51 @@ export function DayCoinCard({ userProgramId, programDayId }: {
         <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>{t('coinDayCardHint')}</Text>
       </View>
       <Icon name="chevron-right" size={18} color={theme.colors.primary} />
+    </Pressable>
+  );
+}
+
+/** The milestone bonus, shown where it is actually earned.
+ *
+ * It used to live only on the Xu screen, which a customer may never open —
+ * and the only notification the programme sends fires at the threshold, so a
+ * waiting bonus could sit unseen for ever. Finishing the 7th day happens
+ * here, so the banner belongs here. */
+export function StreakCoinBanner({ userProgramId }: { userProgramId: string | undefined }) {
+  const theme = useTheme();
+  const { t } = useI18n();
+  const { overview } = useCoinOverview(userProgramId, !!userProgramId);
+  const claim = useClaimStreakCoins();
+  const milestone = overview.claimableStreaks[0];
+
+  if (!userProgramId || !overview.active || !overview.eligible || milestone == null) return null;
+
+  return (
+    <Pressable
+      onPress={() => {
+        if (claim.isPending) return;
+        hapticConfirm();
+        claim.mutate({ userProgramId, milestone }, {
+          onError: (error: unknown) => Alert.alert(t('coinsTitle'), t(explainCoinError(error))),
+        });
+      }}
+      disabled={claim.isPending}
+      style={({ pressed }) => [styles.card, {
+        backgroundColor: theme.colors.successTint,
+        borderColor: theme.colors.success,
+        opacity: claim.isPending ? 0.6 : pressed ? 0.9 : 1,
+      }]}
+    >
+      <Icon name="trending-up" size={19} color={theme.colors.success} />
+      <View style={styles.text}>
+        <Text style={[theme.type.bodyStrong, { color: theme.colors.success }]}>
+          {t('coinStreakTitle', { days: milestone })}
+        </Text>
+        <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
+          {t('coinStreakClaim', { coins: overview.coinsPerStreak })}
+        </Text>
+      </View>
+      <Icon name="chevron-right" size={18} color={theme.colors.success} />
     </Pressable>
   );
 }
