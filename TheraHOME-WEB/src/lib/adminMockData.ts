@@ -74,6 +74,11 @@ export const NAV_CARE: NavItem[] = [
   // purchases is customer-care work, and RLS already grants cskh SELECT on
   // both tables ("web admin cskh select all ...").
   { id: "insights", label: "Khảo sát & Giao dịch", icon: "trending-up" },
+  // Read-only: who holds which plan, and until when. Added 2026-10-13 at the
+  // owner's request, deliberately NOT the admin "Gói đăng ký" tab — that one
+  // edits plan copy and grants plans, and `subscription_holders()` is the
+  // only part of it RLS lets a cskh caller read.
+  { id: "subscribers", label: "Người đăng ký", icon: "star" },
   { id: "users", label: "User", icon: "users" },
 ];
 

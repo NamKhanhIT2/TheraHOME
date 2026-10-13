@@ -22,13 +22,22 @@ import { fetchOpenStaffAlerts, fetchStaffAlert, handleStaffAlert, type StaffAler
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 
-/** Which nav tab answers each kind of alert. */
-const TAB_FOR: Record<StaffAlertKind, string> = {
-  chat: "chat",
-  form_review: "chat",
-  subscription: "subscription-plans",
-  subscription_refund: "subscription-plans",
+/** Which nav tab answers each kind of alert, best first.
+ *
+ * A list rather than one id because the two surfaces name the same job
+ * differently: Admin manages subscriptions in "Gói đăng ký", CSKH only reads
+ * them in "Người đăng ký". The first id the current surface actually carries
+ * wins, and an alert with no matching tab simply does not navigate. */
+const TABS_FOR: Record<StaffAlertKind, string[]> = {
+  chat: ["chat"],
+  form_review: ["chat"],
+  subscription: ["subscription-plans", "subscribers"],
+  subscription_refund: ["subscription-plans", "subscribers"],
 };
+
+function tabFor(kind: StaffAlertKind, navIds: string[]): string | null {
+  return TABS_FOR[kind].find((id) => navIds.includes(id)) ?? null;
+}
 
 const ICON_FOR: Record<StaffAlertKind, string> = {
   chat: "message-circle",
@@ -172,8 +181,8 @@ export function StaffAlertCenter({ activeTab, navIds, onOpenTab }: {
       });
       n.onclick = () => {
         window.focus();
-        const tab = TAB_FOR[alert.kind];
-        if (navIdsRef.current.includes(tab)) onOpenTabRef.current(tab);
+        const tab = tabFor(alert.kind, navIdsRef.current);
+        if (tab) onOpenTabRef.current(tab);
         n.close();
       };
     }
@@ -199,8 +208,8 @@ export function StaffAlertCenter({ activeTab, navIds, onOpenTab }: {
   }
 
   function openAlert(alert: StaffAlert) {
-    const tab = TAB_FOR[alert.kind];
-    if (navIds.includes(tab)) onOpenTab(tab);
+    const tab = tabFor(alert.kind, navIds);
+    if (tab) onOpenTab(tab);
     setOpen(false);
   }
 
