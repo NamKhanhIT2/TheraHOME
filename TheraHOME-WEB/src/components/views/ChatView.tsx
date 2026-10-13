@@ -75,6 +75,7 @@ function LangBadge({ thread, compact = false }: { thread: ChatThread; compact?: 
   );
 }
 import { Icon } from "@/components/ui/Icon";
+import { FormReviewBanner } from "@/components/views/FormReviewBanner";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { pushToast } from "@/components/ui/Toast";
 
@@ -638,6 +639,9 @@ export function ChatView() {
               </button>
             ) : null}
           </div>
+          {/* The clip this conversation is waiting on, and the only place the
+              console can say it has been graded. */}
+          <FormReviewBanner threadId={active.id} messageCount={messages.length} />
           <div
             ref={scrollRef}
             onScroll={(e) => {

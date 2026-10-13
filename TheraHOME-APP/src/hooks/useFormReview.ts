@@ -91,10 +91,14 @@ export function useMyFormReviews(userId: string | undefined) {
 }
 
 /** Roughly what one clip weighs at the capture settings in FormReviewCard
- * (15 seconds, quality 0.5). Only ever used to turn megabytes into a count a
+ * (30 seconds, quality 0.5). Only ever used to turn megabytes into a count a
  * person can understand — the budget itself is bytes, which is why the label
- * says "khoảng". */
-export const CLIP_MB = 5;
+ * says "khoảng".
+ *
+ * Must move whenever MAX_SECONDS there moves, or the card over-promises:
+ * at 5 it would have told a Premium customer "còn khoảng 40 lần" for a
+ * budget that now holds 20. */
+export const CLIP_MB = 10;
 
 /** The month's video budget, in megabytes, with both halves read from the
  * server.

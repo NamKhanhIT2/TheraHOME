@@ -26,16 +26,23 @@ import { usePlanGate } from '@/hooks/usePlanGate';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 import { errorMessage } from '@/lib/errorMessage';
 
-/** Long enough to show a full movement, short enough that nobody films a
- * monologue and short enough to upload on a phone network. Both platforms
- * enforce it in their own camera UI, so it cannot be exceeded. */
-// 15 seconds at quality 0.5, not 20 at 0.7 — about 5 MB a clip instead of
-// ~12 MB. The monthly budget is denominated in megabytes now
-// (form_review_mb_allowance()), so the encode settings decide how many
-// clips 200 MB buys: ~40 at these numbers, ~16 at the old ones. Fifteen
-// seconds is long enough to see one neck-and-shoulder movement, which is
-// what a specialist is grading — this is not a film.
-const MAX_SECONDS = 15;
+/** Long enough to show a full movement, short enough to upload on a phone
+ * network. Both platforms enforce it in their own camera UI, so it cannot be
+ * exceeded. */
+// Thirty seconds, raised from fifteen (owner 2026-10-13: fifteen was too
+// short). At quality 0.5 that is roughly 10 MB a clip rather than 5, which
+// is what CLIP_MB in hooks/useFormReview.ts has to agree with — the card
+// tells the customer how many clips they have left by dividing the month's
+// megabytes by that number, so the two constants are one decision in two
+// files and must move together.
+//
+// Headroom checked rather than assumed: the server rejects a clip over a
+// quarter of the monthly budget (50 MB on Premium, 125 MB above it) and the
+// chat-attachments bucket caps a file at 50 MB. Ten is nowhere near either.
+// What it does halve is how many fit in a month — 20 on Premium's 200 MB,
+// 50 on 500 MB — and a 14-day programme cannot produce 20 days of clips, so
+// the budget is still not the binding limit.
+const MAX_SECONDS = 30;
 
 /** The server raises these as Postgres exceptions; the customer should read
  * the reason, not the error code.

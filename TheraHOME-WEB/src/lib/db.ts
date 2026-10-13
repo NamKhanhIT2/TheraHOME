@@ -3353,3 +3353,59 @@ export async function searchCustomers(query: string, limit = 8): Promise<Array<{
     phone: (row.phone as string) ?? null,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Chấm dáng tập — the specialist's half
+// ---------------------------------------------------------------------------
+//
+// A clip arrives as an ordinary chat attachment, so the console could always
+// watch it and reply. What it could not do was say the job was FINISHED:
+// `complete_form_review` existed and RLS already allowed cskh, but nothing in
+// this app called it. The row stayed 'pending' for ever, which meant the
+// customer kept reading "đang chờ chuyên viên" after being answered, the
+// work-queue alert never closed, and — quietly the worst of the three — the
+// prune cron only deletes clips of reviews that are `reviewed` or
+// `cancelled`, so an ungraded clip was immortal in a 1 GB bucket.
+
+export interface PendingFormReview {
+  id: string;
+  messageId: string | null;
+  dayNumber: number | null;
+  dayLabel: string | null;
+  videoBytes: number;
+  createdAt: string;
+}
+
+/** The clip this thread is waiting on, if any. One at a time is the normal
+ * case; oldest first if somebody sent several. */
+export async function fetchPendingFormReview(threadId: string): Promise<PendingFormReview | null> {
+  const { data, error } = await supabase
+    .from("form_reviews")
+    .select("id, message_id, day_number, day_label, video_bytes, created_at")
+    .eq("thread_id", threadId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as Record<string, unknown>;
+  return {
+    id: String(row.id ?? ""),
+    messageId: (row.message_id as string) ?? null,
+    dayNumber: row.day_number == null ? null : Number(row.day_number),
+    dayLabel: (row.day_label as string) ?? null,
+    videoBytes: Number(row.video_bytes ?? 0),
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+/** Staff only; the RPC raises `staff_required` otherwise, and
+ * `review_not_pending` if somebody else got there first. */
+export async function completeFormReview(reviewId: string, replyMessageId?: string) {
+  const { error } = await supabase.rpc("complete_form_review", {
+    p_review_id: reviewId,
+    p_reply_message_id: replyMessageId ?? undefined,
+  });
+  if (error) throw error;
+}
