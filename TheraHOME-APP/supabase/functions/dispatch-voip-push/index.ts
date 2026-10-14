@@ -27,7 +27,11 @@
 //   APNS_KEY_ID      the Key ID of an APNs auth key (Apple Developer → Keys)
 //   APNS_TEAM_ID     the Apple Developer team id
 //   APNS_PRIVATE_KEY the .p8 contents, including the BEGIN/END lines
-//   APNS_ENVIRONMENT "production" (default) or "sandbox" for a dev build
+//   APNS_ENVIRONMENT "production" (default) or "sandbox" for a dev build.
+//                    Only decides which host is TRIED FIRST — see the send
+//                    site; a token rejected as BadDeviceToken is retried on
+//                    the other one, because the server cannot know which
+//                    environment minted it.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -40,9 +44,6 @@ const APNS_PRIVATE_KEY = Deno.env.get("APNS_PRIVATE_KEY");
 const APNS_ENVIRONMENT = Deno.env.get("APNS_ENVIRONMENT") ?? "production";
 
 const BUNDLE_ID = "ai.therahome";
-const APNS_HOST = APNS_ENVIRONMENT === "sandbox"
-  ? "https://api.sandbox.push.apple.com"
-  : "https://api.push.apple.com";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -230,34 +231,70 @@ Deno.serve(async (request: Request) => {
     cancelReason: call.status === "accepted" ? 4 : 2,
   });
 
+  // BOTH hosts, configured one first.
+  //
+  // A VoIP token belongs to an APNs ENVIRONMENT, and the server cannot tell
+  // which one produced it: the same source builds a TestFlight app (whose
+  // tokens are production) and a dev client (sandbox). With APNS_ENVIRONMENT
+  // pointing at the wrong one, every push comes back 400 BadDeviceToken and
+  // this function still answered HTTP 200 with sent: 0 — which is how an
+  // incoming call could silently stop raising CallKit on the staff iPhone
+  // while nothing anywhere looked broken. Verified by hand on 2026-10-14:
+  // the staff token is accepted by api.push.apple.com and rejected by
+  // api.sandbox.push.apple.com.
+  //
+  // So BadDeviceToken is treated as "wrong environment, ask the other one"
+  // rather than as a dead token. Only a 410 means the token is really gone.
+  const HOSTS = APNS_ENVIRONMENT === "sandbox"
+    ? ["https://api.sandbox.push.apple.com", "https://api.push.apple.com"]
+    : ["https://api.push.apple.com", "https://api.sandbox.push.apple.com"];
+
+  async function pushTo(host: string, token: string) {
+    return await fetch(`${host}/3/device/${token}`, {
+      method: "POST",
+      headers: {
+        authorization: `bearer ${providerToken}`,
+        // The .voip suffix is what makes this a PushKit delivery; without
+        // it APNs rejects the push type.
+        "apns-topic": `${BUNDLE_ID}.voip`,
+        "apns-push-type": "voip",
+        "apns-priority": "10",
+        "apns-expiration": "0",
+      },
+      body: payload,
+    });
+  }
+
   const results = await Promise.all(tokens.map(async (token) => {
-    try {
-      const response = await fetch(`${APNS_HOST}/3/device/${token}`, {
-        method: "POST",
-        headers: {
-          authorization: `bearer ${providerToken}`,
-          // The .voip suffix is what makes this a PushKit delivery; without
-          // it APNs rejects the push type.
-          "apns-topic": `${BUNDLE_ID}.voip`,
-          "apns-push-type": "voip",
-          "apns-priority": "10",
-          "apns-expiration": "0",
-        },
-        body: payload,
-      });
-      if (response.ok) return { token: token.slice(0, 8), ok: true };
-      const detail = await response.text();
-      // 410 Unregistered means the device will never accept another push on
-      // this token — clear it so the next call does not wait on a dead one.
-      if (response.status === 410) {
-        await admin.from("voip_tokens").delete().eq("token", token);
+    const short = token.slice(0, 8);
+    let last: { status?: number; detail?: string } = {};
+    for (const host of HOSTS) {
+      try {
+        const response = await pushTo(host, token);
+        if (response.ok) return { token: short, ok: true, host };
+        const detail = await response.text();
+        last = { status: response.status, detail };
+        // 410 Unregistered means the device will never accept another push on
+        // this token — clear it so the next call does not wait on a dead one.
+        if (response.status === 410) {
+          await admin.from("voip_tokens").delete().eq("token", token);
+          break;
+        }
+        // Anything that is not an environment mismatch will fail the same way
+        // on the other host, so do not spend a second round trip on it.
+        if (!detail.includes("BadDeviceToken")) break;
+      } catch (error) {
+        last = { detail: String(error) };
+        break;
       }
-      return { token: token.slice(0, 8), ok: false, status: response.status, detail };
-    } catch (error) {
-      return { token: token.slice(0, 8), ok: false, detail: String(error) };
     }
+    // Logged, not only returned: the caller swallows this body, and a push
+    // that never rings a phone leaves no other trace.
+    console.error(`voip push failed for ${short}:`, JSON.stringify(last));
+    return { token: short, ok: false, ...last };
   }));
 
   const sent = results.filter((r) => r.ok).length;
+  if (sent === 0) console.error("voip push: nothing delivered", JSON.stringify(results));
   return json({ sent, results });
 });
