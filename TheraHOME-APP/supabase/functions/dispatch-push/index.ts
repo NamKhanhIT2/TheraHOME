@@ -323,7 +323,14 @@ Deno.serve(async (request) => {
         priority: 'high',
         // iOS: a time-sensitive interruption level breaks through Focus
         // modes, which is the point of a ringing phone. Ignored elsewhere.
-        ...(input.mode === 'call' ? { interruptionLevel: 'timeSensitive' } : {}),
+        //
+        // KEBAB-CASE. Expo's enum is 'active' | 'critical' | 'passive' |
+        // 'time-sensitive', and it rejects the whole REQUEST — not the one
+        // field — for a camelCase value. Written 'timeSensitive' it took
+        // every call push down with a VALIDATION_ERROR while chat pushes,
+        // which never set this field, kept working: exactly the shape that
+        // makes a bug look like a flaky network.
+        ...(input.mode === 'call' ? { interruptionLevel: 'time-sensitive' } : {}),
       });
     }
     if (!messages.length) return json({ sent: 0 });
@@ -342,6 +349,10 @@ Deno.serve(async (request) => {
     }
     return json({ sent: messages.length, tickets });
   } catch (error) {
+    // Logged, not just returned. This threw on every call for days and the
+    // only trace was a 500 in the edge log — the reason Expo gave was
+    // swallowed here, so nothing in Supabase could say what was wrong.
+    console.error('dispatch-push failed:', error);
     return json({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
 });
