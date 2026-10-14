@@ -68,6 +68,7 @@ const messages = {
     coinRulesTitle: 'Thể lệ', coinRule1: 'Chương trình dành cho khách hàng đang dùng gói Premium Plus hoặc Premium Trọn Đời.', coinRule2: 'Mỗi ngày tập được đánh dấu hoàn thành, bạn nhận {perDay} xu bằng cách chạm nút nhận trong ngày đó.', coinRule3: 'Hoàn thành {milestones} ngày tập, bạn nhận thêm {perStreak} xu mỗi mốc.', coinRule4: 'Đủ {threshold} xu, bạn được nhận một phần quà gồm 1 miếng dán Vinh Gia và 1 lọ gel.', coinRule5: 'Mỗi tài khoản nhận quà một lần. Xu không quy đổi thành tiền mặt và không chuyển nhượng được.',
     coinHistoryTitle: 'Lịch sử xu', coinHistoryDay: 'Hoàn thành ngày {day}', coinHistoryStreak: 'Mốc {days} ngày tập', coinHistoryAdmin: 'TheraHOME cộng xu', coinHistoryEmpty: 'Chưa có xu nào. Hoàn thành một ngày tập để bắt đầu.',
     coinErrPlan: 'Chương trình tặng xu dành cho gói Premium Plus trở lên.', coinErrAlready: 'Bạn đã nhận xu cho mục này rồi.', coinErrGiftTaken: 'Bạn đã nhận quà rồi. Mỗi người chỉ nhận một lần.', coinErrNotEnough: 'Bạn chưa đủ xu để nhận quà.', coinErrDayNotDone: 'Hãy hoàn thành ngày tập này trước đã nhé.', coinErrMilestone: 'Bạn chưa đạt mốc này.', coinErrGeneric: 'Chưa nhận được xu, thử lại giúp em nhé.',
+    plansYourPlan: 'Gói của bạn',
   },
   en: {
     home: 'Home', roadmap: 'Roadmap', store: 'Store', community: 'Community',
@@ -136,6 +137,7 @@ const messages = {
     coinRulesTitle: 'How it works', coinRule1: 'The programme is for customers on Premium Plus or Premium Lifetime.', coinRule2: 'Each training day you mark as finished gives you {perDay} xu, collected by tapping the button on that day.', coinRule3: 'Finish {milestones} training days and each milestone adds {perStreak} xu.', coinRule4: 'At {threshold} xu you can claim a gift of 1 Vinh Gia patch and 1 bottle of gel.', coinRule5: 'One gift per account. Xu cannot be exchanged for cash and cannot be transferred.',
     coinHistoryTitle: 'Xu history', coinHistoryDay: 'Finished day {day}', coinHistoryStreak: '{days}-day milestone', coinHistoryAdmin: 'Added by TheraHOME', coinHistoryEmpty: 'No xu yet. Finish a training day to start.',
     coinErrPlan: 'The xu programme is for Premium Plus and above.', coinErrAlready: 'You have already collected this one.', coinErrGiftTaken: 'You have already claimed your gift. One per person.', coinErrNotEnough: 'You do not have enough xu for the gift yet.', coinErrDayNotDone: 'Finish this training day first.', coinErrMilestone: 'You have not reached this milestone yet.', coinErrGeneric: 'Could not collect the xu. Please try again.',
+    plansYourPlan: 'Your plan',
   },
   ms: {
     home: 'Utama', roadmap: 'Pelan', store: 'Kedai', community: 'Komuniti',
@@ -204,6 +206,7 @@ const messages = {
     coinRulesTitle: 'Cara ia berfungsi', coinRule1: 'Program ini untuk pelanggan pelan Premium Plus atau Premium Seumur Hidup.', coinRule2: 'Setiap hari latihan yang ditanda selesai memberi anda {perDay} xu, dikumpul dengan menekan butang pada hari tersebut.', coinRule3: 'Selesaikan {milestones} hari latihan dan setiap pencapaian menambah {perStreak} xu.', coinRule4: 'Pada {threshold} xu anda boleh menuntut hadiah 1 pelekat Vinh Gia dan 1 botol gel.', coinRule5: 'Satu hadiah setiap akaun. Xu tidak boleh ditukar dengan wang tunai dan tidak boleh dipindah milik.',
     coinHistoryTitle: 'Sejarah xu', coinHistoryDay: 'Selesai hari {day}', coinHistoryStreak: 'Pencapaian {days} hari', coinHistoryAdmin: 'Ditambah oleh TheraHOME', coinHistoryEmpty: 'Belum ada xu. Selesaikan satu hari latihan untuk bermula.',
     coinErrPlan: 'Program xu adalah untuk Premium Plus ke atas.', coinErrAlready: 'Anda telah mengumpul yang ini.', coinErrGiftTaken: 'Anda telah menuntut hadiah anda. Satu untuk setiap orang.', coinErrNotEnough: 'Xu anda belum cukup untuk hadiah.', coinErrDayNotDone: 'Selesaikan hari latihan ini dahulu.', coinErrMilestone: 'Anda belum mencapai pencapaian ini.', coinErrGeneric: 'Xu tidak dapat dikumpul. Sila cuba lagi.',
+    plansYourPlan: 'Pelan anda',
   },
 } as const;
 

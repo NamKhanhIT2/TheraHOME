@@ -13,6 +13,7 @@ import { BackBar } from '@/components/ui/BackBar';
 import { AvatarImg } from '@/components/AvatarImg';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
+import { useActivePlanCode } from '@/hooks/useSubscription';
 
 const MENU: { icon: string; labelKey: TranslationKey; route: string }[] = [
   // The subscription ladder (app/subscription.tsx). First row on purpose:
@@ -39,6 +40,7 @@ export default function ProfileScreen() {
   const userId = session?.user.id;
   const profile = useProfile(userId).data;
   const activatedPrograms = useActivatedPrograms(userId).data ?? [];
+  const activePlan = useActivePlanCode(userId).data ?? null;
   const program = activatedPrograms.find((p) => p.productId === selectedProductId) ?? activatedPrograms[0];
   // "Ngày N/X" synced with the selected roadmap — X counts only reachable
   // (non-IAP-locked) phases, same as Home's hero.
@@ -102,7 +104,14 @@ export default function ProfileScreen() {
               style={[styles.menuRow, i < MENU.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.divider } : null]}
             >
               <Icon name={item.icon} size={20} color={theme.colors.textSecondary} />
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{t(item.labelKey)}</Text>
+              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>
+                {/* "Nâng cấp gói" is the wrong word once somebody has one:
+                    they are not upgrading, they are looking at what they
+                    bought. The screen behind it already says "Gói hiện tại
+                    của bạn" on the right card, so the row was the only thing
+                    still calling it an upgrade. */}
+                {item.labelKey === 'plansUpgrade' && activePlan ? t('plansYourPlan') : t(item.labelKey)}
+              </Text>
               <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
             </Pressable>
           ))}
