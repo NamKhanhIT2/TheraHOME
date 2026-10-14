@@ -74,15 +74,23 @@ export default function SubscriptionScreen() {
   const landedOn = useRef<string | null>(null);
   useEffect(() => {
     if (!plans.length) return;
-    const key = plans.map((plan) => plan.id).join();
+    // Keyed on the plan code too: active_plan_code resolves a beat after the
+    // list does, and a guard that ignored it would land on the highlighted
+    // card and refuse to correct itself.
+    const key = plans.map((plan) => plan.id).join() + '|' + (activePlanCode ?? '');
     if (landedOn.current === key) return;
     landedOn.current = key;
-    const index = Math.max(0, plans.findIndex((plan) => plan.highlighted));
+    // The plan they HOLD comes first, and only then the one marketing wants
+    // pushed. Opening a subscriber on a sales card and making them swipe to
+    // find what they already bought is the opposite of telling them they own
+    // it — and this screen is reached from a row that now says "Gói của bạn".
+    const owned = activePlanCode ? plans.findIndex((plan) => plan.code === activePlanCode) : -1;
+    const index = owned >= 0 ? owned : Math.max(0, plans.findIndex((plan) => plan.highlighted));
     if (index > 0) {
       setActive(index);
       scrollRef.current?.scrollTo({ x: index * stride, animated: false });
     }
-  }, [plans, stride]);
+  }, [plans, stride, activePlanCode]);
 
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const index = Math.round(event.nativeEvent.contentOffset.x / stride);
@@ -379,11 +387,18 @@ function PlanCard({
           </View>
         ) : null}
       </View>
-      {plan.badge ? (
+      {/* Ownership outranks marketing here. A card that says both "Gói nên
+          thử" and "Đang sử dụng" is noise, and the badge is the only thing on
+          this card visible at a glance — the button text underneath is read
+          second, if at all. */}
+      {isCurrent || plan.badge ? (
         <View style={styles.badgeRow} pointerEvents="none">
-          <View style={[styles.badge, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.sm }]}>
+          <View style={[styles.badge, {
+            backgroundColor: isCurrent ? theme.colors.success : theme.colors.primary,
+            borderRadius: theme.radius.sm,
+          }]}>
             <Text style={[theme.type.captionSm, { color: theme.colors.textOnPrimary, fontFamily: theme.fontFamily.bold }]} numberOfLines={1}>
-              {plan.badge}
+              {isCurrent ? t('plansInUse') : plan.badge}
             </Text>
           </View>
         </View>

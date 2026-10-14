@@ -69,6 +69,7 @@ const messages = {
     coinHistoryTitle: 'Lịch sử xu', coinHistoryDay: 'Hoàn thành ngày {day}', coinHistoryStreak: 'Mốc {days} ngày tập', coinHistoryAdmin: 'TheraHOME cộng xu', coinHistoryEmpty: 'Chưa có xu nào. Hoàn thành một ngày tập để bắt đầu.',
     coinErrPlan: 'Chương trình tặng xu dành cho gói Premium Plus trở lên.', coinErrAlready: 'Bạn đã nhận xu cho mục này rồi.', coinErrGiftTaken: 'Bạn đã nhận quà rồi. Mỗi người chỉ nhận một lần.', coinErrNotEnough: 'Bạn chưa đủ xu để nhận quà.', coinErrDayNotDone: 'Hãy hoàn thành ngày tập này trước đã nhé.', coinErrMilestone: 'Bạn chưa đạt mốc này.', coinErrGeneric: 'Chưa nhận được xu, thử lại giúp em nhé.',
     plansYourPlan: 'Gói của bạn',
+    plansInUse: 'Đang sử dụng',
   },
   en: {
     home: 'Home', roadmap: 'Roadmap', store: 'Store', community: 'Community',
@@ -138,6 +139,7 @@ const messages = {
     coinHistoryTitle: 'Xu history', coinHistoryDay: 'Finished day {day}', coinHistoryStreak: '{days}-day milestone', coinHistoryAdmin: 'Added by TheraHOME', coinHistoryEmpty: 'No xu yet. Finish a training day to start.',
     coinErrPlan: 'The xu programme is for Premium Plus and above.', coinErrAlready: 'You have already collected this one.', coinErrGiftTaken: 'You have already claimed your gift. One per person.', coinErrNotEnough: 'You do not have enough xu for the gift yet.', coinErrDayNotDone: 'Finish this training day first.', coinErrMilestone: 'You have not reached this milestone yet.', coinErrGeneric: 'Could not collect the xu. Please try again.',
     plansYourPlan: 'Your plan',
+    plansInUse: 'In use',
   },
   ms: {
     home: 'Utama', roadmap: 'Pelan', store: 'Kedai', community: 'Komuniti',
@@ -207,6 +209,7 @@ const messages = {
     coinHistoryTitle: 'Sejarah xu', coinHistoryDay: 'Selesai hari {day}', coinHistoryStreak: 'Pencapaian {days} hari', coinHistoryAdmin: 'Ditambah oleh TheraHOME', coinHistoryEmpty: 'Belum ada xu. Selesaikan satu hari latihan untuk bermula.',
     coinErrPlan: 'Program xu adalah untuk Premium Plus ke atas.', coinErrAlready: 'Anda telah mengumpul yang ini.', coinErrGiftTaken: 'Anda telah menuntut hadiah anda. Satu untuk setiap orang.', coinErrNotEnough: 'Xu anda belum cukup untuk hadiah.', coinErrDayNotDone: 'Selesaikan hari latihan ini dahulu.', coinErrMilestone: 'Anda belum mencapai pencapaian ini.', coinErrGeneric: 'Xu tidak dapat dikumpul. Sila cuba lagi.',
     plansYourPlan: 'Pelan anda',
+    plansInUse: 'Sedang digunakan',
   },
 } as const;
 
