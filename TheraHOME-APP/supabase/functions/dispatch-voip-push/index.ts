@@ -159,14 +159,37 @@ Deno.serve(async (request: Request) => {
     .maybeSingle();
   if (callError) return json({ error: "lookup_failed", detail: callError.message }, 500);
   if (!call) return json({ error: "call_not_found" }, 404);
+  // Staff ids are needed twice for a call addressed to the support LINE —
+  // once to decide whether this user may cancel it, once to decide whose
+  // phones to ring or unring — so they are loaded here, before either.
+  let staffIds: string[] = [];
+  if (!call.callee_id) {
+    const { data: staff, error: staffError } = await admin.rpc("staff_user_ids");
+    if (staffError) return json({ error: "staff_lookup_failed", detail: staffError.message }, 500);
+    staffIds = (staff ?? [])
+      .map((row: unknown) => (typeof row === "string" ? row : (row as { staff_user_ids?: string })?.staff_user_ids))
+      .filter((id: unknown): id is string => typeof id === "string" && !!id);
+  }
+
   if (cancel) {
     // Anyone who was in the call may unring the others: the caller who gave
     // up, and the person who answered first — who, on a support-line call,
     // is `answered_by` rather than `callee_id`, because answering does not
     // address the call to anyone.
+    //
+    // Staff also count on a call addressed to the LINE even when they never
+    // answered it: declining is a resolution too, and it is the one that
+    // most needs the other phones told. `end_call` has allowed exactly this
+    // from the start (`callee_id is null and v_is_staff`); leaving it out
+    // here meant a declined support call came back 403 and every other staff
+    // phone went on ringing, with nothing alive on a locked handset able to
+    // take the CallKit screen down. Measured on call 96e36ee8 at 2026-10-14
+    // 17:48:58, where both cancel channels were refused a second after the
+    // decline landed.
     const isParticipant = call.caller_id === user.id
       || call.callee_id === user.id
-      || call.answered_by === user.id;
+      || call.answered_by === user.id
+      || (!call.callee_id && staffIds.includes(user.id));
     if (!isParticipant) return json({ error: "participant_required" }, 403);
     // Refused while it is still ringing, so this cannot be used to silence
     // a live call. A cancel can only ever follow a real resolution.
@@ -179,16 +202,7 @@ Deno.serve(async (request: Request) => {
 
   // Who should ring: the named callee, or every staff account when the call
   // is addressed to the support line.
-  let recipientIds: string[];
-  if (call.callee_id) {
-    recipientIds = [call.callee_id as string];
-  } else {
-    const { data: staff, error: staffError } = await admin.rpc("staff_user_ids");
-    if (staffError) return json({ error: "staff_lookup_failed", detail: staffError.message }, 500);
-    recipientIds = (staff ?? [])
-      .map((row: unknown) => (typeof row === "string" ? row : (row as { staff_user_ids?: string })?.staff_user_ids))
-      .filter((id: unknown): id is string => typeof id === "string" && !!id);
-  }
+  let recipientIds: string[] = call.callee_id ? [call.callee_id as string] : staffIds;
   // Never cancel back to whoever resolved it: on the "answered first" path
   // that device is the one holding a LIVE call, and a cancel ends calls.
   if (cancel) recipientIds = recipientIds.filter((id) => id !== user.id);

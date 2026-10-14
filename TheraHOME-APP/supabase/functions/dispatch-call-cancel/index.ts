@@ -67,13 +67,38 @@ Deno.serve(async (request) => {
     if (callError) return json({ error: "lookup_failed", detail: callError.message }, 500);
     if (!call) return json({ error: "call_not_found" }, 404);
 
+    // Staff ids are needed twice for a call addressed to the support LINE —
+    // once to decide whether this user may cancel it, once to decide whose
+    // phones to unring — so they are loaded here, before either.
+    let staffIds: string[] = [];
+    if (!call.callee_id) {
+      const { data: staff, error: staffError } = await admin.rpc("staff_user_ids");
+      if (staffError) return json({ error: "staff_lookup_failed", detail: staffError.message }, 500);
+      staffIds = (staff ?? [])
+        .map((row: unknown) => (
+          typeof row === "string" ? row : (row as { staff_user_ids?: string })?.staff_user_ids
+        ))
+        .filter((id: unknown): id is string => typeof id === "string" && !!id);
+    }
+
     // Anyone who was in the call may unring the others: the caller who gave
     // up, and whoever answered first. On a support-line call the answerer is
     // `answered_by` and not `callee_id`, because answering a call addressed
     // to the line does not address it to a person.
+    //
+    // Staff count as participants in a call addressed to the LINE even when
+    // they never answered it. Declining is a resolution too, and it is the
+    // one that most needs the other phones told. `end_call` has allowed
+    // exactly this from the start (`callee_id is null and v_is_staff`);
+    // leaving it out here meant a declined support call came back 403 and
+    // every other staff phone went on ringing, with nothing alive on a
+    // locked handset able to take the call screen down. Measured on call
+    // 96e36ee8 at 2026-10-14 17:48:58, where both cancel channels were
+    // refused one second after the decline landed.
     const isParticipant = call.caller_id === user.id
       || call.callee_id === user.id
-      || call.answered_by === user.id;
+      || call.answered_by === user.id
+      || (!call.callee_id && staffIds.includes(user.id));
     if (!isParticipant) return json({ error: "participant_required" }, 403);
 
     // Refused while the call is still ringing, which is what stops this
@@ -81,21 +106,10 @@ Deno.serve(async (request) => {
     // ever follow a real resolution.
     if (call.status === "ringing") return json({ sent: 0, reason: "still_ringing" });
 
-    let recipientIds: string[];
-    if (call.callee_id) {
-      recipientIds = [call.callee_id as string];
-    } else {
-      // Same single source as every other staff fan-out — see
-      // 202610111300_staff_user_ids_single_source.sql for why this is an RPC
-      // and not a query against web_access_contacts.
-      const { data: staff, error: staffError } = await admin.rpc("staff_user_ids");
-      if (staffError) return json({ error: "staff_lookup_failed", detail: staffError.message }, 500);
-      recipientIds = (staff ?? [])
-        .map((row: unknown) => (
-          typeof row === "string" ? row : (row as { staff_user_ids?: string })?.staff_user_ids
-        ))
-        .filter((id: unknown): id is string => typeof id === "string" && !!id);
-    }
+    // Loaded above, from the same single source as every other staff fan-out
+    // — see 202610111300_staff_user_ids_single_source.sql for why that is an
+    // RPC and not a query against web_access_contacts.
+    let recipientIds: string[] = call.callee_id ? [call.callee_id as string] : staffIds;
     // Never back to whoever resolved it. On the "answered first" path that
     // device is the one holding a LIVE call, and telling it to stop ringing
     // would hang up on a conversation in progress.
