@@ -30,14 +30,37 @@ const BRIDGING_IMPORTS = [
   '#import "RNCallKeep.h"',
 ];
 
-const REGISTRATION_CALL = '    RNVoipPushNotificationManager.voipRegistration()';
+// Runs at the TOP of didFinishLaunching, before React Native is started.
+//
+// Measured on the staff iPhone 2026-10-14 19:57: with the app killed, a VoIP
+// push arrived, callservicesd woke the process — and CallKit was never told
+// about the call. No CXProvider registration and no reportNewIncomingCall
+// appeared in callservicesd at all, so no incoming-call screen was drawn and
+// the lock screen showed only the ordinary notification. The same call
+// answered fine when the app was already running: cold start was the whole
+// difference.
+//
+// Two things in that path can lose the call, and both are cheap to close:
+//
+//   1. `voipRegistration` does NOT create the PKPushRegistry inline — it
+//      dispatches that onto the main queue. Called after startReactNative,
+//      the entire JS bundle load sits ahead of it in that queue, and the
+//      registry's `desiredPushTypes` was measured arriving 1.15s after launch
+//      (17.35 launch, 18.50 "Registering client process for PushKit voip").
+//      A push-launched app owes CallKit a reported call well before that.
+//
+//   2. `RNCallKeep.reportNewIncomingCall` silently does nothing when
+//      RNCallKeep has no stored provider configuration — see
+//      seedCallKeepProviderSettings below.
+const LAUNCH_PRELUDE = `    seedCallKeepProviderSettings()
+    RNVoipPushNotificationManager.voipRegistration()`;
 
 // Bumped whenever PUSHKIT_EXTENSION below changes. The generated
 // AppDelegate.swift is only rewritten when the marker in it does not match,
 // so an edit here reaches the next prebuild instead of being skipped as
 // "already done" — which is how the first version of this plugin would have
 // silently shipped stale native code forever.
-const PUSHKIT_MARKER = '// MARK: - PushKit v2 (added by plugins/withVoipPushKit.js)';
+const PUSHKIT_MARKER = '// MARK: - PushKit v3 (added by plugins/withVoipPushKit.js)';
 
 const PUSHKIT_EXTENSION = `
 ${PUSHKIT_MARKER}
@@ -115,6 +138,38 @@ extension AppDelegate: PKPushRegistryDelegate {
     completion()
   }
 }
+
+extension AppDelegate {
+  /// Makes sure RNCallKeep can build a CXProvider before any JS has run.
+  ///
+  /// \`RNCallKeep.reportNewIncomingCall\` — the call above, the one Apple
+  /// requires — ends in \`initCallKitProvider\`:
+  ///
+  ///     if (sharedProvider == nil) {
+  ///         NSDictionary *settings = [self getSettings];
+  ///         if (settings != nil) { sharedProvider = ...; }
+  ///     }
+  ///     [sharedProvider reportNewIncomingCallWithUUID:...];
+  ///
+  /// \`getSettings\` reads the dictionary that JS's \`setup()\` writes into
+  /// NSUserDefaults. On a launch caused by a VoIP push no JS has run yet, and
+  /// if that key is absent \`sharedProvider\` stays nil — at which point
+  /// reporting the call is a message to nil. It does not throw, does not log
+  /// and does not ring, which is exactly the silence measured on the lock
+  /// screen: the push arrived, the process was woken, and callservicesd never
+  /// saw a provider or a call.
+  ///
+  /// Seeding the key removes the dependency on JS having run. \`appName\` is the
+  /// only field \`getProviderConfiguration\` requires and it matches what
+  /// \`src/lib/callkeep.ts\` passes, so a later \`setup()\` overwrites this with an
+  /// identical value rather than fighting it. Written only when missing, so a
+  /// real configuration is never clobbered.
+  func seedCallKeepProviderSettings() {
+    let key = "RNCallKeepSettings"
+    guard UserDefaults.standard.dictionary(forKey: key) == nil else { return }
+    UserDefaults.standard.set(["appName": "TheraHOME"], forKey: key)
+  }
+}
 `;
 
 const withBridgingHeader = (config) =>
@@ -146,14 +201,16 @@ const withPushKitAppDelegate = (config) =>
     // Registering at launch is what makes iOS hand us a PushKit token; without
     // it the app has no VoIP token and no push can ever reach it.
     if (!contents.includes('voipRegistration()')) {
-      const anchor = '    return super.application(application, didFinishLaunchingWithOptions: launchOptions)';
+      // FIRST statement of didFinishLaunching, not the last. See LAUNCH_PRELUDE
+      // for what being late costs.
+      const anchor = '    let delegate = ReactNativeDelegate()';
       if (!contents.includes(anchor)) {
         throw new Error(
-          'withVoipPushKit: could not find the didFinishLaunching return in AppDelegate.swift. '
+          'withVoipPushKit: could not find the start of didFinishLaunching in AppDelegate.swift. '
           + 'The Expo template changed — re-check this plugin against the generated file.',
         );
       }
-      contents = contents.replace(anchor, `${REGISTRATION_CALL}\n\n${anchor}`);
+      contents = contents.replace(anchor, `${LAUNCH_PRELUDE}\n\n${anchor}`);
     }
 
     // Replace rather than skip: an AppDelegate carrying an OLDER version of
