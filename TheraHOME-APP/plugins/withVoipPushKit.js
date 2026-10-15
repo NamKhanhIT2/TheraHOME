@@ -32,35 +32,45 @@ const BRIDGING_IMPORTS = [
 
 // Runs at the TOP of didFinishLaunching, before React Native is started.
 //
-// Measured on the staff iPhone 2026-10-14 19:57: with the app killed, a VoIP
-// push arrived, callservicesd woke the process — and CallKit was never told
-// about the call. No CXProvider registration and no reportNewIncomingCall
-// appeared in callservicesd at all, so no incoming-call screen was drawn and
-// the lock screen showed only the ordinary notification. The same call
-// answered fine when the app was already running: cold start was the whole
-// difference.
+// Measured over a full QA session on 2026-10-15, build 42: an incoming call
+// delivered its VoIP push to the device, callservicesd took a
+// CSDVoIPProcessAssertion on the app — and callservicesd never saw a single
+// reportNewIncomingCall. Zero, across every call of the session, while the
+// same app answered fine from its own in-app sheet.
 //
-// Two things in that path can lose the call, and both are cheap to close:
+// What that ruled OUT matters as much as what it pointed to. Forcing the app
+// to relaunch and watching an unfiltered device log showed CallKit being set
+// up correctly every time:
 //
-//   1. `voipRegistration` does NOT create the PKPushRegistry inline — it
-//      dispatches that onto the main queue. Called after startReactNative,
-//      the entire JS bundle load sits ahead of it in that queue, and the
-//      registry's `desiredPushTypes` was measured arriving 1.15s after launch
-//      (17.35 launch, 18.50 "Registering client process for PushKit voip").
-//      A push-launched app owes CallKit a reported call well before that.
+//   11:01:59.035  app launches
+//   11:01:59.313  Registering client process ... for PushKit voip
+//   11:01:59.316  Delivering voip token ... to application
+//   11:01:59.807  CXCallSource registerWithConfiguration
 //
-//   2. `RNCallKeep.reportNewIncomingCall` silently does nothing when
-//      RNCallKeep has no stored provider configuration — see
-//      seedCallKeepProviderSettings below.
+// So PushKit registration, the VoIP token and the CXProvider were all fine.
+// The delegate was reached too — a token cannot arrive otherwise.
+//
+// The 3ms between registering and the token is the clue. The registry the
+// library creates is a local inside a dispatch_async block (see the long
+// comment on `voipRegistry` below); it lives long enough for the token
+// callback that fires immediately, and is gone by the time a call arrives
+// seconds later. So the app registers, is woken for the push, and has no live
+// registry to hand it to.
+//
+// Two things therefore happen here, both before React Native starts:
+//
+//   1. `startVoipRegistry()` creates the registry and KEEPS it.
+//   2. `seedCallKeepProviderSettings()` makes sure RNCallKeep can build a
+//      CXProvider on a launch where no JS has run yet.
 const LAUNCH_PRELUDE = `    seedCallKeepProviderSettings()
-    RNVoipPushNotificationManager.voipRegistration()`;
+    startVoipRegistry()`;
 
 // Bumped whenever PUSHKIT_EXTENSION below changes. The generated
 // AppDelegate.swift is only rewritten when the marker in it does not match,
 // so an edit here reaches the next prebuild instead of being skipped as
 // "already done" — which is how the first version of this plugin would have
 // silently shipped stale native code forever.
-const PUSHKIT_MARKER = '// MARK: - PushKit v3 (added by plugins/withVoipPushKit.js)';
+const PUSHKIT_MARKER = '// MARK: - PushKit v4 (added by plugins/withVoipPushKit.js)';
 
 const PUSHKIT_EXTENSION = `
 ${PUSHKIT_MARKER}
@@ -139,7 +149,48 @@ extension AppDelegate: PKPushRegistryDelegate {
   }
 }
 
+/// The VoIP registry, retained for the life of the process.
+///
+/// \`RNVoipPushNotificationManager.voipRegistration()\` — what this replaces —
+/// creates its PKPushRegistry as a LOCAL inside a dispatch_async block and
+/// stores it nowhere:
+///
+///     dispatch_async(mainQueue, ^{
+///         PKPushRegistry * voipRegistry = [[PKPushRegistry alloc] initWithQueue: mainQueue];
+///         voipRegistry.delegate = (RNVoipPushNotificationManager *)RCTSharedApplication().delegate;
+///         voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
+///     });
+///
+/// Under ARC that object is released as soon as the block returns, and a
+/// PKPushRegistry nobody holds stops delivering. The measurements fit exactly:
+/// iOS hands the token back about 3ms after \`desiredPushTypes\` is set, so
+/// \`didUpdate\` always lands — the token reached the app on every launch — while
+/// an incoming push arriving seconds or minutes later found no live registry.
+/// From the outside that looks like the system waking the app for a call it
+/// then ignores: APNs delivered, \`CSDVoIPProcessAssertion\` taken, and no
+/// \`reportNewIncomingCall\` ever reaching callservicesd, which is what was
+/// measured on 2026-10-15 across an entire QA session.
+///
+/// It also explains the intermittency, which a plain "never registered" would
+/// not: an object whose last reference has gone can still be alive for a while.
+private var voipRegistry: PKPushRegistry?
+
 extension AppDelegate {
+  /// Registers for VoIP pushes and KEEPS the registry.
+  ///
+  /// The library's own state machine is left out of the loop deliberately:
+  /// calling its \`voipRegistration()\` as well would stand up a second
+  /// registry. JS does not lose anything by it — the token still reaches the
+  /// \`register\` event through \`RNVoipPushNotificationManager.didUpdate\` in the
+  /// delegate above, which is the same path it always used.
+  func startVoipRegistry() {
+    guard voipRegistry == nil else { return }
+    let registry = PKPushRegistry(queue: .main)
+    registry.delegate = self
+    registry.desiredPushTypes = [.voIP]
+    voipRegistry = registry
+  }
+
   /// Makes sure RNCallKeep can build a CXProvider before any JS has run.
   ///
   /// \`RNCallKeep.reportNewIncomingCall\` — the call above, the one Apple
@@ -200,7 +251,7 @@ const withPushKitAppDelegate = (config) =>
 
     // Registering at launch is what makes iOS hand us a PushKit token; without
     // it the app has no VoIP token and no push can ever reach it.
-    if (!contents.includes('voipRegistration()')) {
+    if (!contents.includes('startVoipRegistry()')) {
       // FIRST statement of didFinishLaunching, not the last. See LAUNCH_PRELUDE
       // for what being late costs.
       const anchor = '    let delegate = ReactNativeDelegate()';

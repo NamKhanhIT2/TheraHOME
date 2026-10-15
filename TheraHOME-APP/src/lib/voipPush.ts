@@ -42,8 +42,6 @@ export function isVoipPushSupported(): boolean {
   return Platform.OS === 'ios' && !!VOIP;
 }
 
-let registered = false;
-
 /**
  * Asks iOS for a PushKit token and stores whatever it returns.
  *
@@ -77,10 +75,17 @@ export function registerVoipPush(): () => void {
     }
   });
 
-  if (!registered) {
-    VOIP.registerVoipToken();
-    registered = true;
-  }
+  // NOT `VOIP.registerVoipToken()` any more. AppDelegate now creates the
+  // PKPushRegistry itself and keeps a reference to it (see
+  // plugins/withVoipPushKit.js); asking the library to register as well would
+  // stand up a SECOND registry for the same app, and the one that wins is
+  // whichever the system happened to keep.
+  //
+  // Nothing is lost here: registration happens at launch, earlier than this
+  // code could manage, and the token still arrives on the `register` event
+  // above because the delegate hands it to
+  // `RNVoipPushNotificationManager.didUpdate`. `didLoadWithEvents` replays it
+  // for the cold-start case, which is the one that matters most.
 
   return () => {
     VOIP.removeEventListener('register');
