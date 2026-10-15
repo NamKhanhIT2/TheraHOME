@@ -11,18 +11,17 @@
 // was "tôi chưa nghe tiếng chuông gọi đến". `useRingtone` loops a real ring
 // cadence and vibrates with it, and stops on every way out.
 //
-// Still not a native lock-screen ring: that needs CallKit on iOS and a
-// full-screen intent on Android. This covers the app being open or in the
-// foreground; the push from `dispatch-push` covers the rest.
-import React, { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+// Native lock-screen UI is handled by useCallKeepBridge; this sheet is
+// the foreground fallback when the system is not already displaying it.
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { router, usePathname } from 'expo-router';
 import { useTheme } from '@/theme';
 import { AvatarImg } from '@/components/AvatarImg';
 import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
 import { useRingtone } from '@/hooks/useRingtone';
-import { dismissCall, isSystemRinging, subscribeSystemRinging, wasAnsweredHere } from '@/lib/callkeep';
+import { dismissCall, isCallDismissed, isSystemRinging, subscribeSystemRinging, wasAnsweredHere } from '@/lib/callkeep';
 import { useAnswerCall, useCallTerminator, useCallerProfile, useIncomingCall } from '@/hooks/useCalls';
 
 export function IncomingCallSheet({ enabled, userId, isStaff }: {
@@ -39,6 +38,8 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
   const answerCall = useAnswerCall();
   const terminate = useCallTerminator(call?.id);
   const isVideo = call?.media === 'video';
+  const pathname = usePathname();
+  const [declining, setDeclining] = useState<string | null>(null);
 
   // Whether the OS is already showing a call screen for this call. On iOS it
   // almost always is: a VoIP push makes CallKit ring in native code before
@@ -52,15 +53,8 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
   // Rings while the sheet is up, and the hook's own cleanup stops it on
   // answer, decline, timeout and unmount alike. Silent when the system is
   // ringing — two ringtones out of one phone sound like a fault.
-  useRingtone(!!call && !systemHasIt, 'incoming');
-
-  // Belt and braces against the ringtone outliving the call: if the row
-  // disappears for any reason the component unmounts, and this records that
-  // the ring for THIS call is done so a re-render cannot restart it.
-  const rungForRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (call) rungForRef.current = call.id;
-  }, [call]);
+  useRingtone(!!call && !systemHasIt && declining !== call.id && !answerCall.isPending
+    && !wasAnsweredHere(call.id) && !isCallDismissed(call.id), 'incoming');
 
   // The system may ALSO be ringing for this call — a push raised the telecom
   // screen while the app happened to be alive in the background. When the
@@ -86,7 +80,7 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
   // Decline buttons — and the owner had to press both before the call
   // stopped. Whichever UI is on screen, Từ chối ends the same `calls` row;
   // there should only ever be one of them.
-  if (systemHasIt) return null;
+  if (systemHasIt || pathname === `/call/${call.id}` || wasAnsweredHere(call.id) || isCallDismissed(call.id)) return null;
 
   const name = isStaff ? (caller.data?.fullName ?? 'Khách hàng') : 'TheraHOME CSKH';
 
@@ -116,20 +110,30 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
               color={theme.colors.error}
               icon="phone-off"
               label="Từ chối"
-              onPress={() => { hapticConfirm(); void terminate('declined', 'declined'); }}
+              disabled={answerCall.isPending || declining === call.id}
+              onPress={() => {
+                hapticConfirm();
+                setDeclining(call.id);
+                void terminate('declined', 'declined').finally(() => setDeclining(null));
+              }}
             />
             <Action
               color={theme.colors.success}
               icon={isVideo ? 'video' : 'phone'}
               label="Trả lời"
-              disabled={answerCall.isPending}
+              disabled={answerCall.isPending || declining === call.id}
               onPress={() => {
                 hapticConfirm();
                 answerCall.mutate(call.id, {
                   // Navigate only once the server has accepted, so the call
                   // screen opens straight into connecting and never has to
                   // handle "my answer might still fail".
-                  onSuccess: () => router.push({ pathname: '/call/[callId]', params: { callId: call.id } }),
+                  onSuccess: (answered) => {
+                    if (answered.status === 'accepted' && !isCallDismissed(call.id)) {
+                      router.navigate({ pathname: '/call/[callId]', params: { callId: call.id } });
+                    }
+                  },
+                  onError: () => Alert.alert('Không thể trả lời', 'Cuộc gọi có thể đã kết thúc hoặc được trả lời trên máy khác.'),
                 });
               }}
             />

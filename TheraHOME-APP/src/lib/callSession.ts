@@ -1,28 +1,4 @@
-// The live call, as app-wide state rather than screen state.
-//
-// WHY THIS EXISTS. The room used to live in `app/call/[callId].tsx` and was
-// disconnected on unmount — a deliberate, billing-driven choice: LiveKit
-// charges for every connected minute, and tying the room's life to the
-// screen's made it impossible to leave one running by accident.
-//
-// It also made it impossible to leave the screen. Every other caller lets
-// you minimise a call and go read a message; here, navigating away hung up.
-// So the room moves out here, and the rule it was protecting is restated
-// rather than dropped:
-//
-//   a room is open only while a call row is 'accepted', and the moment that
-//   stops being true — ended, declined, missed, the far end vanishing, the
-//   socket giving up — the room closes.
-//
-// That is now enforced in three independent places, because losing it costs
-// real money: this module closes on the room's own 'disconnected' and on the
-// far end leaving; `useCallTerminator` closes after any end_call; and
-// <OngoingCallBar>, which is mounted for the whole session, watches the row
-// over Realtime and closes on any terminal status. Screen unmount is no
-// longer one of them, and must not become one again.
-//
-// Everything the UI needs is here, so the call screen and the minimised bar
-// are two views of one state rather than two copies of it.
+// One call lifecycle shared by the call screen, the minimised bar and CallKit.
 import { useSyncExternalStore } from 'react';
 import {
   connectCall,
@@ -38,233 +14,215 @@ import {
   type LiveKitRoom,
 } from '@/lib/livekit';
 
-export type CallMediaState = 'connecting' | 'live' | 'reconnecting' | 'failed' | 'unsupported';
+export type CallMediaState = 'ringing' | 'connecting' | 'live' | 'reconnecting' | 'ending' | 'failed' | 'unsupported';
 
 export interface CallSession {
   callId: string;
-  /** How the call was PLACED. The camera may be raised later on an audio one. */
   media: 'audio' | 'video';
   room: LiveKitRoom | null;
   state: CallMediaState;
   remoteJoined: boolean;
   micOn: boolean;
   cameraOn: boolean;
-  /** Which way the camera is pointing. Tracked here rather than read back
-   * from the track, because the platform does not reliably report it — see
-   * switchCallCamera in lib/livekit. */
   facing: 'user' | 'environment';
-  /**
-   * Bumped every time the local camera track is replaced.
-   *
-   * Switching cameras calls `restartTrack`, which stops the old
-   * MediaStreamTrack and acquires a new one. The far end sees the change
-   * immediately — it is a new track on the wire — but the LOCAL preview
-   * showed the last frame of the dead track and stayed there. The React
-   * tree had no reason to think anything had happened: same publication,
-   * same participant, same object identities all the way down.
-   *
-   * The call screen uses this as the preview's React `key`, so a new camera
-   * gets a new view rather than an old one nobody told. Costs a frame of
-   * black, which is what a camera switch looks like anyway.
-   */
   cameraEpoch: number;
   speakerOn: boolean;
   quality: CallQuality;
+  micPending: boolean;
+  cameraPending: boolean;
+  speakerPending: boolean;
+  controlError: string | null;
+  failureReason: string | null;
 }
 
+export const CONNECTION_TIMEOUT_MS = 30_000;
 let session: CallSession | null = null;
+let generation = 0;
+let connection: AbortController | null = null;
+let deadline: ReturnType<typeof setTimeout> | undefined;
+let unsubscribeRoom: (() => void) | undefined;
 const listeners = new Set<() => void>();
 
-function emit(): void {
-  for (const listener of listeners) listener();
-}
-
+function emit(): void { for (const listener of listeners) listener(); }
 function patch(callId: string, changes: Partial<CallSession>): void {
-  // Keyed by call id on every write: an event from a room that has already
-  // been replaced by the next call must not resurrect it.
-  if (!session || session.callId !== callId) return;
+  if (session?.callId !== callId) return;
   session = { ...session, ...changes };
   emit();
 }
-
-export function getCallSession(): CallSession | null {
-  return session;
-}
-
+export function getCallSession(): CallSession | null { return session; }
 export function subscribeCallSession(listener: () => void): () => void {
   listeners.add(listener);
   return () => { listeners.delete(listener); };
 }
-
-/** The live call, or null. Re-renders on every change to it. */
 export function useCallSession(): CallSession | null {
   return useSyncExternalStore(subscribeCallSession, getCallSession, getCallSession);
 }
 
-/**
- * Joins the room for a call, once.
- *
- * Safe to call repeatedly — the call screen's effect runs again on every
- * remount, which is exactly what happens when a minimised call is reopened,
- * and joining twice under one identity makes LiveKit evict the first
- * participant (the user sees the call drop instantly).
- */
-export async function openCallSession(callId: string, media: 'audio' | 'video'): Promise<void> {
-  if (session?.callId === callId) return;
-  // A different call while one is open should not happen — the database
-  // allows one live line — but if it does, the old room is released rather
-  // than left connected and billing.
-  if (session) await closeCallSession();
-
+/** Ringing is tracked too: navigation never owns the ring timeout. */
+export function trackCallSession(callId: string, media: 'audio' | 'video'): void {
+  if (session) return;
+  generation += 1;
   session = {
-    callId,
-    media,
-    room: null,
-    state: 'connecting',
-    remoteJoined: false,
-    micOn: true,
-    cameraOn: false,
-    facing: 'user',
-    cameraEpoch: 0,
-    // A video call is held at arm's length, so it opens on the speaker.
-    speakerOn: media === 'video',
-    quality: 'unknown',
+    callId, media, room: null, state: 'ringing', remoteJoined: false,
+    micOn: true, cameraOn: false, facing: 'user', cameraEpoch: 0,
+    speakerOn: media === 'video', quality: 'unknown',
+    micPending: false, cameraPending: false, speakerPending: false,
+    controlError: null, failureReason: null,
   };
   emit();
+}
 
+function clearDeadline(): void { clearTimeout(deadline); deadline = undefined; }
+function releaseMedia(): Promise<void> {
+  clearDeadline();
+  unsubscribeRoom?.();
+  unsubscribeRoom = undefined;
+  connection?.abort();
+  connection = null;
+  const room = session?.room ?? null;
+  if (session) session = { ...session, room: null, cameraOn: false };
+  return disconnectCall(room);
+}
+function fail(callId: string, reason: string, unsupported = false): void {
+  if (session?.callId !== callId || session.state === 'ending') return;
+  void releaseMedia();
+  // Keep the failure observable until the app-wide owner ends the server row.
+  patch(callId, { state: unsupported ? 'unsupported' : 'failed', failureReason: reason });
+}
+function armDeadline(callId: string, reason: string): void {
+  clearDeadline();
+  deadline = setTimeout(() => fail(callId, reason), CONNECTION_TIMEOUT_MS);
+}
+
+/** Joins only after answer_call; repeated screen/native events share one join. */
+export async function openCallSession(callId: string, media: 'audio' | 'video'): Promise<void> {
+  trackCallSession(callId, media);
+  if (session?.callId !== callId || session.state !== 'ringing') return;
+  const ownGeneration = generation;
+  const controller = new AbortController();
+  connection = controller;
+  patch(callId, { state: 'connecting' });
+  armDeadline(callId, 'connection_timeout');
   try {
-    const { room, cameraOn } = await connectCall(callId, media);
-    // Cancelled while the token round trip was in flight.
-    if (session?.callId !== callId) {
+    const { room, cameraOn } = await connectCall(callId, media, controller.signal);
+    if (controller.signal.aborted || generation !== ownGeneration || session?.callId !== callId) {
       await disconnectCall(room);
       return;
     }
-    patch(callId, {
-      room,
-      state: 'live',
-      cameraEpoch: 1,
-      // Whether the camera ACTUALLY came up, not what was asked for: on a
-      // device whose camera failed the call carries on as audio and the
-      // button correctly reads "Bật camera".
-      cameraOn,
-      remoteJoined: room.remoteParticipants.size > 0,
-    });
+    if (room.state === 'disconnected') {
+      await disconnectCall(room);
+      fail(callId, 'connection_failed');
+      return;
+    }
+    clearDeadline();
+    patch(callId, { room, state: 'live', cameraOn, cameraEpoch: 1,
+      remoteJoined: room.remoteParticipants.size > 0 });
 
-    room.on('participantConnected', () => patch(callId, { remoteJoined: true }));
-    room.on('participantDisconnected', () => {
-      // The far end is gone for good — a hangup whose write has not arrived,
-      // or a client that died. Releasing the room here means the line is not
-      // held open (and billed) waiting for an `end_call` that never comes.
-      patch(callId, { remoteJoined: false });
-      void closeCallSession(callId);
-    });
-    // LiveKit reconnects on its own when the network blips; what was missing
-    // was any sign of it, so the picture simply froze. 'disconnected' is the
-    // final give-up, not a blip.
-    room.on('reconnecting', () => patch(callId, { state: 'reconnecting' }));
-    room.on('reconnected', () => patch(callId, { state: 'live' }));
-    room.on('disconnected', () => {
-      patch(callId, { state: 'failed' });
-      void closeCallSession(callId);
-    });
-    subscribeConnectionQuality(room, (quality) => patch(callId, { quality }));
+    const joined = () => {
+      clearDeadline();
+      patch(callId, { remoteJoined: true, state: 'live' });
+    };
+    const left = () => {
+      if (room.remoteParticipants.size > 0) return;
+      patch(callId, { remoteJoined: false, state: 'reconnecting' });
+      // A full LiveKit reconnect can temporarily remove the other participant.
+      // A real hangup arrives through the call row; otherwise allow recovery.
+      armDeadline(callId, 'peer_timeout');
+    };
+    const reconnecting = () => {
+      patch(callId, { state: 'reconnecting' });
+      armDeadline(callId, 'connection_timeout');
+    };
+    const reconnected = () => {
+      patch(callId, { state: 'live', remoteJoined: room.remoteParticipants.size > 0 });
+      if (room.remoteParticipants.size) clearDeadline();
+      else armDeadline(callId, 'peer_timeout');
+    };
+    const disconnected = () => fail(callId, 'connection_failed');
+    room.on('participantConnected', joined);
+    room.on('participantDisconnected', left);
+    room.on('reconnecting', reconnecting);
+    room.on('signalReconnecting', reconnecting);
+    room.on('reconnected', reconnected);
+    room.on('disconnected', disconnected);
+    const stopQuality = subscribeConnectionQuality(room, (quality) => patch(callId, { quality }));
+    unsubscribeRoom = () => {
+      stopQuality();
+      room.off('participantConnected', joined);
+      room.off('participantDisconnected', left);
+      room.off('reconnecting', reconnecting);
+      room.off('signalReconnecting', reconnecting);
+      room.off('reconnected', reconnected);
+      room.off('disconnected', disconnected);
+    };
     patch(callId, { quality: readConnectionQuality(room) });
+    if (!room.remoteParticipants.size) armDeadline(callId, 'peer_timeout');
   } catch (error) {
-    patch(callId, {
-      state: error instanceof CallUnavailableError ? 'unsupported' : 'failed',
-    });
+    if (controller.signal.aborted || generation !== ownGeneration) return;
+    fail(callId, error instanceof CallUnavailableError ? 'unsupported' : 'connection_failed',
+      error instanceof CallUnavailableError);
     if (__DEV__) console.warn('openCallSession failed:', error);
   }
 }
 
-/**
- * Leaves the room and releases the OS audio session.
- *
- * `callId` guards against closing a NEWER call: a late event from a room
- * that has already been replaced must not hang up its successor. Omit it
- * only when the intent really is "whatever is open, close it".
- */
+/** Stop media immediately, retaining a visible local hangup while RPC retries. */
+export function endCallSession(callId: string): void {
+  if (session?.callId !== callId || session.state === 'ending') return;
+  void releaseMedia();
+  patch(callId, { state: 'ending' });
+}
 export async function closeCallSession(callId?: string): Promise<void> {
-  const open = session;
-  if (!open) return;
-  if (callId && open.callId !== callId) return;
+  if (!session || (callId && session.callId !== callId)) return;
+  const released = releaseMedia();
   session = null;
+  generation += 1;
   emit();
-  await disconnectCall(open.room);
+  await released;
 }
+export function isCallSessionOpen(callId: string): boolean { return session?.callId === callId; }
 
-export function isCallSessionOpen(callId: string): boolean {
-  return session?.callId === callId;
+// Serialize each native control. Rapid taps must not let an older result undo
+// a newer choice; camera switching shares the camera lock with on/off.
+async function control(
+  pending: 'micPending' | 'cameraPending' | 'speakerPending',
+  action: (open: CallSession) => Promise<Partial<CallSession>>,
+  message: string,
+): Promise<void> {
+  const open = session;
+  if (!open?.room || open[pending] || !['live', 'reconnecting'].includes(open.state)) return;
+  const ownGeneration = generation;
+  patch(open.callId, { [pending]: true, controlError: null });
+  try {
+    const changes = await action(open);
+    if (generation === ownGeneration && session?.room === open.room) patch(open.callId, changes);
+  } catch (error) {
+    if (generation === ownGeneration && session?.room === open.room) patch(open.callId, { controlError: message });
+    console.warn(message, error);
+  } finally {
+    if (generation === ownGeneration) patch(open.callId, { [pending]: false });
+  }
 }
-
-// --------------------------------------------------------------- controls
-// Optimistic: the toggle moves immediately and is put back if the native
-// call fails, because a control that waits for a round trip before showing
-// anything reads as broken.
-
-// Every one of these logs its failure out loud. They used to swallow it in a
-// bare `.catch(() => revert)`, which in a release build is indistinguishable
-// from the button not being wired up at all — and "nút chưa hoạt động" is
-// exactly what came back from the device, with nothing anywhere to say which
-// of the two it was.
-
 export function toggleSessionMic(): void {
-  const open = session;
-  if (!open?.room) return;
-  const next = !open.micOn;
-  patch(open.callId, { micOn: next });
-  void setCallMicrophone(open.room, next)
-    .then((actual) => patch(open.callId, { micOn: actual }))
-    .catch((error: unknown) => {
-      console.warn('could not toggle the microphone:', error);
-      patch(open.callId, { micOn: !next });
-    });
+  void control('micPending', async (open) => ({ micOn: await setCallMicrophone(open.room, !open.micOn) }),
+    'Không thể đổi trạng thái micro. Vui lòng thử lại.');
 }
-
 export function toggleSessionCamera(): void {
-  const open = session;
-  if (!open) return;
-  const next = !open.cameraOn;
-  // Optimistic so the button answers the finger immediately, then corrected
-  // to whatever the camera actually did. Both halves matter: without the
-  // first the control feels dead, without the second it can lie.
-  patch(open.callId, { cameraOn: next });
-  void setCallCamera(open.room, next)
-    .then((actual) => patch(open.callId, {
-      cameraOn: actual,
-      // Turning the camera back on is also a new track to render.
-      cameraEpoch: actual ? open.cameraEpoch + 1 : open.cameraEpoch,
-    }))
-    .catch((error: unknown) => {
-      console.warn('could not toggle the camera:', error);
-      patch(open.callId, { cameraOn: !next });
-    });
+  void control('cameraPending', async (open) => {
+    const cameraOn = await setCallCamera(open.room, !open.cameraOn);
+    return { cameraOn, cameraEpoch: open.cameraEpoch + 1 };
+  }, 'Không thể bật/tắt camera. Hãy kiểm tra quyền camera trong Cài đặt.');
 }
-
 export function toggleSessionSpeaker(): void {
-  const open = session;
-  if (!open) return;
-  const next = !open.speakerOn;
-  patch(open.callId, { speakerOn: next });
-  void setCallSpeaker(next)
-    .catch((error: unknown) => {
-      console.warn('could not switch the audio output:', error);
-      patch(open.callId, { speakerOn: !next });
-    });
+  void control('speakerPending', async (open) => {
+    await setCallSpeaker(!open.speakerOn);
+    return { speakerOn: !open.speakerOn };
+  }, 'Không thể chuyển loa. Vui lòng thử lại.');
 }
-
-/** Front ↔ back. The new direction is decided HERE and recorded, so the
- * button alternates even on a device that will not say which way the camera
- * is currently pointing. */
 export function flipSessionCamera(): void {
-  const open = session;
-  if (!open?.room || !open.cameraOn) return;
-  const next = open.facing === 'user' ? 'environment' : 'user';
-  patch(open.callId, { facing: next });
-  void switchCallCamera(open.room, next)
-    .then(() => patch(open.callId, { cameraEpoch: open.cameraEpoch + 1 }))
-    .catch((error: unknown) => {
-      console.warn('could not switch cameras:', error);
-      patch(open.callId, { facing: open.facing });
-    });
+  if (!session?.cameraOn) return;
+  void control('cameraPending', async (open) => {
+    const facing = open.facing === 'user' ? 'environment' : 'user';
+    await switchCallCamera(open.room, facing);
+    return { facing, cameraEpoch: open.cameraEpoch + 1 };
+  }, 'Không thể đổi camera. Vui lòng thử lại.');
 }

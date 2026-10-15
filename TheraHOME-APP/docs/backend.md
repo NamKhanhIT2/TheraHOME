@@ -281,9 +281,12 @@ specifically so a row can opt out: `start_call` sets it false for
 never be told "đang bận" because a real customer is on the line.
 
 `expire_stale_calls` is the janitor that stops a force-quit app from holding
-the line forever (ringing > 90s → `missed`, accepted > 2h → `ended`). It runs
-at the top of `start_call`, so the line self-heals on the next attempt with no
-cron job. It is internal — and note that `revoke ... from public, anon` was
+the line forever (ringing ≥ 45s → `missed`, accepted > 2h → `ended`). It runs
+at the top of `start_call` and once a minute through pg_cron after migration
+`202610142100_call_transitions_are_serialized.sql`. `answer_call` also checks
+the ring deadline. The same migration locks rows for answer/end transitions
+and prevents a stale ring timeout from ending an accepted call. See
+[call regression checks](qa-calls.md) for validation and deployment notes. It is internal — and note that `revoke ... from public, anon` was
 **not** enough to keep it off the REST API, because a default privilege
 re-grants EXECUTE on new public functions to `authenticated`; the follow-up
 migration revokes it from that role by name. Any future internal RPC here

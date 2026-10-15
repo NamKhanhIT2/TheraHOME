@@ -15,8 +15,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import type { Database } from '@/types/database';
-import { dismissCall, markCallActive } from '@/lib/callkeep';
-import { closeCallSession } from '@/lib/callSession';
+import { dismissCall, isCallDismissed, markCallActive } from '@/lib/callkeep';
+import { closeCallSession, endCallSession, getCallSession, openCallSession, trackCallSession } from '@/lib/callSession';
 
 export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'missed' | 'busy' | 'ended';
 
@@ -44,9 +44,7 @@ export interface CallRow {
 /** A status nothing more will happen from — the screen may close. */
 export const CALL_IS_OVER: CallStatus[] = ['declined', 'missed', 'busy', 'ended'];
 
-/** How long the caller lets it ring before giving up. Kept a little under the
- * database janitor's 90s so the UI gives up first and the row is reported as
- * missed by the person who was actually waiting. */
+/** Shared with answer_call/expire_stale_calls in the signaling migration. */
 export const RING_TIMEOUT_MS = 45_000;
 
 // Maps one database row onto the camelCase shape the screens read. The same
@@ -103,6 +101,9 @@ export function useCall(callId: string | undefined) {
     queryFn: async (): Promise<CallRow | null> => {
       const { data, error } = await supabase.from('calls').select('*').eq('id', callId!).maybeSingle();
       if (error) throw error;
+      // A read started before hangup can arrive after the terminal RPC.
+      const cached = queryClient.getQueryData<CallRow>(key);
+      if (cached && CALL_IS_OVER.includes(cached.status)) return cached;
       return data ? toCallRow(data) : null;
     },
     enabled: !!callId,
@@ -124,8 +125,11 @@ export interface StartCallInput {
 }
 
 export function useStartCall() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: StartCallInput = {}): Promise<CallRow> => {
+      const current = getCallSession();
+      if (current) throw new Error('call_already_active');
       // `undefined`, not null: these arguments are optional in the generated
       // signature (they have SQL defaults), so sending null fails the type
       // while sending nothing lets the default apply.
@@ -162,20 +166,47 @@ export function useStartCall() {
       }
       return call;
     },
+    onSuccess: (call) => {
+      queryClient.setQueryData(['call', call.id], call);
+      if (call.status === 'ringing') trackCallSession(call.id, call.media);
+    },
   });
 }
+
+const answering = new Map<string, Promise<CallRow>>();
 
 export function useAnswerCall() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (callId: string): Promise<CallRow> => {
-      const { data, error } = await supabase.rpc('answer_call', { p_call_id: callId });
-      if (error) throw error;
-      return toCallRow(data);
+      const current = getCallSession();
+      if (current && current.callId !== callId) throw new Error('call_already_active');
+      const existing = answering.get(callId);
+      if (existing) return existing;
+      const attempt = (async () => {
+        const { data, error } = await supabase.rpc('answer_call', { p_call_id: callId });
+        if (error) throw error;
+        return toCallRow(data);
+      })();
+      answering.set(callId, attempt);
+      try { return await attempt; } finally { answering.delete(callId); }
     },
     onSuccess: (call) => {
-      queryClient.setQueryData(['call', call.id], call);
       queryClient.invalidateQueries({ queryKey: ['incoming_call'] });
+      // A delayed answer response must not overwrite an end_call response
+      // that already closed this call on the same device.
+      if (call.status === 'accepted' && isCallDismissed(call.id)) {
+        void queryClient.invalidateQueries({ queryKey: ['call', call.id] });
+        return;
+      }
+      queryClient.setQueryData(['call', call.id], call);
+      if (CALL_IS_OVER.includes(call.status)) {
+        dismissCall(call.id);
+        cancelCallPushes(call.id);
+        void closeCallSession(call.id);
+        return;
+      }
+      if (call.status !== 'accepted') return;
       // The system may also be ringing for this call — a push raised it while
       // the app happened to be open, so the user saw both our sheet and the
       // telecom screen. Answering in the app has to tell the system too, or
@@ -183,11 +214,17 @@ export function useAnswerCall() {
       // iOS leaves CallKit stuck on "connecting". A no-op when the system
       // never knew about this call, which is the common case.
       markCallActive(call.id);
+      // Answering from the lock screen must establish media even before a
+      // route is mounted (iOS may leave the app behind the lock screen).
+      void openCallSession(call.id, call.media);
       // Every OTHER staff phone is still ringing for a call that now has an
       // answer. Nothing else stops them: a locked phone has no app running
       // to hear the Realtime update. The function will not send this back to
       // us, so the call we just took is safe.
       cancelCallPushes(call.id);
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({ queryKey: ['incoming_call'] });
     },
   });
 }
@@ -228,13 +265,22 @@ function cancelCallPushes(callId: string): void {
 /**
  * Hang up, decline, or report a ring-out.
  *
- * Idempotent on the server, which matters because both sides race to end
- * every call: one presses the red button, the other's screen unmounts and
- * ends it too.
+ * Idempotent on the server: native actions, timeouts and either participant
+ * can race to resolve a call. Leaving the screen never ends it.
  */
 export function useEndCall() {
   const queryClient = useQueryClient();
   return useMutation({
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    onMutate: async ({ callId, reason }) => {
+      // A timeout can race an answer. Only the server may decide that race;
+      // an explicit hangup, however, stops local audio immediately.
+      if (reason === 'timeout') return;
+      dismissCall(callId);
+      endCallSession(callId);
+      await queryClient.cancelQueries({ queryKey: ['call', callId] });
+    },
     mutationFn: async ({ callId, status = 'ended', reason = 'hangup' }: {
       callId: string;
       status?: 'ended' | 'declined' | 'missed';
@@ -245,9 +291,14 @@ export function useEndCall() {
       return toCallRow(data);
     },
     onSuccess: (call) => {
+      const cached = queryClient.getQueryData<CallRow>(['call', call.id]);
+      if (cached && CALL_IS_OVER.includes(cached.status) && !CALL_IS_OVER.includes(call.status)) return;
       queryClient.setQueryData(['call', call.id], call);
       queryClient.invalidateQueries({ queryKey: ['incoming_call'] });
       queryClient.invalidateQueries({ queryKey: ['call_history'] });
+      if (!CALL_IS_OVER.includes(call.status)) return;
+      dismissCall(call.id);
+      void closeCallSession(call.id);
       // A call that was never answered was, by definition, still ringing
       // somewhere when it ended — on phones that may have nothing running
       // to notice. `answered_at` is the server's own record of that, which
@@ -258,16 +309,7 @@ export function useEndCall() {
   });
 }
 
-/**
- * Ends a call exactly once, whatever happens to the screen.
- *
- * A call must be ended on the way out even when the component unmounts
- * because the user swiped back, hit the hardware back button, or was
- * navigated away — and in every one of those paths React has already thrown
- * away the state a `useEffect` cleanup would read. So the id and the mutation
- * live in refs, and the guard flag makes a second attempt a no-op rather than
- * a second RPC.
- */
+/** Explicit hangup only. Navigation and backgrounding never end a call. */
 export function useCallTerminator(callId: string | undefined) {
   const endCall = useEndCall();
   // Keyed by call id, not a bare boolean. The call screen unmounts between
@@ -284,27 +326,15 @@ export function useCallTerminator(callId: string | undefined) {
     const id = callIdRef.current;
     if (!id || endedForRef.current === id) return;
     endedForRef.current = id;
-    // Clear the system call UI for THIS call, whichever way the app is
-    // ending it — declined in the sheet, hung up on the call screen, rung
-    // out. Android will otherwise keep a connection (and its notification)
-    // alive for a call that no longer exists, and the next call may not ring
-    // at all. Done first, so a failed round trip below still leaves a phone
-    // that has stopped ringing.
-    dismissCall(id);
-    // And leave the LiveKit room. This is one of the three places that
-    // close a session (see src/lib/callSession.ts) and the most direct: the
-    // user pressed the red button. It is NOT tied to the call screen
-    // unmounting any more, because the screen can be dismissed with the
-    // call still running — that is what minimising is.
-    void closeCallSession(id);
     try {
-      await mutateRef.current({ callId: id, status, reason });
+      const call = await mutateRef.current({ callId: id, status, reason });
+      if (!CALL_IS_OVER.includes(call.status)) endedForRef.current = null;
     } catch {
       // Released so a retry is possible. The janitor in `expire_stale_calls`
       // is the backstop behind that: a call this failed to end is cleared on
       // the next attempt by anyone, so the line cannot stay held because one
       // hangup did not reach the server.
-      endedForRef.current = null;
+      if (endedForRef.current === id) endedForRef.current = null;
     }
   }, []);
 
@@ -331,7 +361,7 @@ export function useIncomingCall({ enabled, userId, isStaff }: {
   isStaff: boolean;
 }) {
   const queryClient = useQueryClient();
-  const key = ['incoming_call', isStaff ? 'line' : userId] as const;
+  const key = ['incoming_call', userId, isStaff] as const;
   const armed = enabled && !!userId;
 
   useRealtimeSync({
@@ -355,8 +385,9 @@ export function useIncomingCall({ enabled, userId, isStaff }: {
         .from('calls')
         .select('*')
         .eq('status', 'ringing')
+        .neq('caller_id', userId!)
         .gte('created_at', since);
-      query = isStaff ? query.is('callee_id', null) : query.eq('callee_id', userId!);
+      query = isStaff ? query.or(`callee_id.is.null,callee_id.eq.${userId!}`) : query.eq('callee_id', userId!);
       const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(1)

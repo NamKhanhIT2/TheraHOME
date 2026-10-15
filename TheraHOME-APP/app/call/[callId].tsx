@@ -17,7 +17,7 @@
 // connected, so joining early would charge for calls nobody answered. The
 // waiting is done over Realtime on the `calls` row, which is free.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
@@ -26,13 +26,13 @@ import { useIsStaff } from '@/hooks/useWebRoles';
 import { AvatarImg } from '@/components/AvatarImg';
 import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
-import { useRingtone } from '@/hooks/useRingtone';
 import { CallVideo, useCallVideoTracks } from '@/components/call/CallVideo';
 import { CallPip } from '@/components/call/CallPip';
-import { setCallScreenAwake, setProximityBlanking } from '@/lib/callScreen';
+import { setCallScreenAwake } from '@/lib/callScreen';
 import {
   flipSessionCamera,
   openCallSession,
+  trackCallSession,
   toggleSessionCamera,
   toggleSessionMic,
   toggleSessionSpeaker,
@@ -40,7 +40,6 @@ import {
 } from '@/lib/callSession';
 import {
   CALL_IS_OVER,
-  RING_TIMEOUT_MS,
   formatCallDuration,
   useAnswerCall,
   useCall,
@@ -63,7 +62,7 @@ export default function CallScreen() {
   const call = callQuery.data ?? null;
   const isVideo = call?.media === 'video';
   const isCaller = !!call && call.callerId === userId;
-  const isOver = !!call && CALL_IS_OVER.includes(call.status);
+  const serverOver = !!call && CALL_IS_OVER.includes(call.status);
 
   // The far end. A call with no `callee_id` is addressed to the support line,
   // so for its caller the other party is TheraHOME rather than a person.
@@ -80,6 +79,7 @@ export default function CallScreen() {
   const liveSession = useCallSession();
   const session = liveSession?.callId === callId ? liveSession : null;
   const media = session?.state ?? 'idle';
+  const isOver = serverOver || media === 'ending';
   const room = session?.room ?? null;
   const micOn = session?.micOn ?? true;
   const cameraOn = session?.cameraOn ?? false;
@@ -95,7 +95,6 @@ export default function CallScreen() {
   const tracks = useCallVideoTracks(room, media === 'live' || media === 'reconnecting');
   // Read by the back handler, which must not re-subscribe on every render.
   const canMinimiseRef = useRef(false);
-  const ringingRef = useRef(false);
 
   // Over video, the controls get out of the way. Every other caller does
   // this and the reason is the same: the picture is the point, and a row of
@@ -110,53 +109,20 @@ export default function CallScreen() {
   // the corner — the same gesture, and the same result, as on Messenger.
   const [swapped, setSwapped] = useState(false);
 
-  // The caller hears a quiet ringback while it rings at the other end. The
-  // callee's own phone is rung by the incoming sheet, not here.
-  useRingtone(!!call && call.status === 'ringing' && isCaller, 'ringback');
-
-  // ---------------------------------------------------------------- media
-  // Joins on 'accepted' and only then. `openCallSession` is itself a no-op
-  // for a call it already holds, which is what makes this safe to run again
-  // on every remount — and remounting is exactly what reopening a minimised
-  // call does.
+  // Restore deep links as well as calls started through the chat header.
+  // Once tracked, the shell owns connection, timeouts and ringback.
   useEffect(() => {
-    if (!callId || call?.status !== 'accepted') return;
-    void openCallSession(callId, call.media === 'video' ? 'video' : 'audio');
-  }, [callId, call?.status, call?.media]);
-
-  // Nothing is disconnected here on unmount. That was the old rule and it is
-  // the one thing this screen must NOT do any more: leaving the screen is
-  // how a call is minimised. The room is closed by useCallTerminator, by the
-  // room's own failure events, and by <OngoingCallBar> when the row goes
-  // terminal — see src/lib/callSession.ts.
-
-  // --------------------------------------------------------------- ringing
-  // Only the caller runs the give-up timer: if the callee's phone ran one
-  // too, a brief network stall there would cancel a call the caller is still
-  // happily waiting on.
-  useEffect(() => {
-    if (!isCaller || call?.status !== 'ringing') return;
-    const elapsed = Date.now() - new Date(call.createdAt).getTime();
-    const timer = setTimeout(() => { void terminate('missed', 'timeout'); }, Math.max(0, RING_TIMEOUT_MS - elapsed));
-    return () => clearTimeout(timer);
-  }, [isCaller, call?.status, call?.createdAt, terminate]);
-
-  // An unanswered call must not keep ringing because the caller backgrounded
-  // the app mid-ring. Once connected, backgrounding is left alone on purpose:
-  // a call is expected to continue when the phone is pocketed.
-  useEffect(() => {
-    if (!isCaller) return;
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') return;
-      if (callQuery.data?.status === 'ringing') void terminate('missed', 'caller_left');
-    });
-    return () => subscription.remove();
-  }, [isCaller, callQuery.data?.status, terminate]);
+    if (!call || !userId || serverOver) return;
+    if (call.status === 'ringing' && isCaller) trackCallSession(call.id, call.media);
+    if (call.status === 'accepted' && (isCaller || call.answeredBy === userId)) {
+      void openCallSession(call.id, call.media);
+    }
+  }, [call, userId, isCaller, serverOver]);
 
   // A call that cannot be read at all (a stale push, or an id RLS hides) gets
   // the same treatment as one that is over, rather than leaving a dead screen
   // with an End button that can never work.
-  const unreadable = !callQuery.isPending && !call;
+  const unreadable = callQuery.isSuccess && !call;
   useEffect(() => {
     if (!isOver && !unreadable) return;
     const timer = setTimeout(() => {
@@ -179,23 +145,14 @@ export default function CallScreen() {
     else router.replace(isStaff ? '/chat/admin-conversations' : '/chat/human');
   }, [isStaff]);
 
-  // Android's hardware back used to be swallowed outright, because popping
-  // this screen unmounted it and unmounting ended the call. Now it minimises,
-  // the way every other caller behaves.
-  //
-  // While the call is still RINGING it is swallowed as before, and for a
-  // reason worth stating: there is no room to minimise yet, and the give-up
-  // timer that cancels an unanswered call lives in this component. Backing
-  // out would unmount the timer and leave the other phone ringing on with
-  // nothing to stop it but the server's janitor. Huỷ / Từ chối are the way
-  // out of a ringing call.
+  // Back minimises ringing, connecting and live calls alike.
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (canMinimiseRef.current) {
         minimise();
         return true;
       }
-      return ringingRef.current;
+      return false;
     });
     return () => subscription.remove();
   }, [minimise]);
@@ -207,8 +164,7 @@ export default function CallScreen() {
   // Controls stay usable through a reconnect: muting while the socket is
   // re-establishing should still take effect when it comes back.
   const controlsLive = media === 'live' || media === 'reconnecting';
-  canMinimiseRef.current = !!inCall && !isOver && controlsLive;
-  ringingRef.current = call?.status === 'ringing';
+  canMinimiseRef.current = !!session && !isOver;
   // Driven by whether a picture exists at all, EITHER side's — so a voice
   // call that turns into a video one switches to the video stage, and a
   // call where nobody has a camera stays on the plain identity screen.
@@ -276,17 +232,6 @@ export default function CallScreen() {
     if (!videoStage) setControlsVisible(true);
   }, [videoStage]);
 
-  // ------------------------------------------------------------- proximity
-  // Armed only when the phone is plausibly AT an ear: a connected call with
-  // no picture on screen. A video call, or a voice call with a camera up,
-  // is being looked at — blanking it would be the bug rather than the fix.
-  const atEar = media === 'live' && !cameraOn && !tracks.remote;
-  useEffect(() => {
-    if (!atEar) return;
-    setProximityBlanking(true);
-    return () => setProximityBlanking(false);
-  }, [atEar]);
-
   // And the screen does not lock while a call is up — including while it is
   // still ringing, because watching "Đang gọi…" is exactly the kind of
   // waiting the idle timer interrupts.
@@ -303,7 +248,8 @@ export default function CallScreen() {
     : (peerProfile.data?.fullName ?? (isStaff ? 'Khách hàng' : 'TheraHOME CSKH'));
 
   const statusLine = useMemo(() => {
-    if (!call) return callQuery.isPending ? 'Đang kết nối…' : 'Không tìm thấy cuộc gọi';
+    if (media === 'ending') return session?.failureReason ? 'Không thể duy trì kết nối' : 'Đã kết thúc';
+    if (!call) return callQuery.isError ? 'Không thể tải cuộc gọi' : callQuery.isPending ? 'Đang kết nối…' : 'Không tìm thấy cuộc gọi';
     switch (call.status) {
       case 'ringing':
         return isCaller ? 'Đang gọi…' : (isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi đến');
@@ -314,15 +260,17 @@ export default function CallScreen() {
         if (media !== 'live') return 'Đang kết nối…';
         return remoteJoined ? formatCallDuration(seconds) : 'Đang chờ đầu kia vào…';
       case 'busy':
-        return 'Tổng đài đang có cuộc gọi khác';
+        return peerIsSupport ? 'Tổng đài đang có cuộc gọi khác' : 'Người nhận đang bận';
       case 'declined':
         return isCaller ? 'Cuộc gọi bị từ chối' : 'Đã từ chối';
       case 'missed':
-        return isCaller ? 'Không có người nghe máy' : 'Đã ngắt máy';
+        return isCaller ? (call.endReason === 'cancelled' ? 'Đã hủy cuộc gọi' : 'Không có người nghe máy') : 'Cuộc gọi nhỡ';
       case 'ended':
+        if (call.endReason === 'unsupported') return 'Bản cài đặt này chưa hỗ trợ gọi';
+        if (['connection_failed', 'connection_timeout', 'peer_timeout'].includes(call.endReason ?? '')) return 'Cuộc gọi kết thúc do mất kết nối';
         return call.durationSeconds ? `Đã kết thúc · ${formatCallDuration(call.durationSeconds)}` : 'Đã kết thúc';
     }
-  }, [call, callQuery.isPending, isCaller, isVideo, media, remoteJoined, seconds]);
+  }, [call, callQuery.isPending, callQuery.isError, isCaller, isVideo, media, remoteJoined, seconds, peerIsSupport, session?.failureReason]);
 
   const hint =
     call?.status === 'busy' ? 'Bạn có thể nhắn tin, CSKH sẽ gọi lại ngay khi xong cuộc hiện tại.'
@@ -413,8 +361,7 @@ export default function CallScreen() {
         </View>
       )}
 
-      {/* Minimise. Only once there is a call worth keeping: while it is still
-          ringing there is nothing behind the screen to go back to. */}
+      {/* The shell keeps ringing/connecting even after this view is closed. */}
       {canMinimiseRef.current && showControls ? (
         <Pressable
           accessibilityRole="button"
@@ -443,7 +390,7 @@ export default function CallScreen() {
 
       {showControls ? (
       <View pointerEvents="box-none" style={[styles.controls, videoStage ? styles.controlsOverVideo : null]}>
-        {inCall ? (
+        {inCall && !isOver ? (
           // One row for every call. The camera button is always there, so a
           // voice call can become a video one; "đổi camera" only appears once
           // a camera is actually on, because there is nothing to switch
@@ -452,25 +399,34 @@ export default function CallScreen() {
           // earpiece, which the video-only layout had made impossible.
           <View style={styles.toggleRow}>
             <ToggleButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? 'Tắt tiếng' : 'Đã tắt tiếng'}
-              active={!micOn} onPress={() => { keepControls(); toggleSessionMic(); }} disabled={!controlsLive} onDark={videoStage} />
+              active={!micOn} onPress={() => { keepControls(); toggleSessionMic(); }} disabled={!controlsLive || session?.micPending} onDark={videoStage} />
             <ToggleButton icon={cameraOn ? 'video' : 'video-off'} label={cameraOn ? 'Tắt camera' : 'Bật camera'}
-              active={!cameraOn} onPress={() => { keepControls(); toggleSessionCamera(); }} disabled={!controlsLive} onDark={videoStage} />
+              active={!cameraOn} onPress={() => { keepControls(); toggleSessionCamera(); }} disabled={!controlsLive || session?.cameraPending} onDark={videoStage} />
             {cameraOn ? (
               <ToggleButton icon="switch-camera" label="Đổi camera" active={false}
-                onPress={() => { keepControls(); flipSessionCamera(); }} disabled={!controlsLive} onDark={videoStage} />
+                onPress={() => { keepControls(); flipSessionCamera(); }} disabled={!controlsLive || session?.cameraPending} onDark={videoStage} />
             ) : null}
             <ToggleButton icon="volume-2" label="Loa ngoài" active={speakerOn}
-              onPress={() => { keepControls(); toggleSessionSpeaker(); }} disabled={!controlsLive} onDark={videoStage} />
+              onPress={() => { keepControls(); toggleSessionSpeaker(); }} disabled={!controlsLive || session?.speakerPending} onDark={videoStage} />
           </View>
         ) : null}
 
-        {showAnswerButtons ? (
+        {session?.controlError ? (
+          <Text accessibilityRole="alert" style={[theme.type.captionSm, { color: videoStage ? '#fff' : theme.colors.error, textAlign: 'center' }]}>
+            {session.controlError}
+          </Text>
+        ) : null}
+        {callQuery.isError && !call ? (
+          <RoundButton color={theme.colors.primary} icon="refresh-cw" label="Thử lại" onPress={() => { void callQuery.refetch(); }} />
+        ) : null}
+        {showAnswerButtons && !isOver ? (
           <View style={styles.answerRow}>
             <RoundButton color={theme.colors.error} icon="phone-off" label="Từ chối"
+              disabled={answerCall.isPending}
               onPress={() => { hapticConfirm(); void terminate('declined', 'declined'); }} />
             <RoundButton color={theme.colors.success} icon={isVideo ? 'video' : 'phone'} label="Trả lời"
               disabled={answerCall.isPending}
-              onPress={() => { hapticConfirm(); if (callId) answerCall.mutate(callId); }} />
+              onPress={() => { hapticConfirm(); if (callId) answerCall.mutate(callId, { onError: () => Alert.alert('Không thể trả lời', 'Cuộc gọi có thể đã kết thúc. Vui lòng thử lại.') }); }} />
           </View>
         ) : isOver || unreadable ? null : (
           <RoundButton color={theme.colors.error} icon="phone-off"

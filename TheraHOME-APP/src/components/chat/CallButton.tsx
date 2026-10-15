@@ -25,6 +25,7 @@ import { isCallSupported } from '@/lib/livekit';
 import { useI18n } from '@/lib/i18n';
 import { usePlanGate } from '@/hooks/usePlanGate';
 import { errorMessage } from '@/lib/errorMessage';
+import { getCallSession } from '@/lib/callSession';
 
 export function CallButton({ threadId, calleeId }: {
   threadId: string | undefined;
@@ -42,6 +43,11 @@ export function CallButton({ threadId, calleeId }: {
 
   function place(media: CallMedia) {
     if (startCall.isPending) return;
+    const current = getCallSession();
+    if (current) {
+      router.navigate({ pathname: '/call/[callId]', params: { callId: current.callId } });
+      return;
+    }
     hapticConfirm();
     startCall.mutate(
       { threadId: threadId ?? null, calleeId: calleeId ?? null, media },
@@ -103,6 +109,7 @@ function HeaderCallButton({ icon, label, busy, onPress, tint, background }: {
       accessibilityRole="button"
       accessibilityLabel={label}
       hitSlop={6}
+      disabled={busy}
       onPress={onPress}
       style={({ pressed }) => [styles.button, { backgroundColor: background, opacity: pressed || busy ? 0.7 : 1 }]}
     >

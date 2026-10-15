@@ -82,7 +82,7 @@ export function useCallVideoTracks(room: LiveKitRoom | null, enabled: boolean): 
     function read() {
       if (!room) return;
       const localPublication = room.localParticipant.getTrackPublication(Source.Camera);
-      const local = localPublication?.videoTrack
+      const local = localPublication?.videoTrack && !localPublication.isMuted
         ? { participant: room.localParticipant, publication: localPublication, source: Source.Camera }
         : undefined;
 
@@ -91,7 +91,7 @@ export function useCallVideoTracks(room: LiveKitRoom | null, enabled: boolean): 
       // third joiner cannot crash this, and the first camera found wins.
       for (const participant of room.remoteParticipants.values()) {
         const publication = participant.getTrackPublication(Source.Camera);
-        if (publication?.videoTrack) {
+        if (publication?.videoTrack && !publication.isMuted) {
           remote = { participant, publication, source: Source.Camera };
           break;
         }

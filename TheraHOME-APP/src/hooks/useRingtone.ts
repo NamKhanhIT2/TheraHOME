@@ -20,6 +20,7 @@
 import { useEffect, useRef } from 'react';
 import { Vibration } from 'react-native';
 import { requireOptionalNativeModule } from 'expo-modules-core';
+import { configureRingtoneAudio } from '@/lib/livekit';
 
 // Same guard the typing sound uses (src/components/roadmap/SurveySuggestion.tsx):
 // a JS bundle served to a binary built before expo-audio was added has no
@@ -109,14 +110,17 @@ export function useRingtone(active: boolean, role: 'incoming' | 'ringback' = 'in
       if (player) {
         // Before play(), not after: the category is what decides whether the
         // first second of the ring is audible.
-        void EXPO_AUDIO?.setAudioModeAsync(ringingAudioMode());
         player.loop = true;
         // Ringback is the caller's own feedback and plays against the
         // earpiece; at full volume it drowns the moment the other side picks
         // up and starts talking.
         player.volume = role === 'incoming' ? 1 : 0.25;
-        player.seekTo(0);
-        player.play();
+        void configureRingtoneAudio(async () => {
+          await EXPO_AUDIO?.setAudioModeAsync(ringingAudioMode());
+          if (!playingRef.current) return;
+          await player.seekTo(0);
+          if (playingRef.current) player.play();
+        }).catch(() => undefined);
       }
     } catch {
       // No audio in this build. The vibration below still carries the ring.
@@ -137,18 +141,11 @@ export function useRingtone(active: boolean, role: 'incoming' | 'ringback' = 'in
 /**
  * Hands the audio session back.
  *
- * Ordering matters and is the reason this is a separate function worth a
- * comment: when a ring stops because the call was ANSWERED, LiveKit is about
- * to configure the session for a voice call, and whichever of the two writes
- * last wins. It is always LiveKit — `connectCall` only touches audio after
- * fetching a token from the Edge Function, a network round trip later than
- * this. If that ever changes, a call with no sound is the symptom to look
- * for here first.
+ * Serialized with LiveKit setup. A late ringtone cleanup skips the reset
+ * while a room owns audio, so connection speed cannot decide the audio mode.
  */
 function releaseAudioSession(): void {
-  try {
-    void EXPO_AUDIO?.setAudioModeAsync(idleAudioMode());
-  } catch {
-    // No audio module in this build; nothing was configured to undo.
-  }
+  void configureRingtoneAudio(async () => {
+    await EXPO_AUDIO?.setAudioModeAsync(idleAudioMode());
+  }).catch(() => undefined);
 }

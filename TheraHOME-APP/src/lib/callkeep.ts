@@ -1,24 +1,5 @@
-// The system incoming-call screen — the one that shows on a locked phone.
-//
-// Everything before this rang only inside the app: a modal while TheraHOME
-// was open, and an ordinary push notification otherwise. A notification on a
-// locked screen is a line of text you have to notice; this is the full-screen
-// ring with Answer and Decline that a phone call is supposed to be.
-//
-// ANDROID ONLY for now, through ConnectionService. That choice is about Play
-// policy, not convenience: since Android 14 `USE_FULL_SCREEN_INTENT` — the
-// obvious way to do this — is auto-granted only to apps whose CORE function
-// is calling or alarms, and Play revokes it at install for everything else.
-// TheraHOME is a rehab app with a support line, so it would be revoked, leaving
-// a permission prompt users would have to find and grant. ConnectionService
-// (`MANAGE_OWN_CALLS`) is the sanctioned API for an app that places calls as
-// part of what it does, and it carries no such restriction.
-//
-// iOS is deliberately NOT wired up here. CallKit needs a PushKit VoIP push,
-// and Expo's push service cannot send one — it has no apns-push-type: voip —
-// so iOS needs a separate APNs path with its own key before CallKit can do
-// anything. Calling setup() on iOS would register a phone account that never
-// rings, which is worse than not having one.
+// Native incoming-call UI: CallKit on iOS, ConnectionService on Android.
+// PushKit / the background task raises the call; the shared bridge resolves it.
 import { Alert, Linking, NativeModules, Platform } from 'react-native';
 
 // Guarded on the exact key the library reads (`NativeModules.RNCallKeep`),
@@ -170,20 +151,33 @@ export async function drainInitialCallKeepEvents(
   try {
     // Native-side this is a Promise on both platforms, even though its name
     // reads like a getter.
-    const events = await CALLKEEP.getInitialEvents() as { name: string; data: { callUUID?: string } }[] | null;
+    const events = await CALLKEEP.getInitialEvents() as { name: string; data: { callUUID?: string; error?: string } }[] | null;
+    const ended = new Set((events ?? []).filter((event) => event.name === 'RNCallKeepPerformEndCallAction')
+      .map((event) => event.data?.callUUID?.toLowerCase()));
+    const replayed = new Set<string>();
     for (const event of events ?? []) {
-      const callId = event?.data?.callUUID;
+      const callId = event?.data?.callUUID?.toLowerCase();
       if (!callId) continue;
+      const key = `${event.name}:${callId}`;
+      if (replayed.has(key)) continue;
+      replayed.add(key);
       if (event.name === 'RNCallKeepPerformAnswerCallAction') {
+        if (ended.has(callId) || isCallDismissed(callId)) continue;
+        nativeAnswered.add(callId);
         answered = true;
         onAnswer(callId);
       }
-      if (event.name === 'RNCallKeepPerformEndCallAction') onEnd(callId);
+      if (event.name === 'RNCallKeepPerformEndCallAction') {
+        setSystemRinging(callId, false);
+        if (!isOurOwnEcho(callId)) onEnd(callId);
+      }
       // A call still ringing in CallKit while this app was cold-starting —
       // the usual shape of a VoIP push waking a killed app. Recording it
       // keeps the in-app sheet from drawing itself over a live system call
       // screen a moment after launch.
-      if (event.name === 'RNCallKeepDidDisplayIncomingCall') setSystemRinging(callId, true);
+      if (event.name === 'RNCallKeepDidDisplayIncomingCall' && !event.data.error && !ended.has(callId)) {
+        setSystemRinging(callId, true);
+      }
     }
     CALLKEEP.clearInitialEvents();
   } catch (error) {
@@ -206,10 +200,12 @@ export async function drainInitialCallKeepEvents(
 // the user has not enabled). So the sheet asks this instead, and steps
 // aside exactly when the system has it covered.
 const systemRinging = new Set<string>();
+const nativeAnswered = new Set<string>();
 const ringingListeners = new Set<() => void>();
 
 function setSystemRinging(callId: CallKeepUUID, ringing: boolean): void {
   const key = callId.toLowerCase();
+  if (ringing && (isCallDismissed(key) || wasAnsweredHere(key))) return;
   const had = systemRinging.has(key);
   if (ringing) systemRinging.add(key); else systemRinging.delete(key);
   if (had !== ringing) for (const listener of ringingListeners) listener();
@@ -235,7 +231,9 @@ export async function displayIncomingCall(
   hasVideo: boolean,
 ): Promise<void> {
   if (!isCallKeepSupported()) return;
+  if (isCallDismissed(callId) || wasAnsweredHere(callId)) return;
   await setupCallKeep();
+  if (isCallDismissed(callId) || wasAnsweredHere(callId)) return;
   // Marked here, not from the `didDisplayIncomingCall` event: Android fires
   // that event only from its own native reportNewIncomingCall, never from
   // the JS method this calls. iOS is the other way round, which is why both
@@ -246,13 +244,16 @@ export async function displayIncomingCall(
   // it ringing then and the in-app sheet would stand aside for a call
   // screen that never appeared, leaving the user with nothing at all —
   // which is worse than the two screens this whole change is fixing.
-  if (await hasCallKeepAccount()) setSystemRinging(callId, true);
+  const hasAccount = await hasCallKeepAccount();
+  if (isCallDismissed(callId) || wasAnsweredHere(callId)) return;
+  if (hasAccount) setSystemRinging(callId, true);
   try {
     // `handle` is what Android shows as the "number". There is no phone
     // number here, so the caller's name goes in both slots rather than
     // showing a blank or a raw uuid.
     CALLKEEP.displayIncomingCall(callId, callerName, callerName, 'generic', hasVideo);
   } catch (error) {
+    setSystemRinging(callId, false);
     if (__DEV__) console.warn('displayIncomingCall failed:', error);
   }
 }
@@ -276,9 +277,20 @@ export async function displayIncomingCall(
 // get through.
 const ECHO_WINDOW_MS = 4000;
 const selfEnded = new Map<CallKeepUUID, number>();
+const dismissed = new Map<CallKeepUUID, number>();
 let suppressAllEndsUntil = 0;
 
+/** Ignore delayed ring/answer pushes for a call this device already ended. */
+export function isCallDismissed(callId: string): boolean {
+  const now = Date.now();
+  for (const [id, at] of dismissed) if (now - at > 5 * 60_000) dismissed.delete(id);
+  return dismissed.has(callId.toLowerCase());
+}
+
+export function getSystemRingingCalls(): string[] { return [...systemRinging]; }
+
 function isOurOwnEcho(callId: CallKeepUUID): boolean {
+  callId = callId.toLowerCase();
   const now = Date.now();
   if (now < suppressAllEndsUntil) return true;
   const at = selfEnded.get(callId);
@@ -295,7 +307,11 @@ function isOurOwnEcho(callId: CallKeepUUID): boolean {
  * elsewhere, declined, timed out — or Android leaves a phantom call in the
  * telecom stack and the next one may not ring. */
 export function dismissCall(callId: CallKeepUUID): void {
+  callId = callId.toLowerCase();
+  dismissed.set(callId, Date.now());
   setSystemRinging(callId, false);
+  answeredHere.delete(callId);
+  nativeAnswered.delete(callId);
   if (!isCallKeepSupported()) return;
   selfEnded.set(callId, Date.now());
   try {
@@ -324,11 +340,15 @@ const answeredHere = new Set<CallKeepUUID>();
  * "ringing" to the in-call state (and starts its timer), and moves CallKit
  * off "connecting". */
 export function markCallActive(callId: CallKeepUUID): void {
+  callId = callId.toLowerCase();
+  if (isCallDismissed(callId)) return;
+  const needsAnswer = isSystemRinging(callId) && !nativeAnswered.has(callId);
   answeredHere.add(callId);
   setSystemRinging(callId, false);
   if (!isCallKeepSupported()) return;
   try {
-    CALLKEEP.setCurrentCallActive(callId);
+    if (needsAnswer) CALLKEEP.answerIncomingCall(callId);
+    if (Platform.OS === 'android') CALLKEEP.setCurrentCallActive(callId);
   } catch {
     // Not fatal — the call still works, Android's own timer just will not run.
   }
@@ -344,7 +364,7 @@ export function markCallActive(callId: CallKeepUUID): void {
  * must NOT — tearing that down hangs up on a live conversation.
  */
 export function wasAnsweredHere(callId: CallKeepUUID): boolean {
-  return answeredHere.has(callId);
+  return answeredHere.has(callId.toLowerCase());
 }
 
 /** Brings TheraHOME to the front, which is what has to happen when someone
@@ -372,15 +392,26 @@ export function listenToCallKeep({ onAnswer, onEnd }: CallKeepHandlers): () => v
   // nothing is on screen and the in-app sheet must still show.
   const displayed = ({ callUUID, error }: { callUUID: string; error?: string }) => {
     if (error) return;
+    // PushKit can display natively before JS gets to inspect a delayed push.
+    if (isCallDismissed(callUUID)) {
+      dismissCall(callUUID);
+      return;
+    }
     setSystemRinging(callUUID, true);
   };
-  const answer = ({ callUUID }: { callUUID: string }) => onAnswer(callUUID);
+  const answer = ({ callUUID }: { callUUID: string }) => {
+    const id = callUUID.toLowerCase();
+    if (wasAnsweredHere(id) || isCallDismissed(id)) return;
+    // Native has already accepted; do not send answerIncomingCall back.
+    nativeAnswered.add(id);
+    onAnswer(id);
+  };
   const end = ({ callUUID }: { callUUID: string }) => {
     // See the echo guard above: a dismissal we issued ourselves comes back
     // here looking exactly like the user pressing Decline.
     setSystemRinging(callUUID, false);
     if (isOurOwnEcho(callUUID)) return;
-    onEnd(callUUID);
+    onEnd(callUUID.toLowerCase());
   };
   CALLKEEP.addEventListener('didDisplayIncomingCall', displayed);
   CALLKEEP.addEventListener('answerCall', answer);

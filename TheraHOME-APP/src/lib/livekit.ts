@@ -26,6 +26,19 @@ export type LiveKitRoom = import('livekit-client').Room;
 let native: LiveKitNative | null = null;
 let client: LiveKitClient | null = null;
 let globalsRegistered = false;
+let audioOwner: LiveKitRoom | null = null;
+let audioQueue: Promise<void> = Promise.resolve();
+
+function withAudioSession(action: () => Promise<void>): Promise<void> {
+  const next = audioQueue.then(action);
+  audioQueue = next.catch(() => undefined);
+  return next;
+}
+
+/** Ring cleanup must not overwrite a call's recording/playback audio mode. */
+export function configureRingtoneAudio(action: () => Promise<void>): Promise<void> {
+  return withAudioSession(async () => { if (!audioOwner) await action(); });
+}
 
 export class CallUnavailableError extends Error {
   constructor() {
@@ -82,30 +95,34 @@ export interface ConnectedCall {
   cameraOn: boolean;
 }
 
-export async function connectCall(callId: string, media: 'audio' | 'video' = 'audio'): Promise<ConnectedCall> {
+export async function connectCall(callId: string, media: 'audio' | 'video' = 'audio', signal?: AbortSignal): Promise<ConnectedCall> {
   const { native: lk, client: lkClient } = loadLiveKit();
+  const checkCancelled = () => {
+    if (signal?.aborted) throw new Error('call_cancelled');
+  };
+  checkCancelled();
 
   const { data, error } = await supabase.functions.invoke<{ token: string; url: string }>('livekit-token', {
     body: { callId },
   });
   if (error) throw error;
   if (!data?.token || !data?.url) throw new Error('livekit_token_missing');
+  checkCancelled();
 
   // Audio routing. A voice call belongs at the ear; a video call is held at
   // arm's length and must start on the speaker, the way every other video
   // caller behaves. The communication preset keeps echo cancellation on in
   // both cases — speakerphone without it feeds the far end its own voice.
   const speakerFirst = media === 'video';
-  await lk.AudioSession.configureAudio({
+  const audioConfiguration: Parameters<typeof lk.AudioSession.configureAudio>[0] = {
     android: {
       preferredOutputList: speakerFirst
         ? ['bluetooth', 'headset', 'speaker', 'earpiece']
         : ['bluetooth', 'headset', 'earpiece', 'speaker'],
       audioTypeOptions: lk.AndroidAudioTypePresets.communication,
     },
-    ios: { defaultOutput: speakerFirst ? 'speaker' : 'earpiece' },
-  });
-  await lk.AudioSession.startAudioSession();
+    ios: { defaultOutput: speakerFirst ? 'speaker' as const : 'earpiece' as const },
+  };
 
   const room = new lkClient.Room({
     // adaptiveStream drops the resolution of a track whose view is small or
@@ -144,14 +161,27 @@ export async function connectCall(callId: string, media: 'audio' | 'video' = 'au
   });
 
   let cameraOn = false;
+  const abort = () => { void disconnectCall(room); };
+  signal?.addEventListener('abort', abort, { once: true });
   try {
+    await withAudioSession(async () => {
+      checkCancelled();
+      audioOwner = room;
+      await lk.AudioSession.configureAudio(audioConfiguration);
+      checkCancelled();
+      await lk.AudioSession.startAudioSession();
+    });
+    checkCancelled();
     await room.connect(data.url, data.token, { autoSubscribe: true });
+    checkCancelled();
     await room.localParticipant.setMicrophoneEnabled(true);
+    checkCancelled();
   } catch (connectError) {
     // A half-open room and a live audio session would both leak — and the
     // audio session leaking is audible, because the OS keeps the call route
     // and other apps stay ducked.
     await disconnectCall(room);
+    signal?.removeEventListener('abort', abort);
     throw connectError;
   }
 
@@ -165,10 +195,15 @@ export async function connectCall(callId: string, media: 'audio' | 'video' = 'au
   if (media === 'video') {
     try {
       await room.localParticipant.setCameraEnabled(true);
-      cameraOn = true;
+      cameraOn = room.localParticipant.isCameraEnabled;
     } catch (cameraError) {
       if (__DEV__) console.warn('camera unavailable, continuing audio-only:', cameraError);
     }
+  }
+  signal?.removeEventListener('abort', abort);
+  if (signal?.aborted) {
+    await disconnectCall(room);
+    checkCancelled();
   }
   return { room, cameraOn };
 }
@@ -181,11 +216,13 @@ export async function disconnectCall(room: LiveKitRoom | null): Promise<void> {
   } catch {
     // Already gone. Releasing the audio session below still matters.
   }
-  try {
-    native?.AudioSession.stopAudioSession();
-  } catch {
-    // Nothing to release.
-  }
+  await withAudioSession(async () => {
+    // A cancelled token request may finish after the next call starts.
+    // Its cleanup must never stop that newer call's global audio session.
+    if (!room || audioOwner !== room) return;
+    audioOwner = null;
+    try { await native?.AudioSession.stopAudioSession(); } catch { /* Already released. */ }
+  });
 }
 
 // ------------------------------------------------------------- quality
@@ -244,6 +281,11 @@ export function subscribeConnectionQuality(
 /** Earpiece ↔ speaker, the one audio control a voice call needs. */
 export async function setCallSpeaker(on: boolean): Promise<void> {
   const { native: lk } = loadLiveKit();
+  if (Platform.OS === 'ios') {
+    // Removing the override still uses defaultOutput. A video call's old
+    // default was speaker, so selecting "default" never turned it off.
+    await lk.AudioSession.configureAudio({ ios: { defaultOutput: on ? 'speaker' : 'earpiece' } });
+  }
   // The device ids differ per platform: iOS exposes only "use the system
   // route" or "force the speaker", while on Android they are real device
   // types. Passing the wrong platform's name is silently ignored, so the
