@@ -28,7 +28,7 @@ export function DayCoinCard({ userProgramId, programDayId, dayDone }: {
 }) {
   const theme = useTheme();
   const { t } = useI18n();
-  const { overview } = useCoinOverview(userProgramId, !!userProgramId);
+  const { overview, isFetching } = useCoinOverview(userProgramId, !!userProgramId);
   const claim = useClaimDayCoins();
 
   if (!userProgramId || !programDayId || !overview.active) return null;
@@ -61,6 +61,12 @@ export function DayCoinCard({ userProgramId, programDayId, dayDone }: {
   }
 
   if (!claimable) {
+    // "Not in the claimable list" is not the same as "collected". A day
+    // missing from it because the overview predates the day being finished
+    // looks identical here, and saying "Đã nhận" then is simply false. While
+    // a refetch is in flight the honest answer is nothing at all; one of the
+    // two states below arrives a moment later.
+    if (isFetching) return null;
     // Already taken. A quiet line, not a card: it is a receipt, not an offer.
     return (
       <View style={styles.doneRow}>

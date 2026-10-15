@@ -407,6 +407,14 @@ export function useMarkDayWatched() {
       queryClient.invalidateQueries({ queryKey: ['user_program_days', vars.userProgramId] });
       queryClient.invalidateQueries({ queryKey: ['catalog_program_days'] });
       queryClient.invalidateQueries({ queryKey: ['user_programs'] });
+      // Finishing a day is what PUTS xu on it. `coin_overview` builds its
+      // claimable list from `status = 'done'`, so an overview fetched a moment
+      // earlier answers "nothing to collect here" for the day just finished —
+      // and the day card reads that absence as "already collected" and says
+      // so. Measured on day 11: the screen claimed the xu had been taken while
+      // the ledger had no row for it at all, and the real card appeared only
+      // after navigating away and back refetched the overview.
+      queryClient.invalidateQueries({ queryKey: ['coin_overview'] });
     },
   });
 }
