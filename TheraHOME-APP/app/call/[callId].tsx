@@ -361,8 +361,19 @@ export default function CallScreen() {
         </View>
       )}
 
-      {/* The shell keeps ringing/connecting even after this view is closed. */}
-      {canMinimiseRef.current && showControls ? (
+      {/* The shell keeps ringing/connecting even after this view is closed.
+          NOT subject to the auto-hide above, unlike every other control, and
+          the asymmetry is the point: on iOS this button is the only way off
+          this screen. The route is a fullScreenModal with
+          `gestureEnabled: false`, so there is no swipe back, and iOS has no
+          hardware Back — so hiding it after four seconds of video left an
+          iPhone with no exit at all until the user happened to tap the
+          picture. Android never showed the bug because its Back button goes
+          through the same `minimise()` whether the chrome is up or not.
+          Reported 2026-10-15: "android nếu thoát ra vẫn thấy thanh nổi còn
+          iphone thì không". One 40pt chevron in a corner is a smaller price
+          than a call screen that cannot be left. */}
+      {canMinimiseRef.current ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Thu nhỏ cuộc gọi"
