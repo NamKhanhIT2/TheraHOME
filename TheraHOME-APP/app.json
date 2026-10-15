@@ -40,7 +40,6 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
         "android.permission.CAMERA",
         "android.permission.MANAGE_OWN_CALLS",
         "android.permission.FOREGROUND_SERVICE_PHONE_CALL",
