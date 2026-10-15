@@ -12,11 +12,21 @@ import { useAnswerCall, useEndCall, CALL_IS_OVER, RING_TIMEOUT_MS, type CallStat
 import { registerCallBackgroundTask } from '@/lib/callBackgroundTask';
 import { registerVoipPush } from '@/lib/voipPush';
 
-export function useCallKeepBridge(enabled: boolean) {
+/**
+ * @param enabled   A session exists and the account is not blocked. Deliberately
+ *                  NOT the full `inApp`: that waits on a profile fetch, and a
+ *                  phone woken by a VoIP push must be able to answer before any
+ *                  network round trip has finished.
+ * @param settledIn The user is actually inside the app — past onboarding, with
+ *                  a profile. Used ONLY to decide whether this is a reasonable
+ *                  moment to ask Android for the calling-account permission,
+ *                  which must not land on top of the intake questions.
+ */
+export function useCallKeepBridge(enabled: boolean, settledIn = true) {
   const answer = useAnswerCall();
   const end = useEndCall();
-  const actions = useRef({ enabled, answer: answer.mutateAsync, end: end.mutateAsync });
-  actions.current = { enabled, answer: answer.mutateAsync, end: end.mutateAsync };
+  const actions = useRef({ enabled, settledIn, answer: answer.mutateAsync, end: end.mutateAsync });
+  actions.current = { enabled, settledIn, answer: answer.mutateAsync, end: end.mutateAsync };
 
   useEffect(() => {
     if (!enabled || !isCallKeepSupported()) return;
@@ -70,7 +80,8 @@ export function useCallKeepBridge(enabled: boolean) {
           }
         }
       }
-      if (!cancelled && !getCallSession() && !getSystemRingingCalls().length && !answering.size) {
+      if (!cancelled && actions.current.settledIn && !getCallSession()
+        && !getSystemRingingCalls().length && !answering.size) {
         await promptForPhoneAccount();
       }
     })().catch((error: unknown) => {

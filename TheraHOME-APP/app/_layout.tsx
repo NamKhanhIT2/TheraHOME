@@ -153,7 +153,19 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // Android's system call screen — the only thing that rings a locked phone.
   // Armed for anyone signed in, since calls now go both ways. Sits below
   // `inApp`, which several auth checks above feed into.
-  useCallKeepBridge(inApp);
+  // Armed by the SESSION, not by `inApp`.
+  //
+  // `inApp` additionally waits for `profile`, which is a network fetch, so
+  // gating the bridge on it put a server round trip between a ringing phone
+  // and the code that turns answering into an `answer_call`. On the one
+  // launch that matters most — a VoIP push waking the app on a locked phone
+  // — that round trip has not finished when the call is answered, and the
+  // answer goes nowhere. The bridge needs none of it: its two RPCs need a
+  // session and nothing else.
+  //
+  // A blocked account still gets no bridge: it must not be able to take
+  // calls at all.
+  useCallKeepBridge(!!session && !blockedReason, inApp);
 
   // Also doubles as the "last active" heartbeat the win-back notification
   // job reads (profiles.last_login_at) — a persisted session means most
