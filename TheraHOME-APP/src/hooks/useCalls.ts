@@ -91,7 +91,31 @@ export function useCall(callId: string | undefined) {
       channel.on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'calls', filter: `id=eq.${callId}` },
-        () => queryClient.invalidateQueries({ queryKey: key }),
+        (payload) => {
+          // USE the row the event already carries. Throwing it away and
+          // refetching put a second server round trip in the critical path:
+          // the caller learned "accepted" from Realtime, then asked the
+          // server for a row it had just been handed, and only then went for
+          // a LiveKit token. Measured on a real call — answered at 15:25:15,
+          // the caller did not start connecting until 15:25:19.9 — which is
+          // most of the "Đang kết nối…" the owner was watching.
+          //
+          // An UPDATE payload carries the complete new row; only `old` is
+          // trimmed by the table's replica identity. Anything unexpected
+          // falls back to the refetch rather than guessing.
+          const row = (payload as { new?: unknown }).new as
+            Database['public']['Tables']['calls']['Row'] | undefined;
+          if (!row?.id || !row.status) {
+            void queryClient.invalidateQueries({ queryKey: key });
+            return;
+          }
+          const next = toCallRow(row);
+          // Same rule the fetcher applies: a late update must not reopen a
+          // call this device has already seen finish.
+          const cached = queryClient.getQueryData<CallRow>(key);
+          if (cached && CALL_IS_OVER.includes(cached.status) && !CALL_IS_OVER.includes(next.status)) return;
+          queryClient.setQueryData(key, next);
+        },
       ),
     onSync: () => queryClient.invalidateQueries({ queryKey: key }),
   });
