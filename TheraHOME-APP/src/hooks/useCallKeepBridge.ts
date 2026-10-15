@@ -1,5 +1,6 @@
 // Native and in-app actions use the same signaling mutations and media owner.
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
@@ -32,6 +33,40 @@ export function useCallKeepBridge(enabled: boolean, settledIn = true) {
     if (!enabled || !isCallKeepSupported()) return;
     let cancelled = false;
     const answering = new Set<string>();
+    const pendingNavigation = new Set<{ remove: () => void }>();
+
+    /**
+     * Opens the call screen, but never while the app is in the background.
+     *
+     * Answering on the lock screen gets here with the app not active and the
+     * screen still locked, and navigating a React tree that is not on screen
+     * left the app showing nothing at all once it was unlocked — a black
+     * screen that only killing the app cleared. Reported 2026-10-15, and
+     * absent from every call where the phone was never locked, which is what
+     * narrowed it to this.
+     *
+     * So the navigation waits for the app to actually come forward. Nothing
+     * is lost by waiting: until then there is no one looking at it, and
+     * CallKit is showing the call anyway.
+     */
+    function openCallScreen(callId: string) {
+      const go = () => {
+        if (cancelled || isCallDismissed(callId)) return;
+        router.navigate({ pathname: '/call/[callId]', params: { callId } });
+      };
+      if (AppState.currentState === 'active') {
+        go();
+        return;
+      }
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state !== 'active') return;
+        subscription.remove();
+        pendingNavigation.delete(subscription);
+        go();
+      });
+      pendingNavigation.add(subscription);
+    }
+
     const stopVoip = registerVoipPush();
     const handlers = {
       onAnswer: (callId: string) => {
@@ -40,7 +75,7 @@ export function useCallKeepBridge(enabled: boolean, settledIn = true) {
         void actions.current.answer(callId).then((call) => {
           if (cancelled || !actions.current.enabled || isCallDismissed(callId) || call.status !== 'accepted') return;
           bringAppToForeground();
-          router.navigate({ pathname: '/call/[callId]', params: { callId } });
+          openCallScreen(callId);
         }).catch((error: unknown) => {
           dismissCall(callId);
           if (__DEV__) console.warn('Native answer failed:', error);
@@ -93,6 +128,12 @@ export function useCallKeepBridge(enabled: boolean, settledIn = true) {
     })().catch((error: unknown) => {
       if (__DEV__) console.warn('CallKeep bridge setup failed:', error);
     });
-    return () => { cancelled = true; unsubscribe(); stopVoip(); };
+    return () => {
+      cancelled = true;
+      for (const subscription of pendingNavigation) subscription.remove();
+      pendingNavigation.clear();
+      unsubscribe();
+      stopVoip();
+    };
   }, [enabled]);
 }
