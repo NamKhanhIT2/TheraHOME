@@ -17,7 +17,7 @@
 // this file is imported for its side effect from app/_layout.tsx.
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import { displayIncomingCall, dismissCall, isAndroidCallKeep } from '@/lib/callkeep';
+import { displayIncomingCall, dismissCall, hasCallKeepAccount, isAndroidCallKeep } from '@/lib/callkeep';
 
 export const CALL_BACKGROUND_TASK = 'therahome-incoming-call';
 
@@ -79,11 +79,38 @@ TaskManager.defineTask(CALL_BACKGROUND_TASK, async ({ data, error }) => {
   // first, and it is deliberately NOT a database read: this context is
   // short-lived and unauthenticated, and a network round trip here is the
   // difference between ringing and not.
-  await displayIncomingCall(
-    call.callId,
-    call.callerName?.trim() || 'Khách hàng',
-    call.media === 'video',
-  );
+  const callerName = call.callerName?.trim() || 'Khách hàng';
+  const isVideo = call.media === 'video';
+  await displayIncomingCall(call.callId, callerName, isVideo);
+
+  // The call push carries no title or body any more, so that an incoming
+  // call shows ONE thing — the telecom call screen — the way Messenger and
+  // Zalo do, rather than a banner next to it.
+  //
+  // That leaves one hole worth covering. Android keeps the app's calling
+  // account DISABLED until the user switches it on in Settings, and while it
+  // is off `displayIncomingCall` is accepted and then silently draws
+  // nothing. Measured on the test handset 2026-10-14: the push arrived, the
+  // task ran, and the only thing that appeared was the banner. Take the
+  // banner away without this and that phone shows nothing at all for an
+  // incoming call, which is far worse than showing two things.
+  //
+  // So the notification becomes the FALLBACK rather than the default: posted
+  // only when the system has no call screen to give.
+  if (await hasCallKeepAccount()) return;
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi đến',
+        body: `${callerName} đang gọi — mở ứng dụng để trả lời`,
+        data: { type: 'call', callId: call.callId },
+        sound: 'ting.wav',
+      },
+      trigger: null,
+    });
+  } catch (error) {
+    if (__DEV__) console.warn('could not post the incoming-call fallback:', error);
+  }
 });
 
 /** Registers the task with the notification system. Idempotent; safe on every

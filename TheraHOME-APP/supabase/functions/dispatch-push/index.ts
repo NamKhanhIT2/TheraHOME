@@ -248,6 +248,11 @@ Deno.serve(async (request) => {
         callerName: call.callee_id ? 'TheraHOME CSKH' : callerDisplayName,
       };
 
+      // The copy below is NOT what the recipient sees any more — a call push
+      // is delivered silently (see the message build). It is kept because
+      // `compose` returning a value is what marks a recipient as wanted, and
+      // because the Android fallback notification, raised by the app when the
+      // telecom account is switched off, needs the same words.
       if (call.callee_id) {
         // CSKH is calling a customer back. Ringing every staff phone here —
         // which is what this branch did before two-way calling — would wake
@@ -309,12 +314,26 @@ Deno.serve(async (request) => {
       const message = compose(recipient);
       if (!message) continue;
       seen.add(row.expo_push_token);
+      // A CALL carries no title, body or sound.
+      //
+      // It used to carry all three, so an incoming call arrived as a banner
+      // AND a call screen — two notifications for one event, which is not
+      // what Messenger or Zalo do and not what a phone call looks like. The
+      // push still has to be SENT, because on Android it is the thing that
+      // wakes the headless task that raises the telecom screen; it just must
+      // not draw anything itself. `_contentAvailable` is what makes
+      // expo-notifications hand it to that task and show nothing, exactly as
+      // `dispatch-call-cancel` already does for the other direction.
+      //
+      // iOS does not need it to ring at all — PushKit does that — so there a
+      // silent push is pure redundancy rather than a second alert.
+      const isCall = input.mode === 'call';
       messages.push({
         to: row.expo_push_token,
-        title: message.title,
-        body: message.body,
+        ...(isCall
+          ? { _contentAvailable: true }
+          : { title: message.title, body: message.body, sound: 'ting.wav' }),
         data,
-        sound: 'ting.wav',
         // A call rings on its own Android channel, so staff can give it a
         // louder sound (and a DND override) without touching every other
         // TheraHOME notification. See ANDROID_CALL_CHANNEL_ID in
