@@ -7,7 +7,7 @@ import {
   getSystemRingingCalls, isCallDismissed, isCallKeepSupported,
   listenToCallKeep, promptForPhoneAccount, setupCallKeep, wasAnsweredHere,
 } from '@/lib/callkeep';
-import { getCallSession } from '@/lib/callSession';
+import { getCallSession, setSessionMicOn } from '@/lib/callSession';
 import { useAnswerCall, useEndCall, CALL_IS_OVER, RING_TIMEOUT_MS, type CallStatus } from '@/hooks/useCalls';
 import { registerCallBackgroundTask } from '@/lib/callBackgroundTask';
 import { registerVoipPush } from '@/lib/voipPush';
@@ -45,6 +45,12 @@ export function useCallKeepBridge(enabled: boolean, settledIn = true) {
           dismissCall(callId);
           if (__DEV__) console.warn('Native answer failed:', error);
         }).finally(() => { answering.delete(callId); });
+      },
+      onSetMuted: (callId: string, muted: boolean) => {
+        // Only for the call this device is actually in: a stale action for
+        // some other id must not reach into a live conversation.
+        if (!actions.current.enabled || getCallSession()?.callId !== callId) return;
+        setSessionMicOn(!muted);
       },
       onEnd: (callId: string) => {
         if (!actions.current.enabled) return;

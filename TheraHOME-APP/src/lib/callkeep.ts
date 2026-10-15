@@ -354,6 +354,18 @@ export function markCallActive(callId: CallKeepUUID): void {
   }
 }
 
+/** Mirrors an in-app mute onto the system call screen, so the two never
+ * disagree about whether the microphone is live. A no-op when the system
+ * does not know this call. */
+export function syncCallMuted(callId: CallKeepUUID, muted: boolean): void {
+  if (!isCallKeepSupported()) return;
+  try {
+    CALLKEEP.setMutedCall(callId.toLowerCase(), muted);
+  } catch {
+    // The system has no call to update.
+  }
+}
+
 /**
  * Whether this device answered that call.
  *
@@ -381,10 +393,15 @@ export function bringAppToForeground(): void {
 export interface CallKeepHandlers {
   onAnswer: (callId: CallKeepUUID) => void;
   onEnd: (callId: CallKeepUUID) => void;
+  /** iOS's own in-call screen has a Mute button, and on a call answered from
+   * the lock screen that screen is the one in front of the user. Without
+   * this the system showed a muted call while the room went on publishing —
+   * the far end heard everything. Reported 2026-10-15 on a video call. */
+  onSetMuted?: (callId: CallKeepUUID, muted: boolean) => void;
 }
 
 /** Subscribes to the two events that matter and returns an unsubscribe. */
-export function listenToCallKeep({ onAnswer, onEnd }: CallKeepHandlers): () => void {
+export function listenToCallKeep({ onAnswer, onEnd, onSetMuted }: CallKeepHandlers): () => void {
   if (!isCallKeepSupported()) return () => undefined;
   // Fired once the system has actually PUT A CALL SCREEN UP — including the
   // iOS case where native code did it from a VoIP push with no JS involved.
@@ -413,12 +430,19 @@ export function listenToCallKeep({ onAnswer, onEnd }: CallKeepHandlers): () => v
     if (isOurOwnEcho(callUUID)) return;
     onEnd(callUUID.toLowerCase());
   };
+  const muted = ({ callUUID, muted: isMuted }: { callUUID: string; muted: boolean }) => {
+    const id = callUUID.toLowerCase();
+    if (isCallDismissed(id)) return;
+    onSetMuted?.(id, !!isMuted);
+  };
   CALLKEEP.addEventListener('didDisplayIncomingCall', displayed);
   CALLKEEP.addEventListener('answerCall', answer);
   CALLKEEP.addEventListener('endCall', end);
+  CALLKEEP.addEventListener('didPerformSetMutedCallAction', muted);
   return () => {
     CALLKEEP.removeEventListener('didDisplayIncomingCall');
     CALLKEEP.removeEventListener('answerCall');
     CALLKEEP.removeEventListener('endCall');
+    CALLKEEP.removeEventListener('didPerformSetMutedCallAction');
   };
 }

@@ -203,7 +203,25 @@ async function control(
   }
 }
 export function toggleSessionMic(): void {
-  void control('micPending', async (open) => ({ micOn: await setCallMicrophone(open.room, !open.micOn) }),
+  setSessionMicOn(!session?.micOn);
+}
+
+/**
+ * Sets the microphone to a STATE rather than flipping it.
+ *
+ * iOS's own in-call screen has a Mute button, and on a call answered from
+ * the lock screen that screen is the one the user is looking at. Pressing it
+ * sends CallKit's own mute action, which has to arrive here as "off", not as
+ * "the opposite of whatever the app currently thinks" — the two can already
+ * disagree, which is the whole reason this exists.
+ *
+ * Reported 2026-10-15: muting a video call left the far end still hearing
+ * everything, because nothing in the app was listening for that action at
+ * all. CallKit showed a muted call while LiveKit went on publishing.
+ */
+export function setSessionMicOn(on: boolean): void {
+  if (!session || session.micOn === on) return;
+  void control('micPending', async (open) => ({ micOn: await setCallMicrophone(open.room, on) }),
     'Không thể đổi trạng thái micro. Vui lòng thử lại.');
 }
 export function toggleSessionCamera(): void {

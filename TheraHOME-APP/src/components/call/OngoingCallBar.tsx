@@ -20,7 +20,7 @@ import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
 import { closeCallSession, openCallSession, useCallSession, type CallSession } from '@/lib/callSession';
-import { dismissCall } from '@/lib/callkeep';
+import { dismissCall, syncCallMuted } from '@/lib/callkeep';
 import { setProximityBlanking } from '@/lib/callScreen';
 import { useRingtone } from '@/hooks/useRingtone';
 import { useCallVideoTracks } from '@/components/call/CallVideo';
@@ -146,6 +146,15 @@ function ActiveCall({ callId, userId, session, hidden }: {
     const timer = setInterval(() => { void terminate('ended', session.failureReason ?? 'hangup'); }, 5000);
     return () => clearInterval(timer);
   }, [ending, session.failureReason, terminate]);
+
+  // A mute pressed INSIDE the app has to show on the system call screen too,
+  // or the two disagree the moment the user looks at the one they did not
+  // press. The opposite direction — iOS's own Mute button — is handled in
+  // useCallKeepBridge, which is where system actions arrive.
+  useEffect(() => {
+    if (session.state !== 'live' && session.state !== 'reconnecting') return;
+    syncCallMuted(callId, !session.micOn);
+  }, [callId, session.micOn, session.state]);
 
   const tracks = useCallVideoTracks(session.room, session.state === 'live' || session.state === 'reconnecting');
   const atEar = session.state === 'live' && !session.speakerOn && !session.cameraOn && !tracks.remote;
