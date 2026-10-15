@@ -114,8 +114,20 @@ export function DayCoinCard({ userProgramId, programDayId, dayDone }: {
  * It used to live only on the Xu screen, which a customer may never open —
  * and the only notification the programme sends fires at the threshold, so a
  * waiting bonus could sit unseen for ever. Finishing the 7th day happens
- * here, so the banner belongs here. */
-export function StreakCoinBanner({ userProgramId }: { userProgramId: string | undefined }) {
+ * here, so the banner belongs here.
+ *
+ * ONE OFFER AT A TIME. The milestone is reached by finishing a day, so both
+ * this and the day's own xu become claimable in the same moment — two cards,
+ * stacked, both leading with "Nhận 10 xu", for what a customer reads as the
+ * same 10 xu offered twice. Reported as "giao diện đang khá rối".
+ *
+ * So the bonus waits for the day it was earned on to be collected. The order
+ * then matches the story: take today's xu, and the bonus appears as the extra
+ * it is. `programDayId` is only ever used to ask that question. */
+export function StreakCoinBanner({ userProgramId, programDayId }: {
+  userProgramId: string | undefined;
+  programDayId: string | undefined;
+}) {
   const theme = useTheme();
   const { t } = useI18n();
   const { overview } = useCoinOverview(userProgramId, !!userProgramId);
@@ -123,6 +135,8 @@ export function StreakCoinBanner({ userProgramId }: { userProgramId: string | un
   const milestone = overview.claimableStreaks[0];
 
   if (!userProgramId || !overview.active || !overview.eligible || milestone == null) return null;
+  // The day's own xu is still on the table: let that card speak alone.
+  if (programDayId && overview.claimableDays.some((d) => d.programDayId === programDayId)) return null;
 
   return (
     <Pressable

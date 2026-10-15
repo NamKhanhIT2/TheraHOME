@@ -419,7 +419,7 @@ export default function DayDetailScreen() {
           {!progressLocked ? (
             <DayCoinCard userProgramId={userProgramId} programDayId={programDayId} dayDone={d.status === 'done'} />
           ) : null}
-          {!progressLocked ? <StreakCoinBanner userProgramId={userProgramId} /> : null}
+          {!progressLocked ? <StreakCoinBanner userProgramId={userProgramId} programDayId={programDayId} /> : null}
           {!progressLocked ? (
             <FormReviewCard
               userId={userId}
