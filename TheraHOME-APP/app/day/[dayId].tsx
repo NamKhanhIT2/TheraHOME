@@ -350,10 +350,16 @@ export default function DayDetailScreen() {
           )}
         </View>
 
-        <View style={[styles.videoTip, { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight }]}> 
-          <Icon name="sparkles" size={17} color={theme.colors.primary} />
-          <Text style={[theme.type.caption, styles.videoTipText, { color: theme.colors.textSecondary }]}>{t('videoTip')}</Text>
-        </View>
+        {/* Advice about how to WATCH, so it goes away once the day has been
+            watched. Leaving it up put a tip telling you to press the button
+            directly above the button, on a screen that had already recorded
+            you pressing it. */}
+        {d.status !== 'done' ? (
+          <View style={[styles.videoTip, { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight }]}> 
+            <Icon name="sparkles" size={17} color={theme.colors.primary} />
+            <Text style={[theme.type.caption, styles.videoTipText, { color: theme.colors.textSecondary }]}>{t('videoTip')}</Text>
+          </View>
+        ) : null}
 
         <View style={{ gap: 12 }}>
           <Pressable
@@ -384,9 +390,13 @@ export default function DayDetailScreen() {
             </View>
           ) : null}
           {d.status === 'done' ? (
-            <View style={[styles.completedRow, { backgroundColor: theme.colors.successTint, borderRadius: theme.radius.md }]}> 
-              <Icon name="check" size={18} color={theme.colors.success} />
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.success }]}>{t('completed')}</Text>
+            // A receipt, not a card. As a full-width tinted band it carried
+            // the visual weight of the things below it that you can actually
+            // press, and sat directly above a second confirmation line about
+            // the xu — two announcements of one event.
+            <View style={styles.completedRow}>
+              <Icon name="check" size={16} color={theme.colors.success} />
+              <Text style={[theme.type.caption, { color: theme.colors.success }]}>{t('completed')}</Text>
             </View>
           ) : null}
           {/* Support-tools link is optional: when Admin leaves the day's
@@ -508,9 +518,9 @@ const styles = StyleSheet.create({
   completedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 15,
+    gap: 7,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
   completionHint: {
     borderWidth: 1,
