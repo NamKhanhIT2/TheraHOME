@@ -23,6 +23,9 @@ export interface MarketContent {
 
 export interface ProgramDay {
   id: number;
+  /** The `program_days` row's uuid. Present on everything loaded from the
+   * database; absent only on a day being created in the editor. */
+  rowId?: string;
   phase: string;
   status: "done" | "current" | "locked";
   video: MarketContent;

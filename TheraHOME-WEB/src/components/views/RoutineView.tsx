@@ -28,6 +28,8 @@ import { HeaderAccessory } from "@/components/shell/HeaderAccessory";
 import { Icon } from "@/components/ui/Icon";
 import { pushToast } from "@/components/ui/Toast";
 import { PhaseContentModal } from "@/components/views/PhaseContentModal";
+import { ExerciseReferenceEditor } from "@/components/views/ExerciseReferenceEditor";
+import { fetchExerciseReferences, type ExerciseReference } from "@/lib/db";
 import { translateDrafts } from "@/lib/translate";
 
 type DayModalState = "new" | number | null;
@@ -101,6 +103,18 @@ export function RoutineView() {
   const [dayModal, setDayModal] = useState<DayModalState>(null);
   const [phaseContentTarget, setPhaseContentTarget] = useState<ProgramPhase | null>(null);
   const [dayMarketTab, setDayMarketTab] = useState<MarketKey>("vn");
+  // The `program_days` row uuid behind the open modal. A reference clip
+  // hangs off the ROW, not off (product, day_number), so a renumber does
+  // not hand day 5's demonstration to whoever becomes day 5 next.
+  const [dayRowId, setDayRowId] = useState<string | null>(null);
+  // Which days carry a "tập cùng chuyên viên" demonstration. Loaded once for
+  // the whole table: without it the only way to find out was to open all 28
+  // day modals one at a time.
+  const [references, setReferences] = useState<Map<string, ExerciseReference>>(new Map());
+  function reloadReferences() {
+    fetchExerciseReferences().then(setReferences).catch(() => {});
+  }
+  useEffect(reloadReferences, []);
   const [phase, setPhase] = useState("");
   const [type, setType] = useState<"train" | "rest">("train");
   const [video, setVideo] = useState<MarketContent>(EMPTY_MARKET_CONTENT);
@@ -384,6 +398,7 @@ export function RoutineView() {
   function openNewDay() {
     if (!product) return;
     setDayModal("new");
+    setDayRowId(null);
     setDayMarketTab(viewMarket);
     setPhase(product.phases[0]?.name ?? "");
     setType("train");
@@ -392,6 +407,7 @@ export function RoutineView() {
   }
   function openEditDay(d: ProgramDay) {
     setDayModal(d.id);
+    setDayRowId(d.rowId ?? null);
     setDayMarketTab(viewMarket);
     setPhase(d.phase);
     setType(d.type);
@@ -654,6 +670,7 @@ export function RoutineView() {
               <th style={{ padding: "0 8px 10px" }}>Loại</th>
               <th style={{ padding: "0 8px 10px" }}>Video</th>
               <th style={{ padding: "0 8px 10px" }}>Nội dung thêm</th>
+              <th style={{ padding: "0 8px 10px" }}>Tập cùng CV</th>
               <th></th>
             </tr>
           </thead>
@@ -682,6 +699,20 @@ export function RoutineView() {
                   ) : (
                     <span style={{ color: "var(--text-muted)" }}>—</span>
                   )}
+                </td>
+                <td style={{ padding: "10px 8px" }}>
+                  {(() => {
+                    const reference = d.rowId ? references.get(d.rowId) : undefined;
+                    if (!reference) return <span style={{ color: "var(--text-muted)" }}>—</span>;
+                    if (!reference.published) {
+                      return <Badge color="#B9860B" bg="rgba(185,134,11,0.12)">Chưa phát hành</Badge>;
+                    }
+                    return (
+                      <Badge color="#1E9E5E" bg="rgba(30,158,94,0.12)">
+                        {reference.samples ? `${Math.round(reference.duration ?? 0)}s` : "Thiếu keypoint"}
+                      </Badge>
+                    );
+                  })()}
                 </td>
                 <td style={{ padding: "10px 8px", textAlign: "right" }}>
                   <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -894,6 +925,9 @@ export function RoutineView() {
               Xoá nội dung
             </GhostBtn>
           </div>
+          {/* Only on a day that already exists: a reference attaches to a
+              row, and a day being created does not have one yet. */}
+          {dayRowId ? <ExerciseReferenceEditor programDayId={dayRowId} onChange={reloadReferences} /> : null}
         </Modal>
       ) : null}
       {phaseContentTarget ? (

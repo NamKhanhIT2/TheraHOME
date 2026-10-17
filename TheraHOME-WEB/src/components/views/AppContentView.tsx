@@ -34,6 +34,15 @@ const FIELD_META: Record<string, { label: string; help: string; localized: boole
     localized: false,
     placeholder: "support@therahomeai.com",
   },
+  motion_tracking_enabled: {
+    label: 'Tính năng "Tập cùng chuyên viên" (gõ off để TẮT trên mọi máy)',
+    help:
+      "Màn hình bật camera chấm động tác theo thời gian thực. Để trống hoặc bất kỳ giá trị nào khác ngoài off là ĐANG BẬT. " +
+      "Gõ off rồi Lưu là tính năng biến mất khỏi mọi điện thoại trong khoảng 5 phút, không cần bản build mới — " +
+      "đây là van an toàn nếu có máy nào chấm sai. Tắt tính năng KHÔNG xoá bài mẫu đã đăng; bật lại là có ngay.",
+    localized: false,
+    placeholder: "on",
+  },
   upgrade_card_title: {
     label: 'Thẻ "Nâng cấp" trên Trang chủ — tiêu đề',
     help:

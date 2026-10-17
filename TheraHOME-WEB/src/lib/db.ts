@@ -170,6 +170,11 @@ export async function fetchRoutineProducts(): Promise<Product[]> {
       .map(
         (d): ProgramDay => ({
           id: d.day_number,
+          // The row's uuid as well as its number. Day CONTENT is addressed
+          // by (product, day_number), but anything attached to a day —
+          // the "tập cùng chuyên viên" reference, for one — is attached to
+          // the row, because a renumber must not move it.
+          rowId: d.id,
           phase: phaseNameById.get(d.phase_id) ?? "",
           status: "locked",
           video: { vn: d.video_url_vn ?? "", us: d.video_url_us ?? "", malay: d.video_url_malay ?? "" },
@@ -3478,4 +3483,83 @@ export async function fetchCoinSettings(): Promise<CoinSettings | null> {
     giftThreshold: Number(row.gift_threshold ?? 0),
     planCodes: (row.plan_codes as string[]) ?? [],
   };
+}
+
+// --------------------------------------------------------------------------
+// "Tập cùng chuyên viên": the short clip a customer copies, and the
+// specialist's own keypoints precomputed from it.
+//
+// The track is produced on a Mac by TheraHOME-APP/scripts/pose-track.py,
+// which also writes a QC video with the skeleton drawn on it. Nothing is
+// published until a human has watched that video: a track that is quietly
+// wrong for two seconds in the middle tells a customer their good form is
+// bad, which is worse than having no feature at all.
+//
+// The bucket is PRIVATE, and that is where the paid gate actually lives —
+// an account with no plan cannot sign a URL for the clip, whatever the app
+// does. See the migration a_day_can_carry_a_movement_to_copy.
+// --------------------------------------------------------------------------
+
+export type ExerciseReference = {
+  programDayId: string;
+  clipPath: string | null;
+  published: boolean;
+  /** Read out of the track for the editor to show; never edited by hand. */
+  view: string | null;
+  samples: number | null;
+  duration: number | null;
+  label: string | null;
+  updatedAt: string | null;
+};
+
+export async function fetchExerciseReferences(): Promise<Map<string, ExerciseReference>> {
+  const { data, error } = await supabase
+    .from("exercise_references")
+    .select("program_day_id, clip_path, published, track, updated_at");
+  if (error) throw error;
+  const out = new Map<string, ExerciseReference>();
+  for (const row of data ?? []) {
+    const track = (row.track ?? null) as { view?: string; samples?: unknown[]; duration?: number; label?: string } | null;
+    out.set(row.program_day_id, {
+      programDayId: row.program_day_id,
+      clipPath: row.clip_path ?? null,
+      published: !!row.published,
+      view: track?.view ?? null,
+      samples: Array.isArray(track?.samples) ? track!.samples.length : null,
+      duration: typeof track?.duration === "number" ? track.duration : null,
+      label: track?.label ?? null,
+      updatedAt: row.updated_at ?? null,
+    });
+  }
+  return out;
+}
+
+/** Uploads the clip and returns its path. One object per day, overwritten
+ * on re-upload, so an old clip never lingers in the bucket paying for
+ * itself. */
+export async function uploadExerciseClip(programDayId: string, file: File): Promise<string> {
+  const extension = file.name.toLowerCase().endsWith(".mov") ? "mov" : "mp4";
+  const path = `${programDayId}/clip.${extension}`;
+  const { error } = await supabase.storage
+    .from("exercise-reference")
+    .upload(path, file, { upsert: true, contentType: file.type || "video/mp4", cacheControl: "31536000" });
+  if (error) throw error;
+  return path;
+}
+
+export async function saveExerciseReference(
+  programDayId: string,
+  patch: { track?: unknown; clipPath?: string | null; published?: boolean }
+) {
+  const row: Record<string, unknown> = { program_day_id: programDayId, updated_at: new Date().toISOString() };
+  if (patch.track !== undefined) row.track = patch.track;
+  if (patch.clipPath !== undefined) row.clip_path = patch.clipPath;
+  if (patch.published !== undefined) row.published = patch.published;
+  const { error } = await supabase.from("exercise_references").upsert(row, { onConflict: "program_day_id" });
+  if (error) throw error;
+}
+
+export async function deleteExerciseReference(programDayId: string) {
+  const { error } = await supabase.from("exercise_references").delete().eq("program_day_id", programDayId);
+  if (error) throw error;
 }
