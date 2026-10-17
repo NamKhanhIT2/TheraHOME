@@ -31,8 +31,11 @@ import type { SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
  * Read from `active_plan_code()` rather than from the rows: expiry is
  * evaluated server-side, so a subscription that lapsed an hour ago stops
  * granting without any job having run and without the client doing date
- * arithmetic of its own. Review accounts get the top tier from the same
- * function. */
+ * arithmetic of its own.
+ *
+ * This is the PURCHASED plan and nothing else — it used to hand App Review
+ * the top tier, and that is what hid the paywall from the reviewer. Use
+ * `usePaidAccess` for "may they use this feature". */
 export function useActivePlanCode(userId: string | undefined) {
   return useQuery({
     queryKey: ['active_plan_code', userId],
@@ -40,6 +43,31 @@ export function useActivePlanCode(userId: string | undefined) {
       const { data, error } = await supabase.rpc('active_plan_code');
       if (error) throw error;
       return (data as string | null) ?? null;
+    },
+    enabled: !!userId,
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * May this account USE the paid features — which is NOT the same question
+ * as which plan it bought.
+ *
+ * App Review holds no subscription and must still reach every feature, so
+ * the server answers this one separately (`has_paid_access()` = a live
+ * purchase OR `account_type = 'review'`). Anything deciding whether to
+ * SHOW A PRICE asks `useActivePlanCode` instead, because a reviewer who is
+ * told they already own Premium Trọn Đời never sees the upgrade card and
+ * can never buy anything — which is precisely why Apple rejected build 45.
+ * See the 2026-10-17 migration.
+ */
+export function usePaidAccess(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['has_paid_access', userId],
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase.rpc('has_paid_access');
+      if (error) throw error;
+      return data === true;
     },
     enabled: !!userId,
     staleTime: 60_000,

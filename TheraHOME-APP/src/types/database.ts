@@ -920,6 +920,50 @@ export type Database = {
         }
         Relationships: []
       }
+      exercise_references: {
+        Row: {
+          clip_path: string | null
+          config: Json
+          created_at: string
+          id: string
+          program_day_id: string
+          published: boolean
+          track: Json | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          clip_path?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          program_day_id: string
+          published?: boolean
+          track?: Json | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          clip_path?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          program_day_id?: string
+          published?: boolean
+          track?: Json | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_references_program_day_id_fkey"
+            columns: ["program_day_id"]
+            isOneToOne: true
+            referencedRelation: "program_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       faq_items: {
         Row: {
           active: boolean
@@ -3033,6 +3077,7 @@ export type Database = {
         Returns: boolean
       }
       current_web_roles: { Args: never; Returns: string[] }
+      days_with_exercise_reference: { Args: never; Returns: string[] }
       delete_account: { Args: never; Returns: undefined }
       end_call: {
         Args: { p_call_id: string; p_reason?: string; p_status?: string }
@@ -3146,6 +3191,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      has_paid_access: { Args: never; Returns: boolean }
       log_call_to_thread: {
         Args: { p_call: Database["public"]["Tables"]["calls"]["Row"] }
         Returns: undefined

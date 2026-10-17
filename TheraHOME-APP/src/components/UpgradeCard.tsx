@@ -7,10 +7,19 @@
 // it cannot render as an empty box — the same fallback rule every other
 // app_config-backed string follows.
 //
-// It hides itself in the two cases where it would be wrong rather than
-// useful: when no tier is configured at all, and when the user already holds
-// one. Every tier is paid now (there is no free row on the paywall), so
-// holding ANY tier is reason enough to stop advertising.
+// It hides itself in ONE case only: when no tier is configured at all.
+//
+// It used to hide from anyone who already held a tier, which was tidy and
+// wrong twice over (owner, 2026-10-17). A subscriber on the middle tier was
+// shown no way to reach the one above it. And the paywall's only entrance
+// outside Hồ sơ disappeared for exactly the account App Review signs in
+// with — which is how build 45 came back rejected for in-app purchases that
+// "could not be found".
+//
+// So it always shows, and what it OFFERS depends on what they hold: the
+// next tier up, or — for someone already on the top one — their own plan,
+// as a way in rather than a sales pitch. It never sells anybody the thing
+// they are already paying for.
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -29,13 +38,20 @@ export function UpgradeCard({ userId }: { userId: string | undefined }) {
   const activePlanCode = useActivePlanCode(userId).data ?? null;
 
   if (plans.length === 0) return null;
-  // Already paying for something — this card would be selling them what they
-  // have. The ladder stays reachable from Hồ sơ either way.
-  if (activePlanCode) return null;
 
-  const feature = plans.find((plan) => plan.highlighted) ?? plans[0];
-  const title = get('upgrade_card_title') || feature.name;
-  const body = get('upgrade_card_body') || feature.tagline;
+  // Plans are ordered cheapest first (`sort_order`), so "the next one up" is
+  // simply the first that sorts after theirs.
+  const held = activePlanCode ? plans.findIndex((plan) => plan.code === activePlanCode) : -1;
+  const nextUp = held >= 0 ? plans[held + 1] : undefined;
+  const onTopTier = held >= 0 && !nextUp;
+
+  // Someone with no plan gets the admin's own copy — it is written to sell
+  // the highlighted tier. A subscriber gets the specific plan this card can
+  // actually move them to, because generic upgrade copy aimed at a paying
+  // customer reads as the app not knowing who they are.
+  const feature = held >= 0 ? (nextUp ?? plans[held]) : (plans.find((plan) => plan.highlighted) ?? plans[0]);
+  const title = held >= 0 ? feature.name : get('upgrade_card_title') || feature.name;
+  const body = held >= 0 ? feature.tagline : get('upgrade_card_body') || feature.tagline;
 
   return (
     <Pressable
@@ -68,7 +84,7 @@ export function UpgradeCard({ userId }: { userId: string | undefined }) {
       </View>
       <View style={[styles.cta, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.sm }]}>
         <Text style={[theme.type.captionSm, { color: theme.colors.textOnPrimary, fontFamily: theme.fontFamily.semiBold }]}>
-          {t('plansUpgrade')}
+          {onTopTier ? t('plansCurrentPlan') : t('plansUpgrade')}
         </Text>
         <Icon name="chevron-right" size={13} color={theme.colors.textOnPrimary} />
       </View>
