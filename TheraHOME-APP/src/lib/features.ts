@@ -62,3 +62,23 @@ export const IAP_ENABLED = Platform.OS === 'android' ? IAP_ENABLED_ANDROID : IAP
 // docs/manual-setup.md is done — all seven benefit lines are enforced — so
 // this no longer sells anything that does nothing.
 export const SUBSCRIPTIONS_ENABLED = true;
+
+/**
+ * "Tập cùng chuyên viên" — the live form check (app/train/[dayId].tsx).
+ *
+ * TWO SWITCHES, and they are not redundant:
+ *
+ * - THIS one is the build. False means the feature is not in this version
+ *   at all: no card, no route, nothing for App Review to see and nothing
+ *   for a customer to find. That is the honest way to ship a version whose
+ *   native pose module has not been tested yet — inert, not hidden.
+ * - `app_config.motion_tracking_enabled`, edited in WEB Admin → "Nội dung
+ *   ứng dụng", is the kill switch for a version where it IS shipped and
+ *   reviewed. It reaches every phone in about five minutes.
+ *
+ * The distinction matters for Guideline 2.3.1: a remote switch may turn a
+ * reviewed feature OFF, but using one to light up functionality App Review
+ * never saw is what that rule forbids. So a build either contains this
+ * feature and shows it, or does not contain it.
+ */
+export const MOTION_TRACKING_ENABLED = true;

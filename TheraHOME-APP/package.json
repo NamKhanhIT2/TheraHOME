@@ -74,7 +74,8 @@
     "lint": "expo lint",
     "build:ios:development": "EAS_NO_VCS=1 EAS_PROJECT_ROOT=\"$PWD\" npx eas-cli@latest build --platform ios --profile development --clear-cache",
     "postinstall": "patch-package",
-    "test:calls": "node --test tests/call-*.test.cjs"
+    "test:calls": "node --test tests/call-*.test.cjs",
+    "test:pose": "node --test tests/pose-*.test.cjs"
   },
   "private": true
 }

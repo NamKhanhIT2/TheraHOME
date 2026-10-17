@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { PainScaleModal } from '@/components/PainScaleModal';
 import { FormReviewCard } from '@/components/day/FormReviewCard';
+import { LiveFormCard } from '@/components/day/LiveFormCard';
 import { DayCoinCard, StreakCoinBanner } from '@/components/day/DayCoinCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
@@ -430,6 +431,19 @@ export default function DayDetailScreen() {
             <DayCoinCard userProgramId={userProgramId} programDayId={programDayId} dayDone={d.status === 'done'} />
           ) : null}
           {!progressLocked ? <StreakCoinBanner userProgramId={userProgramId} programDayId={programDayId} /> : null}
+          {/* The two ways to ask "tôi tập thế này đúng chưa", in the order
+              they answer: the live one first because it answers while you
+              are still on the mat, the specialist one under it because it
+              answers better. Both hide themselves when they have nothing
+              to offer. */}
+          {!progressLocked ? (
+            <LiveFormCard
+              userId={userId}
+              productId={productId}
+              dayNumber={d.id}
+              programDayId={programDayId}
+            />
+          ) : null}
           {!progressLocked ? (
             <FormReviewCard
               userId={userId}

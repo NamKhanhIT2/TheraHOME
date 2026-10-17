@@ -61,3 +61,12 @@ scripts/android-qa-credentials.csv
 # Gradle intermediates, .bin caches, merged resources) into a commit.
 modules/*/android/build/
 modules/*/ios/build/
+
+# Pose track generator downloads its (9 MB) MediaPipe model on first run.
+# The APP ships its own copy under modules/therahome-pose/android/.../assets;
+# this one is only for scripts/pose-track.py on a Mac.
+scripts/.models/
+
+# The browser harness is built from source on demand (scripts/pose-preview/
+# build.mjs) and carries a copy of a reference clip. Nothing in it is source.
+scripts/pose-preview/dist/

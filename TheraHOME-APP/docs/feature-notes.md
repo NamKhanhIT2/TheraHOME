@@ -5199,3 +5199,418 @@ would update the card silently. Staff discoverability is the conversation
 list's unread badge plus the clip's caption ("Nhờ chuyên viên xem giúp em
 bài tập Ngày N"); if clips start getting missed, a pending count belongs on
 the staff conversations header.
+
+## Tập cùng chuyên viên — live motion tracking (2026-10-16)
+
+The specialist on top, you underneath, and the part of you that is out of
+step turning red while you move. Asked for by the owner as "realtime motion
+tracking", with Sword Health's on-video skeleton as the visual reference.
+
+It sits beside the existing `FormReviewCard`, deliberately: one asks a human
+and answers in hours, the other answers while you are still on the mat.
+Gated on a paid plan from day one (owner, 2026-10-16), like chấm dáng tập.
+
+### The detector is ours, and it is two different detectors
+
+`modules/therahome-pose` (read its README before touching it) — Apple's
+**Vision** on iOS, **MediaPipe**'s pose landmarker on Android. Not
+`react-native-vision-camera`: nothing in that ecosystem publishes support
+for RN 0.86 / Expo SDK 57 (its v5 line states a 0.81 / Expo 54 floor), and
+this app has already lost a day to a third-party native library that linked
+fine and then failed at runtime under the New Architecture. iOS avoids
+MediaPipe specifically because its pod wants `use_frameworks!` and the
+Podfile already carries LiveKit WebRTC, CallKeep, VoIP PushKit and Google
+Sign-In.
+
+Two models disagree slightly about where a shoulder is. That is paid for by
+never comparing coordinates: both are reduced to the same fifteen canonical
+points, and **everything above compares joint ANGLES**. An angle is the same
+for a tall man two metres away and a small woman one metre away, which
+position comparison never is.
+
+Two things in that module are easy to get wrong and are commented at length
+where they live: the preview is mirrored while the analysed frames are not
+(both detectors label joints anatomically, so a mirrored person comes back
+with left and right swapped — the app would paint the wrong arm red), and
+frame coordinates are not view coordinates (the preview fills the view and
+crops the frame; `viewPoint` undoes that on both platforms, identically).
+
+### The specialist's movement is precomputed, not detected live
+
+`scripts/pose-track.py` turns a demo clip into a track on a Mac, with the
+slow accurate model, and writes a QC video with the skeleton burned in.
+Running a second detector on the reference video at playback time would
+double the cost on the cheapest phone we support AND make "correct"
+slightly different every time the clip played.
+
+**Clips have to cooperate, and the first two did not.** The owner's exercise
+clip (2026-10-16) contained two camera push-ins, at 5.1s and 10.9s; across
+one of those the torso grows 50% on screen and every angle after it is
+measured against a different camera. The first cut detector compared pixel
+histograms and missed it completely — a one-second push-in changes the
+picture too gradually. It now measures the SKELETON instead (shoulder
+midpoint jumping, torso length changing), which catches cuts, zooms and the
+detector losing the person with the same two numbers.
+
+The second surprise: that exercise is performed **lying down, filmed from
+the side**. The track therefore carries a `view` of `front` or `side`, and
+the comparison scores a different set of angles for each — a camera at the
+customer's side cannot see shoulders tilt, and scoring it would be measuring
+noise and calling it form. It also means the setup instruction differs: a
+side-on exercise needs the phone propped near the floor.
+
+### Not telling people they are wrong when they are not
+
+Three mechanisms, each of which existed because without it the skeleton
+flickers red at someone doing nothing wrong:
+
+- **A ±600ms window.** The customer is matched against the best-fitting
+  moment nearby, not the exact frame. Someone copying a video is always a
+  beat behind it; scoring them against the exact frame paints them red for
+  being human.
+- **EMA smoothing**, then **three consecutive bad frames** before a limb
+  goes red.
+- **Confidence.** A joint the camera cannot see is grey and takes no part in
+  any measurement. A limb is only as trustworthy as its worse end. "We
+  cannot see your arm" is never "your arm is wrong".
+
+`src/lib/poseCompare.ts` is pure arithmetic with no React and no runtime
+imports, so it is tested on its own: `npm run test:pose`
+(`tests/pose-compare.test.cjs`). Every test there is a thing that, if it
+broke, would show a customer a red limb they did not deserve.
+
+The wording lives apart from the maths in `src/lib/poseHints.ts`, under two
+rules: say what to DO rather than what is wrong with them (nothing uses the
+word "sai"), and only claim a direction where the angle has one — measures
+taken against the vertical wrap at ±180°, so "bigger" and "smaller" mean
+nothing a customer could act on.
+
+### Where the gate actually is
+
+The `exercise-reference` bucket is **private**, and the storage policy wants
+`active_plan_code() is not null`. Without a plan `createSignedUrl` is
+refused, so there is no clip, whatever the client does. `usePlanGate` is the
+polite version of the same no. Review accounts pass, because
+`active_plan_code()` already returns a plan for `account_type = 'review'`.
+
+Which days HAVE a demonstration is a separate, unguarded question
+(`days_with_exercise_reference()`): the card has to appear for people who
+have not paid — that is the point of it — while the track stays unreadable.
+
+### Privacy
+
+Nothing the camera sees leaves the phone: no upload, no frame kept, nothing
+written to Supabase but the numeric result of a session. The screen says so
+before it asks for the camera. `NSCameraUsageDescription` and the
+`expo-image-picker` camera string were rewritten to say it too (they only
+mentioned video calls), and §2.4 was added to the privacy policy in both
+`src/lib/legalContent.ts` and the WEB copy.
+
+### What the owner's own reference changed (same day)
+
+The owner sent Sword Health's product video for comparison, and two things
+in it were better than what had been built:
+
+- **The skeleton is white, not coloured.** White with a dark halo under it
+  reads on a white wall, a wooden floor and grey leggings alike, and it
+  leaves colour free to mean something — green, amber and red say how the
+  movement is going, and nothing else on the body is coloured at all. The
+  first version used gold for the neutral skeleton and spent the one thing
+  the feature needs to say on decoration.
+- **Only the bones the exercise is scored on are drawn** (`edgesFor` in
+  `poseCompare.ts`). A skeleton showing every bone it can find looks like a
+  debug overlay. It also quietly fixes two eyesores: shoulder-to-shoulder
+  and hip-to-hip collapse to a dot when the camera is at the customer's
+  side, and crossed legs on a seated front-on exercise tangle into a knot.
+
+`scripts/pose-track.py`'s QC render follows both, so what a track is
+approved on looks like what the customer will see — scored bones exactly as
+the app draws them, everything else faint, because a joint going wrong
+OUTSIDE the scored set is still a sign the track is bad.
+
+Also noted from that video and not built: Sword counts reps and holds
+on screen ("Hold 29") rather than showing a score. Worth considering once
+there is a real exercise with a defined rep.
+
+### Seeding content without the console
+
+`TheraHOME-WEB/scripts/publish-exercise-reference.mjs` does what the day
+editor does — upload clip, store track, publish — from the command line
+with the service-role key. The console is how the team should do it; the
+script is for seeding the first day, re-publishing a corrected track across
+several days, and the twenty repetitions an engineer does while tuning.
+
+**The demonstration can come out of the day's own YouTube video.** Day 1's
+video (`zDl7nDuLb6o`) is 33 minutes of a guided session, and the owner asked
+on 2026-10-17 for roughly a minute of it. Finding the right minute is the
+work, and it is mechanical:
+
+1. `yt-dlp` at 720p — ample for a detector that downsamples to 256×256, and
+   a tenth of the 4K original.
+2. `ffmpeg`'s scene filter over a 256px-wide copy: 99 cuts, leaving 15
+   uncut stretches of 25s or more.
+3. A contact sheet of the midpoint of each: most are a talking head or an
+   intro, two are the exercise itself.
+4. `pose-track.py` on the chosen window. Scene detection cannot see a slow
+   push-in, so this is still the check that matters.
+
+Day 1 now carries **five movements cut from five places in its own
+video**, 114 seconds in total with the specialist's voice:
+
+| | source | movement |
+|---|---|---|
+| 1 | 11:30–11:50 | nằm yên trên máy để làm quen |
+| 2 | 18:50–19:14 | trượt nhịp nhàng trên máy |
+| 3 | 19:38–19:58 | kết hợp cùng chân và hông |
+| 4 | 21:40–22:00 | nâng chân |
+| 5 | 23:12–23:42 | chống tay kết hợp trượt cổ |
+
+1710 samples, body found in 1710/1710, no camera movement flagged in any
+of the five. The clip is 6.4 MB with audio; the track is 788 KB of JSON,
+198 kB stored and 136 KB over the wire.
+
+(It started as one 60-second range — 18:46–19:46 — which was a mistake
+worth recording: a session video demonstrates one movement after another,
+and taking a single minute of it shows the customer one movement looping.)
+
+The earlier choice (the standalone warm-up clip, front view, 7.8s) was
+replaced by it. It was only ever a stand-in: the owner's three standalone
+clips are all edited with camera push-ins — clip 1 at 5.1s and 10.9s, clip
+2 at 2.9s and 6.1s — so each yields four to seven seconds of usable
+single-shot material, where the day's own video yields a continuous minute.
+
+**`MAX_SECONDS` went from 25 to 90** at the same time. Twenty-five assumed
+a demonstration is a short loop; a minute of real guided movement is a
+session to follow, which is better. The ceiling still exists because the
+track travels with the row.
+
+### Sound, and more than one movement (2026-10-17)
+
+Two changes the owner asked for after seeing the first minute-long
+reference, both of which came from the same misreading on my part — that a
+demonstration is a short silent loop of ONE movement.
+
+**Sound is on.** `instance.muted` is false in `app/train/[dayId].tsx`. Day
+1's reference is the specialist talking the customer through the movements;
+muting it threw away half of what she teaches. iOS still honours the silent
+switch, which is the right way round — the screen has to work without
+sound, never only with it.
+
+**`pose-track.py --segments` joins several ranges into one reference.** A
+session video demonstrates one movement after another, so a reference built
+from a single range shows one movement looping. `--segments
+690-710,1130-1154,…` processes each range in turn, offsets its sample times
+onto one continuous output timeline, and — the point of doing it this way
+rather than cutting the video first and analysing the result — checks each
+range for camera movement ON ITS OWN, so the deliberate joins between them
+are not reported as cuts.
+
+Two details that are easy to get wrong and are commented where they live:
+each range gets a landmarker of its own (VIDEO mode tracks a body between
+frames, and that state must not cross a join), and `--clip-out` cuts the
+video with ffmpeg rather than OpenCV because the clip now carries audio.
+
+### Fourteen videos, twenty-eight days (2026-10-17)
+
+The roadmap's 28 days are built from **14 videos** — days 15-28 repeat days
+1-14 — so a demonstration is published to two day rows at once and the clip
+is uploaded once, under the first day's id (`--day a,b` in
+`publish-exercise-reference.mjs`).
+
+**`scripts/pick-segments.py` proposes the ranges.** Assembling day 1 by
+hand — scene-detect, contact sheet, look — works and does not scale to
+fourteen 30-minute videos, and most of what the eye does there is
+mechanical. It samples each candidate window a couple of frames a second
+with the LITE model and measures four things: how often the whole body is
+visible (kills close-ups, which crop the legs and make the detector invent
+them), whether the camera holds still, how much the joint angles move, and
+the posture. It proposes; a human still looks at the frames before anything
+is built, because which movements a customer is taught is a judgement.
+
+Three things it got wrong first, each worth keeping:
+
+- **It chose the specialist sitting and talking.** Two of its first five
+  picks had a torso 1-2° off vertical. Every TheraNECK exercise is done
+  lying down — the device goes under the neck — so `--min-tilt` now
+  requires the torso to be 55° or more off upright. For a programme with
+  seated exercises that flag goes to 0, and the operator checks what comes
+  back.
+- **It measured whole uncut stretches.** Day 1 has an 87-second stretch
+  holding three different movements; its average is a posture that occurs
+  in none of them and its middle straddles two. It now slides a window of
+  the length it intends to take, so every candidate is measured as the
+  piece it would become.
+- **It threw away a leg raise as a duplicate of a flat slide.** Both are
+  "lying, legs straight, moving a lot". What separates them is the hip —
+  about 90° with a leg in the air, about 170° with it on the floor — which
+  is now part of the distinctness test.
+
+(It also had to move from VIDEO to IMAGE mode: windows overlap, so the
+timestamps a VIDEO landmarker demands would have to run backwards.)
+
+**Size, for 28 days of this.** Three changes took day 1 from 788 KB of
+track and a 6.4 MB clip to **596 KB and 3.8 MB**: points below
+`POSE_HIDDEN` are dropped (the app neither draws nor measures them, so
+storing them was paying to send what nothing reads), coordinates are
+rounded to three decimals (a thousandth of the frame — about a pixel and a
+half, well under the detector's own wobble), and the clip is encoded at 960
+wide rather than 720p, since the pane is a few hundred points across on a
+phone.
+
+**All 28 days carry a reference as of 2026-10-17.** 14 videos, 5-6 movements
+each, 102-114 seconds, and the body was found in **every sampled frame of
+every one** — 22,000-odd samples with no gaps and no camera movement
+flagged. 2.4 MB of tracks in Postgres and 54 MB of clips in the bucket for
+the whole roadmap.
+
+Two things worth knowing for the next product:
+
+- **The later days are quadruped, not supine.** From roughly day 8 the
+  programme moves to bird-dog — hands and knees, opposite arm and leg
+  extended. `--min-tilt 55` admits it (the torso sits around 73°) while
+  still rejecting the specialist sitting and talking, which is the balance
+  that flag is for.
+- **Day 13's video would only download at 480p**, where the others gave
+  720p. The clip encoder now uses `scale='min(960,iw)'` so a smaller source
+  is never upscaled — spending bytes inventing pixels is worse than a
+  slightly softer clip.
+
+### Trying it without a build
+
+`scripts/pose-preview/` serves the REAL comparison engine — `poseCompare.ts`
+transpiled, not reimplemented — against a webcam in a browser, with a real
+reference track. Two commands and no device:
+
+```
+node scripts/pose-preview/build.mjs --track <track.json> --clip <clip.mp4>
+python3 -m http.server 8777 --directory scripts/pose-preview/dist
+```
+
+It exists because the thing that needs trying over and over is whether the
+THRESHOLDS feel right — whether a limb goes red when a person would say it
+is wrong — and a native rebuild per attempt is far too slow for that. It
+says nothing about the native detectors or about performance on a phone.
+
+It earned its keep immediately. Run against the day-1 track with one arm
+deliberately out of place, the score came back **88** while the arm was
+painted red: one angle out of eight moves the mean by an eighth. A screen
+showing a red limb and a reassuring number teaches people to ignore the
+colour. The score now blends the mean with the WORST angle (`worstWeight`,
+0.25), which puts that same body at 66 — and `tests/pose-compare.test.cjs`
+gained a case so it cannot drift back.
+
+### Still open
+
+- **Head rotation (yaw) is the weak point.** No body-pose model has a face,
+  so `headTurn` is a guess from how the nose sits between the ears. Its
+  thresholds are deliberately loose; a neck-rotation exercise should be
+  scored on something else until face landmarks exist.
+- **Drawing is plain SVG at ~12fps.** If a Galaxy A12 hitches, the escape
+  hatch is to draw the skeleton natively inside the same view.
+- **No build has run yet** (owner: build only when told), so the fps figures
+  the design assumes — ≥10 on an A12, ≥20 on an iPhone — are targets, not
+  measurements. `app/dev-pose.tsx` (`therahome://dev-pose`, dev or review
+  accounts) exists to take them.
+
+
+## App Review could not find the in-app purchases (2026-10-17)
+
+Apple rejected build 45 under **Guideline 2.1(b)**: "In-app purchase
+products associated with the app version submitted for review, such as
+Premium Plus, Premium, and Premium Lifetime, could not be found in the
+submitted binary."
+
+**They could not be found because we hid them.** `active_plan_code()` had
+returned the top tier for `account_type = 'review'` since the tiers
+shipped — one honest reading of the owner's rule that a review account
+bypasses every gate. But a review account that already HOLDS Premium Trọn
+Đời is a review account that sees no upgrade card on Home (`UpgradeCard`
+hides itself from anyone who already pays, and that card is the only
+entrance to the paywall outside Hồ sơ) and finds the top plan marked "đang
+dùng" with its buy button disabled. The reviewer looked for a purchase and
+there wasn't one.
+
+The fix separates two questions that were never the same thing:
+
+| question | answer | who asks |
+|---|---|---|
+| which plan did they BUY | `active_plan_code()` | anything that shows a price |
+| may they USE paid features | `has_paid_access()` (new) | every feature gate |
+
+`has_paid_access()` is "a live purchase OR `account_type = 'review'`". The
+owner's rule is unchanged in substance — App Review still reaches every
+feature without buying — but it is no longer told it owns a subscription it
+never bought, which was both the cause of the rejection and, read plainly,
+untrue.
+
+Only three callers needed moving: `suggested_reminder_hour()` and the two
+`exercise-reference` read policies on the server, and `LiveFormCard` in the
+app (`usePaidAccess`). Everything else that gated a FEATURE already tested
+`account_type = 'review'` explicitly — the call, chat, form-review and xu
+allowances all have their own review branch — and everything else that
+reads `active_plan_code()` is store UI, which is exactly what should now
+see the truth.
+
+**The other half is not in this repo.** "Could not be found in the
+submitted binary" is also what Apple says when the IAP products themselves
+are not attached to the version, or are sitting in Rejected / Developer
+Action Needed / Ready to Submit. The app only ever shows a buy button for a
+product StoreKit actually returned (`canBuy` in `useSubscription.ts` needs
+the store to have returned the product), so an unattached product is a
+button that reads "Sắp mở" forever. That has to be checked in App Store
+Connect → Monetization, and the products resubmitted alongside the next
+binary.
+
+
+## The first device build: three bugs, none of them native (2026-10-17)
+
+Both halves of `modules/therahome-pose` compiled first time — Swift clean,
+`:therahome-pose:compileDebugKotlin` BUILD SUCCESSFUL — which was better
+than expected for 600 lines of native code no compiler had ever seen. The
+bugs were elsewhere.
+
+**1. The app was killed the instant the camera produced a frame.** It
+looked exactly like a native camera crash. It was this:
+
+```
+Unhandled JS Exception: TypeError: Cannot read property 'filter' of undefined
+    at DevPoseScreen
+```
+
+A view made with `requireNativeView` delivers events the React Native way —
+`{ nativeEvent: payload }` — and every Expo package unwraps that before
+handing the payload on (`expo-image`'s `onLoad` is the reference). This code
+read the event as if it were already the payload, so `points` was
+`undefined`, the screen called `.filter` on it, and the unhandled error
+took the app down.
+
+The unwrapping now happens once, in `components/pose/PoseCamera.tsx`, which
+accepts BOTH shapes and drops any event without a `points` array. Being
+wrong about which shape arrives costs a device build to discover, and a
+camera screen in a health app should not be killable by a malformed event.
+
+**The lesson is about diagnosis, not about the bug.** Four plausible native
+causes were ruled in and out by reading code and none was right. What
+settled it in one line was
+`xcrun devicectl device process launch --console --device <udid> <bundle>`,
+which attaches to the app on the device and prints the JS exception with
+its component stack. Reach for that before theorising.
+
+**2. Connection properties were read mid-configuration.** `configure()` set
+`videoOrientation` and `isVideoMirrored` between `beginConfiguration()` and
+`commitConfiguration()`, where a connection is still half-built. Nobody saw
+the effect because the app died first; it would have been a skeleton lying
+at ninety degrees to the body. The commit now happens before the
+connections are touched.
+
+**3. `expo run:ios` does not run prebuild when `ios/` already exists**, so
+the rewritten `NSCameraUsageDescription` — the one that tells App Review
+the camera is used for form checking, not just video calls — never reached
+the installed binary. `npx expo prebuild --platform ios` fixed it, and in
+doing so reset `CURRENT_PROJECT_VERSION` to 1. `CFBundleVersion` (the number
+Apple actually reads) comes from app.json and stayed at 45, but `ios/` is
+generated and gitignored, so the pbxproj value will reset again on the next
+prebuild. A config plugin would make that permanent.
+
+**Still unmeasured:** frames per second on a real device, and whether the
+skeleton lands on the body. Those need the screen to run, which it now can.

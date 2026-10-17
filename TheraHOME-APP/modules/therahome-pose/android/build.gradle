@@ -1,0 +1,37 @@
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'ai.therahome.pose'
+version = '1.0.0'
+
+android {
+  namespace "ai.therahome.pose"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // CameraX rather than Camera2 by hand: lifecycle binding, back-pressure
+  // and the rotation/mirroring rules for the preview are the parts that are
+  // tedious to get right on a thousand handsets, and they are exactly what
+  // CameraX is.
+  def camerax = "1.6.2"
+  implementation "androidx.camera:camera-core:$camerax"
+  implementation "androidx.camera:camera-camera2:$camerax"
+  implementation "androidx.camera:camera-lifecycle:$camerax"
+  implementation "androidx.camera:camera-view:$camerax"
+
+  // MediaPipe's pose landmarker. Pinned to the last of the 0.10 line, which
+  // is what every published Pose Landmarker sample and doc is written
+  // against; 1.1.x additionally drags in `litertlm-android` (an LLM
+  // runtime) that this module has no use for.
+  //
+  // iOS does NOT use this — it uses Apple's Vision, which costs zero bytes.
+  // See ios/TheraHomePose.podspec for why the two platforms differ.
+  implementation "com.google.mediapipe:tasks-vision:0.10.35"
+}

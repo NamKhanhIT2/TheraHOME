@@ -71,6 +71,38 @@ export const painScaleColors = {
   high: '#FF9F0A',
 } as const;
 
+// The skeleton drawn over a camera frame or a reference clip.
+//
+// Its own palette, not the UI tokens, because it is not UI: it sits on top
+// of live video of a room whose colours nobody controls, in light mode and
+// dark alike, and it has to stay legible over a white wall, a wooden floor
+// and grey leggings.
+//
+// White, with the dark halo below — checked against the product video the
+// owner sent (2026-10-16). White reads on every background once it is
+// haloed, and it leaves colour to mean something: green, amber and red say
+// how the movement is going, and nothing else on the body is coloured at
+// all. An earlier version used gold for the neutral skeleton and spent the
+// one thing the feature needs to say on decoration.
+//
+// `reference` is the neutral "this is your body" colour — the only one the
+// specialist's frame ever uses, because the specialist is never wrong.
+// ok/warn/bad only ever colour the CUSTOMER's skeleton, limb by limb.
+export const poseColors = {
+  reference: '#FFFFFF',
+  ok: '#34C759',
+  warn: '#FF9F43',
+  bad: '#FF4D4F',
+  /** A joint the detector guessed rather than saw — off the edge of the
+   * frame, or hidden behind the body. Never coloured as if it were a
+   * measurement, and never red: "we cannot see your arm" is not "your arm
+   * is wrong". */
+  weak: '#9AA4B2',
+  /** Drawn under every bone and joint, wider, so a white skeleton survives
+   * a white wall and a green one survives a green mat. */
+  halo: 'rgba(0, 0, 0, 0.38)',
+} as const;
+
 export function painColor(value: number): string {
   if (value <= 3) return painScaleColors.low;
   if (value <= 7) return painScaleColors.mid;

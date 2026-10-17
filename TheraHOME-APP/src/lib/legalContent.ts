@@ -98,6 +98,8 @@ TheraHOME là ứng dụng thể dục và chăm sóc sức khoẻ (fitness & we
 \t• Dữ liệu thiết bị và nhật ký kỹ thuật: loại thiết bị, hệ điều hành, phiên bản ứng dụng, mã định danh thiết bị, nhật ký lỗi phục vụ khắc phục sự cố.
 2.3 Dữ liệu từ bên thứ ba
 Nếu bạn đăng nhập bằng tài khoản Apple/Google, chúng tôi nhận một số thông tin cơ bản (tên, email) theo phạm vi bạn cho phép tại thời điểm đăng nhập.
+2.4 Camera khi dùng tính năng "Tập cùng chuyên viên"
+Khi bạn bật tính năng chấm động tác trực tiếp, Ứng dụng dùng camera trước của thiết bị để nhận diện vị trí các khớp trên cơ thể (vai, khuỷu tay, cổ tay, hông, gối, cổ chân) và so sánh với bài mẫu của chuyên viên. Toàn bộ việc này diễn ra ngay trên thiết bị của bạn: chúng tôi KHÔNG tải lên, KHÔNG lưu trữ và KHÔNG chia sẻ hình ảnh hoặc video từ camera, kể cả với đội ngũ hỗ trợ. Thứ duy nhất được lưu là kết quả dạng số của buổi tập (ví dụ tỷ lệ phần trăm thời gian đúng động tác). Camera được tắt ngay khi bạn rời màn hình tập, và bạn có thể từ chối quyền camera mà vẫn dùng được mọi phần khác của Ứng dụng.
 3. Mục đích sử dụng dữ liệu
 \t• Tạo và quản lý tài khoản, xác thực đăng nhập.
 \t• Xây dựng và cá nhân hoá lộ trình tập luyện, biểu đồ theo dõi mức độ khó chịu và tiến độ.

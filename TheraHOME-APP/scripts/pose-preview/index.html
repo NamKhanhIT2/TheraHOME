@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tập cùng chuyên viên — bản chạy thử</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --ok: #34c759;
+    --warn: #ff9f43;
+    --bad: #ff4d4f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  main { width: 100%; max-width: 440px; padding: 16px; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .note { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+  .pane { position: relative; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+  .pane video { display: block; width: 100%; }
+  .pane canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .tag {
+    position: absolute; left: 8px; top: 8px; z-index: 2;
+    background: rgba(0,0,0,.55); padding: 2px 8px; border-radius: 999px; font-size: 11.5px;
+  }
+  /* The preview is mirrored and the frames handed to the detector are not —
+     exactly as the native view does it, and for the same reason: the
+     detector labels joints anatomically and a mirrored person comes back
+     with left and right swapped. */
+  #camera { transform: scaleX(-1); }
+  .readout { display: flex; align-items: baseline; gap: 10px; min-height: 30px; }
+  #score { font-size: 26px; font-weight: 700; }
+  #hint { color: var(--muted); font-size: 13px; }
+  button {
+    width: 100%; padding: 13px; margin-top: 10px; border: 0; border-radius: 10px;
+    background: #1f6feb; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { color: var(--muted); font-size: 12.5px; margin-top: 8px; min-height: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tập cùng chuyên viên — bản chạy thử trên máy tính</h1>
+  <p class="note">
+    Dùng đúng bộ so sánh của app, nhưng nhận diện bằng MediaPipe trong trình duyệt.
+    Dùng để thử xem báo đỏ/xanh có hợp lý không — <b>không</b> đo được tốc độ trên điện thoại.
+  </p>
+
+  <div class="pane">
+    <span class="tag">Chuyên viên</span>
+    <video id="reference" src="clip.mp4" loop muted playsinline></video>
+    <canvas id="referenceCanvas"></canvas>
+  </div>
+
+  <div class="pane">
+    <span class="tag">Bạn</span>
+    <video id="camera" autoplay muted playsinline></video>
+    <canvas id="cameraCanvas"></canvas>
+  </div>
+
+  <div class="readout">
+    <span id="score">—</span>
+    <span id="hint"></span>
+  </div>
+
+  <button id="start">Bật camera và bắt đầu</button>
+  <div id="status"></div>
+</main>
+
+<script type="module">
+import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/+esm';
+import { sampleAt } from './poseTrack.js';
+import { createComparator, edgesFor } from './poseCompare.js';
+
+// Mirrors modules/therahome-pose/.../Canonical.kt. The harness and the app
+// must agree about which landmark is which, or they are not testing the
+// same thing.
+const CANONICAL = {
+  0: 'nose', 7: 'earL', 8: 'earR',
+  11: 'shoulderL', 12: 'shoulderR',
+  13: 'elbowL', 14: 'elbowR',
+  15: 'wristL', 16: 'wristR',
+  23: 'hipL', 24: 'hipR',
+  25: 'kneeL', 26: 'kneeR',
+  27: 'ankleL', 28: 'ankleR',
+};
+
+const EDGES = [
+  ['earL', 'shoulderL'], ['earR', 'shoulderR'], ['shoulderL', 'shoulderR'],
+  ['shoulderL', 'elbowL'], ['elbowL', 'wristL'],
+  ['shoulderR', 'elbowR'], ['elbowR', 'wristR'],
+  ['shoulderL', 'hipL'], ['shoulderR', 'hipR'], ['hipL', 'hipR'],
+  ['hipL', 'kneeL'], ['kneeL', 'ankleL'],
+  ['hipR', 'kneeR'], ['kneeR', 'ankleR'],
+];
+
+// Kept in step with src/theme/colors.ts and src/lib/pose.ts by hand. A
+// third copy of the drawing rules is the price of a harness that runs
+// without React Native; if these drift, this file is the one that is wrong.
+const COLOURS = { reference: '#ffffff', ok: '#34c759', warn: '#ff9f43', bad: '#ff4d4f', weak: '#9aa4b2' };
+const HALO = 'rgba(0,0,0,0.38)';
+const CONFIDENT = 0.5;
+const HIDDEN = 0.3;
+const DOT_RATIO = 0.0065;
+const LINE_RATIO = 0.0026;
+
+const VIETNAMESE = {
+  poseHintElbowBend: 'Gập khuỷu tay {side} lại một chút',
+  poseHintElbowStraighten: 'Duỗi thẳng tay {side} hơn',
+  poseHintArmLower: 'Hạ tay {side} xuống gần người hơn',
+  poseHintArmRaise: 'Nâng tay {side} ra xa người hơn',
+  poseHintKneeBend: 'Co gối {side} lại một chút',
+  poseHintKneeStraighten: 'Duỗi chân {side} thẳng hơn',
+  poseHintHipFlex: 'Kéo gối {side} về phía ngực hơn',
+  poseHintHipExtend: 'Hạ chân {side} xuống thấp hơn',
+  poseHintChinTuck: 'Thu cằm về phía ngực một chút',
+  poseHintHeadBack: 'Ngửa đầu ra sau thêm một chút',
+  poseHintHeadTilt: 'Nhìn lại độ nghiêng đầu của chuyên viên',
+  poseHintHeadTurn: 'Nhìn lại hướng quay đầu của chuyên viên',
+  poseHintShoulders: 'Giữ hai vai ngang như chuyên viên',
+  poseHintTorso: 'Giữ thân người thẳng như chuyên viên',
+};
+
+const DIRECTED = {
+  elbowL: ['poseHintElbowBend', 'poseHintElbowStraighten', 'trái'],
+  elbowR: ['poseHintElbowBend', 'poseHintElbowStraighten', 'phải'],
+  shoulderL: ['poseHintArmLower', 'poseHintArmRaise', 'trái'],
+  shoulderR: ['poseHintArmLower', 'poseHintArmRaise', 'phải'],
+  kneeL: ['poseHintKneeBend', 'poseHintKneeStraighten', 'trái'],
+  kneeR: ['poseHintKneeBend', 'poseHintKneeStraighten', 'phải'],
+  hipL: ['poseHintHipFlex', 'poseHintHipExtend', 'trái'],
+  hipR: ['poseHintHipFlex', 'poseHintHipExtend', 'phải'],
+  neckAngle: ['poseHintChinTuck', 'poseHintHeadBack', null],
+};
+const NEUTRAL = {
+  headTilt: 'poseHintHeadTilt', headTurn: 'poseHintHeadTurn',
+  shoulderTilt: 'poseHintShoulders', torso: 'poseHintTorso',
+};
+
+function hintText(result) {
+  if (!result) return '';
+  const directed = DIRECTED[result.id];
+  if (directed && result.direction !== 0) {
+    const key = result.direction > 0 ? directed[0] : directed[1];
+    return VIETNAMESE[key].replace('{side}', directed[2] ?? '');
+  }
+  const neutral = NEUTRAL[result.id];
+  return neutral ? VIETNAMESE[neutral] : '';
+}
+
+const status = document.getElementById('status');
+const scoreEl = document.getElementById('score');
+const hintEl = document.getElementById('hint');
+const startBtn = document.getElementById('start');
+const referenceVideo = document.getElementById('reference');
+const cameraVideo = document.getElementById('camera');
+
+const track = await fetch('track.json').then((r) => r.json());
+const config = { view: track.view };
+const drawnEdges = edgesFor(config);
+const comparator = createComparator(track, config);
+status.textContent = `Bài mẫu: ${track.samples.length} mẫu · ${track.duration}s · góc quay ${track.view === 'side' ? 'nghiêng' : 'chính diện'}`;
+
+function draw(canvas, video, points, levels, level) {
+  // The canvas is sized to the element, and the video is drawn with
+  // object-fit: fill here (both panes keep the source aspect), so the
+  // normalized coordinates map straight across.
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, width, height);
+  if (!points.length) return;
+
+  const at = new Map(points.map((p) => [p.k, p]));
+  const dot = Math.max(3, width * DOT_RATIO);
+  const line = Math.max(1.5, width * LINE_RATIO);
+
+  const bones = EDGES.filter(([a, b]) => {
+    if (!drawnEdges.has(`${a}-${b}`)) return false;
+    const from = at.get(a);
+    const to = at.get(b);
+    return from && to && from.c >= HIDDEN && to.c >= HIDDEN;
+  });
+  const joints = new Set(bones.flat());
+
+  context.lineCap = 'round';
+  for (const pass of ['halo', 'ink']) {
+    for (const [a, b] of bones) {
+      const from = at.get(a);
+      const to = at.get(b);
+      const guessed = from.c < CONFIDENT || to.c < CONFIDENT;
+      context.strokeStyle = pass === 'halo' ? HALO : (guessed ? COLOURS.weak : COLOURS[levels?.[`${a}-${b}`] ?? level]);
+      context.lineWidth = pass === 'halo' ? line * 2.6 : line;
+      context.beginPath();
+      context.moveTo(from.x * width, from.y * height);
+      context.lineTo(to.x * width, to.y * height);
+      context.stroke();
+    }
+    for (const key of joints) {
+      const point = at.get(key);
+      const guessed = point.c < CONFIDENT;
+      context.fillStyle = pass === 'halo' ? HALO : (guessed ? COLOURS.weak : COLOURS[level]);
+      context.beginPath();
+      context.arc(point.x * width, point.y * height, pass === 'halo' ? dot * 1.5 : dot, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+}
+
+function referencePoints(timeMs) {
+  const sample = sampleAt(track, timeMs);
+  if (!sample) return [];
+  return Object.entries(sample.p).map(([k, value]) => ({ k, x: value[0], y: value[1], c: value[2] }));
+}
+
+startBtn.addEventListener('click', async () => {
+  startBtn.disabled = true;
+  startBtn.textContent = 'Đang tải mô hình…';
+  try {
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm',
+    );
+    const landmarker = await PoseLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath:
+          'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
+        delegate: 'GPU',
+      },
+      runningMode: 'VIDEO',
+      numPoses: 1,
+    });
+
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+    cameraVideo.srcObject = stream;
+    await cameraVideo.play();
+    await referenceVideo.play();
+
+    startBtn.textContent = 'Đang chạy — tập theo khung trên';
+    status.textContent = 'Làm sai lệch một bên tay để xem nó có báo đỏ đúng bên không.';
+
+    let last = -1;
+    function frame() {
+      const now = performance.now();
+      if (cameraVideo.readyState >= 2 && now !== last) {
+        last = now;
+        const result = landmarker.detectForVideo(cameraVideo, now);
+        const landmarks = result.landmarks?.[0] ?? [];
+        const points = [];
+        for (const [index, key] of Object.entries(CANONICAL)) {
+          const landmark = landmarks[Number(index)];
+          if (!landmark) continue;
+          const confidence = landmark.visibility ?? 0;
+          if (confidence <= 0) continue;
+          // The preview is mirrored, the analysed frame is not.
+          points.push({ k: key, x: 1 - landmark.x, y: landmark.y, c: confidence });
+        }
+
+        const clipTime = referenceVideo.currentTime * 1000;
+        const paneAspect = cameraVideo.clientWidth / cameraVideo.clientHeight;
+        const verdict = comparator.push(points, paneAspect, clipTime);
+
+        if (verdict.tracking === 'lost') {
+          scoreEl.textContent = '—';
+          scoreEl.style.color = COLOURS.weak;
+          hintEl.textContent = 'Chưa thấy bạn trong khung hình — lùi ra xa một chút';
+        } else {
+          scoreEl.textContent = verdict.score;
+          scoreEl.style.color = verdict.score >= 80 ? COLOURS.ok : verdict.score >= 60 ? COLOURS.warn : COLOURS.bad;
+          hintEl.textContent = hintText(verdict.hint) || 'Bạn đang theo rất sát';
+        }
+
+        draw(document.getElementById('cameraCanvas'), cameraVideo, points, verdict.edges, 'ok');
+        draw(document.getElementById('referenceCanvas'), referenceVideo, referencePoints(clipTime), undefined, 'reference');
+      }
+      requestAnimationFrame(frame);
+    }
+    frame();
+  } catch (error) {
+    startBtn.disabled = false;
+    startBtn.textContent = 'Thử lại';
+    status.textContent = `Không bật được: ${error?.message ?? error}`;
+  }
+});
+</script>
+</body>
+</html>

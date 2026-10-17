@@ -16,7 +16,7 @@ import { useI18n, type TranslationKey } from '@/lib/i18n';
 /** The features that can be gated. Named keys rather than free text so a
  * caller cannot accidentally put an untranslated string in front of a
  * customer reading the app in English or Malay. */
-export type GatedFeature = Extract<TranslationKey, 'featureFormReview' | 'featureCall'>;
+export type GatedFeature = Extract<TranslationKey, 'featureFormReview' | 'featureCall' | 'featureMotionTracking'>;
 
 export function usePlanGate() {
   const { t } = useI18n();

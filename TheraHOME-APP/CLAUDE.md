@@ -158,6 +158,14 @@ backend gets built against — see Chat in `docs/backend.md`.
   No actual remote-push-sending pipeline exists yet (nothing reads
   `push_tokens` to call the Expo Push API) — that's blocked on the Apple/
   Firebase credentials in `docs/manual-setup.md`, same as EAS itself.
+- **Live motion tracking** ("tập cùng chuyên viên"): `modules/therahome-pose`
+  is a LOCAL native module of ours — Apple Vision on iOS, MediaPipe on
+  Android — fronted by `src/lib/pose.ts`. The comparison engine
+  (`src/lib/poseCompare.ts`) is pure arithmetic with its own tests
+  (`npm run test:pose`). Read `modules/therahome-pose/README.md` before
+  touching the native side and the 2026-10-16 entry in
+  `docs/feature-notes.md` before touching the rest; the two traps are
+  mirroring and frame-vs-view coordinates, and both are written up there.
 - **Motion**: `react-native-reanimated` 4 + shared motion hooks/components —
   conventions and the do-not-migrate-`Animated` rule live in
   `docs/motion.md`.

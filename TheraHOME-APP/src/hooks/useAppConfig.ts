@@ -24,7 +24,14 @@ export type AppConfigKey =
   // vi/en/ms; blank makes the card fall back to the highlighted plan's own
   // name and tagline, so it is never an empty box.
   | 'upgrade_card_title'
-  | 'upgrade_card_body';
+  | 'upgrade_card_body'
+  // The kill switch for "tập cùng chuyên viên" (app/train/[dayId].tsx).
+  // Anything but 'off' leaves it on. It lives here rather than in
+  // features.ts because the thing it guards runs native code against a live
+  // camera: if it goes wrong on a handset nobody tested, the fix has to be
+  // reachable in minutes, and a constant in the bundle is a fix that takes
+  // a store release.
+  | 'motion_tracking_enabled';
 
 const DEFAULTS: Record<AppConfigKey, string> = {
   // Empty on purpose: TheraHOME has no hotline yet (2026-09-04), and a
@@ -46,6 +53,12 @@ const DEFAULTS: Record<AppConfigKey, string> = {
   // could be — it already matches whatever is on sale.
   upgrade_card_title: '',
   upgrade_card_body: '',
+  // ON by default, deliberately. This is a kill switch, not a way to ship
+  // the feature dark and light it up after review — App Review has to see
+  // what customers see (Guideline 2.3.1). A build where this feature is not
+  // ready goes out with MOTION_TRACKING_ENABLED false in features.ts
+  // instead, so the code is genuinely inert rather than hidden.
+  motion_tracking_enabled: 'on',
 };
 
 interface ConfigRow {

@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Declared here rather than only in app.json so the module carries its
+       own requirement and cannot be broken by an edit to the app's list.
+       (app.json already asks for CAMERA for video calls; this is the same
+       permission, for a second reason.) -->
+  <uses-permission android:name="android.permission.CAMERA" />
+
+  <!-- `required="false"`: a tablet or an emulator without a front camera
+       should still be able to INSTALL the app. The feature switches itself
+       off at runtime instead — Play would otherwise hide the whole app from
+       those devices over one screen. -->
+  <uses-feature android:name="android.hardware.camera" android:required="false" />
+  <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+</manifest>

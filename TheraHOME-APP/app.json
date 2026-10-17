@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ai.therahome",
-      "buildNumber": "45",
+      "buildNumber": "46",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -18,7 +18,7 @@
         "UIBackgroundModes": [
           "audio"
         ],
-        "NSCameraUsageDescription": "TheraHOME cần quyền camera để bạn gọi video với nhân viên chăm sóc khách hàng."
+        "NSCameraUsageDescription": "TheraHOME cần quyền camera để bạn gọi video với nhân viên chăm sóc khách hàng, và để chấm động tác tập của bạn ngay trên máy — hình ảnh không được tải lên hay lưu lại."
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -61,7 +61,7 @@
         "expo-image-picker",
         {
           "photosPermission": "TheraHOME cần quyền truy cập thư viện ảnh để bạn thêm ảnh vào bài viết.",
-          "cameraPermission": "TheraHOME cần quyền camera để bạn gọi video với nhân viên chăm sóc khách hàng.",
+          "cameraPermission": "TheraHOME cần quyền camera để bạn gọi video với nhân viên chăm sóc khách hàng, và để chấm động tác tập của bạn ngay trên máy — hình ảnh không được tải lên hay lưu lại.",
           "microphonePermission": "TheraHOME cần quyền micro để bạn gọi thoại cho nhân viên chăm sóc khách hàng."
         }
       ],

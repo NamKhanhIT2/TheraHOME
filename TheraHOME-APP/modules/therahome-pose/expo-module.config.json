@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["TheraHomePoseModule"]
+  },
+  "android": {
+    "modules": ["ai.therahome.pose.TheraHomePoseModule"]
+  }
+}
