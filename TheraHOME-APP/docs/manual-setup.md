@@ -359,7 +359,12 @@ Enforced by `ai_chat_daily_allowance()`, `start_call`,
 `chat_thread_overview.plan_code`. Every number is editable in WEB Admin →
 Gói đăng ký → "Hạn mức của gói".
 
-### Step 1 — Apple: create the subscription products
+### Step 1 — Apple: create the subscription products — DONE
+
+All three exist in App Store Connect. Build 46 was rejected under Guideline
+2.1(b) not because they were missing but because they were not submitted
+WITH the binary, and because the review account had been granted a plan
+server-side so the paywall never appeared for it. Both fixed 2026-10-17.
 
 App Store Connect → the app → **Subscriptions**.
 
@@ -407,7 +412,13 @@ No new secret: `verify-subscription` reuses `APPLE_ISSUER_ID`,
 `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` and `APPLE_BUNDLE_ID`, already set for
 `verify-apple-purchase`.
 
-### Step 2 — Google Play: create the subscription products
+### Step 2 — Google Play: create the subscription products — STILL TO DO
+
+Nothing has been created on Play yet, so on Android every price button
+stays "Sắp mở": `canBuy` requires the STORE to have returned the product,
+and an id typed into WEB Admin cannot light up a button on its own. An AAB
+can be uploaded before this is done — the rest of the app works — but
+nobody can buy a subscription on Android until it is.
 
 Play Console → the app → **Monetise** → **Subscriptions**.
 

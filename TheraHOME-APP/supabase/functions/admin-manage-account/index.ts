@@ -61,10 +61,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Newer supabase-js ignores this header in `auth.getUser()` and reads
-    // only its own stored session, which an edge function has none of — so
-    // the token is also carried separately and passed in explicitly. See the
-    // longer note in livekit-token for how this was found.
+    // Carried separately so the helpers below can pass it to getUser()
+    // explicitly — the documented form, and the one that does not depend
+    // on where the library looks for a token. (It is not a workaround for
+    // a library bug: the implicit form worked all along. See the note in
+    // livekit-token for the 2026-10-19 session that looked like one.)
     const callerToken = authHeader.replace(/^Bearer\s+/i, "");
     const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },

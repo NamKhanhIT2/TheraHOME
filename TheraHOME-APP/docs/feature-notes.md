@@ -5614,3 +5614,92 @@ prebuild. A config plugin would make that permanent.
 
 **Still unmeasured:** frames per second on a real device, and whether the
 skeleton lands on the body. Those need the screen to run, which it now can.
+
+## Android, and a stale login that looked like four other bugs (2026-10-19)
+
+The motion tracking screen ran on a real Android phone for the first time.
+It worked: the skeleton lands on the body, with the right side on the right
+side. What the device then found was mostly in the JavaScript, and one of
+it was not in this app at all.
+
+**Four things the screen was sure about.** All the same mistake wearing
+different clothes — treating "we do not know yet" as "the answer is no". A
+joint took the screen-wide fallback level (`'ok'` while a session runs), so
+every dot stayed green while the bones around it went red. The score
+printed `0` when the camera could not see anybody, which is a mark out of a
+hundred for a measurement never taken. `tracking: 'partial'` — half the
+body out of shot — had no message at all. And `UpgradePromptModal` decided
+once per launch whether to advertise, with a subscription query still in
+flight reading as "no subscription", so paying customers were sold their
+own plan on every launch, on both platforms.
+
+**The stop button sat under Android's navigation bar.** `edges={['top']}`
+with no bottom inset, on the one control somebody mid-exercise has to be
+able to hit. Every other screen was checked: the tab screens are correct
+because the tab bar applies `useTabBarInset()` itself.
+
+**Debug builds crash on the SM-A125F.** `SIGSEGV` in `libreactnative.so`,
+inside Fabric's first mount, seconds after the dev client connects. The
+release build on the same phone is fine, so on-device Android testing means
+`--variant release`. Before that it ANRs on "Bundling 99%" — the phone is
+slow enough that Android thinks it has hung.
+
+**The emulator's camera is unusable here.** Three modes, three different
+failures on this Apple Silicon Mac: `webcam0` leaves even the stock Camera
+app saying "isn't responding", `virtualscene` is rejected for the front
+camera, `imagefile` delivers solid magenta. Verifying anything visual on
+Android means a real device.
+
+### The one that cost the afternoon
+
+Calls had been working — 77 of them, averaging 17 seconds — and then every
+call from one phone ended `connection_failed` after a second or two, while
+the same call from another phone worked.
+
+The evidence pointed four ways and three of them were wrong:
+
+- LiveKit's own dashboard showed only the CSKH joining the room; the
+  customer never appeared. **Not** a quota problem: 104 participant minutes
+  against nothing worth calling a limit.
+- `livekit-token` and `dispatch-voip-push` were answering 401 for that
+  device and 200 for the other, interleaved within the same second.
+- `auth.getUser()` said **"Auth session missing!"**, which reads exactly
+  like the unpinned `@supabase/supabase-js@2` having changed under us.
+
+It had not. A probe was added inside the function that logged the token's
+CLAIMS — never the token — and it reported `role: authenticated`,
+`expired: false`, a correct issuer. Replacing `getUser()` with the plain
+HTTP request it is supposed to make gave the real answer:
+
+    403 {"error_code":"session_not_found",
+         "msg":"Session from session_id claim in JWT does not exist"}
+
+The device held a correctly signed, unexpired token whose **session row had
+been deleted**. PostgREST checks only signature and expiry, so the app went
+on loading days, charts and the roadmap with the same token every Edge
+Function refused — a zombie login that looks healthy from inside the app.
+Signing out and back in fixed it, and three calls in a row ended `hangup`.
+
+Two conclusions that were stated confidently and were wrong are recorded
+here on purpose: that the library had broken ten functions (the same code
+answered 200 throughout for every healthy session), and that LiveKit had
+run out of quota. Both were reasonable readings of a misleading error
+message, and both cost hours. The lesson is the one the probe taught:
+make the thing under test say which version of itself is answering before
+drawing conclusions from its output.
+
+**What changed because of it.** `src/lib/invokeFunction.ts` now wraps every
+Edge Function call: it retries once after a refresh on 401/403, signs out
+only when the refresh proves the session is gone (`isAuthRetryableFetchError`
+keeps a tunnel from logging anyone out), and logs the status and body with
+`console.error` — which survives a release build, unlike the
+`if (error && __DEV__)` that hid all of this. The purchase verifications go
+through it too: the money has already left the customer's account by then.
+`dispatch-voip-push` and `livekit-token` read the caller with one fetch to
+`/auth/v1/user` and log what it answered.
+
+**Not a bug:** the specialist's phone showing a call screen *and* a push
+notification at once. Two channels are sent deliberately — PushKit is the
+only thing that rings a locked iPhone, Expo covers Android and a
+backgrounded app — and both are cancelled when the call resolves. Removing
+the duplicate would mean losing the fallback.
