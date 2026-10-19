@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { useIAP, ErrorCode, getAvailablePurchases as fetchOwnedPurchases, type Purchase } from 'react-native-iap';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { invokeFunction } from '@/lib/invokeFunction';
 
 /** Which phases (by id) this user has a non-revoked verified purchase for,
  * mapped to WHEN they bought it. Feeds the roadmap's phase-lock check and
@@ -170,14 +171,14 @@ export function usePurchasePhase(
       setPurchaseError(null);
       setPaymentPending(false);
       try {
+        // Through invokeFunction so a 401 is retried after a refresh rather
+        // than becoming "thử lại" on a purchase the customer has already
+        // paid for. A stale session is survivable here; a lost purchase is
+        // not. See src/lib/invokeFunction.ts.
         const { data, error } =
           Platform.OS === 'android'
-            ? await supabase.functions.invoke('verify-google-purchase', {
-                body: { phaseId, purchaseToken: purchase.purchaseToken },
-              })
-            : await supabase.functions.invoke('verify-apple-purchase', {
-                body: { phaseId, transactionId: purchase.id },
-              });
+            ? await invokeFunction<{ ok?: boolean; pending?: boolean; revoked?: boolean; expired?: boolean; error?: string }>('verify-google-purchase', { phaseId, purchaseToken: purchase.purchaseToken })
+            : await invokeFunction<{ ok?: boolean; pending?: boolean; revoked?: boolean; expired?: boolean; error?: string }>('verify-apple-purchase', { phaseId, transactionId: purchase.id });
         if (error) {
           const code = await functionErrorCode(error);
           if (code && TERMINAL_VERIFY_ERRORS.has(code)) {

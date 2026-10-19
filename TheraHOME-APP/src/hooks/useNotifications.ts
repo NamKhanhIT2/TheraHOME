@@ -7,6 +7,7 @@
 // community_moderation_and_notifications migration. See CLAUDE.md.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { invokeFunction } from '@/lib/invokeFunction';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { marketForLanguage, type StoreMarket } from '@/hooks/useMarket';
 import type { AppLanguage } from '@/store/useAppStore';
@@ -310,10 +311,8 @@ export function useSendNotificationBroadcast() {
         .from('notifications')
         .insert(userIds.map((user_id) => ({ user_id, type: input.type, title: input.title, body: input.body, created_at: createdAt })));
       if (error) throw error;
-      void supabase.functions.invoke('dispatch-push', {
+      void invokeFunction('dispatch-push', {
         body: { mode: 'broadcast', userIds, title: input.title, body: input.body, data: { type: input.type } },
-      }).then(({ error }) => {
-        if (error && __DEV__) console.warn('dispatch-push failed:', error);
       });
       return userIds.length;
     },

@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { invokeFunction } from '@/lib/invokeFunction';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import type { Database } from '@/types/database';
 import { dismissCall, isCallDismissed, markCallActive } from '@/lib/callkeep';
@@ -175,18 +176,8 @@ export function useStartCall() {
         // thing that rings a LOCKED iPhone, and Expo's service cannot send
         // it. Both are fire-and-forget: the call is already ringing in the
         // database, and a failed push must not fail the call.
-        void supabase.functions
-          .invoke('dispatch-push', { body: { mode: 'call', callId: call.id } })
-          .then(({ error: pushError }) => {
-            if (pushError && __DEV__) console.warn('call push failed:', pushError);
-          });
-        void supabase.functions
-          .invoke('dispatch-voip-push', { body: { callId: call.id } })
-          .then(({ error: voipError }) => {
-            // 503 here just means APNs is not configured yet, which is not
-            // worth shouting about on every call.
-            if (voipError && __DEV__) console.warn('voip push failed:', voipError);
-          });
+        void invokeFunction('dispatch-push', { mode: 'call', callId: call.id });
+        void invokeFunction('dispatch-voip-push', { callId: call.id });
       }
       return call;
     },
@@ -274,16 +265,8 @@ export function useAnswerCall() {
  * THIS function, so neither can be used to silence a live conversation.
  */
 function cancelCallPushes(callId: string): void {
-  void supabase.functions
-    .invoke('dispatch-call-cancel', { body: { callId } })
-    .then(({ error }) => {
-      if (error && __DEV__) console.warn('call cancel push failed:', error);
-    });
-  void supabase.functions
-    .invoke('dispatch-voip-push', { body: { callId, cancel: true } })
-    .then(({ error }) => {
-      if (error && __DEV__) console.warn('voip cancel push failed:', error);
-    });
+  void invokeFunction('dispatch-call-cancel', { callId });
+  void invokeFunction('dispatch-voip-push', { callId, cancel: true });
 }
 
 /**

@@ -6,6 +6,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
+import { invokeFunction } from '@/lib/invokeFunction';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 import { reportChatChannelStatus } from '@/lib/chatConnection';
@@ -206,10 +207,8 @@ export async function sendChatMessageRequest({
   if (error) throw error;
 
   if (kind !== 'ai') {
-    void supabase.functions.invoke('dispatch-push', {
-      body: { mode: 'chat', threadId, senderType, preview: message.body || undefined, attachment: !message.body },
-    }).then(({ error: pushError }) => {
-      if (pushError && __DEV__) console.warn('dispatch-push failed:', pushError);
+    void invokeFunction('dispatch-push', {
+      mode: 'chat', threadId, senderType, preview: message.body || undefined, attachment: !message.body,
     });
   }
 

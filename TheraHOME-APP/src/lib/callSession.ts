@@ -138,7 +138,12 @@ export async function openCallSession(callId: string, media: 'audio' | 'video'):
       if (room.remoteParticipants.size) clearDeadline();
       else armDeadline(callId, 'peer_timeout');
     };
-    const disconnected = () => fail(callId, 'connection_failed');
+    // LiveKit hands the reason to this callback and the old code dropped
+    // it, so every ejection from a room — token expired, duplicate
+    // identity, room closed, server shutting down — arrived in `calls` as
+    // the same word. Keeping it means `end_reason` finally says which.
+    const disconnected = (reason?: unknown) =>
+      fail(callId, reason === undefined ? 'connection_failed' : `livekit_${String(reason)}`);
     room.on('participantConnected', joined);
     room.on('participantDisconnected', left);
     room.on('reconnecting', reconnecting);
@@ -161,7 +166,10 @@ export async function openCallSession(callId: string, media: 'audio' | 'video'):
     if (controller.signal.aborted || generation !== ownGeneration) return;
     fail(callId, error instanceof CallUnavailableError ? 'unsupported' : 'connection_failed',
       error instanceof CallUnavailableError);
-    if (__DEV__) console.warn('openCallSession failed:', error);
+    // console.error, and not behind __DEV__. This is the line that says why
+    // a call would not start, and on 2026-10-19 it was invisible for hours
+    // in a release build while the customer was told only "mất kết nối".
+    console.error('openCallSession failed:', error instanceof Error ? error.message : String(error));
   }
 }
 

@@ -23,6 +23,7 @@ import {
 } from 'react-native-iap';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { invokeFunction } from '@/lib/invokeFunction';
 import { SUBSCRIPTIONS_ENABLED } from '@/lib/features';
 import type { SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
 
@@ -204,16 +205,19 @@ export function useSubscriptionPurchase(
       setPurchaseError(null);
       setPaymentPending(false);
       try {
-        const { data, error } = await supabase.functions.invoke('verify-subscription', {
-          body:
-            Platform.OS === 'android'
-              ? { planCode: plan.code, purchaseToken: purchase.purchaseToken }
-              : // NEVER purchase.id on Android: react-native-iap fills it
-                // with the orderId or falls back to the token. On iOS it is
-                // the StoreKit transaction id, which is what Apple's API
-                // wants.
-                { planCode: plan.code, transactionId: purchase.id },
-        });
+        // invokeFunction, not a bare invoke: a 401 is retried after a
+        // refresh. The money has already left the customer's account by
+        // this point, so a stale session must not be the thing that decides
+        // whether they get the plan. See src/lib/invokeFunction.ts.
+        const { data, error } = await invokeFunction<{ ok?: boolean; pending?: boolean; revoked?: boolean; expired?: boolean; error?: string }>('verify-subscription',
+          Platform.OS === 'android'
+            ? { planCode: plan.code, purchaseToken: purchase.purchaseToken }
+            : // NEVER purchase.id on Android: react-native-iap fills it
+              // with the orderId or falls back to the token. On iOS it is
+              // the StoreKit transaction id, which is what Apple's API
+              // wants.
+              { planCode: plan.code, transactionId: purchase.id },
+        );
         if (error) {
           const code = await functionErrorCode(error);
           if (code && TERMINAL_VERIFY_ERRORS.has(code)) {
@@ -249,7 +253,7 @@ export function useSubscriptionPurchase(
         onVerifiedRef.current?.(plan.code);
       } catch (e) {
         setPurchaseError(e instanceof Error ? e.message : 'verify_failed');
-        if (__DEV__) console.warn('subscription verification failed:', e);
+        console.error('subscription verification failed:', e instanceof Error ? e.message : String(e));
       } finally {
         setVerifying(false);
       }
