@@ -192,6 +192,26 @@ export default function TrainScreen() {
   const hint = hintFor(verdict?.hint ?? null);
   const lost = phase === 'running' && verdict?.tracking === 'lost';
 
+  /* Some of the body is out of shot — knees and ankles, usually, because
+     the phone is propped too close. The engine already downgrades to
+     'partial' and scores only what it can see; before today the screen
+     said nothing, so the customer got a low score with no idea that half
+     of them was off camera. */
+  const partial = phase === 'running' && verdict?.tracking === 'partial';
+
+  /* Nearly everything is out at once. That is not a limb to correct, it is
+     the wrong position entirely — lying down while the demonstration sits
+     up, or facing the wrong way. Telling somebody to "lower your left arm"
+     when they are not even in the posture is noise, and it is what this
+     screen did on 2026-10-19 while the tester sat at a desk and the
+     specialist lay on a mat. */
+  const offPose =
+    phase === 'running' &&
+    !!verdict &&
+    verdict.measures.length >= 3 &&
+    verdict.measures.filter((measure) => measure.level === 'bad').length >=
+      Math.ceil(verdict.measures.length * 0.75);
+
   const body = useMemo(() => {
     if (!isPoseSupported() || !isPoseCameraAvailable()) return 'unsupported' as const;
     if (referenceQuery.isLoading || programsQuery.isLoading || daysQuery.isLoading) return 'loading' as const;
@@ -220,7 +240,11 @@ export default function TrainScreen() {
   }
 
   return (
-    <ScreenContainer edges={['top']}>
+    // 'bottom' as well as 'top': without it the action button sits UNDER
+    // Android's navigation bar. Seen on a Galaxy A12, 2026-10-19 — the
+    // gesture bar was drawn across "Dừng lại", which is the one control
+    // somebody mid-exercise needs to be able to hit.
+    <ScreenContainer edges={['top', 'bottom']}>
       <BackBar onBack={() => router.back()} title={t('trainTitle')} />
 
       {/* The specialist. Letterboxed to the clip's own shape so the
@@ -286,11 +310,11 @@ export default function TrainScreen() {
           </View>
         ) : null}
 
-        {lost ? (
-          <View style={[styles.banner, { backgroundColor: theme.colors.bgCard }]}>
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{t('trainLost')}</Text>
-          </View>
-        ) : null}
+        {/* No banner over the camera. The footer already carries one line of
+            advice, in bold, in the place the customer is already reading —
+            and when the line was "we cannot see you" the screen printed the
+            identical sentence twice, once here and once below (seen on the
+            device, 2026-10-19). One message, one place. */}
 
         {cameraState === 'denied' ? (
           <View style={[styles.cover, { backgroundColor: theme.colors.bgApp }]}>
@@ -304,15 +328,31 @@ export default function TrainScreen() {
       <View style={styles.footer}>
         {phase === 'running' ? (
           <View style={styles.readout}>
-            <Text style={[theme.type.h2, { color: scoreColour(verdict?.score) }]}>
-              {verdict?.score ?? '—'}
-            </Text>
-            <Text style={[theme.type.caption, styles.hint, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+            <View style={styles.score}>
+              {/* A dash, not a zero, when nobody is in shot. The engine
+                  reports 0 for an unscorable frame, and printing that under
+                  "điểm" tells somebody who simply stepped out of frame that
+                  they scored nothing — a verdict on a measurement that was
+                  never taken. */}
+              <Text style={[theme.type.h2, { color: lost ? theme.colors.textMuted : scoreColour(verdict?.score) }]}>
+                {lost || verdict === null ? '—' : verdict.score}
+              </Text>
+              {lost ? null : (
+                <Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>
+                  {t('trainScoreUnit')}
+                </Text>
+              )}
+            </View>
+            <Text style={[theme.type.bodyStrong, styles.hint, { color: theme.colors.textPrimary }]} numberOfLines={2}>
               {lost
                 ? t('trainLost')
-                : hint
-                  ? t(hint.key, hint.side ? { side: t(hint.side === 'left' ? 'poseSideLeft' : 'poseSideRight') } : undefined)
-                  : t('trainOnTrack')}
+                : partial
+                  ? t('trainPartial')
+                  : offPose
+                    ? t('trainOffPose')
+                    : hint
+                      ? t(hint.key, hint.side ? { side: t(hint.side === 'left' ? 'poseSideLeft' : 'poseSideRight') } : undefined)
+                      : t('trainOnTrack')}
             </Text>
           </View>
         ) : null}
@@ -376,10 +416,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   cover: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
   message: { textAlign: 'center' },
-  banner: { position: 'absolute', left: 16, right: 16, bottom: 16, padding: 10, borderRadius: 12, alignItems: 'center' },
   tag: { position: 'absolute', left: 10, top: 10, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   footer: { padding: 20, gap: 12 },
   readout: { alignItems: 'center', gap: 2 },
+  score: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   hint: { textAlign: 'center' },
   action: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
 });

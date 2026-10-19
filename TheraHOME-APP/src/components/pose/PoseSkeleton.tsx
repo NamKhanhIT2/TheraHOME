@@ -24,6 +24,11 @@ import { POSE_CONFIDENT, POSE_EDGES, POSE_HIDDEN, POSE_STYLE, type PoseKey, type
  * frame only ever uses it, because the specialist is never wrong. */
 export type PoseLevel = 'reference' | 'ok' | 'warn' | 'bad' | 'weak';
 
+/** How loudly a verdict speaks, for resolving a joint shared by two bones.
+ * `weak` ranks with `ok` on purpose: "we could not see it" must never win
+ * over "that limb is out", or an unseen wrist would mute a red forearm. */
+const SEVERITY: Record<PoseLevel, number> = { reference: 0, ok: 1, weak: 1, warn: 2, bad: 3 };
+
 /** `${from}-${to}`, matching POSE_EDGES. */
 export type EdgeId = string;
 
@@ -69,10 +74,21 @@ export const PoseSkeleton = memo(function PoseSkeleton({
     return !!a && !!b && a.c >= POSE_HIDDEN && b.c >= POSE_HIDDEN;
   });
 
-  const joints = new Set<PoseKey>();
+  // A joint takes the WORST verdict of the bones that reach it.
+  //
+  // It used to take `level` — the screen-wide fallback, which is 'ok' while
+  // a session runs. So every joint was drawn green no matter what, and a
+  // shoulder sitting between two red bones still had a green dot on it.
+  // Reported from the device, 2026-10-19: the limb says "wrong" and the
+  // joint says "fine", in the same picture, and the customer has to decide
+  // which half of the drawing to believe.
+  const joints = new Map<PoseKey, PoseLevel>();
   for (const [from, to] of bones) {
-    joints.add(from);
-    joints.add(to);
+    const edge = levels?.[`${from}-${to}`] ?? level;
+    for (const key of [from, to] as PoseKey[]) {
+      const held = joints.get(key);
+      if (held === undefined || SEVERITY[edge] > SEVERITY[held]) joints.set(key, edge);
+    }
   }
 
   return (
@@ -95,7 +111,7 @@ export const PoseSkeleton = memo(function PoseSkeleton({
           />
         );
       })}
-      {[...joints].map((key) => {
+      {[...joints.keys()].map((key) => {
         const point = at.get(key)!;
         return (
           <Circle
@@ -130,7 +146,7 @@ export const PoseSkeleton = memo(function PoseSkeleton({
           />
         );
       })}
-      {[...joints].map((key) => {
+      {[...joints.entries()].map(([key, jointLevel]) => {
         const point = at.get(key)!;
         const guessed = point.c < POSE_CONFIDENT;
         return (
@@ -139,7 +155,7 @@ export const PoseSkeleton = memo(function PoseSkeleton({
             cx={point.x * width}
             cy={point.y * height}
             r={dot}
-            fill={guessed ? poseColors.weak : poseColors[level]}
+            fill={guessed ? poseColors.weak : poseColors[jointLevel]}
             opacity={guessed ? 0.5 : 1}
           />
         );

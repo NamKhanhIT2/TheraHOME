@@ -30,7 +30,15 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
   const muted = useAppStore((s) => s.upgradePromptMuted);
   const mute = useAppStore((s) => s.muteUpgradePrompt);
   const plans = useSubscriptionPlans().data ?? [];
-  const activePlanCode = useActivePlanCode(userId).data ?? null;
+  const planQuery = useActivePlanCode(userId);
+  const activePlanCode = planQuery.data ?? null;
+  /* Until this answers, "no plan" and "not asked yet" look identical — and
+     the decision below is taken ONCE per launch and never revisited.
+     `isSuccess` rather than "not loading" on purpose: a query that FAILED
+     has not told us there is no subscription either, and the cost of
+     guessing wrong is advertising a plan to the person already paying for
+     it. Silence is the safe side of this one. */
+  const subscriptionKnown = !!userId && planQuery.isSuccess;
   const [claimed, setClaimed] = useState(false);
   const [open, setOpen] = useState(true);
   const [muteChecked, setMuteChecked] = useState(false);
@@ -38,7 +46,16 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
   const plan = plans.find((p) => p.highlighted) ?? plans[0];
   // Every reason not to show it. `activePlanCode` is the one worth naming:
   // somebody already paying would be looking at an advert for what they own.
-  const eligible = !muted && !!userId && daysDone >= 1 && !!plan && !activePlanCode;
+  //
+  // `subscriptionKnown` is the other one, and it is why this used to greet
+  // paying customers on every launch (reported on Android, 2026-10-19).
+  // The plans list and the subscription are two separate queries; whenever
+  // the plans won the race, this ran with `activePlanCode` still null —
+  // not because the customer had no plan, but because nobody had answered
+  // yet. That claimed the launch, and the claim is never re-examined, so
+  // the late answer arrived too late to matter. A query in flight is not a
+  // negative result.
+  const eligible = !muted && !!userId && subscriptionKnown && daysDone >= 1 && !!plan && !activePlanCode;
 
   // Claiming the launch is a side effect, so it happens in an effect rather
   // than during render — a render can be thrown away and re-run, and this
@@ -49,7 +66,10 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
     setClaimed(true);
   }, [eligible]);
 
-  if (!claimed || !open || !plan) return null;
+  /* Checked again here, not just in `eligible`. That decision is taken once
+     per launch and frozen; this is the standing rule — a subscriber never
+     sees this sheet, whatever order the queries answered in. */
+  if (!claimed || !open || !plan || activePlanCode) return null;
 
   function dismiss(permanently: boolean) {
     if (permanently) mute();

@@ -38,12 +38,30 @@ export const IAP_ENABLED = Platform.OS === 'android' ? IAP_ENABLED_ANDROID : IAP
  * itself is always reachable — a free user is meant to read what the paid
  * tiers contain; this only controls whether anything can be bought.
  *
- * False because buying would grant nothing yet. The purchase path is built
- * (verify-subscription + user_subscriptions + active_plan_code()), but no
- * feature currently ASKS active_plan_code() anything: chấm dáng tập still
- * allows 4 clips a month to everybody, chat AI is unlimited for everybody,
- * and the call button has no tier check. Selling a tier that changes nothing
- * is both a refund waiting to happen and an App Review rejection.
+ * It was false until build 35, and for a good reason: the purchase path was
+ * built (verify-subscription + user_subscriptions + active_plan_code()) but
+ * no feature ASKED active_plan_code() anything, so buying granted nothing.
+ * Selling a tier that changes nothing is both a refund waiting to happen and
+ * an App Review rejection.
+ *
+ * That is no longer the case, and this list is the answer to "does the
+ * paywall promise anything the code does not enforce?" — a question worth
+ * re-asking every time a benefit line is added in WEB Admin → "Gói đăng ký",
+ * because that editor can write a promise nothing implements:
+ *
+ *   ai_chat_daily_allowance()    chat AI, per local day
+ *   call_minutes_allowance()     1-1 calls, per local month
+ *   form_review_mb_allowance()   chấm dáng tập, megabytes per month
+ *   has_paid_access()            tập cùng chuyên viên + its reference clips
+ *   suggested_reminder_hour()    reminders that follow the customer's habits
+ *   dispatch-weekly-reports      the weekly progress report
+ *   coin_settings.plan_codes     the xu programme (Plus and Trọn Đời only)
+ *
+ * The free tier is the floor in `baseline_limits()` — two AI messages a day,
+ * no call minutes, no form-check megabytes — so the gap a customer pays to
+ * cross is real. Review accounts are exempt from every one of these, checked
+ * individually inside each function (see the memory rule: account_type
+ * 'review' bypasses every gate).
  *
  * Note this is not the only gate: `canBuy` in useSubscription also requires
  * the store to have RETURNED the product, so a product id typed into WEB
@@ -59,8 +77,8 @@ export const IAP_ENABLED = Platform.OS === 'android' ? IAP_ENABLED_ANDROID : IAP
 // useSubscription also requires the store to have RETURNED the product, so on
 // a platform whose products do not exist yet (Android has none at all, and
 // Apple's are still being created) every button stays "Sắp mở". Step 0 of
-// docs/manual-setup.md is done — all seven benefit lines are enforced — so
-// this no longer sells anything that does nothing.
+// docs/manual-setup.md is done — every benefit line is enforced — so this no
+// longer sells anything that does nothing.
 export const SUBSCRIPTIONS_ENABLED = true;
 
 /**
