@@ -117,7 +117,21 @@ Deno.serve(async (request) => {
     const authorization = request.headers.get('Authorization') ?? '';
     const callerClient = createClient(url, anonKey, { global: { headers: { Authorization: authorization } } });
     const admin = createClient(url, serviceKey);
-    const { data: { user }, error: userError } = await callerClient.auth.getUser();
+    // The token is passed explicitly, which is the documented form and the
+    // only one that does not depend on the client having a stored session.
+    //
+    // Not a fix for a library bug, despite how it looked on 2026-10-19: for
+    // hours every call from one device came back 401 and `getUser()` said
+    // "Auth session missing!", which reads like the library losing the
+    // token. It was not. The Auth server was answering 403
+    // `session_not_found` — a correctly signed, unexpired token whose
+    // session row had been deleted — and the library rendered that as a
+    // missing session. The same code answered 200 all along for every
+    // device whose session still existed.
+    //
+    // Worth keeping anyway: it removes a dependency on where the library
+    // looks for the token, and it costs nothing.
+    const { data: { user }, error: userError } = await callerClient.auth.getUser(authorization.replace(/^Bearer\s+/i, ""));
     if (userError || !user) return json({ error: 'unauthorized' }, 401);
 
     const input = await request.json() as RequestBody;

@@ -61,6 +61,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Newer supabase-js ignores this header in `auth.getUser()` and reads
+    // only its own stored session, which an edge function has none of — so
+    // the token is also carried separately and passed in explicitly. See the
+    // longer note in livekit-token for how this was found.
+    const callerToken = authHeader.replace(/^Bearer\s+/i, "");
     const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -72,9 +77,9 @@ Deno.serve(async (req: Request) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    if (payload.action === "create") return await handleCreate(adminClient, callerClient, payload);
+    if (payload.action === "create") return await handleCreate(adminClient, callerClient, callerToken, payload);
     if (payload.action === "reset_password") return await handleResetPassword(adminClient, payload);
-    if (payload.action === "delete") return await handleDelete(adminClient, callerClient, payload);
+    if (payload.action === "delete") return await handleDelete(adminClient, callerClient, callerToken, payload);
     return jsonResponse({ error: "Unknown action" }, 400);
   } catch (err) {
     return fail("unhandled", err);
@@ -82,7 +87,7 @@ Deno.serve(async (req: Request) => {
 });
 
 // deno-lint-ignore no-explicit-any
-async function handleCreate(adminClient: any, callerClient: any, payload: Record<string, unknown>) {
+async function handleCreate(adminClient: any, callerClient: any, callerToken: string, payload: Record<string, unknown>) {
   const username = String(payload.username ?? "").trim().toLowerCase();
   const password = String(payload.password ?? "");
   // Optional real email. When omitted, the synthetic <username>@thera.local is
@@ -129,7 +134,8 @@ async function handleCreate(adminClient: any, callerClient: any, payload: Record
   }
 
   const userId = created.user.id;
-  const { data: callerUser } = await callerClient.auth.getUser();
+  // Explicit token: see the note where callerToken is derived.
+  const { data: callerUser } = await callerClient.auth.getUser(callerToken);
   const createdBy = callerUser?.user?.id ?? null;
 
   const { error: profileError } = await adminClient
@@ -216,11 +222,12 @@ async function provisionFullCatalog(adminClient: any, userId: string, email: str
 }
 
 // deno-lint-ignore no-explicit-any
-async function handleDelete(adminClient: any, callerClient: any, payload: Record<string, unknown>) {
+async function handleDelete(adminClient: any, callerClient: any, callerToken: string, payload: Record<string, unknown>) {
   const userId = String(payload.user_id ?? "");
   if (!userId) return jsonResponse({ error: "missing_required_field" }, 400);
 
-  const { data: callerUser } = await callerClient.auth.getUser();
+  // Explicit token: see the note where callerToken is derived.
+  const { data: callerUser } = await callerClient.auth.getUser(callerToken);
   if (callerUser?.user?.id === userId) return jsonResponse({ error: "cannot_delete_self" }, 400);
 
   const { data: target, error: targetError } = await adminClient

@@ -130,13 +130,11 @@ Deno.serve(async (request: Request) => {
   }
 
   const authorization = request.headers.get("Authorization");
-  if (!authorization) return json({ error: "unauthorized" }, 401);
-  const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authorization } },
-  });
-  const { data: userData, error: userError } = await callerClient.auth.getUser();
-  if (userError || !userData?.user) return json({ error: "unauthorized" }, 401);
-  const user = userData.user;
+  if (!authorization) {
+    return json({ error: "unauthorized" }, 401);
+  }
+  const user = await userFromAuthHeader(authorization);
+  if (!user) return json({ error: "unauthorized" }, 401);
 
   let callId: string;
   // `cancel` turns this into the opposite push: stop ringing. See the long
@@ -312,3 +310,41 @@ Deno.serve(async (request: Request) => {
   if (sent === 0) console.error("voip push: nothing delivered", JSON.stringify(results));
   return json({ sent, results });
 });
+
+
+/** The caller's user, read straight from the Auth REST endpoint.
+ *
+ * This is the HTTP request `supabase.auth.getUser()` makes, written out so
+ * the failure is legible. The library reports every rejection as "Auth
+ * session missing!", which on 2026-10-19 sent a whole afternoon chasing a
+ * library that was working fine: the Auth server was answering
+ *
+ *   403 {"error_code":"session_not_found",
+ *        "msg":"Session from session_id claim in JWT does not exist"}
+ *
+ * — a correctly signed, unexpired, `role: authenticated` token whose
+ * session row had been deleted. The device kept using it because PostgREST
+ * checks only the signature and expiry, so the app loaded data normally
+ * while every edge function refused it, and the symptom looked like a
+ * broken call feature rather than a stale login.
+ *
+ * Signing out and back in fixed it. Keeping the raw status and body in the
+ * log is what makes the next one take minutes instead of hours. */
+async function userFromAuthHeader(
+  authorization: string,
+): Promise<{ id: string } | null> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: authorization },
+    });
+    if (!response.ok) {
+      console.error("auth: /auth/v1/user said", response.status, (await response.text()).slice(0, 200));
+      return null;
+    }
+    const body = await response.json() as { id?: unknown };
+    return typeof body?.id === "string" && body.id ? { id: body.id } : null;
+  } catch (error) {
+    console.error("auth: /auth/v1/user unreachable:", String(error));
+    return null;
+  }
+}
