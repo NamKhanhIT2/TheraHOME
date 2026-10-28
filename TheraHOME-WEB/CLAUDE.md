@@ -130,14 +130,30 @@ here still applies.)
      client RLS access** — looked up only through a `SECURITY DEFINER` RPC
      callable by `authenticated`, so a client can't `select *` the whole
      contact list.
-   - **Provisioned admins**: originally `khanha1k59@gmail.com` /
-     `0395581037` and `hoankenny2002@gmail.com` / `0328552894`. **Both rows
-     now carry `roles = []`** (checked against production 2026-09-16), so
-     signing in with either Google account lands on the public site as an
-     ordinary customer — that is correct, not a bug. Admin today is the
-     TheraHOME account `hoankenny@therahomeai.com`
-     (`profiles.account_type = 'admin'`), which `current_web_roles()` resolves
-     from the account type rather than from a contact row.
+   - **Provisioned admins**: `khanha1k59@gmail.com` / `0395581037` and
+     `hoankenny2002@gmail.com` / `0328552894`, both carrying
+     `roles = ['admin','cskh']` since 2026-10-28. **Admin signs in with
+     Google, and only with Google.** The shared password account
+     `hoankenny@therahomeai.com` used to be the way in via
+     `profiles.account_type = 'admin'`; it was demoted to `'tester'` the same
+     day, and `profiles` now holds no `'admin'` row at all. Two consequences
+     worth knowing before changing any of this:
+     - `current_web_roles()` reads `web_access_contacts` FIRST and only falls
+       back to `profiles.account_type`. Both halves still exist — CSKH
+       (`support@therahomeai.com`, `cskh01@thera.local`) is still resolved
+       from the account type — so do not delete the fallback branch.
+     - `account_type` is guarded by `protect_privileged_profile_columns()`,
+       which raises `42501 privileged_profile_column_change_forbidden` unless
+       the caller is `service_role` or already holds the admin web role. A
+       migration that touches it must `set local request.jwt.claims =
+       '{"role":"service_role"}'` first — see
+       `202610281400_the_password_admin_stands_down.sql`.
+     On the web, staff deliberately do NOT show their app identity: the nav
+     chip renders "Admin"/"CSKH" with the Google picture rather than
+     `profiles.full_name` and the avatar uploaded in the app, because these
+     Google accounts are ordinary app accounts too. Nothing is written to
+     `profiles` for that — it is a display rule in `useLandingSession.ts`, so
+     the mobile app is unaffected.
    - No match → access-denied state. No self-serve path — rows are added
      manually for this phase (an actual signup/provisioning flow is public
      Web App scope, not this one).
