@@ -10,7 +10,7 @@
 // JS) is React state, and lang.js's localStorage picker is a hook. The
 // hover/focus choreography stays in CSS (src/styles/landing.css) exactly as
 // designed — it is all :hover/:focus-within and needs no JS.
-import { Fragment, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { BrandMark } from "@/components/landing/BrandMark";
@@ -18,10 +18,12 @@ import { AccountChip } from "@/components/landing/AccountChip";
 import { useLandingSession } from "@/components/landing/useLandingSession";
 import { LANG_LABEL, getLangSnapshot, getLangServerSnapshot, setLang, subscribeLang, type Lang } from "@/lib/langPreference";
 
+// Only the home entry is left. /san-pham and /gioi-thieu were removed on
+// 2026-10-28 at the owner's request: selling happens on the Shopify
+// storefront, and the contact details the about page carried are already in
+// the footer of every page, so neither had a second home to move to.
 export const NAV_LINKS = [
   { href: "/", label: "Trang chủ" },
-  { href: "/san-pham", label: "Sản phẩm", dropdown: true },
-  { href: "/gioi-thieu", label: "Về chúng tôi" },
 ] as const;
 
 /** The design's own auth screen, now built: /dang-nhap and /dang-ky. The staff
@@ -29,38 +31,6 @@ export const NAV_LINKS = [
  * from the console, not from the public site. */
 const SIGN_IN = "/dang-nhap";
 const SIGN_UP = "/dang-ky";
-
-function Chevron({ size = 10, width = 1.6 }: { size?: number; width?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M2.5 4.5 6 8l3.5-3.5" />
-    </svg>
-  );
-}
-
-function ProductsDropdown({ current }: { current: boolean }) {
-  return (
-    <div className={"nav-dd" + (current ? " nav-dd-current" : "")} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-      <Link href="/san-pham" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: current ? "#fff" : "rgba(255,255,255,0.72)" }}>
-        Sản phẩm
-        <Chevron />
-      </Link>
-      {/* padding-top bridges the gap to the trigger so the pointer can travel
-          into the panel without :hover dropping */}
-      <div className="nav-dd-panel" style={{ position: "absolute", top: "100%", left: "50%", transform: "translate(-50%, 6px)", paddingTop: 49, opacity: 0, visibility: "hidden", transition: "opacity 180ms ease-out, transform 180ms ease-out" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 240, padding: 10, borderRadius: 18, background: "rgba(8,14,26,0.96)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 26px 60px rgba(0,0,0,0.55)", backdropFilter: "blur(16px)" }}>
-          <Link href="/san-pham" style={{ display: "flex", flexDirection: "column", gap: 3, padding: "12px 14px", borderRadius: 12, color: "#fff" }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>TheraNECK+</span>
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.68)" }}>Máy trị liệu cổ 4 trong 1</span>
-          </Link>
-          <span style={{ padding: "10px 14px 4px", fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>
-            Sắp có thêm sản phẩm
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function LanguagePicker() {
   // useSyncExternalStore, not state+effect: see src/lib/langPreference.ts.
@@ -129,15 +99,6 @@ export function LandingNav() {
 
   const isCurrent = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
-  const renderLink = (link: (typeof NAV_LINKS)[number]) =>
-    "dropdown" in link && link.dropdown ? (
-      <ProductsDropdown current={isCurrent(link.href)} />
-    ) : (
-      <Link href={link.href} className={isCurrent(link.href) ? "nav-links-current" : undefined} style={{ color: isCurrent(link.href) ? "#fff" : "rgba(255,255,255,0.72)" }}>
-        {link.label}
-      </Link>
-    );
-
   return (
     <>
       <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, padding: "22px clamp(20px, 4vw, 64px)", background: "rgba(2,3,11,0.72)", backdropFilter: "blur(14px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -148,7 +109,9 @@ export function LandingNav() {
 
         <div className="nav-links" style={{ display: "flex", gap: "clamp(16px, 2.2vw, 40px)", fontSize: 13, letterSpacing: "0.06em" }}>
           {NAV_LINKS.map((link) => (
-            <Fragment key={link.href}>{renderLink(link)}</Fragment>
+            <Link key={link.href} href={link.href} className={isCurrent(link.href) ? "nav-links-current" : undefined} style={{ color: isCurrent(link.href) ? "#fff" : "rgba(255,255,255,0.72)" }}>
+              {link.label}
+            </Link>
           ))}
         </div>
 
@@ -188,9 +151,6 @@ export function LandingNav() {
         {menuOpen ? (
           <div className="nav-mobile" style={{ display: "flex", position: "fixed", left: 0, right: 0, top: 84, flexDirection: "column", gap: 4, padding: "14px clamp(20px, 4vw, 64px) 20px", background: "rgba(8,14,26,0.97)", borderBottom: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(16px)" }}>
             <Link href="/" onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>Trang chủ</Link>
-            <span style={{ padding: "12px 4px 4px", fontSize: 11.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }}>Sản phẩm</span>
-            <Link href="/san-pham" onClick={closeMenu} style={{ padding: "10px 4px 10px 18px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>TheraNECK+</Link>
-            <Link href="/gioi-thieu" onClick={closeMenu} style={{ padding: "12px 4px", fontSize: 15, color: "rgba(255,255,255,0.86)" }}>Về chúng tôi</Link>
             <span style={{ height: 1, margin: "8px 0", background: "rgba(255,255,255,0.1)" }} />
             {session.signedIn ? (
               <button type="button" onClick={() => { closeMenu(); void signOut(); }} style={{ padding: "12px 4px", fontSize: 15, fontWeight: 600, color: "#fff", background: "transparent", border: "none", textAlign: "left", fontFamily: "inherit", cursor: "pointer" }}>

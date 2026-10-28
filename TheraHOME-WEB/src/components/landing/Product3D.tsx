@@ -1,5 +1,9 @@
 "use client";
 
+// UNUSED since 2026-10-28: its only caller was /san-pham, which the owner
+// removed. Kept rather than deleted so the page can be restored as it was;
+// delete this file too if that decision becomes permanent.
+
 // The product in real 3D: orbit it, zoom it, and on Android open it in the
 // room. Google's <model-viewer> over the owner's own .glb.
 //

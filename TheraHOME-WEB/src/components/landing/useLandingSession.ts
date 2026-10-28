@@ -19,8 +19,9 @@ export interface LandingSession {
   signedIn: boolean | null;
   name: string;
   email: string;
-  /** profiles.avatar_url — the picture the customer set in the app, or the one
-   * Google supplied at sign-up. Empty when they have neither. */
+  /** For a customer: profiles.avatar_url, the picture they set in the app,
+   * falling back to the one Google supplied. For STAFF: never the app
+   * picture — see the note on `name` below. Empty when there is none. */
   avatarUrl: string;
   roles: WebAccessRole[];
 }
@@ -45,19 +46,34 @@ export function useLandingSession(): LandingSession & { signOut: () => Promise<v
       ]);
       if (error) console.error("Unable to read the profile row for the nav", error);
       if (cancelled) return;
-      // The name is profiles.full_name on purpose, NOT the Google display
-      // name: the app shows full_name everywhere, so taking Google's here
-      // would make the same person read differently on phone and web. Someone
-      // who renamed themselves in the app means it.
-      // The avatar falls back to what the provider supplied, for an account
-      // that signed in with Google and never set a picture in the app.
+      // For a CUSTOMER the name is profiles.full_name on purpose, NOT the
+      // Google display name: the app shows full_name everywhere, so taking
+      // Google's here would make the same person read differently on phone and
+      // web. Someone who renamed themselves in the app means it.
+      //
+      // STAFF are the exception (owner 2026-10-28). The two owner Google
+      // accounts are also ordinary app accounts, so the chip was reading their
+      // app profile and showing a personal name and a picture uploaded in the
+      // app — "Long", with an avatar from the `avatars` bucket. Signing into
+      // the console is not the same act as using the app, and the owner wants
+      // the web side to say so: one shared label, and nothing carried over
+      // from the app account.
+      //
+      // Nothing is written to `profiles` for this. The row keeps the name and
+      // picture the mobile app renders, so signing in on the phone is
+      // completely unaffected — this is a display rule on the web only.
       const meta = session.user.user_metadata ?? {};
       const providerAvatar = typeof meta.avatar_url === "string" ? meta.avatar_url : typeof meta.picture === "string" ? meta.picture : "";
+      const staffLabel = roles.includes("admin") ? "Admin" : roles.includes("cskh") ? "CSKH" : "";
       setState({
         signedIn: true,
-        name: profile?.full_name || email,
+        name: staffLabel || profile?.full_name || email,
         email,
-        avatarUrl: profile?.avatar_url || providerAvatar || "",
+        // Staff skip profile.avatar_url entirely. Google's picture is still
+        // offered, because the owner holds two Google accounts and the face is
+        // the quickest way to see which one is signed in; with none, the chip
+        // falls back to the "A"/"C" initial it draws underneath.
+        avatarUrl: staffLabel ? providerAvatar : profile?.avatar_url || providerAvatar || "",
         roles,
       });
     }

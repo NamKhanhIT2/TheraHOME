@@ -442,7 +442,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         <div style={{ display: "flex", gap: 22 }}>
           <Link href="/terms" style={{ color: "rgba(255,255,255,0.66)" }}>Điều khoản sử dụng</Link>
           <Link href="/privacy" style={{ color: "rgba(255,255,255,0.66)" }}>Chính sách bảo mật</Link>
-          <Link href="/gioi-thieu#lien-he" style={{ color: "rgba(255,255,255,0.66)" }}>Hỗ trợ</Link>
+          <Link href="/#ve-chung-toi" style={{ color: "rgba(255,255,255,0.66)" }}>Hỗ trợ</Link>
         </div>
       </footer>
     </div>

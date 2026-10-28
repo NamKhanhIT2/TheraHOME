@@ -141,7 +141,7 @@ export function CinematicHero() {
 
               It is a real link rather than a label: a badge that reads
               "step into TheraHOME" and does nothing would be a lie. */}
-          <Link href="/san-pham" data-cine-tag className="cine-enter">
+          <Link href="/app" data-cine-tag className="cine-enter">
             <span className="cine-enter-icon" aria-hidden="true">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-4" />
@@ -168,7 +168,7 @@ export function CinematicHero() {
             <Scrim />
             <h1 style={{ ...headline, fontSize: "clamp(34px, 4.6vw, 64px)" }}>Một khởi đầu khỏe hơn<br />từ chính ngôi nhà của bạn.</h1>
             <p style={body}>Chăm sóc cơ thể tại nhà với một lộ trình rõ ràng hơn.</p>
-            <Link className="cine-cta" href="/san-pham" style={cta}>Khám phá TheraHOME</Link>
+            <Link className="cine-cta" href="/app" style={cta}>Khám phá TheraHOME</Link>
           </div>
 
           <div className="cine-copy" data-cine-copy="2" style={{ ...copyBase, bottom: "clamp(72px, 12vh, 140px)", visibility: "hidden" }}>
@@ -198,7 +198,7 @@ export function CinematicHero() {
           <div className="cine-copy" data-cine-copy="6" style={{ ...copyBase, top: "50%", transform: "translateY(-50%)", visibility: "hidden" }}>
             <Scrim />
             <h2 style={{ ...headline, fontSize: "clamp(32px, 4.2vw, 58px)" }}>Một cơ thể khỏe mạnh<br />là nền tảng cho những<br />điều tuyệt vời hơn.</h2>
-            <Link className="cine-cta" href="/san-pham" style={cta}>Khám phá TheraHOME</Link>
+            <Link className="cine-cta" href="/app" style={cta}>Khám phá TheraHOME</Link>
           </div>
         </div>
 

@@ -42,6 +42,14 @@ export function SafeImg({
       aria-hidden="true"
       className={className}
       onError={() => setFailed(true)}
+      // Kept as insurance for Google profile pictures, which this now also
+      // serves. Google avatars did fail to render in the admin console until
+      // the same header was added there — but a direct curl of one of these
+      // lh3.googleusercontent.com URLs returns 200 with or without a Referer,
+      // so the exact trigger is NOT pinned down and may be a browser-only
+      // signal. The header costs nothing on the local assets this started out
+      // serving, so it stays rather than being removed on a half-measurement.
+      referrerPolicy="no-referrer"
       style={style}
     />
   );

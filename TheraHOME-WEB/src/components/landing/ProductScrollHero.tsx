@@ -1,5 +1,9 @@
 "use client";
 
+// UNUSED since 2026-10-28: its only caller was /san-pham, which the owner
+// removed. Kept rather than deleted so the page can be restored as it was;
+// delete this file too if that decision becomes permanent.
+
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { LandingButton } from "@/components/landing/LandingButton";

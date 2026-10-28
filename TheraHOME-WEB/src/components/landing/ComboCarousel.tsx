@@ -1,5 +1,9 @@
 "use client";
 
+// UNUSED since 2026-10-28: its only caller was /san-pham, which the owner
+// removed. Kept rather than deleted so the page can be restored as it was;
+// delete this file too if that decision becomes permanent.
+
 // The combo showcase: four objects on a coloured ground, one in focus at a
 // time, the ground changing colour with it. It is a band INSIDE /san-pham,
 // directly under the two offers — the combo is a bundle of this product, not

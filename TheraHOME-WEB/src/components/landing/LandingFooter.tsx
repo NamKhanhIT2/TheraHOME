@@ -42,7 +42,6 @@ export function LandingFooter({ compact = false }: { compact?: boolean }) {
           </div>
           <div style={{ display: "flex", gap: 26, fontSize: 13, flexWrap: "wrap" }}>
             <Link href="/" style={{ color: "rgba(255,255,255,0.72)" }}>Trang chủ</Link>
-            <Link href="/san-pham" style={{ color: "rgba(255,255,255,0.72)" }}>Sản phẩm</Link>
             {SOCIAL.map((s) => (
               <a key={s.href} href={s.href} target="_blank" rel="noreferrer" style={{ color: "rgba(255,255,255,0.72)" }}>{s.label}</a>
             ))}
@@ -59,15 +58,6 @@ export function LandingFooter({ compact = false }: { compact?: boolean }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <Wordmark />
             <span style={{ fontSize: 13, lineHeight: 1.6, color: "rgba(255,255,255,0.6)" }}>Operated by H-COMMERCE GLOBAL COMPANY LIMITED</span>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Về chúng tôi</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 14 }}>
-              <Link href="/gioi-thieu" style={{ color: "rgba(255,255,255,0.78)" }}>Giới thiệu</Link>
-              <Link href="/gioi-thieu#lien-he" style={{ color: "rgba(255,255,255,0.78)" }}>Liên hệ</Link>
-              <Link href="/gioi-thieu#blog" style={{ color: "rgba(255,255,255,0.78)" }}>Blog</Link>
-            </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
