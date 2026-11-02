@@ -72,6 +72,7 @@ import {
   ShoppingBag,
   Shield,
   ShieldCheck,
+  ShoppingCart,
   Smartphone,
   SlidersHorizontal,
   Laugh,
@@ -82,6 +83,7 @@ import {
   Sun,
   Play,
   Trash2,
+  Timer,
   TrendingUp,
   User,
   UserX,
@@ -101,6 +103,11 @@ import {
 } from 'lucide-react-native';
 
 const ICONS: Record<string, LucideIcon> = {
+  // Home v3's nav and metric row: a cart (not the bag the old tab bar used)
+  // and a stopwatch. Its assistant button is the nurse mascot image, not a
+  // glyph — see AssistantBubble.
+  'shopping-cart': ShoppingCart,
+  timer: Timer,
   'chevron-left': ChevronLeft,
   play: Play,
   lock: Lock,

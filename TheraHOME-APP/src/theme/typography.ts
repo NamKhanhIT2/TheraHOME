@@ -5,6 +5,9 @@
 import type { TextStyle } from 'react-native';
 
 export const fontFamily = {
+  /** Home v3's hero numeral only — a hairline weight that reads as a
+   * display face at 72pt and as mush at anything smaller. */
+  extraLight: 'Inter_200ExtraLight',
   regular: 'Inter_400Regular',
   medium: 'Inter_500Medium',
   semiBold: 'Inter_600SemiBold',

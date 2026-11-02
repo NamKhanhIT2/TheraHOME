@@ -55,7 +55,6 @@ export const IAP_ENABLED = Platform.OS === 'android' ? IAP_ENABLED_ANDROID : IAP
  *   has_paid_access()            tập cùng chuyên viên + its reference clips
  *   suggested_reminder_hour()    reminders that follow the customer's habits
  *   dispatch-weekly-reports      the weekly progress report
- *   coin_settings.plan_codes     the xu programme (Plus and Trọn Đời only)
  *
  * The free tier is the floor in `baseline_limits()` — two AI messages a day,
  * no call minutes, no form-check megabytes — so the gap a customer pays to
@@ -100,3 +99,14 @@ export const SUBSCRIPTIONS_ENABLED = true;
  * feature and shows it, or does not contain it.
  */
 export const MOTION_TRACKING_ENABLED = true;
+
+/**
+ * 1-1 voice/video calls with the support team.
+ *
+ * The plumbing is all here and working — CallKit, PushKit, LiveKit, the
+ * `calls` table — but the owner is not releasing the feature yet
+ * (2026-10-27), so the customer has no way to start one. This hides the
+ * entrance in `app/chat/human.tsx` only; a specialist can still call out
+ * from the staff console, which is how a soft launch is run.
+ */
+export const CUSTOMER_CALLS_ENABLED = false;

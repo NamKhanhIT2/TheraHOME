@@ -70,3 +70,8 @@ scripts/.models/
 # The browser harness is built from source on demand (scripts/pose-preview/
 # build.mjs) and carries a copy of a reference clip. Nothing in it is source.
 scripts/pose-preview/dist/
+
+# Design-comparison renders (previews/*.png) — 38 MB of throwaway side-by-side
+# mockups from the Home v3 work. The Swift renderer that produces them IS
+# tracked; its output is not, because git keeps every byte forever.
+previews/*.png

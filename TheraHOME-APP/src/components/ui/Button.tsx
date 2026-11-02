@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -12,6 +12,11 @@ export interface ButtonProps {
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
   icon?: React.ReactNode;
+  /** 'glass' for the screens on the dark redesign's palette. Same switch
+   * `ScreenContainer` and `BackBar` carry — a light-mode primary button on
+   * one of those screens is the brand blue on near-black, which passes for
+   * deliberate until you put it next to a real one. */
+  tone?: 'app' | 'glass';
 }
 
 export function Button({
@@ -22,25 +27,28 @@ export function Button({
   loading,
   style,
   icon,
+  tone = 'app',
 }: ButtonProps) {
   const theme = useTheme();
   const isDisabled = disabled || loading;
+  const glass = tone === 'glass';
 
   const bg =
     variant === 'primary'
-      ? theme.colors.primary
+      ? glass ? homeGlassColors.tick : theme.colors.primary
       : variant === 'danger'
-        ? theme.colors.errorTint
+        ? glass ? homeGlassColors.surfaceRaised : theme.colors.errorTint
         : variant === 'secondary'
-          ? theme.colors.bgCardAlt
+          ? glass ? homeGlassColors.surfaceRaised : theme.colors.bgCardAlt
           : 'transparent';
   const textColor =
     variant === 'primary'
-      ? theme.colors.textOnPrimary
+      ? glass ? homeGlassColors.text : theme.colors.textOnPrimary
       : variant === 'danger'
-        ? theme.colors.error
-        : theme.colors.textPrimary;
-  const borderColor = variant === 'ghost' ? theme.colors.borderInput : 'transparent';
+        ? glass ? homeGlassColors.dotMissed : theme.colors.error
+        : glass ? homeGlassColors.text : theme.colors.textPrimary;
+  const borderColor =
+    variant === 'ghost' ? (glass ? homeGlassColors.hairline : theme.colors.borderInput) : 'transparent';
 
   return (
     <Pressable
