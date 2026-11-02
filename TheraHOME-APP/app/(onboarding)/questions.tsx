@@ -889,6 +889,14 @@ export default function QuestionsScreen() {
                       <View
                         style={[
                           styles.cinematicRadio,
+                          // Two of these questions accept several answers, and
+                          // the box was a circle on all of them — so nothing on
+                          // screen said so, and people answered one and moved on
+                          // (owner spotted it missing, 2026-11-02). The
+                          // accessibility role already said 'checkbox'; only the
+                          // drawing did not. A square is the one convention
+                          // everyone reads without being told.
+                          isMulti ? styles.cinematicCheckbox : null,
                           active
                             ? { borderColor: cinematicAccent, backgroundColor: cinematicAccent }
                             : undefined,
@@ -2228,6 +2236,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5,12,18,0.36)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cinematicCheckbox: {
+    borderRadius: 9,
   },
   cinematicRadioActive: {
     borderColor: '#18A9FF',
