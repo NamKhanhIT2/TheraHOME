@@ -85,7 +85,7 @@ export function RoadmapCalendar({ days, activatedAt, doneCount, totalDays, onSel
     return map;
   }, [days, activatedAt]);
 
-  const { cells, rowHeight, circleSize } = useMemo(() => {
+  const { weeks, rowHeight, circleSize } = useMemo(() => {
     const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
     const lead = mondayIndex(firstOfMonth);
     const length = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -97,6 +97,9 @@ export function RoadmapCalendar({ days, activatedAt, doneCount, totalDays, onSel
     const height = (ROW_HEIGHT * GRID_ROWS) / rows;
     return {
       cells: Array.from({ length: rows * 7 }, (_, index) => addDays(gridStart, index)),
+      weeks: Array.from({ length: rows }, (_, row) =>
+        Array.from({ length: 7 }, (_, column) => addDays(gridStart, row * 7 + column)),
+      ),
       rowHeight: height,
       circleSize: Math.min(MAX_CIRCLE, Math.floor(height - MARKER_HEIGHT)),
     };
@@ -160,8 +163,17 @@ export function RoadmapCalendar({ days, activatedAt, doneCount, totalDays, onSel
         ))}
       </View>
 
+      {/* One row per week, cells sharing it with flex — NOT one wrapping
+          grid of `100 / 7`% cells. Seven of those round up past the full
+          width on a narrow screen, so the seventh wrapped and every date
+          after it slid a column left: on an iPhone SE, Monday 2 November
+          sat under T3 (QA on an SE simulator, 2026-11-02). The weekday
+          header above already shares its row with `flex: 1`, which is why
+          it never drifted and the two disagreed. */}
       <View style={styles.grid}>
-        {cells.map((date) => {
+        {weeks.map((week, weekIndex) => (
+        <View key={weekIndex} style={styles.gridRow}>
+        {week.map((date) => {
           const inMonth = date.getMonth() === month.getMonth();
           const day = dayByDate.get(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
           const isToday = sameDay(date, today);
@@ -221,6 +233,8 @@ export function RoadmapCalendar({ days, activatedAt, doneCount, totalDays, onSel
             </Pressable>
           );
         })}
+        </View>
+        ))}
       </View>
 
       {/* No "Hôm nay" entry: the filled red circle under today's date says
@@ -301,12 +315,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     marginTop: 2,
   },
+  gridRow: {
+    flexDirection: 'row',
+  },
   cell: {
-    width: `${100 / 7}%`,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
