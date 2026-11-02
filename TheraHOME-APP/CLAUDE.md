@@ -17,6 +17,9 @@ working on its area** instead of guessing:
   login/onboarding/activation.
 - `docs/motion.md` — the Reanimated motion system: shared hooks/components
   and the rules for adding animation. Read before adding/changing motion.
+- `docs/home-ui-rules.md` — the owner's standing UI rules for Home v3.
+  Read it before touching `app/(tabs)/home.tsx` or `src/components/home/`;
+  most of them were learned by breaking them.
 - `docs/feature-notes.md` — the chronological, dated work log (community,
   notifications, market/language architecture, quiz/IAP phase unlock,
   redesigns, bug fixes…). When touching an existing feature, search this
@@ -62,6 +65,18 @@ this app lives in `.design-reference/` (`app.jsx`, `screens.jsx`,
 never imported or bundled.** When the design changes upstream, re-pull the
 relevant files via `DesignSync.get_file` and re-diff against
 `.design-reference/` rather than guessing what changed.
+
+`DesignSync` needs a one-off `/design-login`, run from an **interactive**
+Claude Code terminal on the machine — a headless or SDK session cannot start
+that flow and will just report the project as unauthorized. It is per
+machine, not per session.
+
+The Home tab is the exception to the frozen-copy rule: it was rebuilt
+2026-10-23 from **`TheraHOME Home v3.html`** (`home-oura.jsx`), which is NOT
+in `.design-reference/` — pull it with `DesignSync.get_file` instead of
+trusting a hand-copied baseline. See `docs/feature-notes.md` (2026-10-23) for
+what the translation dropped and why. Roadmap/Store/Community are still on
+the older light design pending their own v3 files.
 
 The same Claude Design project also contains three other surfaces that were
 **not** imported here and are out of scope for this app: `TheraHOME
@@ -281,9 +296,10 @@ not key secrecy).
 ## Guarding an optional native module: use the key the library itself reads
 
 Several files load a native module only if the running binary contains it
-(`src/lib/callkeep.ts`, `src/lib/voipPush.ts`, `src/components/call/CallVideo.tsx`,
-`src/lib/googleAuth.ts`, `src/hooks/useRingtone.ts`). The pattern is right —
-an older TestFlight build must not crash on a module it was built without —
+(`src/lib/callkeep.ts`, `src/lib/voipPush.ts`, `src/lib/callWindow.ts`,
+`src/components/call/CallVideo.tsx`, `src/lib/googleAuth.ts`,
+`src/hooks/useRingtone.ts`). The pattern is right — an older TestFlight
+build must not crash on a module it was built without —
 but the name passed to the guard is a trap, and it cost two shipped features.
 
 A guard with the wrong name is **indistinguishable from a build that lacks

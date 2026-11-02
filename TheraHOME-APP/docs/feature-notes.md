@@ -5703,3 +5703,2711 @@ notification at once. Two channels are sent deliberately — PushKit is the
 only thing that rings a locked iPhone, Expo covers Android and a
 backgrounded app — and both are cancelled when the call resolves. Removing
 the duplicate would mean losing the fallback.
+
+## 2026-10-19 — The call survives leaving the app (Android)
+
+Reported from the device: *"tôi muốn khi đang trong cuộc gọi mà thoát ra
+ngoài app thì vẫn phải thấy thanh nổi."*
+
+`<OngoingCallBar>` already kept a minimised call visible, but only inside
+the app — it is a React view, and the moment the user pressed Home there
+was nothing on screen to say a call was still connected, still billing and
+still carrying someone's voice. The in-app bar and this are the same idea
+one step apart.
+
+**Picture-in-picture, not a floating overlay.** A bar genuinely drawn over
+other apps is `SYSTEM_ALERT_WINDOW` — a permission the user has to find in
+a Settings page, and one Play reviews against its own policy.
+`app.json` deliberately keeps it in `blockedPermissions`, and it still can:
+PiP needs no permission at all, the system draws and moves the window, and
+tapping it is the way back into the call. This is what every other calling
+app does.
+
+**Three native hooks, because two of them are Activity callbacks.**
+`modules/therahome-callwindow` holds the module; MainActivity is generated
+by `expo prebuild`, so `plugins/withAndroidPictureInPicture.js` injects the
+callbacks and they call into `CallWindow`:
+
+| way out of the app | what catches it |
+|---|---|
+| Home / Recents, Android 12+ | `setAutoEnterEnabled` — the system does it, with no frame of full-screen app on the way out |
+| Home / Recents, Android 8–11 | `onUserLeaveHint()`, the only place those versions accept `enterPictureInPictureMode()` from — from `onPause` it is ignored |
+| Back on the last screen | a line inside React Native's own `invokeDefaultOnBackPressed`. Back never reaches `onUserLeaveHint`: RN answers it with `moveTaskToBack`, documented not to call that callback |
+
+That last one is **edited into** RN's existing override rather than added
+beside it — two overrides of one method do not compile — and the plugin
+throws if the method is ever renamed upstream, rather than shipping a build
+where Back quietly loses the call.
+
+**The app is the window.** PiP shrinks this view tree; it does not get one
+of its own. A full call screen at an inch tall is a name clipped to two
+letters and a hangup button too small to hit, so `<OngoingCallBar>` swaps
+itself for `<CallWindowView>` — who, how long, still running, and nothing
+else. Nothing interactive either: a PiP window receives no touches, so a
+button drawn there would be a button that cannot be pressed.
+
+**Armed only during a call.** An app that shrinks itself into a corner
+every time you press Home is a bug. `armCallWindow(false)` runs on every
+way out — call over, sign-out, reload — and `exitCallWindow()` closes a
+window left floating over someone's screen showing a call that has ended.
+
+iOS is untouched: CallKit already keeps a call visible there, and there is
+no app-level equivalent to reach for. `requireOptionalNativeModule` returns
+null and every function in `src/lib/callWindow.ts` becomes a no-op, so an
+older binary is unaffected too.
+
+## 2026-10-19 — R8 is on, and the DEX is 61% smaller
+
+Play Console had reported **"Tối ưu hoá mã DEX: Thấp"** on every bundle this
+app has ever uploaded: 1% obfuscated, no R8 configuration, 55 MB of DEX.
+The cause was one line of Expo's template —
+`android.enableMinifyInReleaseBuilds=false`.
+
+| | versionCode 23 (no R8) | now |
+|---|---|---|
+| uncompressed DEX | 62.4 MB | **24.4 MB** |
+
+**The flag was the easy half.** R8 deletes and renames anything it cannot
+see being used, and it cannot see JNI, a class named as a string in a
+manifest, or a reflective lookup. Those failures do not fail the build,
+do not appear in a debug build, and land on a customer's phone. So the
+keep rules in `plugins/android-keep-rules.pro` are the actual work, and
+every block in it names the thing that breaks without it. Two libraries
+turned out to ship **no consumer rules at all**, which is why they are
+first in the file:
+
+- **LiveKit's WebRTC** (`livekit.org.webrtc`) — the .aar has an empty
+  classes.jar and no proguard.txt. libwebrtc is C++ calling back into Java
+  by name; without the rule there are no calls.
+- **MediaPipe** (`tasks-vision`, `tasks-core`) — same, plus protobuf
+  fields read reflectively, so `GeneratedMessageLite` field names have to
+  survive even where the class is kept.
+
+Also kept whole: Nitro (`com.margelo.nitro.**`, which is what
+react-native-iap is now — the one path where a failure costs a customer
+money), CallKeep, and our own three modules under `ai.therahome.**`.
+
+**R8 does not fit in the daemon Expo configures.** The first release build
+died in `minifyReleaseWithR8` with "the JVM garbage collector is thrashing
+and after running out of JVM Metaspace" — 2 GB heap, 512 MB metaspace. It
+reads like a broken keep rule and is not one. `plugins/withAndroidR8.js`
+raises it to 6 GB / 2 GB, so the next person to build on a different
+machine does not lose an hour to it.
+
+**Resource shrinking is deliberately still off.** The warning is about
+DEX, and resource shrinking is the half that strips drawables and assets
+referenced by name — including `pose_landmarker_lite.task`. Verified
+present in the output APK, along with the JS bundle.
+
+**Two rules were missing, and only the device found them.** The build was
+green, lint was green, and the DEX contained everything the first check
+looked for. Then:
+
+1. The app **crashed on launch** —
+   `ClassNotFoundException: livekit.org.jni_zero.JniInit`, then
+   `Fatal signal 5 (SIGTRAP)`. jni_zero registers every WebRTC native
+   method and lives in a SIBLING package to `livekit.org.webrtc`, which
+   was all the first rule covered. Redrawn one level up at
+   `livekit.org.**`.
+2. The app then launched cleanly but logged, every time,
+   `ClassNotFoundException:
+   expo.modules.adapters.react.apploader.RNHeadlessAppLoader`. **Not
+   fatal, which is what makes it the worse of the two**: it does not
+   crash, it just means no background task ever starts again — on this
+   app, the push that rings an Android phone for a call while the app is
+   killed. Confirmed against versionCode 23: the class is in that DEX,
+   and `usage.txt` lists R8 removing it from this one. It is reached by
+   `Class.forName` on a string read from `<meta-data android:value>`;
+   AGP auto-keeps `android:name`, and has no way to know a `value` is a
+   class name.
+
+The lesson is the cheap one to state and the expensive one to learn:
+**a release build with R8 has to be run on a phone before it is trusted.**
+Neither failure was visible from the build, the lint, or the DEX contents.
+
+**What was verified**, by reading the DEX of the built APK rather than
+trusting the rules: `livekit.org.webrtc.PeerConnection`,
+`PoseLandmarker`, all three `ai.therahome` modules,
+`VoiceConnectionService`, `com.margelo.nitro.iap`, `BillingClient`,
+`WebRTCModule`, Reanimated, Firebase Messaging, Google Sign-In and
+expo-notifications all survive with their original names.
+`com.facebook.react.ReactActivity` is renamed to `com.facebook.react.p` —
+obfuscation working, not a class gone missing. `expo.modules.updates` is
+absent because expo-updates is not a dependency; the manifest meta-data
+keys are template leftovers.
+
+**Upload the AAB, never a bare APK.** Obfuscated stack traces are only
+readable because `mapping.txt` rides inside the bundle for Play to
+de-obfuscate with. The universal APK built for this check is 252 MB
+because it carries all four ABIs at once; the AAB splits them and is not
+comparable.
+
+And on the device, from logcat with the R8'd build installed:
+`Successfully loaded NitroIap C++ library`, the bridgeless ReactHost
+creating its instance and attaching a surface, and
+`NativeLibrary: Loading native library: lkjingle_peerconnection_so`
+followed by `PeerConnectionFactory ... initialized` — the exact path that
+had crashed. No FATAL, no ClassNotFoundException.
+
+**Not verified by machine:** everything behind the lock screen. The test
+handset takes a pattern, so the call, purchase and motion-tracking flows
+are the owner's to run.
+
+**Not done:** Play also suggests AGP 9.0. Expo SDK 57 pins AGP 8.12, so
+that is an Expo upgrade, not a setting.
+
+## 2026-10-21 — The app can say "you are too old" (shipped off)
+
+Owner's question: *"người dùng vẫn phải cập nhật thủ công à, hay không nhận
+được thông báo gì?"*
+
+Neither store notifies anybody. iOS has no such notification at all; both
+stores lean on the phone's own auto-update setting — on by default, but it
+runs overnight, on Wi-Fi, while charging. So a release reaches most people
+within a day or two and reaches the rest **never**: someone who switched
+auto-update off keeps the build they installed in September for as long as
+they own the phone.
+
+Survivable until the server moves. Edge functions, RPCs and the schema go
+on changing; an old binary eventually calls something that is not there any
+more, and the customer hits a failure nobody can reproduce.
+
+**Two thresholds, per platform, in `app_config`** — the shape every other
+app uses:
+
+| key | effect |
+|---|---|
+| `ios_latest_version` / `android_latest_version` | a card with a "Để sau" |
+| `ios_min_version` / `android_min_version` | a wall with no way past it |
+
+Per platform because the stores release on their own clock: Apple approves
+in about a day, Play rolls out over several. One shared threshold raised the
+moment Apple approves would block every Android customer whose update has
+not been offered to them yet.
+
+**All four ship empty, and empty means off.** Nothing appears until somebody
+sets a value in WEB Admin → "Nội dung ứng dụng".
+
+**Everything fails open, and that is the design.** `decideUpdate()` treats a
+blank row, a missing row, an unparseable string and an unknown installed
+version as "no update needed". `tests/app-update.test.cjs` (`npm run
+test:update`, 8 tests) exists for exactly one reason: these values are typed
+by a person into a web form, read by every install on the next launch, and
+the `required` verdict has no way past it. A gate that failed closed would
+take every customer's app away over a typo — and the person who made the
+typo would be the only one who could undo it.
+
+**The nudge asks once per build.** Dismissing records the installed version;
+the next release makes that record stale and the card returns by itself.
+There is no dismissing a required update, which is what required means.
+
+**The trap worth writing down**, and it is in the admin help text too: never
+set `min_version` to a build that is still **in review**. App Review runs
+the older binary, would hit the wall, and would reject the app. Raise it
+only after the new build is live.
+
+Where it lives: `src/lib/appUpdate.ts` (the decision, pure and tested),
+`src/components/UpdateGate.tsx` (the two shapes), mounted last in
+`app/_layout.tsx` so a required update covers the call bar, the incoming-call
+sheet and onboarding alike. The store button opens `itms-apps://` /
+`market://` and falls back to the https page.
+
+**Not done:** no `expo-updates`, so this is still store updates only — the
+gate tells people to go to the store, it cannot deliver JavaScript over the
+air. That remains a separate decision.
+
+## 2026-10-23 — Home v3: the photo-backed home screen
+
+`app/(tabs)/home.tsx` is now a translation of **`TheraHOME Home v3.html`**
+(`home-oura.jsx`) from the Claude Design project. It replaces the light
+card-stack Home: a full-bleed photograph, glass panels over it, and a hero
+that scrolls away under a darkening scrim.
+
+**Only Home changed.** Roadmap, Store and Community keep the shared white tab
+bar and the light theme; the owner is still designing those (2026-10-23).
+
+### Reading the design again
+
+`DesignSync` refused every call until `/design-login` was run once from an
+interactive terminal — headless sessions cannot start that flow, and the
+error says so. It is a one-off per machine; after it, `get_file` on project
+`d030fe5f-…` works normally. **The upstream files for this screen are
+`home-oura.jsx`, `ios-frame.jsx`, `image-slot.js` and `TheraHOME Home
+v3.html`.** They were deliberately NOT frozen into `.design-reference/`:
+hand-transcribing 13KB of JSX would have produced a diff baseline nobody
+could trust. Re-pull them with `DesignSync.get_file` instead — that is now
+the cheaper and more reliable path.
+
+### What the prototype does that React Native cannot
+
+Three effects were dropped, each noted at the place it would have gone:
+
+- **The blurred second photo.** The prototype stacks a `blur(9px)` copy of
+  the hero image masked to the lower 40% of the frame. There is no blur
+  without `expo-blur`, which is a native module — a new dev-client build
+  before anyone could even look at the screen. The scrim is already 75–95%
+  opaque exactly where that copy would show, so the sharp original under the
+  scrim is the whole surviving effect.
+- **`backdrop-filter` on the glass.** Same reason. What carries the panels is
+  the tint and the hairline, which is most of it: the designer had already
+  put a near-opaque dark fill (`rgba(20,40,56,0.38)`) under every blur.
+- **The scroll mask.** A CSS mask feathers the scroll content's top and
+  bottom edges; RN would need a masked view. The header gradient and the
+  bottom scrim do the same job.
+
+Gradients are `react-native-svg` (`components/home/VerticalGradient.tsx`),
+not `expo-linear-gradient` — same reasoning, and svg was already a dependency.
+**No native module was added, so an existing dev client loads this over the
+JS bundle with no rebuild.**
+
+### Real data behind the prototype's fixtures
+
+The prototype runs on fixed arrays. Everything here is the hooks Home already
+used, unchanged — the data layer was not touched at all:
+
+| Prototype | Now |
+|---|---|
+| 28 dots, 14 green then 14 red | one dot per `program_days` row, by real status (`GlassRoadmapCard`) |
+| `PAIN_SETS[7\|14]` | `usePainLogs`, windowed, labelled with the real day number |
+| `cups` in component state | `useWaterLog` / `useSetWaterLog` |
+| `NGÀY 10/14` | `useAccessibleProgress` — still excludes IAP-locked phases |
+| "Giai đoạn 2" | the position of today's `phaseId` in the programme |
+| a hardcoded article | the pinned official post, same one Community pins |
+
+Two additions the prototype has no concept of, both of which a real customer
+hits on day one: the discomfort chart has an **empty state** (nobody has
+logged anything yet), and the hero keeps all four of its old branches —
+roadmap-not-published, still-resolving-locks, has-a-day, and
+not-yet-activated.
+
+**"Luyện tập 30p" is a fixed string.** Nothing records how long a session
+took. The owner asked (2026-10-23) to keep the design's figure rather than
+drop the metric or compute a substitute. Swap it the day a session logs its
+duration — `app/(tabs)/home.tsx`, search for `value="30p"`.
+
+### The bottom bar
+
+The design's bar is a translucent pill over the photograph; the shared one in
+`(tabs)/_layout.tsx` is an opaque strip under it. So `CustomTabBar` returns
+`null` while `home` is the focused route and Home paints `HomeGlassNav`
+itself. The assistant is the *same* `AssistantBubble` component with two new
+props (`placement="inline"`, `appearance="glass"`) — the AI/specialist picker
+sheet is shared, not duplicated.
+
+When the other three tabs get their own v3 designs, the per-route opt-out is
+what should collapse back into one bar.
+
+### Two deliberate losses, and one thing left alone
+
+- **The product dropdown is gone from Home.** v3 puts the device name in the
+  header instead. Switching devices still works from the Roadmap tab, which
+  is where Home's dropdown was mirrored from in the first place.
+- **`PainChart.tsx` and `WaterCard.tsx` are now unused.** Kept, not deleted:
+  the other three tabs are mid-redesign and a light-theme chart or water card
+  may well land in one of them. Delete them if that turns out false.
+- **`UpgradeCard` has no v3 design**, so it still renders with its own light
+  card chrome in the middle of the glass stack. It was kept rather than
+  dropped because dropping it would silently remove an upsell — but it is the
+  one thing on the screen that does not match. Needs a design.
+
+### Tokens
+
+No hex was hardcoded. The screen's palette is `homeGlassColors` in
+`src/theme/colors.ts`, sitting beside `painScaleColors`/`poseColors` for the
+same reason those do: it is read on a photograph under a scrim, so it does
+not flip with the light/dark setting. `Inter_200ExtraLight` was added to the
+font load for the 72pt day numeral — an asset from the already-installed
+`@expo-google-fonts/inter`, so a download, not a build.
+
+## 2026-10-23 (later) — Home v3, second pass: the blur, the raised edge, SF Pro
+
+The owner sent a screen recording of the prototype and asked for the scroll
+effect and a 100% match. Three things were wrong or missing in the first pass.
+
+### The raised edge was flattened into a border
+
+Every Home v3 surface is built in the prototype from a 145° sheen plus **two
+opposing inset shadows**:
+
+```
+background: linear-gradient(145deg, rgba(255,255,255,0.07), transparent 55%)
+box-shadow: inset  1.5px  1.5px 1px rgba(255,255,255,0.16),
+            inset -2px   -2px  4px rgba(0,20,40,0.18)
+```
+
+The first pass collapsed all of that into one flat `borderColor`, which is
+exactly why it read bezel-less beside the design. `components/home/
+NeumorphicSurface.tsx` now paints it with `react-native-svg`: the fill carries
+the 145° sheen, and the stroke runs light → neutral → dark along the same
+diagonal, which is what two opposing inset shadows amount to. It measures its
+own box via `onLayout` because the rim is stroked ON the rect edge and
+react-native-svg has no `calc()`.
+
+Used by the metric discs, the cards, the nav pill, the two header buttons,
+the start pill, the water steppers and the assistant button. The flat
+`borderWidth`s were removed from `glass.ts` at the same time — leaving both
+cancels the effect out.
+
+### The blur
+
+The prototype runs `filter: blur()` over the hero as it scrolls. React Native
+cannot blur a live view, so this took two mechanisms:
+
+- **The photograph** — two stacked copies, sharp and `blurRadius={18}`,
+  cross-faded on scroll. `blurRadius` is RN core; no dependency.
+- **The text, gauge and button** — `expo-blur`'s `BlurView`, which blurs
+  whatever was painted beneath it, clipped to its own bounds. It is the LAST
+  child inside the hero block, so it catches the hero's own content, and it
+  scrolls with that block rather than sitting on a fixed region of the screen
+  — otherwise a card scrolling up into that region would blur too, which the
+  recording clearly shows does not happen.
+
+  Held at a fixed `intensity` and faded in by **opacity**, deliberately:
+  animating `intensity` would drop the whole thing off the native driver.
+
+**This added `expo-blur`, the first native dependency this screen needed.**
+Until then every change here reached the phone by re-bundling JS into an
+existing binary; from this commit on, Home v3 needs a dev client built after
+2026-10-23. The owner approved the rebuild.
+
+### SF Pro
+
+The prototype asks for `"SF Pro Display", "SF Pro Text", -apple-system`, and
+the hero's proportions are tuned to it — the 72pt hairline numeral especially.
+So this screen, and only this screen, steps outside the app's Inter:
+`heroFont()` in `components/home/glass.ts` returns the system face on iOS
+(which IS SF Pro) and keeps Inter at the matching weight on Android, which has
+no SF Pro and would otherwise fall back to Roboto at a weight Inter would have
+rendered differently.
+
+### Also fixed, from the owner's side-by-side
+
+- **The photo was framed wrong.** `resizeMode="cover"` was left to size itself
+  from `left`/`right`/`height`, and it put the figure off the right edge. It
+  also cannot express the prototype's `object-position: 50% 0%`. The cover
+  maths is now done by hand in `home.tsx` — scale to cover, centre
+  horizontally, hang the extra height off the bottom.
+- **The header showed `Thiết bị hỗ trợ cổ · Th…`** — the catalogue name is a
+  sentence. `deviceWordmark()` takes whatever follows the last `·` and
+  uppercases it, giving `THERANECK+`.
+- Store icon: bag → **cart**. Training metric: clock → **stopwatch**.
+  Assistant: the brand avatar → the **robot glyph** in a glass disc, as the
+  design draws it. `bot`, `shopping-cart` and `timer` added to `Icon.tsx`.
+- **"Hướng dẫn nhanh" was removed.** The first pass added it to preserve the
+  old Home's quick-guide button; the recording confirms the design has no such
+  link. The day's video is still reachable through "Bắt đầu hôm nay" → the day
+  screen, so no feature was lost.
+
+### One bug the device caught that nothing else did
+
+The first device run crashed instantly with `Property 'R' doesn't exist`.
+`ArcGauge` called a module-scope `'worklet'` helper from inside another
+worklet; serialised to the UI thread, that helper arrives **without its own
+closure**, so the geometry constants simply do not exist there. Typecheck,
+lint and `expo export` all passed. The maths is now inlined into the worklet
+that needs it, where the babel plugin captures the constants properly, and
+`pointAt` is a plain function used only to build the static path.
+
+**The rule**: do not call a module-scope worklet from another worklet. Inline
+it, or pass what it needs as arguments.
+
+## 2026-10-24 — Why the Debug configuration could not be built, and the fix
+
+Debug had been unbuildable on this machine for at least a week, and it failed
+in a way that looked like something else entirely: the 2026-10-17 Debug build
+in DerivedData was a *partially written* `.app`, and installing it gave
+
+```
+dyld: Library not loaded: @rpath/TheraHOME.debug.dylib
+```
+
+which reads as a packaging bug. It was not. The build had failed and left the
+`.app` behind. Two separate faults, stacked:
+
+### 1. Xcode 16's debug-dylib split + SwiftUICore
+
+With `ENABLE_DEBUG_DYLIB` on (Xcode 16's default for Debug), the app's own
+code links into a separate `TheraHOME.debug.dylib`. That link step fails here:
+
+```
+cannot link directly with 'SwiftUICore' because product being built
+is not an allowed client of it
+```
+
+`plugins/withIosNoDebugDylib.js` sets `ENABLE_DEBUG_DYLIB = NO` for every
+Debug configuration, putting the code back in the main binary where it lived
+before Xcode 16. Release never used the split, which is why Release always
+worked.
+
+### 2. The prebuilt React core was always the Release flavour
+
+With that out of the way, the link failed again:
+
+```
+Undefined symbol: _OBJC_CLASS_$_RCTPackagerConnection
+referenced from libexpo-dev-launcher.a
+```
+
+React Native ships its core, its C++ dependencies and Hermes as prebuilt
+xcframeworks (`RCT_USE_PREBUILT_RNCORE`, on unless
+`ios.buildReactNativeFromSource` is set). A script phase swaps in the
+Debug-flavoured artifact, and its test is:
+
+```sh
+CONFIG="Release"
+if echo $GCC_PREPROCESSOR_DEFINITIONS | grep -q "DEBUG=1"; then CONFIG="Debug"; fi
+```
+
+**CocoaPods never puts `DEBUG=1` on a pod target** — `React-Core-prebuilt`'s
+Debug xcconfig is just `$(inherited) COCOAPODS=1`. So the test never fired and
+every Debug build linked the Release core, which has no dev-support classes in
+it. `plugins/withIosPrebuiltDebugArtifacts.js` adds `DEBUG=1` to the Debug
+configuration of `React-Core-prebuilt`, `ReactNativeDependencies` and
+`hermes-engine` through a Podfile `post_install` hook. All three swap together
+on purpose: a Debug core against a Release Hermes is not a combination anybody
+tests.
+
+### 3. A stale marker, which needed clearing once by hand
+
+`replace-rncore-version.js` keeps `React-Core-prebuilt/.last_build_configuration`
+and skips the swap when it already matches — plus:
+
+```js
+// Assumption: if there is no stored last build, we assume that it was build for debug.
+if (!fileExists && configuration === 'Debug') return false;
+```
+
+Those two rules had left the marker saying `Debug` while the extracted
+artifact was Release. Writing `Release` into the three markers
+(`Pods/`, `Pods/React-Core-prebuilt/`, `Pods/ReactNativeDependencies/`) made
+the next Debug build notice the mismatch and extract properly. **If Debug ever
+starts failing on a missing React symbol again, check those markers against
+what is actually extracted before anything else.**
+
+### A measurement trap worth remembering
+
+While chasing this I "confirmed" twice that the prebuilt core had no
+dev-support symbols, using `nm -g`. That was wrong: `nm -g` reports nothing
+useful for this framework — even `_OBJC_CLASS_$_RCTBridge` comes back as zero.
+`nm -a` finds 85 symbols mentioning `RCTPackagerConnection`. The conclusion
+happened to point the right way, but the evidence for it was junk.
+
+### Where this leaves the loop
+
+Debug builds and installs again, so `npx expo run:ios --device <udid>` gives
+live reload over Metro. The Release path still works and is what the fast
+"re-bundle JS into an existing binary, re-sign, install" loop uses (~1 min, no
+native compile) when the native side has not changed.
+
+## 2026-10-24 — The arc gauge sat at zero on day 14
+
+Reported as "why is the bright dot at 0 when it is day 14". Not an animation
+fault — the gauge was being handed provisional numbers and chasing them.
+
+`console.log` on the gauge's inputs, read off Metro, gave the whole story in
+four lines per launch:
+
+```
+[ArcGauge] value 0,  max 1   target 0
+[ArcGauge] value 0,  max 14  target 0
+[ArcGauge] value 14, max 28  target 0.5
+[ArcGauge] value 14, max 14  target 1
+```
+
+`useAccessibleProgress` reports **provisional** values until the phase-lock and
+purchase queries settle — 28 reachable days before, 14 after — and says so
+through `isReady`. The hero copy already gates on that flag; the gauge, which
+renders above it, did not. So every launch restarted a 1.2s fill from whatever
+the head had reached, three times over: the head crawled near zero, jumped to
+half, then to full. Screenshot it early enough and it reads as stuck at 0.
+
+`ArcGauge` now takes `ready` and holds empty until the numbers are real, then
+fills once. **Anything else that animates off `useAccessibleProgress` needs the
+same gate.**
+
+### Two wrong turns on the way, both from testing badly
+
+- Blamed `MaskedView` for freezing UI-thread animation in its subtree. Reading
+  `RNCMaskedView.m` settled it: the component sets `self.maskView` and nothing
+  else — no rasterisation, no snapshot. It was never implicated.
+- Before that, the same gauge really had been broken by `<Filter>` /
+  `<FeGaussianBlur>`: they compile and typecheck, but on iOS the filtered paths
+  do not draw at all, which left only the one unfiltered head dot on screen.
+  The bloom is concentric strokes now. **Do not use react-native-svg filter
+  primitives in this app.**
+
+Both times the fix only arrived after measuring instead of reasoning from the
+screenshot.
+
+## 2026-10-24 — Water is an instrument dial now, not a tumbler
+
+The photographed glass is gone: `WaterGlass.tsx` and `assets/water/` were
+deleted, and `src/components/home/WaterDial.tsx` took its place in Home's card
+stack. The owner's reference is a dark panel with a bezelled dial, a blue band
+running clockwise from twelve o'clock, eight tick marks, and a needle. The two
+knobs either side step the count. The needle is red and stops well inside the
+ticks: the first pass had it blue and reaching the band, which read as the
+pointer fouling its own scale (owner, same day).
+
+### The radii are measured, not chosen
+
+The reference image was sampled in polar coordinates around the dial's centre —
+counting white and blue pixels by radius — which gave the band at 229–258px,
+the ticks at 224–249, the rim at 263–271 and the drop glyph at 97–134, on a
+dial 271px in radius. Everything in the component is those numbers scaled by
+98/271 into a 200-unit viewBox. The first pass was eyeballed from a screenshot
+instead and had the band half again too thick and the glyph nearly three times
+too big; a 20-line histogram settled it in one go.
+
+### How it moves
+
+One shared value, `turn`, drives both the arc and the needle, so the pointer can
+never disagree with the band: the arc's `d` is rebuilt from it in a worklet, and
+the needle is a separate `Animated.View` that is simply rotated. `turn` is capped at 0.9999 — a 360° arc has its start and
+end at the same point and draws nothing at all. It stays at zero until the
+section scrolls into view, then springs to today's count.
+
+Pressing a knob writes a local `shown` first and calls `onSet` second, the same
+optimistic trick the glass needed: waiting for the mutation and the query cache
+to come back round is what made the old buttons feel slow.
+
+The panel itself is a plain `GlassCard`, like every other card in the stack —
+the reference's own near-black panel was the one thing that had to go, because
+on this screen it was the only opaque card among translucent ones and the stack
+stopped reading as one material. The dial's face keeps the dark, but tinted to
+the screen's blue-black and kept darker than the card, so it reads as sunk in.
+
+## 2026-10-24 (later) — The card stack lost its cards
+
+Home's scrolling stack is flat now: `glassCard` paints nothing, `GlassCard` no
+longer wraps its children in a `NeumorphicSurface` rim, and the panels'
+drop shadows are gone. Content sits straight on the screen's own background,
+which is what the owner asked for. What replaced the card edge:
+
+- `GLASS_CARD_GAP` 10 → 28. The gap is the only thing separating two blocks
+  now, so it has to be big enough to read as a break.
+- `GLASS_CARD_PADDING` 16 → 8, applied horizontally only, which lines the
+  stack up with the hero instead of insetting it twice.
+- `UpgradeCard` was redrawn in `homeGlassColors`. It renders on exactly one
+  screen, and it was the last light-themed card left; flat, on a dark scrim,
+  it would have been the only sheet of white paper on the screen. Its pill
+  keeps a fill, because that is the part you press.
+
+Each block still fades and lifts into view through `ScrollFade` — with no card
+outline, that entrance is now the main thing that tells one block from the next
+as you scroll.
+
+## 2026-10-24 (later still) — Three things the launch video showed
+
+The owner recorded a cold launch and a scroll. Most of what is visible in it
+is the dev client: the "Downloading 0%…100%" banner is Metro handing over a
+19MB debug bundle, and nothing in a release build does that. Underneath it
+were three real faults.
+
+### A scroll gesture re-rendered the whole screen
+
+`lookAt` — where the mascot is looking — was `useState` on HomeScreen, written
+from `onTouchStart` on the root view. The first touch of every drag therefore
+re-rendered Home entire: hero, chart, dial, roadmap, article card. It now
+lives in `src/components/home/glanceStore.ts`, a module-level store read
+through `useSyncExternalStore` by `HomeMascot` and by nothing else, so a
+glance costs one small subtree instead of the screen.
+
+Still re-rendering Home once mid-scroll: `setWaterActive`, when the dial
+reaches the middle of the screen. Once per session, by design — if that single
+hitch is visible it can move to the same store.
+
+### The white flash was the app shell
+
+`app/_layout.tsx` wraps everything in a `bgApp` (#EEF3FB) view. It is visible
+for exactly one handoff — the frames between the splash coming down and the
+first screen painting — and for a signed-in boot that screen is Home, which is
+dark. It now uses `homeGlassColors.sky[4]` while `inApp`, so the gap matches
+what lands in it instead of flashing near-white.
+
+### The hero's placeholders were a missing warm-up
+
+`useHomeWarmup` deliberately skipped `program_days`, which is the longest part
+of the chain: phases, then days, two serial round trips behind the programme
+list. So the splash came down and the hero sat in placeholders for over a
+second. It now warms the first activated programme's days and waits for them
+to settle (success or error, not merely "not loading" — there is a render
+between the two queries where nothing is in flight). The cap went 2500 → 3000
+ms, which on a release build is 1.2s past the splash's own 1820ms minimum.
+
+It warms the FIRST programme rather than re-deriving Home's choice of one.
+That rule reads the persisted selection, the default product, the publish flag
+and the review-account exemption; a second copy of it here would drift.
+
+## 2026-10-24 (evening) — Measuring the scroll instead of arguing about it
+
+The owner filmed a scroll that still stuttered. Rather than guess again, the
+recording was measured: each frame's vertical displacement was recovered by
+correlating a 40×800 column of it against the frame before (row-averaged to
+1-D first, searched over ±40px). Through the hero's fade the series reads
+
+    -16 +4 -17 +4 -8 0 -10 0 -6 +2 -4 0 ...
+
+— **one frame in four does not move at all**, and the next one jumps double.
+On a 30fps capture that is the app rendering in the low twenties. A fling
+later in the same recording runs `-12 -12 -40 -37 -29 -5 -9 -32 -9`: the
+velocity swings sixfold between frames. That pattern is GPU-bound compositing,
+not JS — which matters, because it means a release build would not have fixed
+it.
+
+What was stacked in that one window: a live full-screen blur, a full-screen
+mask, two cross-fading photographs, and five `react-native-svg` views being
+scaled. Three changes:
+
+- **The hero's live BlurView is gone.** A `UIVisualEffectView` re-blurs its
+  backdrop every frame; it covered most of the screen, was alive for the first
+  450px of scroll, and sat *inside* the MaskedView, so it ran inside that
+  mask's offscreen pass. The photograph still cross-fades into a blurred copy
+  of itself — the part of the effect you actually see — and the hero's content
+  now fades and shrinks instead of blurring. One commented block in home.tsx
+  restores it.
+- **Vector content is cached, not redrawn.** iOS re-rasterises SVG when a
+  layer's scale changes, and both the hero (1 → 0.9) and every card
+  (0.94 → 1) are scaled by the scroll. The metrics row, the gauge (once its
+  arc has finished filling) and the two still cards now set
+  `shouldRasterizeIOS`; Fabric sets `rasterizationScale` to the display scale,
+  so the cache stays sharp. The dial is pointedly NOT cached — its needle
+  animates, and the cache would be invalid every frame.
+- **The last mid-scroll `setState` is gone.** `waterActive` moved to
+  `waterArrival.ts`, the same store pattern as the glance point, so the dial
+  learns it has arrived without re-rendering Home.
+
+The MaskedView stays. It is the cheaper of the two offscreen passes, and it is
+there because the owner asked twice for content to disappear under the header
+rather than be dimmed by a scrim.
+
+## 2026-10-24 (night) — The skeleton was the network, so the network left the path
+
+Warming `program_days` under the splash only started the chain earlier; it
+still had to run. Session, products, programmes, phases, days — five round
+trips before the hero can show a day number, and on a slow one the warm-up's
+cap expires and hands over placeholders anyway. The owner saw them a third
+time.
+
+`src/lib/queryPersistence.ts` keeps a disk copy of the eight slow-moving
+queries the hero is built from (`products`, `user_programs`, `program_phases`,
+`user_program_days`, the two phase-lock ones, and the product defaults), read
+into the cache in `_layout.tsx` before the boot gate opens and mirrored back
+on a 1.5s debounce. From the second launch on, Home paints from what it knew
+last time and revalidates underneath; the warm-up then returns true on its
+first call instead of waiting for anything.
+
+Three details that matter:
+
+- `setQueryData` counts as an update, so `isFetched` is true for a hydrated
+  query — which is exactly what `useAccessibleProgress.isReady` and the hero
+  gate on.
+- A hydrated entry never overwrites one that is already newer. The disk read
+  cannot lose that race in practice (tens of ms against a round trip), but a
+  bug that only appears when it does is one nobody would ever reproduce.
+- The whitelist is short on purpose. Posts, notifications and anything counted
+  per-day are cheaper to refetch than to reason about when stale.
+
+First launch after an install still walks the chain. Nothing can fix that one
+but a faster chain.
+
+## 2026-10-24 (night) — The mask is gone; the edges moved into the blocks
+
+The owner chose smoothness over the look of it (asked directly). `MaskedView`
+is out of `app/(tabs)/home.tsx`: a mask makes iOS render the layer it covers
+into its own buffer on every frame, and what it covered was the entire
+scrolling screen.
+
+Each block now enforces the same two edges itself, from its measured geometry.
+`ScrollFade` builds opacity as the product of two guards — one keyed to the
+block's bottom clearing the nav, one to its top meeting the header — both
+plain interpolations of the same `scrollY`, so everything stays on the native
+driver and the composite is `Animated.multiply`.
+
+Two things the geometry forced:
+
+- **The ramps scale with the room a block has.** The dial is 420pt tall in a
+  640pt band; with fixed 170/130 ramps it would have begun leaving before it
+  finished arriving and never been fully opaque. Each ramp is now capped at a
+  fraction of the slack, which leaves every block a plateau (chart 75px of
+  scroll, dial 45, article 170).
+- **A hero row cannot fade before it reaches the header — it starts there.**
+  The metrics row rests exactly on the header's lower edge, so the strict rule
+  would have rendered it invisible at rest. The hero's three rows use a
+  height-anchored guard instead: full while just below the header, gone by the
+  time their bottom edge has passed under it. They dissolve one after another
+  — metrics over the first 62px of scroll, the gauge 78→181, the copy
+  300→438 — which is close to what the mask did to them anyway.
+
+What is lost: the mask dissolved a block gradually across itself, top edge
+first with the bottom still crisp. A block now dims as a whole. Nothing is
+drawn under the fixed furniture either way, which was the owner's actual
+requirement.
+
+`@react-native-masked-view/masked-view` is still a dependency and nothing
+imports it. Left installed deliberately: removing it means a pod change and a
+native build, for no gain.
+
+### The same cache crashed the screen an hour later
+
+`undefined is not a function`, from `useAccessibleProgress`'s
+`requirements.has(d.phaseId)`.
+
+`phase_promos_lock` and `phase_purchases` both resolve to a **Map**, and
+`JSON.stringify(new Map(...))` is `{}` — no error, no warning, just an empty
+object. Hydrating that put something with no `.has()` where every caller
+expects a Map. The round trip was the whole mechanism and I never checked what
+it could carry.
+
+The persister now tags Maps and Sets on the way out (`{__map: [...]}`) and
+rebuilds them on the way in, and the storage key moved to v2 so nothing ever
+reads what v1 wrote; v1's key is deleted on the next launch. Dates are
+deliberately NOT handled — nothing persisted here holds one (programme rows
+keep `activatedAt` as Supabase's ISO string) and a reviver guessing at
+date-shaped strings would cause more trouble than it solves.
+
+Rule for anything added to that whitelist: if the query's data is not plain
+JSON, it does not go in without a tag here.
+
+## 2026-10-24 (late) — What "smooth like the design" actually meant
+
+The owner sent the design recording back with "closer, but not as smooth as
+the design". Measured the same way as the app clip — per-frame displacement
+from a 40×800 column — the prototype runs at **5% frozen frames** against the
+app's 25% before any of this week's work, with a velocity series that climbs
+and decays evenly (`-6 -7 -9 -4 -4 -6 -3 -4 -3 -6 -2 -7 -9 ...`). That is the
+number to beat.
+
+But the frames say something the number does not. Stepping through the
+prototype's scroll: **no card ever dims**. They stay fully crisp all the way
+up the screen and vanish only in a thin band at the header, because the CSS
+mask cuts them there. The replacement guards were fading a card from the
+middle of the screen onward — a 130pt ramp on a 290pt card means it starts
+dimming while it is still the main thing you are looking at. That is the
+difference the owner could see, and it is a look, not a frame rate.
+
+`LEAVE_RAMP` is now 48pt: a block holds full strength until its top edge is
+within 48pt of the header, then goes in about a twentieth of a second. Each
+block is now fully opaque across most of its travel (chart 194px of scroll,
+article 314px, the 420pt-tall dial 75px — tall blocks in a 640pt band cannot
+do better without a mask).
+
+Also: `photoOpacity` now ends at 0 rather than 0.15. Fifteen percent of a
+photograph under a 75% scrim is about four percent of a photograph — nothing
+anyone can see, and two full-screen layers for iOS to composite on every frame
+of the rest of the scroll.
+
+Still unmeasured: all of the app numbers come from a debug build, and the
+prototype's come from a browser at 60fps. Until the same clip is taken from a
+release build, "how far from the design" is not actually known.
+
+## 2026-10-25 — Activity rings replace the dot grid, and prebuild bites
+
+Home's roadmap dot grid is gone (the Roadmap tab still has it). In its place,
+`src/components/home/GlassHealthCard.tsx` draws today's three Apple Activity
+rings and the step count, read through `@kingstinct/react-native-healthkit`
+(16.2.0 — it builds on `react-native-nitro-modules`, which this project
+already had).
+
+The goals come from `HKActivitySummary`, so they are the user's OWN Move,
+Exercise and Stand targets rather than numbers we invented; the defaults
+(400 kcal / 30 min / 12 h) only stand in when Health has never been set up.
+
+### HealthKit will not tell you whether it said yes
+
+Read permission status is deliberately unreadable — an app must not be able
+to infer a condition from a refusal. So the hook can only remember that it
+asked, run the queries, and treat "nothing came back" as its own state. Hence
+three real states: a connect button before asking, the rings when there is
+data, and a plain "nothing recorded today" with a route into Settings when
+there is not. A card full of zeroes would be a lie.
+
+The card renders nothing on Android and on any device with no Health app —
+Health Connect is a separate library and a separate Play declaration, and the
+owner chose one platform first.
+
+### The fade model was wrong for tall blocks
+
+Keyed to one edge and a fixed 48pt ramp, a 290pt chart hit zero opacity the
+moment its top edge met the header — with all 290pt of it still on screen, in
+the middle of an otherwise empty screen (owner's screenshot). Both fades are
+now anchored to the block's own two edges: full strength while it is entirely
+inside the band, fading in proportion to how much has left it, zero only once
+it has genuinely gone. A tall block therefore dissolves slowly and a short one
+quickly, which is what reads as "it went under" rather than "it switched off".
+
+### Two build traps, both self-inflicted
+
+- `expo prebuild` regenerates `ios/` from scratch, and `DEVELOPMENT_TEAM`
+  lives in `project.pbxproj`. It had survived only because nobody had
+  regenerated the project since setting it by hand in Xcode. The first
+  prebuild lost it and the build died in signing.
+  `plugins/withIosDevelopmentTeam.js` now writes it every time.
+- The build command was written as `xcodebuild … ; echo "exit=$?"; tail …`,
+  so the status the harness saw came from `tail`. It reported success while
+  the log said `** BUILD FAILED **`. Only checking the `.app`'s timestamp
+  caught it. **Never let anything run after a build command whose exit code
+  matters.**
+
+## 2026-10-25 (later) — The unit of a reveal is a row, not a card
+
+Third attempt at Home's edges, and the first one that is not a compromise
+between two things that cannot both be true of a card.
+
+A card is 290–420pt tall. Ask it to be gone before its top meets the header
+and it vanishes while all of it is still on screen; let it fade in proportion
+to how much has crossed and its top sits under the header at 90% opacity,
+which is the one thing the header exists to prevent. Both were shipped, both
+were reported, and they are the same mistake: an edge effect applied to a unit
+far larger than the edge.
+
+`ScrollFade.tsx` now exports three things and the unit is the ROW:
+
+- `ScrollFadeProvider` carries the scroll offset and the two screen edges, so
+  nothing has to be drilled through three levels of card.
+- `FadeGroup` measures itself and publishes its absolute position downward
+  without touching how it looks. `onLayout` reports a child's position
+  relative to its PARENT, so each level adds its own offset — which is what
+  lets a legend row inside a card inside the stack know where it really is.
+- `Reveal` fades one row, keyed to its own two edges.
+
+Leaving is front-loaded on purpose (`[0, .15, .35, .6, 1] → [1, .6, .25, .05,
+0]` of the row's own height): a straight ramp left readable text under the
+header. Arriving is slower and in three steps so a block of rows comes up one
+after another — which is what the owner asked for, and which falls out of the
+geometry rather than needing a stagger timer.
+
+Rows now revealed individually: the hero's three, the chart's legend / plot /
+empty state, the dial's title / dial / sentence / rule, the health card's
+header and body, the articles header and card.
+
+## 2026-10-25 — A phone with no Apple Watch has no rings
+
+The rings came back 0/400, 0/30, 0/12 — my own default goals, which meant
+`queryActivitySummary` had returned nothing at all. Exercise and Stand are the
+Watch's measurements; without one, iOS has no activity summary to give.
+
+So `HealthActivity.rings` is nullable, and when it is null the card shows what
+an iPhone CAN count on its own: steps against 10,000, distance, flights
+climbed — one ring instead of three, and a line saying why. Three rings of
+zero against goals nobody set would have been theatre.
+
+The card's body is also centred now rather than pinned left: with no card
+background behind it, a left-hugging group left a visibly dead right half.
+
+### The offsets were adding up, and one view did not play along
+
+All three of the owner's screenshots — rows showing through the nav at rest,
+rows gone the instant a scroll started, the health card absent entirely —
+were one bug. `Reveal` built its absolute position by adding each level's
+`onLayout` offset to its parent's, and `GlassCard` sits between the stack and
+every row inside a card without participating. So every row believed it was a
+few points below the top of the stack: rows whose real position was near the
+nav were computed to be mid-screen (visible at rest), and rows further down
+got a negative "already past the header" offset and could never be drawn at
+all.
+
+Positions now come from `measureLayout` against the scroll content view,
+which cannot drift however many plain views sit in between. The content view
+also counts its own height changes into `version`, because a row's `onLayout`
+does NOT fire when a card above it grows — its position inside its own parent
+did not change.
+
+The owner also asked for the UI rules to be written down rather than
+rediscovered: `docs/home-ui-rules.md`.
+
+## 2026-10-25 (evening) — The mask comes back, because nothing else can do it
+
+The owner sent the design's own spec: the scroller is cut by a vertical
+`mask-image`, transparent for the first 96px and opaque by 122. And the thing
+they kept asking for — "the chart's top half fades while its bottom half has
+not" — is only possible by pixel. A row's opacity takes the whole row at once,
+which is why both attempts at it failed in opposite directions.
+
+So `MaskedView` is back, with the dissolve band sitting just above the
+header's lower edge (62pt, longer than the design's 26 because the owner asked
+for gradual) and a 44pt band before the nav. `Reveal` kept only its entrance;
+the hero went back to being one block, as the design describes it. Two more
+things from that spec landed with it: the header's backdrop gradient, which is
+transparent at rest and darkens with `heroK`, and the hero's scale, which is
+1 → 0.94 rather than the 0.9 that had been guessed.
+
+The cost is an offscreen pass per frame, which is exactly why it was removed
+on 2026-10-24 — but it shared that frame with a live full-screen blur, which
+is gone now, and with un-cached vector content, which is cached now. Measure
+before concluding anything.
+
+### Why the health card said there was no data
+
+`queryStatisticsForQuantity` on a type that was never authorised does not
+return empty — it throws. Distance and flights were added to the read set
+after the owner had already granted access to steps, so those two threw, the
+`Promise.all` rejected, and the card reported "nothing recorded today" on a
+phone that had counted 672 steps an hour earlier.
+
+Each read now fails on its own, the stored "we asked" key moved to v2 so the
+new types get an authorisation sheet, and the empty state has a Try again
+button — iOS only shows the sheet for types it has not already decided, so
+asking again is cheap.
+
+## 2026-10-25 (night) — The design's curve, a water switch, and copy
+
+- **`Reveal` now uses the design's own thresholds** — an element's centre at
+  1.02 → 0.76 of the viewport to come in, 0.34 → 0.06 to go. Centre-based is
+  what makes the fade start well below the header, which is what the owner
+  was pointing at; the mask still does the per-pixel dissolve at the edge.
+  Last threshold is 0.06 rather than the design's 0.10 so nothing reaches
+  zero while standing in open space.
+- **The hero is cached as one bitmap** (`FadeGroup rasterize`) once its arc
+  has filled, instead of three separate caches. It is scaled and translated
+  on every frame of the scroll, and everything in it is vector.
+- **Water reminders**: five local notifications a day (09:00, 11:00, 14:00,
+  16:30, 20:00) behind a switch on the card, persisted in `useAppStore`.
+  Deliberately not routed through `scheduleReminder` — that tags its
+  notifications so the inbox listener writes a `notifications` row for them,
+  and a nudge to drink a glass is not something to find again a week later.
+  The switch corrects itself if the permission prompt is refused.
+- **Copy rewritten.** The owner's note was that it read as AI: "Lấy số liệu
+  vận động hôm nay từ ứng dụng Sức khoẻ của bạn" became "Nối với app Sức
+  khoẻ để xem hôm nay bạn đi được bao nhiêu", and the em-dash explanation of
+  the missing rings became a plain sentence. Rule 25 in home-ui-rules.md.
+
+## 2026-10-25 (late) — The judder was a number I chose, and measured wrong
+
+The owner's recording showed the content jerking BACKWARDS, and this time the
+measurement was unambiguous: correlating a column of the frame against the one
+before it gives a clear single minimum each time, and the series reads
+`-7 -6 -6 +6 -5 -3 -3 +3` — three frames up, one frame back, forever. Not an
+estimator tie: the SAD curve at the jumping frames is monotonic to its
+minimum, with no second candidate.
+
+The period is four frames at 58fps ≈ 68ms. `scrollEventThrottle` was 64.
+
+The comment above it claimed the throttle "only governs the JS listener,
+because the parallax, the fades and the mask run on the native driver". That
+is wrong on iOS: the native animated driver is fed by the same dispatched
+scroll events, so throttling them to 64ms updated every scroll-linked
+transform four times more slowly than the scroll itself — and the mismatch
+between a 60fps scroll and 15fps transforms is what reads as kicking
+backwards. It is now 16.
+
+### The prototype's scroll, read rather than remembered
+
+`home-oura.jsx` from the design project, for the parts that govern scrolling:
+
+- `ScrollFade` keys on each element's CENTRE as a fraction of the viewport —
+  `inK = (1.02 - c) / 0.26`, `outK = (c - 0.1) / 0.24`, `k = min(inK, outK)` —
+  and applies `opacity: k`, `translateY((1-inK)*36 - (1-outK)*24)`,
+  `scale(0.94 + 0.06k)` and `blur((1-k)*6px)`. Ours now matches all of it
+  except the blur, which React Native cannot do to a live view.
+- The scroller's mask is `transparent 0 → 96px, #000 122px, #000 (100%-130px),
+  transparent (100%-70px)`. On its 874pt frame that top ramp ends exactly at
+  the header's lower edge and the bottom one straddles the nav's top edge,
+  which is what ours does.
+- The hero block: `opacity max(0, 1 - heroK*1.15)`, `translateY(sy*0.45)`,
+  `scale(1 - heroK*0.06)`, origin `50% 30%`. Ours matches but for the origin.
+- The photograph's blurred copy is masked to the lower 55–62% rather than
+  cross-faded. Ours cross-fades; left alone deliberately — the owner asked
+  for the scroll only.
+
+## 2026-10-25 (night) — Home's scroll animation moved to Reanimated
+
+The judder is gone; what was left was a frame of lag. Measuring the owner's
+side-by-side recording did not show a systematic delay (at the onset of a
+scroll, the app's scrim responds on the same frame the content moves, while
+the prototype's takes two) — but there is a structural one that a 30fps
+recording cannot see, and it is worth removing on its own terms.
+
+RN's `Animated` with `useNativeDriver` updates its nodes from the scroll event
+in `RCTNativeAnimatedModule`'s own display-link pass, which runs after the
+scroll view has already drawn that frame; every scroll-linked transform
+therefore trails the content it belongs to by one frame. Reanimated runs the
+worklet inside the UI thread's event handler and applies the style in the same
+frame.
+
+So Home's scroll is now one `useSharedValue` driven by
+`useAnimatedScrollHandler`, and every scroll-linked style — the photograph and
+its blurred copy, the parallax, the scrim, the hero block, the header backdrop
+and every `Reveal` — is a `useAnimatedStyle`. `Animated` from react-native is
+no longer imported by this screen.
+
+Two things fell out of it:
+
+- The water dial's arrival threshold is checked inside the scroll worklet and
+  calls `markWaterArrived` through `runOnJS` once, instead of a JS listener
+  attached to every scroll event.
+- `waterTop` and `waterArmed` became shared values, because the worklet reads
+  them.
+
+Also: the "HÔM NAY" caption under the water card is gone. It read as a label
+for whatever came next rather than as a divider; the hairline stays.
+
+## 2026-10-25 — Lộ trình goes dark, and the bar floats higher
+
+Four things, from the owner's own design (their image) rather than from the
+Claude Design project.
+
+### The day list
+
+`PathNode` was rewritten for the dark palette: a 44pt node, a connector that
+is solid blue below a finished day and a column of dots below everything
+else, the title and status to its right, and a 38pt action circle at the far
+right — chevron for a finished day, play for today, lock for a shut one.
+
+Today's row is marked by a surface and a thin accent rim, NOT by the design's
+red ring and glow: "nhìn hơi loè loẹt". The accent is the blue the rest of
+the app already uses for "this is the thing to tap".
+
+`PhaseFooter`'s three states (locked, available, answered) were given the
+same geometry as a day row, so the survey reads as the last stop of a phase
+rather than a card bolted underneath it. `ProductDropdown` gained a `glass`
+appearance — a chip, not a field — and its menu now right-aligns to the chip
+so it cannot run off the screen.
+
+**No logic changed.** Every gate, every query, the review-account exemptions,
+the IAP rules and the survey prompt are exactly as they were.
+
+### Still light, deliberately
+
+`PhaseUnlockPromo`, `RoadmapComingSoonCard` and `ProductActivateCard` are
+untouched and will look out of place on the dark screen. They are three
+states this account does not normally reach (unpublished roadmap, device not
+yet activated, next phase to buy) and converting them half-way is worse than
+leaving them for their own pass.
+
+### The bar
+
+The floating nav's bottom offset moved from `max(14, inset - 8)` to
+`max(22, inset + 6)` — about 14pt higher on the owner's phone — after they
+compared it with Shopify's. It is one exported function now
+(`navBottomOffset`), because Home's scroll mask and bottom padding have to
+agree with it. Lộ trình carries the same bar, so the shared white strip now
+stands down for two routes rather than one.
+
+### The day screen
+
+The xu cards (`DayCoinCard`, `StreakCoinBanner`) and the send-a-clip-to-a-
+specialist card (`FormReviewCard`) are off it. The live posture check stays.
+
+## 2026-10-25 (evening) — Lộ trình, second pass
+
+- **The rail no longer crosses the nodes.** It ran centre-to-centre, and
+  since a node's fill is translucent the line showed straight through the
+  circle and across the tick. It now spans only the 18pt gap between two
+  circles, 3pt wide, in `accentStrong`.
+- **Ticks are the brighter blue** (`accentStrong`, stroke 3) rather than the
+  pale `accent`, and both the node and the action circle carry a
+  `NeumorphicSurface` rim — the raised edge every other circle in the app
+  has.
+- **The three light cards were converted**: `PhaseUnlockPromo`,
+  `RoadmapComingSoonCard` and `ProductActivateCard` now read the glass
+  palette. One mapping, applied mechanically: `bgCard` → `surface`,
+  `textPrimary` → `text`, `primary` → `accentStrong`, and so on.
+- **The blue assistant bubble is gone from this tab** — the mascot already
+  sits in its own bar, so there were two assistant buttons on one screen.
+- **The list fades out before the nav**, through the same MaskedView rule
+  Home uses; nothing shows through the bar any more.
+- The title is `t('roadmap')` ("Lộ trình"), not `recoveryRoadmap` ("Lộ trình
+  tập luyện").
+- The bar came back down ~4pt: `max(22, inset + 6)` → `max(18, inset + 2)`.
+
+### The owner's test account was rolled back to day 10
+
+`khanha1k59@gmail.com` (program `24ada829…`, neck-plus) was at day 15 with
+days 1–14 all `done`, so no row on the roadmap was ever "today" and the focus
+treatment could not be seen. Rolled back in production, at their request:
+
+- `user_programs.activated_at` → `now() - 9 days`, `current_day` → 10.
+- `user_program_days.status` reset from `done` to `locked` for days 10–14
+  (5 rows), so day 10 derives as `current`.
+
+**Not done:** the discomfort logs for days 10–14 are still there — the delete
+was refused by the sandbox's classifier, which is the right default for a
+destructive statement against production. Home's chart will therefore still
+plot up to day 14. Say the word and I will ask for that permission.
+
+## 2026-10-25 (late) — The bar's own colour, and today goes red again
+
+- **`surfaceNav` is a dark tint now**, `rgba(18,27,38,0.88)` instead of
+  `rgba(255,255,255,0.08)`. A white film picks up whatever is behind it; on
+  this app's blue-black that read as silver ("hơi bạc"). The active pill came
+  down from 0.14 to 0.10 to match. The bar also dropped another 2pt.
+- **Today's row is red again** — `#FF453A` rim, red play button, red status
+  line, over a 7% red wash. Three passes to get here: the design's neon ring
+  ("loè loẹt"), then blue (which lost the point), now the design's colour at
+  the design's weight but without the glow.
+- **The phase chevron sits in the same 38pt column as the day rows' action
+  buttons** rather than hugging the screen edge, and it is a real tap target.
+- **Expanding a phase cascades from its own first row.** The stagger was
+  keyed to the index in the whole list, so expanding phase 2 waited out the
+  delay of every row in phase 1 before it started. Collapsing fades out.
+- **The specialist's clip shows a frame before you press Bắt đầu.** The
+  player was created, muted and left alone until the session started, so the
+  pane was black. It now loads muted, steps one frame forward, and a spinner
+  covers the pane until `statusChange` reports `readyToPlay`. Sound is
+  switched back on when the session actually starts.
+
+## 2026-10-25 (night) — Dark neumorphism: shadow, not silver
+
+`NeumorphicSurface` gained a third tone, `dark`. The two it had both carry a
+bright light rim — 0.62 and 0.44 at the top-left — which is what made every
+circle on the roadmap look chrome-plated against a near-black screen ("trắng
+bạc"). The dark tone almost removes that edge (0.13), leans the opposite one
+hard into `edgeShade` (0.8), and lets a real black drop shadow under the
+control carry the depth. That is how the kit the owner sent does it: elements
+the same colour as their background, raised by shadow alone.
+
+Using it: the roadmap's day nodes and their action buttons, the survey row's
+two circles, the floating bar and the assistant button, each with the shared
+`darkKnob` shadow.
+
+Also:
+
+- `surfaceNav` went darker again, `rgba(12,19,27,0.94)`, with a heavier
+  shadow under the bar (0.55 at 18pt).
+- The focus red was softened from iOS systemRed `#FF453A` to `#E5484D`, and
+  the row's wash from 7% to 6% — same signal, less glare.
+
+## 2026-10-25 — Cộng đồng goes dark, and the bubble leaves every tab
+
+### The circles
+
+`NeumorphicSurface`'s dark tone now runs its gradients straight down rather
+than along the 145° diagonal: in the owner's reference crops the light sits on
+the TOP edge of a circle and the shadow on the bottom, which is what makes it
+read as a dome rather than a lit sphere. The top sheen went 0.05 → 0.09, the
+bottom shade 0.18 → 0.24, the light rim 0.13 → 0.17.
+
+### The assistant bubble
+
+Gone from every tab. Home and Lộ trình seat the mascot in their own floating
+bar; the owner asked for it off Cửa hàng and Cộng đồng too, so
+`app/(tabs)/_layout.tsx` no longer renders it at all. The chat entrances live
+in the mascot's sheet and in Hồ sơ.
+
+### Cộng đồng
+
+Converted to the same dark shell as Home and Lộ trình: its own sky gradient,
+the floating glass bar, and a MaskedView so the feed fades out before that bar.
+The composer is a card with the image button on its right, as the owner's
+reference has it, rather than a pill. The palette mapping was applied to the
+feed, the post detail, the create screen, the article and profile screens, and
+every component under `src/components/community/`.
+
+`ScreenContainer` and `BackBar` gained a `tone="glass"`, because converting a
+screen's contents without converting the container it sits in paints dark text
+on a near-white background — which is exactly what the first run of this
+produced.
+
+**Not done, and not attempted:** the reference's purple accent (this app is
+blue and red — adopting a third would need the owner's word), and the voice
+note recorder in their second screenshot. That one is not a restyle: nothing
+in the app records or stores audio posts.
+
+## 2026-10-25 — Violet for Cộng đồng, glass for Cửa hàng, a deeper tick
+
+- **Cộng đồng is violet.** The owner said to take the reference's accent, so
+  `purple` / `purpleStrong` / `purpleSoft` and a `purpleSky` gradient are now
+  that tab's own, and every `accent`/`accentStrong` under it was swapped. It
+  stays that tab's: Home is blue, the roadmap's today is red. `ScreenContainer`
+  and `BackBar` gained a `violet` tone so everything the feed opens stands on
+  the same ground.
+- **Cửa hàng got the same dark shell** — its own sky, the floating bar, the
+  mask before the bar, the palette mapping. That was the last light tab.
+- **The shared white strip is gone.** With all four tabs painting their own
+  bar, `CustomTabBar`, `TabBarButton`, their styles and the per-route opt-outs
+  came out of `app/(tabs)/_layout.tsx`; the navigator gets a `NoTabBar`.
+- **The roadmap's tick is a deeper blue** (`tick: #2E7FF0`), and a finished
+  day's circle no longer carries a pale blue ring: the rim is the dark one
+  `NeumorphicSurface` paints plus the black shadow under it, which is what the
+  owner's crops show.
+
+Not done, by their word: the voice note recorder.
+
+## 2026-10-25 — Cộng đồng, built to the reference rather than recoloured
+
+The first pass only swapped the palette. This one follows the structure.
+
+**The composer** is a card: the prompt row (avatar, placeholder, image
+button) with four chips under it — Ảnh, Video, Tiến trình, Bài tập, each in
+the reference's own colour, each opening the composer with that kind already
+selected (`/community/create?type=…`). They are the four kinds this app
+actually posts, which is why they are not the reference's Photo/Video/Poll/
+Feeling: nothing here runs a poll or attaches a feeling.
+
+**The post card**: a two-line header (name and badge, then the timestamp
+under it) beside a 44pt avatar, the photo running edge to edge inside the
+card's padding, 20pt corners.
+
+**The action row** was rebuilt (`PostActionBar`): one row, counts beside the
+icons, saving on the right — replacing the stats row plus three labelled
+buttons. The reference's third count is shares; nothing here counts those, so
+the share button carries no number rather than an invented one, and it opens
+the OS share sheet with the post's own text.
+
+**The create screen**: close on the left, title centred, a filled violet
+"Chia sẻ" pill on the right that replaced the full-width button at the
+bottom, and a row of outline icons where the type chips used to be. The
+icons are only the ones that do something here — photo, video, progress,
+roadmap, guidelines.
+
+Still not done, by the owner's word: the voice note recorder.
+
+## 2026-10-25 — One feed, a slimmer arc, and a capped photo
+
+- **The selected tab reads as selected again**: `surfaceNavActive` back to
+  0.14 from the 0.10 it was dropped to.
+- **The hero's arc is slimmer and fades toward its tail.** The sweep went
+  4.2pt → 3pt, the bloom from 11/7.5/5.5 to 8/5.5/4 at lower opacities, and
+  the stroke is painted with a horizontal gradient (0.3 → 1): the arc runs
+  left to right and fills from the left, so that gradient IS a tail-to-head
+  fade.
+- **The bell carries its count** (9+ past nine) instead of a dot.
+- **Cộng đồng is one feed.** The Tất cả / Từ TheraHOME chips are gone, and
+  with them the rule that kept every official post except the pinned one out
+  of the main feed. A TheraHOME post is now a post like any other: same card,
+  same surface, inline. The separate pinned `ArticleCard` went with it — it
+  would have shown the same post twice.
+- **The action row** lost its share button (the owner will not build
+  sharing), and both counts show even at zero, as the reference does.
+- **A tall photo is capped at 4:5 and cropped**, which is what the video
+  player already did. A 9:16 phone photo was taking a whole screen to itself
+  in the feed; tapping still opens the full frame.
+
+## 2026-10-25 — Menus that cover what is under them, and a tidier bar
+
+- **The post menu is opaque.** It was painted on `surface`
+  (`rgba(20,40,56,0.38)`), so the post's own text read straight through it.
+  Menus and sheets now use `homeGlassColors.menu` (`#1C1A26`, opaque) with a
+  real shadow.
+- **The violet ground is lighter** — `purpleSky` from `#241B3D/#150F26/#0B0814`
+  to `#1A1529/#120F1E/#0A0912`. A hint of violet, not a violet screen.
+- **Counts sit against their own icon**: 5pt inside a pair, 26pt between
+  pairs. The spacing is the only thing saying which number belongs to which.
+- **The selected tab is its own 54×40 marker** rather than the whole flex
+  cell, which had been drawing a wide slab with the bar's rim showing through
+  its corners.
+- **The two header buttons lost their drop shadow and went 46 → 50pt.** On a
+  photograph a shadow under a translucent chip reads as grime. The bell's
+  badge now sits half outside the circle (the button had `overflow: hidden`,
+  which would have clipped it).
+- **The composer is a `fullScreenModal`**, its close button is a 44pt target,
+  its icon row is spread rather than bunched, and the community guidelines
+  are a text link under it.
+
+### Seeded like counts
+
+`likes_count` on the eight approved posts was raised to a stable 24–43
+(`greatest(current, 18 + hash(id) % 43)`), at the owner's request, so the feed
+does not read as deserted. Safe to do: `bump_post_likes` increments and
+decrements rather than recomputing, so a real reaction adds to this base
+instead of wiping it.
+
+`comments_count` was deliberately left alone. It has a list behind it — the
+post detail shows the actual comments — and a card promising 24 comments
+above a thread of three is a lie the next tap exposes.
+
+### 2026-10-26 — Cộng đồng: counts, spacing, the save that re-ranked the feed
+
+Owner pass on the installed build.
+
+- **The "..." menus on the post detail were still see-through.** The feed's
+  menus were made opaque the day before; `app/community/[postId].tsx` has
+  its own post menu, comment menu, report sheet and emoji bar, and all four
+  were still on the translucent `surface`, so the post read through them.
+  All four are `homeGlassColors.menu` now, with the deeper shadow. Same for
+  `ReactionPicker`'s tray, which floats directly over a post.
+  *The lesson: `surface` is a tint, not a background. Anything that FLOATS
+  over content needs `menu`.*
+- **Only the heart carries a number** (owner). The count moved INSIDE the
+  heart's own `ReactionButton` via its `label` prop: a 44pt box around a
+  21pt icon put ~16pt of air between the icon and its number, which is more
+  than the gap to the next pair — so the number stopped reading as that
+  heart's number. Inside one target it is 5pt, and the number is tappable
+  too. `hitLabelled` now hugs its content instead of `flex: 1` (nothing was
+  using the labelled variant).
+- **The card was spending screen on nothing.** `postCard` keeps 14pt
+  everywhere but the bottom, now 3pt, and `PostActionBar`'s `marginTop`
+  went 12 → 2. The 44pt targets contribute ~11pt of their own padding at
+  each edge; that was being paid twice.
+- **"Xem thêm" is muted grey, not purple** — on a violet ground next to a
+  violet tick and a violet bookmark it read as one more accent.
+- **Saving a post sent it to the top of the feed.** `rankCommunityPosts`
+  derives per-author affinity from the viewer's own reactions and saves.
+  Reading those through refs stopped a tap from re-ranking directly, but
+  `useTogglePostSave` invalidates `POSTS_KEY`, the refetch produced a new
+  `posts` array, the memo re-ran — and by then the refs held the new save.
+  Now the ranker only runs when the SET of post ids changes; a refetch that
+  returns the same ids keeps the order already on screen.
+- **The composer header sat on the clock.** Inside the `fullScreenModal`
+  the safe-area context reported `insets.top === 0`, so the title and the
+  Chia sẻ pill were drawn across the status bar. `ScreenContainer` no
+  longer pads the top (the modal must run edge to edge) and the header pads
+  itself by `Math.max(insets.top, initialWindowMetrics?.insets.top ?? 0) + 10`
+  — `initialWindowMetrics` is read from the window at launch, outside any
+  provider, so it still knows how tall this phone's status bar is.
+
+### 2026-10-26 (later) — readability and touch targets
+
+- Tab-bar icons 23 → 26, marker 54×40 → 56×42.
+- **"Xem thêm" now toggles back to "Thu gọn"** (`seeLess` already existed in
+  i18n). Expanding was one-way, so a long post could not be put back.
+- `PostActionBar`'s `marginTop` is **-4**. The targets stay 44pt — the
+  negative margin cancels the ~11pt of air a 21pt icon centred in a 44pt
+  box carries at its top edge, which is the gap that was actually visible.
+- **The composer's four chips scroll instead of sharing the width.** They
+  were `flex: 1`, so each got a quarter whether its word fitted or not and
+  "Tiến trình"/"Bài tập" came out clipped. Sized to their own labels the
+  four need ~340pt and a 375pt phone has 319 inside the card's padding, so
+  wrapping would cost a second line — a horizontal ScrollView costs
+  nothing when they fit, which is the usual case.
+- **Roadmap middle column up a step**: day title 16 → 17.5, status 14 →
+  14.5 (`styles.status`, `numberOfLines={1}`), quiz row to match, phase
+  header 12.5 → 13.5 with `flex: 1` + clamp so a long phase name can never
+  crowd the 38pt chevron out of its column.
+- **Back/close targets**: `BackBar` 36 → 42pt, icon 20 → 23, hitSlop 12 and
+  an immediate pressed state (nothing answered the tap before the next
+  screen appeared). Both full-screen media viewers' close button 42 → 46
+  with the same press feedback. The composer's four tool icons are 27pt
+  inside 44pt buttons.
+- `store` is **"Sản phẩm"** (the tab label and the screen title read from
+  the same key). `viewCommunityGuidelines` is **"Quy định cộng đồng"**.
+- **The dark-mode row is gone from the profile.** `useAppStore.darkMode`
+  and `ThemeProvider` are untouched — only the control was removed, since
+  the app is being redesigned dark and the switch had less and less to act
+  on.
+
+### 2026-10-26 — the community strip, and a new read-only RPC
+
+Owner's reference: a row of ringed avatars above the composer, "ưu tiên
+chọn những người có tập luyện chăm chỉ nhất và có avatar".
+
+**`get_community_highlights(p_limit)` — new, on production, owner agreed
+first.** It had to be server-side: `profiles` RLS returns only your own row
+by design ("no public user directory"), so no client can rank members, and
+the feed only knows the 4 people who have ever posted. The function is
+`stable security definer`, `set search_path to ''`, execute granted to
+`authenticated` only (revoked from `anon`/`public`), and it projects just
+`full_name`, `avatar_url`, `current_streak`, `completed_days` — the same
+fields `get_community_profile` already returns for any user id. It requires
+an avatar, requires at least one completed day, excludes deleted/locked
+profiles and `admin`/`cskh`/`tester` accounts, orders by completed days then
+streak, and clamps the limit to 30. 16 members currently qualify.
+
+Client: `useCommunityHighlights` (30-minute `staleTime` — the ranking moves
+once a day at most and the strip is the first thing drawn), filtered against
+the viewer's blocked list and against themselves, since they are the first
+circle.
+
+`CommunityStories` draws the ring as an SVG circle with a gradient stroke
+(no `expo-linear-gradient` in this project). Ring colours are assigned by
+POSITION, not by a hash of the user, so the top member always gets the same
+ring. It is not a stories feature: nothing expires, the first circle opens
+the composer and the rest open profiles.
+
+The header above it is the reference's too — title left, inbox bell with its
+unread badge and a violet compose button right. The viewer's own avatar left
+the header; it is the first circle now.
+
+Also: `store` → "Sản Phẩm" and `community` → "Cộng Đồng" (owner's
+capitalisation), the composer chip `exercise` → "Bài tập", and `glassNav`'s
+shadow pulled from {0,10}/18/0.55 to {0,3}/12/0.4 — offset that far down on
+an almost-black ground read as a grey stripe parked under the bar rather
+than as depth.
+
+### 2026-10-26 (tối) — thanh tab phẳng, và bảng vinh danh
+
+- **The nav bar's silver streak.** It was the `NeumorphicSurface tone="dark"`
+  rim: its gradient ends on `edgeShade` `#001428`, which is darker than the
+  BAR but bluer — and therefore lighter — than the near-black violet behind
+  it, so along the bottom curve it drew a grey-blue line. The bar now has no
+  painted rim and no drop shadow at all: `surfaceNav` dropped to 0.72 alpha
+  with one even `rgba(255,255,255,0.07)` hairline. "Chỉ cần tạo độ trong
+  suốt nhẹ thôi" (owner).
+- **`MemberStreakSheet`** — tapping a circle in the strip opens consistency
+  (streak / days trained / rank), NOT the community profile. The owner was
+  explicit that these are different things: the profile is about what
+  someone posted, the strip is about what they have done.
+
+**Blocked, needs the owner's approval:** the daily check-in the owner
+designed (the "+" on the strip). It needs a production migration and the
+tool refused it as a production deploy. Planned, unchanged, for when it is
+allowed:
+1. `daily_check_ins` (user_id, check_in_date, mood easy|normal|hard,
+   day_number, shared, post_id), unique per user per LOCAL day
+   (Asia/Ho_Chi_Minh — at UTC the day rolls at 07:00 local), RLS: read your
+   own, no direct writes.
+2. `community_posts_post_type_check` extended with `'checkin'`.
+3. `submit_daily_check_in(p_mood, p_share)` — upserts the check-in, and when
+   shared inserts the feed post itself. **It would insert `status =
+   'approved'`**, bypassing moderation, because the text is generated from
+   the roadmap, not typed. That is a policy call and is called out to the
+   owner rather than assumed.
+4. `get_community_highlights` to also return `checked_in_today`,
+   `today_mood` and `missed_days`, and to put today's check-ins first.
+
+### 2026-10-26 — "Điểm danh hôm nay" shipped (owner approved the migrations)
+
+**Database** (production, in this order):
+1. `daily_check_ins` — one row per user per LOCAL day (Asia/Ho_Chi_Minh),
+   mood `easy|normal|hard`, `day_number`, `shared`, `post_id`. RLS: read your
+   own; no write policy at all, writes go through the RPC.
+2. `community_posts.post_type` now allows `'checkin'`.
+3. `submit_daily_check_in(p_mood, p_share)` — upserts the check-in and owns
+   the feed post: inserts it when sharing is on, rewrites its text when the
+   mood changes, **deletes it when sharing is turned back off**.
+4. `get_my_check_in_today()` — always returns a row: `checked_in` plus the
+   roadmap's own `day_number`, so the sheet's "Đã hoàn thành ngày N" and the
+   text the write generates can never disagree, and the client never does
+   local-date or day-count arithmetic.
+5. `get_community_highlights` → also `missed_days`, `checked_in_today`,
+   `today_mood`; today's check-ins sort first; default limit 20 (owner),
+   capped at 40.
+6. `set_post_moderation_status()` now approves `post_type = 'checkin'`.
+
+**Two traps, both found by running the thing before shipping it:**
+- The function's OUT parameters (`check_in_date`, `mood`, …) share their
+  names with the table's columns, so an unqualified `check_in_date` in the
+  body raised `42702 ambiguous` on the very first call. Every reference is
+  table-qualified now and the upsert names its constraint
+  (`daily_check_ins_user_id_check_in_date_key`) instead of a column list.
+- `trg_post_moderation_status` **overwrites** whatever status an insert asks
+  for. The RPC inserting `'approved'` would have been silently flipped back
+  to `'pending'`, i.e. the owner's "bài sẽ hiện ở new feed" would quietly not
+  happen. The exemption had to go in the trigger.
+  Verified end to end inside a transaction and rolled back: check in → post
+  approved with author info filled by `set_author_info`, mood change →
+  rewritten, unshare → deleted, highlights → `checked_in_today`.
+
+**Client**: `useMyCheckInToday` / `useSubmitCheckIn`, `CheckInSheet` (mood,
+progress line, share switch), the strip's ring thickens and glows with a ✓
+for anyone who checked in today, and a check-in post in the feed carries its
+own 👏 Cổ vũ button (the existing `celebrate` reaction — no new storage).
+
+**The tab bar got its neumorphism back**, in black: `NeumorphicSurface` now
+takes a `shade` prop. The default `edgeShade` (#001428) is darker than the
+bar but BLUER — and so lighter — than the violet-black behind it, which is
+what drew the silver line along the bottom curve, twice. Anything floating
+on a near-black ground passes `shade="#000000"`. The selected tab is a
+raised key now, same light, same shade.
+
+**Note**: `src/types/database.ts` was hand-extended for these three
+functions and the new table rather than regenerated. Regenerate on the next
+schema change.
+
+### 2026-10-26 (khuya) — neumorphism done properly, and a fixed media box
+
+- **`NeumorphicBox`** (new). Neumorphism the way the kits build it: the
+  surface is the same colour as the ground and the shape comes from two
+  opposite shadows — light up-left, shade down-right — with nothing drawn on
+  the edge. `NeumorphicSurface` paints its rim with an SVG gradient, and on
+  the near-black violet behind the tab bar the dark end of that gradient was
+  LIGHTER than the ground, which is what drew the silver line the owner
+  reported three times in three different shapes. A shadow cannot do that.
+  `surfaceNav` is opaque `#12121A` now: through a translucent surface the
+  two shadow layers show through each other and the effect collapses.
+  The selected tab is a pressed-in key (light and shade swapped).
+- **Fixed media box**, `FEED_MEDIA_RATIO = 4/5` in
+  `src/components/community/feedMedia.ts`. Every post's media occupies it
+  whatever is inside: 1 → the box, 2 → columns, 3 → one tall + two stacked,
+  4+ → 2×2 with "+N". Photos `cover` it; a LANDSCAPE video is letterboxed
+  (`contain`) instead, because cropping a landscape video to a portrait box
+  throws away the picture rather than the margins. The per-photo measuring
+  in `CommunityPostImage` is gone.
+- Honour sheet: rank is back as the third tile, each tile carries its own
+  glyph and tint (flame / dumbbell / crown), and "Không bỏ ngày nào" is a
+  badge under the name rather than a tick where a number should be.
+- Composer card gets `marginBottom: 12` — it was the one card in the feed
+  touching its neighbour.
+- Cộng đồng's bell is a COMMUNITY inbox: `isCommunityNotification()` in
+  `useNotifications.ts` is the list (reactions, comments, replies,
+  moderation, `blog`), the badge counts only those, and it opens
+  `/notifications?scope=community`, which filters the same way. Water and
+  "đến giờ tập" stay on Home's bell.
+- The compose button is drawn at 40pt against the bell's 44: a solid disc
+  reads bigger than an outlined one of the same size.
+
+**Why the English article showed on a Vietnamese UI.** Not a bug: content
+follows `profiles.country`, the UI follows `profiles.language`, and the
+owner's test account is `country = 'US'`, `language = 'vi'`. The English
+article is `target_markets ['US']`, so the feed was right to show it to a US
+account. Added the Vietnamese twin (`target_markets ['VN']`, pinned for VN),
+with `notify_official_post_inbox` disabled inside the insert's own
+transaction so it sent no notification, as the owner asked. The owner's
+account country was left alone — two of their accounts are US, which looks
+deliberate.
+
+### 2026-10-26 (đêm) — the viewer bug, the bar again, and a notification check
+
+- **The image viewer was laying out wrong, and had been for a while.** Each
+  page in `CommunityMediaViewer`'s pager was `<View style={{ width }}>` with
+  no height, so the image's `height: '82%'` had no parent height to resolve
+  against: the photo came out pinned to the top with a black slab under it
+  and the close button sitting on the picture. The page is a full-height
+  centring box now, padded clear of the close button. `ChatMediaViewer` was
+  never affected — there the image is a direct child of the centred backdrop.
+- **Tab bar, to the owner's reference crop.** `surfaceNav` `#1A2130` (a
+  raised slab, clearly lighter than the #060D14/#0A0912 grounds — the
+  shadows need something to sit against), deeper light/shade on the pill,
+  and the selected tab is a PRESSED key: `NeumorphicBox` gained `inset`,
+  which swaps where the light and the shade fall, the well is darker than
+  the bar (`surfaceNavActive` `#151B28`) and its icon is white with a soft
+  bloom.
+- The checked-in ring no longer glows — just a thicker ring and the tick.
+  "Tôi chỉ cần cái vòng xung quanh là được rồi."
+- `ArcGauge`: three beads, not five, placed RADIALLY (`R + 16`) instead of
+  straight up. Offsetting straight up only clears the stroke near the apex,
+  so the outer beads sat on the arc and were swallowed by it — which is why
+  only two were ever visible.
+- `ShareStoryModal` was still a white `bgCard` sheet opening on the
+  near-black Cộng đồng, with the light-grey secondary `Button` inside it.
+  Dark palette now, with its own two buttons.
+- Owner's account `country` → VN (`language` was already `vi`). The write
+  needs `request.jwt.claims` set to the service role: `profiles` has a
+  `protect_privileged_profile_columns` trigger that only lets the owner
+  change their own country while `country_confirmed` is still false.
+
+**Community notifications verified, not assumed** — reaction and comment
+both, inside a transaction, rolled back:
+`post_reaction` → "… đã bày tỏ cảm xúc về bài viết của bạn", `post_comment`
+→ "Khanh đã bình luận về bài viết của bạn", both addressed to the post's
+author. Two things found while checking:
+- The notification rows go to the OTHER user, so they are invisible to the
+  reacting account under RLS — a check that queries them as the actor will
+  always come back empty and look broken. Query them as the service role.
+- `post_comments` has an INSERT policy that subqueries `post_comments`, so a
+  direct insert raises `42P17 infinite recursion`. The app never hits it (it
+  posts through `create_community_comment`, SECURITY DEFINER), but anything
+  that inserts a comment directly will fail. Left alone for now — noted here
+  because it will look like a comment bug when it surfaces.
+
+### 2026-10-26 — dark neumorphism, to the owner's written spec
+
+`NeumorphicBox` rewritten as the ONE material the chrome is made of — the
+tab bar, the selected tab's well, the assistant disc and Home's "Bắt đầu
+hôm nay" are now the same stuff, lit from the same side.
+
+- Outer shade (5, 7) / blur 16 / black 0.40; outer light (-3, -3) / blur 10
+  / `#708CAA` 0.10. Two sibling layers behind the content, each filled with
+  the base colour, because React Native allows one shadow per view.
+- Surface gradient `#29394B` → `#192432` (top-left → bottom-right) painted
+  with `react-native-svg`, plus a top-edge highlight that is brightest in
+  the middle and gone at both ends — a lit edge, never an outline. No
+  bordered version of this bar ever survived contact with the near-black
+  ground.
+- `well` replaces the inset shadow React Native does not have: a dark
+  gradient pooling at the top-left and a pale one at the bottom-right,
+  clipped to the corner radius. That is what an inner shadow amounts to.
+- Palette: `navGround #111B28`, `surfaceNav #202D3D`, `surfaceNavActive
+  #1B2838`, `navIcon #A5AFBC`, `navIconActive #F3F6FA`.
+- The ground behind the bar is blended in with a `VerticalGradient` that
+  extends well past it on every side (a shadow must not be clipped by the
+  thing that blends the ground behind it) — not a coloured rectangle, and
+  nothing else on the screen changes colour.
+- `NavTab` is its own component so each tab owns its animation: the well
+  fades in over 200ms, the lit icon crosses over the quiet one in the same
+  200ms, and a press scales to 0.97 without moving the layout. The tab is
+  still 50pt tall inside the pill's 5pt padding — the 60pt every screen's
+  scroll mask is measured against.
+- The assistant disc lost its painted rim and its own drop shadow; the
+  material casts both now. Its picker sheet was still a white `bgCard`
+  panel opening on a near-black screen — dark palette now, like
+  `ShareStoryModal` before it.
+
+### 2026-10-26 — a little more depth in the dark neumorphism
+
+The owner wanted the dark chrome closer to the reference kits without
+changing the layout. `NeumorphicBox` now casts a slightly wider, stronger
+black shade down-right and a clearer blue-grey light up-left. The face
+gradient has more separation, the pressed tab well has deeper inner shade
+and light, and the short top highlight is a touch brighter. The assistant
+disc now carries that highlight too, so the tab bar, selected tab, assistant
+and Home CTA still read as one material. No borders or silver outline were
+added.
+
+### 2026-10-26 — reference arc and clearer depth on device
+
+- `ArcGauge` keeps the real `0` and programme total but now matches the new
+  reference: four tiny round beads sit fully above the curve, the completed
+  stroke is slimmer and fades from quiet to bright, and the oversized glowing
+  head is gone. The old beads were not triangles — they crossed the SVG's top
+  edge, which clipped two into wedges and hid the middle one completely.
+- The shared dark chrome gets a second, deliberate depth increase after the
+  owner reviewed it on the Release build: a darker down-right shadow, clearer
+  blue-grey up-left light, stronger face gradient and deeper selected-tab
+  well. The treatment still has no enclosing border, so it reads as dark
+  neumorphism rather than a silver outline.
+
+### 2026-10-26 — blue icon strokes and a true hairline arc
+
+- Bottom-nav icon strokes now belong to Home's existing blue palette: muted
+  blue at rest and `accent` blue when selected. The bar itself is a deeper
+  blue-black, while its inset well picks up a restrained blue reflected edge.
+- "Bắt đầu hôm nay" gets its own surface one step lighter than the tab bar.
+  Its Play outline uses the same selected blue; the label stays white so the
+  action remains legible rather than turning into a neon badge.
+- The progress arc is now a real 1.4pt hairline. All three bloom strokes were
+  removed, its quiet track is 0.75pt, and the live stroke fades strongly from
+  0.08 opacity at the left tail to 0.94 by the current 11/14 area, matching
+  the reference's fine dim-to-bright sweep.
+
+### 2026-10-26 — quieter nav edges and the roadmap's charcoal knobs
+
+- The nav no longer gives every destination equal blue weight: resting icons
+  are cool grey and only the selected icon is blue. The bar and mascot also
+  lost their painted top highlight and use only 0.08 outer-light opacity, so
+  their depth comes from the black down-right shade instead of a glowing rim.
+- Every circular control in Roadmap day and survey rows now uses the reference
+  treatment: opaque charcoal face, restrained top bevel, black lower edge and
+  a close down-right shadow. Completed checks keep a saturated blue; neutral
+  chevrons use slate; today's play keeps the existing red state signal.
+- The arc remains bloom-free and keeps its exact dim-to-bright gradient, but
+  its live hairline moves from 1.4pt to 1.65pt after the on-device review.
+
+### 2026-10-26 — severity colour, split chart reveal and neutral Roadmap
+
+- Home's discomfort chart uses a severity ramp across its curve, area and
+  point rings; the final palette is recorded in the review below.
+- The graph and its `N8…N14` axis labels are separate `Reveal` rows. The plot
+  arrives first; the text baseline follows on its own scroll geometry instead
+  of the entire 200pt chart fading as one raster.
+- Roadmap moves from saturated navy to neutral blue-charcoal. Its circular
+  controls no longer use `NeumorphicSurface`'s painted rim: the new shared
+  `RoadmapKnob` uses an opaque near-black face plus a quiet upper-left light
+  and close black lower-right shade, matching the supplied reference.
+- The hero arc keeps the same fade and no bloom, with its stroke increased
+  one final small step from 1.65pt to 1.85pt.
+
+### 2026-10-26 — score-level colour and the restored 14-day swipe
+
+- Pain scores now have eleven colour steps rather than three flat swatches.
+  Scores 0–3 rise through blue, 4–7 through violet and 8–10 through red,
+  matching the owner's dark power-ring reference. The curve, area and point
+  rings all read from the same mapping.
+- The detached 8/9/10 sample rings were removed. For this design review only,
+  one point in the plotted data is raised to 9 in memory; the customer's
+  stored health history is untouched.
+- The 14-day chart restores the previous 48pt-per-day horizontal viewport,
+  opens on the newest days and keeps every day label/value in the scroll
+  content. The Y axis and X baseline remain fixed while the data moves, with
+  enough side/top/bottom padding to preserve 0, N1/N14 and point values.
+  Seven days retain the current fitted layout.
+- The area under the curve uses five broad blended stops instead of one stop
+  per integer score. Red-pink, violet, indigo and blue now interpolate over
+  wider spans while opacity eases from 0.40 to 0.08, preserving severity
+  without visible horizontal tiers.
+- The 7/14-day picker is a transparent full-screen modal. Its menu is still
+  anchored under the trigger, but every point outside the menu now dismisses
+  it, including the area beyond the chart card.
+- Store now uses Roadmap's exact graphite background gradient. The shared nav
+  and mascot use a darker, more neutral face and a quieter upper-left light,
+  reducing the blue glare without changing layout or active-state semantics.
+- Store purchase buttons now use Roadmap's completed-day blue.
+- The hero arc keeps its existing fade and rises from 1.85pt to 3.4pt after
+  the smaller increases were still imperceptible on device.
+
+### 2026-10-26 — the language stayed behind after sign-out
+
+Owner made a test account, picked **Malaysia** in `country.tsx`, signed out,
+and the app — login screen included — stayed in Malay.
+
+`useAppStore` is persisted per DEVICE, but `language`, `languageAutoDetected`
+and `market` had been set by one ACCOUNT's onboarding: `country.tsx` calls
+`setLanguage('ms')`, which also pins `languageAutoDetected = false`, so the
+device-locale re-check in `onRehydrateStorage` stops running. Signing out
+cleared the session and nothing else, so the phone kept the language — and
+would have handed it to whoever signed in next, until their own profile's
+`language_explicit` overrode it.
+
+`clearAccountPreferences()` resets `language` to `detectDeviceLanguage()`,
+`languageAutoDetected` back to true, `market` to null and `selectedProductId`
+to null. Called from the root layout's `onAuthStateChange` on `SIGNED_OUT`
+(so it covers a revoked session, a deleted account and a locked one, not just
+the button) and again from the profile screen's own sign-out, because that
+event is Supabase's to emit and the button is the path people actually take.
+
+Hooked to the EVENT, not to `session == null`: that is also true for the whole
+of a cold start before the stored session is read, and resetting there would
+wipe the language on every launch.
+
+**Onboarding answers deliberately survive** — "Tài khoản của bạn đã được tạo.
+Bạn có thể đăng nhập lại để tiếp tục bất cứ lúc nào" is a promise that a
+half-finished questionnaire is still there after signing back in.
+
+### 2026-10-27 — cinematic first onboarding question
+
+- Question 1 now uses the supplied full-screen shoulder-discomfort photograph
+  as its fixed cinematic ground. The old white illustration panel, explanatory
+  subtitle and four answer illustrations are absent from this screen.
+- Answers are deliberately text-only. Their graphite surfaces use a restrained
+  top-left light and deeper lower-right shade; selection adds a blue rim and a
+  simple check without bringing the former pictograms back.
+- The photograph renders independently and first. Progress chrome fades in,
+  the question rises next, each answer rises in sequence, then Continue enters
+  last. Reduce Motion still resolves directly to the finished state.
+- The first-question preload batch now contains only the cinematic photograph;
+  remaining onboarding art continues warming in the background.
+- On-device review exposed that the first two background layers still fell
+  through to the near-black backup ground. A clean export proved the PNG was
+  present and matched the supplied source byte-for-byte. The actual fault was
+  `ios-device-reload.sh`: Expo exported the file below
+  `assets/assets/onboarding/`, then the script copied that tree into the app's
+  `assets/assets/`, creating `assets/assets/assets/onboarding/`. Old artwork
+  appeared only because it was already embedded at the correct path in the
+  base Xcode build; every newly-added asset was silently unreachable. The
+  script now copies into the app's `assets/` root. Question 1 also uses the
+  same native `ImageBackground` path as the working auth screens and keeps
+  only a 5% neutral wash above the photograph.
+- Neumorphic answer faces are translucent graphite/blue glass rather than
+  opaque slabs. Their diagonal face, subtle top highlight, cool upper-left
+  reflection and black lower-right shade remain separate layers, so the
+  photograph is visible through the material without flattening its depth.
+
+### 2026-10-27 — cinematic second onboarding question
+
+- Priority-zone question 2 now shares question 1's cinematic composition and
+  staggered entrance: fixed photograph first, then progress/title, each answer
+  in order, and Continue last. Its former explanatory subtitle, leading icons
+  and answer illustrations are not rendered on this screen.
+- The supplied bedroom photograph is bundled as a 1440×2160 JPEG, large
+  enough for the target phone while avoiding the roughly 80 MB decoded cost
+  of the original 3730×5595 frame.
+- A cool slate wash and cyan-blue glass palette follow the photograph's shirt,
+  headboard and bedding. Inactive answers stay translucent graphite; the
+  selected answer and Continue use restrained cyan rather than question 1's
+  stronger electric blue.
+- Verified on the physical iPhone through iPhone Mirroring after the release
+  reload's 77-asset byte comparison completed successfully.
+
+### 2026-10-27 — cinematic third onboarding question
+
+- Home-care-reason question 3 now uses the supplied meditation photograph as
+  its full-screen background. The former explanatory subtitle, leading icons
+  and answer illustrations are absent; the three multi-select answers retain
+  only their labels and simple check controls.
+- It shares the first two questions' staged entrance: the photograph is
+  visible first, followed by the chrome and rising title, each answer in
+  sequence, then Continue. The original multi-select behavior is unchanged.
+- Translucent graphite-teal neumorphic surfaces pick up the photograph's cool
+  wall and clothing, while a restrained sea-glass accent marks selected
+  answers and the enabled CTA.
+- The primary photograph is now scaled down slightly over a softened copy of
+  itself, preserving more of the supplied composition without introducing
+  empty bands around the narrower phone viewport.
+
+### 2026-10-27 — cinematic fourth onboarding question
+
+- Tension-level question 4 now uses the supplied neck-discomfort photograph
+  as its full-screen ground and shares the staged entrance of questions 1–3.
+  Its former answer icons and character illustrations are not rendered.
+- Four text-only graphite glass answers retain the original single-selection
+  behavior. A dusty rose accent drawn from the photograph's nail colour marks
+  the chosen answer, progress and enabled Continue button.
+
+### 2026-10-27 — calendar roadmap, free form check, and a health-data leak
+
+**The roadmap is a month now** (owner's reference). `RoadmapCalendar` +
+`TodayCard` replace the fourteen-row `PathNode` list; the survey row and the
+promo cards stay. A day's DATE is derived, never stored — day 1 is the
+activation date and day N is N-1 days later, which is the same arithmetic
+`useProgramDays` already runs in reverse (`daysSinceLocal(activatedAt) + 1`)
+to decide which day is today. Change one without the other and the tick
+lands on the wrong square. Tapping a square runs the same `requestDay` gate
+the list ran.
+
+A locked (unpurchased) phase keeps a visible tappable row, one per phase
+rather than one per day: before the roadmap is finished it is the only path
+into the paywall, and it is the path App Review uses to find the IAP without
+playing through fourteen days. `dayBoughtWaiting` and `currentPhaseId` went
+with the list; `dayBoughtOpen` stays because `dayBlocked` is built on it.
+Label is "Tiến trình", not "Tiến trình lộ trình" (owner).
+
+**A new account inherited the previous one's health data.** The HealthKit
+permission flag was one key for the whole DEVICE, so signing in a brand-new
+account on a phone that had already agreed went straight to reading it: the
+activity card was filled in with someone else's steps before the new account
+had agreed to anything. Keyed per account now (`…-v3:<userId>`), and
+`useHealthActivity(userId)` reads nothing without one. iOS never shows its
+own sheet twice for types it has already decided, so a returning account
+pays nothing for this — the question being asked again is ours, not
+HealthKit's.
+
+**"Tập cùng chuyên viên" is free** (owner). The card no longer calls the
+plan gate. **The two policies that actually enforced it are NOT changed
+yet** — see below.
+
+**Calls are hidden for customers**: `CUSTOMER_CALLS_ENABLED = false` in
+`features.ts` removes `CallButton` from `app/chat/human.tsx`. The staff
+console keeps its own, which is how a soft launch runs.
+
+**BLOCKED, needs the owner's approval.** Freeing the live form check needs
+two RLS changes on production and the tool refused them as "Modify Shared
+Resources":
+
+```sql
+drop policy if exists "read published exercise references with a plan" on public.exercise_references;
+create policy "read published exercise references" on public.exercise_references
+  for select to authenticated
+  using (published or ('admin' = any (current_web_roles())) or ('cskh' = any (current_web_roles())));
+
+drop policy if exists "read exercise clips with a plan" on storage.objects;
+create policy "read exercise clips" on storage.objects
+  for select to authenticated using (bucket_id = 'exercise-reference');
+```
+
+Until those run, a free account can open the card and will be told the day
+has no reference — `createSignedUrl` on the private bucket is refused
+without `has_paid_access()`. Also worth the owner's attention: the
+subscription copy still sells this feature, and `features.ts` lists
+`has_paid_access()` as an enforced paid benefit. Freeing it makes that line
+false.
+
+### 2026-10-27 (sau) — the roadmap above the fold
+
+"Bắt đầu buổi chăm sóc" has to be reachable without a scroll (owner):
+
+- The tagline is gone.
+- **The calendar draws this month and nothing else.** It used to pad a fixed
+  six-row grid with the neighbouring months' dates, which added a whole row
+  of numbers belonging to nothing and pushed the CTA below the fold. Rows
+  are now `ceil((lead + daysInMonth) / 7)` — four to six, blanks for the
+  lead — and cells are 32pt instead of 34.
+- The today card's headline is just "Ngày N". It used to run the phase on
+  behind it ("Ngày 1 · Giai đoạn 1 · Giảm khó chịu & làm quen"); the chip
+  under it now says "Giai đoạn 1" alone, taken as everything before the "·"
+  in the phase name. The "Thư giãn cổ vai gáy cùng …" line is gone.
+
+**Still blocked, and worth being precise about.** The owner said the live
+form check already works for users. It works for HIM: `has_paid_access()`
+is `active_plan_code() is not null or account_type = 'review'`, and his
+account is one of only **4** with an active subscription — out of 362
+profiles. For the other 358 the card now opens and the screen reports no
+reference, because the clip's bucket policy and `exercise_references`' RLS
+still demand a plan. The two statements are in the previous entry.
+
+### 2026-10-27 (tối) — the calendar, read off the reference properly
+
+- **The neighbouring months' dates are back, dimmed.** Removing them left
+  half-empty rows that read as a mistake. What stays removed is the fixed
+  six-row grid: the row count follows the month (four to six), which is the
+  part that was pushing the CTA off the screen, not the dimmed dates
+  themselves. October 2026 needs five rows either way.
+- The today card's headline is "Ngày 5 · Giảm khó chịu & làm quen": the
+  phase name splits on "·", the chip takes "Giai đoạn 1" and the headline
+  takes what the phase is FOR. Both behind the day number was the thing
+  nobody read to the end.
+- The phase chip is glass — translucent fill, shadow doing the lifting —
+  and the duration beside it has no frame at all. Two framed pills in a row
+  read as two buttons, and only one of them is even a label.
+
+### 2026-10-28 — a mark for the days that were missed, and the list is back
+
+- **"Chưa hoàn thành" had no mark.** The calendar drew a past-and-not-done
+  day with the same faint dot as a day that has not arrived — so the one
+  thing a person most needs to see on this screen was invisible. A missed
+  day is a hollow ring in `dotMissed` now (outlined and empty, which is what
+  it is), upcoming dots moved from `textFaint` to `textMuted`, and the
+  legend has four entries.
+- **The vertical day list is back, below the today card.** The calendar
+  answers "where am I" and the card answers "what do I do now"; the list
+  answers "what does the whole thing look like", which is a question people
+  only ask by scrolling. Phase headers, collapse, `PathNode`, and the greyed
+  locked-phase header are all as they were — so the separate
+  `lockedPhaseRows` block went away, and with it the risk of showing a
+  locked phase twice. `currentPhaseId`, `collapsedOverrides` and
+  `dayBoughtWaiting` came back with it.
+- Today's phase still shows its survey under the start button; the other
+  phases keep theirs at the end of their own phase, so nothing is drawn
+  twice.
+
+### 2026-10-28 (sau) — nothing above the fold may grow
+
+The owner read the roadmap as having wider calendar rows. It did not — the
+grid is the same 80pt per row it was. What grew was the LEGEND: the fourth
+entry ("Chưa hoàn thành") wrapped it onto a second line and took ~25pt of
+the pre-scroll screen, which pushed the start button down towards the tab
+bar. The legend is one line again — `flexWrap` off, tighter gaps, 11pt
+labels that shrink to fit on a narrow phone.
+
+The rule this is an instance of: **anything added to this screen has to pay
+for itself out of the part you have to scroll to.** The calendar and the
+start button are the pre-scroll budget.
+
+The phase survey moved back to the end of its own phase, today's included.
+"Đánh giá sau Ngày 7" means after day 7, not pinned above it — and pinning
+it under the start button cost the pre-scroll screen another row.
+
+### 2026-10-28 — the fold is measured, and a pass for small screens
+
+**The fold.** A strip of the next section (the phase header) still showed
+above the tab bar. A fixed margin cannot fix that — it leaves a strip on a
+tall screen and a hole on a short one. The spacer between the today card and
+the day list is computed: the scroll view's visible height
+(`windowHeight − insets.top − (navBottomOffset + 72)`) minus where the card
+actually ends. Two measurements, because the card reports a `y` relative to
+its own parent, not to the scroll view: the wrapper reports its own `y`
+inside the content and the card reports its bottom inside the wrapper.
+
+**Small screens.** Audited the layouts rather than one screenshot. The app
+is flex-based nearly everywhere — store action buttons are `flex: 1`, card
+bodies are `flex: 1` columns whose text wraps, `BackBar` titles are
+`flex: 1, minWidth: 0` with a clamp, feed author names and composer chips
+are clamped or scroll. The real gap was the roadmap header: a screen title
+and the product pill in a `space-between` row, **neither of which could
+shrink**, so a longer product name than "TheraNECK+" would push the title
+off a narrow phone instead of truncating itself. Both shrink now
+(`flexShrink: 1, minWidth: 0`), the pill is capped at 62% of the row, and
+its label is `numberOfLines={1}`.
+
+The calendar legend got `adjustsFontSizeToFit` with `minimumFontScale`
+in the same pass — four Vietnamese labels on one line is the tightest row
+in the app, and it is the one that has to hold at 320pt.
+
+Not verified by rendering at 320pt — there is no simulator build on this
+machine, only the device one. Offered to the owner as a next step.
+
+### 2026-10-28 — sign-up screen
+
+- **The username field is gone.** `signUpAccount`'s `username` is optional
+  now and the key is simply left out of the sign-up metadata, so
+  `handle_new_user` writes `profiles.username` null and the account carries
+  no name until its owner sets one. Display fallbacks say **"Người dùng"**
+  (`defaultUserName`, three languages) on the profile and the composer —
+  `t('you')` is how the app ADDRESSES someone, not what they are called.
+  The community feed keeps its own "Ẩn danh" fallback; that one means an
+  author the row cannot name, which is a different thing.
+- **"Nhập lại mật khẩu" added.** The match is checked in the shell: the
+  button stays disabled until the two agree, and the hint line under the
+  field turns into "Mật khẩu nhập lại chưa khớp" — but only once something
+  has been typed into it. Nobody wants to be told they got it wrong before
+  they have finished getting it right.
+- **Apple and Google did nothing on this screen.** They were drawn
+  (`showApple={Platform.OS === 'ios'}`) but no `onApple`/`onGoogle` was ever
+  passed, so both were dead buttons. Wired to the same calls the login
+  screen makes — signing in with either creates the account when it is new —
+  plus the same `AppleAuthentication.isAvailableAsync()` check, so the Apple
+  button no longer shows on an iOS device that cannot do it.
+- **A fresh install opens on sign-up.** `everSignedIn` is a persisted device
+  fact latched the first time a session exists and never cleared (notably
+  NOT by `clearAccountPreferences` — someone who signs out wants the login
+  screen back). `login.tsx` returns `<Redirect href="/create-account" />`
+  while it is false, so the login form never paints a frame on the way past.
+
+### 2026-10-28 — the auth entry, without the double background
+
+The `<Redirect>` added this morning worked but looked wrong: it still MOUNTS
+the login route, whose bare background painted for a beat before the sign-up
+screen slid in over it ("thấy màn nền lặp lại rồi mới thấy màn tạo tài
+khoản"). A redirect is a navigation, and a navigation is visible.
+
+The form moved into `CreateAccountForm`, so `login.tsx` renders it directly
+when the device has never held a session — one mount, no navigation, nothing
+to see on the way past. `/create-account` is still a real route and still
+renders the same component.
+
+The catch this creates, and its answer: the sign-up screen's "Đăng nhập"
+link used to push `/login`, which on a first-run device now renders sign-up
+again. The link passes `force=1`, which is the only thing that makes that
+route show the sign-in form while `everSignedIn` is false.
+
+The confirm-password field got its own eye. Not the first field's — they are
+two separate things to check, and people check the second precisely because
+they cannot see it.
+
+### 2026-10-30 — legend, "Apple Health", and the in-app order question
+
+- Calendar legend is three states: the filled red circle under today's date
+  already says "hôm nay", so that entry was explaining a thing nobody needed
+  explained. The other three get their 12pt labels and their spacing back.
+- `healthConnect` / `healthConnectHint` say **Apple Health** in all three
+  languages. Referential use of an Apple product name in body copy is
+  allowed — what is not is putting it in the app's own name or icon, or
+  implying Apple endorses this app. Neither applies here.
+- **Selling the pillow through an in-app form instead of a Shopify link
+  does not break Apple's rules — it is the rule.** Guideline 3.1.5(a):
+  physical goods consumed outside the app MUST use a payment method other
+  than in-app purchase. The risk is not the sale; it is what the form
+  collects. Name, phone and address are Contact Info and have to be declared
+  in App Store Connect's privacy questionnaire and covered by the privacy
+  policy, and card numbers must never be typed into a form of ours.
+
+### 2026-10-30 — QA pass (two auditors), and what was fixed
+
+Two review agents, one on UI, one on logic. Both reports are summarised in
+the chat; what matters here is what changed and what is still open.
+
+**Fixed in the client:**
+- `queryClient.clear()` on `SIGNED_OUT` (`app/_layout.tsx`). The TanStack
+  cache lives on the device while its contents belong to one account, and a
+  few keys carried no user id at all — `['exercise_reference', programDayId]`
+  held a **signed URL into the paid clips bucket**, fresh for five minutes.
+  The next account to sign in read them out of cache before anything
+  refetched. `useExerciseReference` also takes the viewer's id now.
+- The questionnaire is attributed to an account
+  (`onboardingOwnerId` + `claimOnboardingFor`). `clearAccountPreferences`
+  deliberately kept the answers so a half-finished questionnaire survives a
+  sign-out — but a DIFFERENT account signing in resumed them and the consent
+  step wrote that person's `treatment_area`/`goal` onto the new profile.
+  Same shape as the HealthKit leak fixed on 2026-10-27: device-scoped state
+  holding account-scoped data.
+- Six light-palette sheets converted to the dark palette: `PainScaleModal`
+  (the gate before opening any day), `ReminderPopup` (the first thing a new
+  user sees), `SurveyPromptModal`, `UpgradePromptModal`,
+  `ExternalLinkModal`, `IncomingCallSheet`. `darkMode` has been permanently
+  false since the toggle was removed, so `theme.colors` is always the light
+  palette — these were white cards on a near-black app.
+  *Trap hit while doing it:* `theme.colors.bgCard` is a prefix of
+  `theme.colors.bgCardAlt`, so a naive ordered replace produced `menuAlt`.
+- `GlassPainCard`'s legend ran over the 7/14-day button: `flexShrink`
+  defaults to **0** in React Native, so five unclamped labels never gave way.
+- Community toast was `homeGlassColors.text` (#FFF) with `surface` text (38%
+  navy) ≈ 2.2:1 — every error this tab reports was unreadable.
+- Calendar header printed "10 2026" in en/ms: the string is `{month} {year}`
+  and it was being passed a number. Vietnamese numbers its months; English
+  and Malay name them.
+- `app/call/[callId]` is a fullScreenModal and had no top inset — the same
+  `insets.top === 0` trap as `community/create`.
+
+**Confirmed by query, NOT fixed — needs the owner, because it is production
+SQL:** two UPDATE policies whose `with_check` is null, so the check falls
+back to USING, which only proves ownership:
+- `community_posts` "authors update own posts": `authenticated` holds UPDATE
+  on `status`, `is_official`, `pinned`, `likes_count`, `comments_count`,
+  `saves_count`, `target_markets`, and `trg_post_moderation_status` is
+  BEFORE **INSERT** only. A member can approve their own rejected post and
+  flag it as an official TheraHOME post.
+- `user_program_days` "own user_program_days update": UPDATE on `status`
+  and `completed_at`. Marking a day `done` makes `dayBlocked` return false
+  for a phase that has not been bought (`day.status !== 'done'`), and
+  `claim_day_coins` only checks for `done`.
+
+### 2026-10-30 — language coverage closed on the client
+
+Owner's answers to the four open items: phase 3 content does not exist and
+plans are not being sold (both already off on the web), calls are not being
+released — so `total_days`, `sales_enabled` and the call FEATURE all stay as
+they are. Languages, though: "đảm bảo làm đủ".
+
+Done on the client:
+- **44 new keys × 3 languages** for the call UI, which was entirely
+  hardcoded Vietnamese across `IncomingCallSheet`, `OngoingCallBar` and
+  `app/call/[callId]`. Those first two mount at the ROOT for every account,
+  so a Malaysian customer receiving a support call saw a Vietnamese screen —
+  the one thing `CUSTOMER_CALLS_ENABLED = false` does NOT cover, because it
+  only hides the outgoing button. Translated even though calls are not
+  released: the strings are what ship, not the switch.
+- The store's quantity stepper labels (VoiceOver read them in Vietnamese).
+- Re-ran the dictionary check: **861 keys, identical across vi/en/ms**, zero
+  missing, zero extra. Zero Vietnamese literals left in the three call files.
+
+**Still blocked on the owner — the tool refused both as production writes:**
+1. `format_community_notification` takes no language at all and holds its
+   copy as literals, so every community notification is Vietnamese for the
+   36 profiles reading the app in en/ms. The rewrite is ready: language
+   first, matching `notification_copy(p_language, …)`; the three calling
+   triggers already resolve the recipient's language for the image
+   placeholder, so they have it to hand.
+2. `submit_daily_check_in` compares `v_lang = 'malay'` while
+   `profiles.language` stores `'ms'` — my own bug from 2026-10-26. The
+   branch never matches, so a Malaysian member's shared check-in post is
+   written in Vietnamese.
+
+### 2026-10-30 — the two database language fixes ran (owner approved)
+
+- `format_community_notification` takes the language first now, like
+  `notification_copy` does, and carries vi/en/ms for all four kinds plus the
+  grouping ("and 2 others" / "dan 2 yang lain") and the missing-name
+  fallback ("Someone" / "Seseorang").
+- **The three callers were rewritten by the database, not by hand.** Each
+  definition was read back out of the catalogue with `pg_get_functiondef`,
+  the call sites replaced in place, and the result executed — two hundred
+  lines of trigger body retyped by a model is two hundred chances to drop a
+  character. Each replacement is checked and raises if the pattern is not
+  found, because a body still calling the old 5-argument signature would not
+  fail at migration time: it would fail at runtime, on somebody's next like.
+  Verified afterwards: all three pass a language, none still has the old
+  call.
+- `submit_daily_check_in` compared `v_lang = 'malay'` while
+  `profiles.language` stores `'ms'` — 'MALAY' is the MARKET code. The branch
+  never matched, so a Malaysian member's shared check-in was written in
+  Vietnamese. Same replace-and-verify method.
+- Official posts seeded to at least 20 likes (owner): 25, 42, 43, 43. Safe
+  because `bump_post_likes` adds and subtracts rather than recomputing, so
+  real likes land on top of the seed.
+
+Tested in a rolled-back transaction: a reaction and a comment on a
+Vietnamese reader's post still produce Vietnamese; the formatter returns
+correct English and Malay for every kind, group size and null-actor case.
+
+### 2026-10-30 — the two write holes are closed (owner approved)
+
+Both were UPDATE policies with a null `with_check`, so Postgres reused the
+USING clause, which only ever proved "this row is yours" — never "this
+column is yours to change".
+
+1. **`community_posts`** — `trg_protect_privileged_post_columns` (BEFORE
+   UPDATE) puts `status`, `is_official`, `pinned`, `pinned_markets`,
+   `target_markets`, the three counters and the author fields back to their
+   OLD values. Staff (`current_web_roles()`) and `service_role` pass
+   through, and so does anything at `pg_trigger_depth() > 1` — that last one
+   matters: `bump_post_likes` and `bump_post_comments` keep the counters by
+   updating this table from their own triggers, and freezing the counters
+   unconditionally would have silently stopped every count in the app.
+2. **`user_program_days`** — the client UPDATE policy is gone. The app only
+   ever READS this table; days are completed through `mark_day_watched`,
+   which owns the unlock rules. It is now the only writer.
+
+**A test that lied, and why.** The first attempt ran as the owner's own
+account and the attack appeared to succeed. That account holds
+`current_web_roles() = {admin, cskh}`, so the trigger was correctly letting
+it through. Re-run as a plain member: `status` stayed `approved` against an
+attempt to set `rejected`, `is_official`/`pinned` stayed false,
+`likes_count` stayed 31 against 99999, `target_markets` stayed null — while
+the legitimate `{ text }` edit the app actually sends went through.
+**Worth remembering: the owner's account bypasses these guards, so testing
+moderation by hand from his own phone will not show what a customer sees.**
+
+Also verified after the change: `mark_day_watched` still completes a day,
+and a shared check-in still lands in the feed `approved` — the owner asked
+for check-ins to stay unmoderated and they do, because that exemption lives
+in `set_post_moderation_status` on INSERT, which this did not touch.
+
+## 2026-10-30 — Chương trình tặng xu ra khỏi app (phần server vẫn còn)
+
+Chủ sở hữu bỏ phần xu khỏi app. Đã xoá toàn bộ mặt client:
+
+- `app/coins.tsx` (màn "Xu của bạn": số dư, quà, thể lệ, lịch sử) —
+  xoá; `src/hooks/useCoins.ts` (`coin_overview`, `claim_day_coins`,
+  `claim_streak_coins`, `claim_coin_gift`, `coin_entries`) — xoá;
+  `src/components/day/DayCoinCard.tsx` — xoá, và nó **đã là code chết từ
+  trước**: `DayCoinCard`/`StreakCoinBanner` không được import ở đâu cả, nên
+  trên thực tế chưa bao giờ có nút nhận xu trong màn Ngày.
+- Lối vào: dòng "Xu & quà tặng" trong menu Hồ sơ, `<Stack.Screen
+  name="coins" />` trong `app/_layout.tsx`, và nhánh
+  `destination === 'coins'` trong `app/notifications.tsx`.
+- 24 khoá dịch `coin*` (8 dòng × vi/en/ms) trong `src/lib/i18n.ts`, và lần
+  `invalidateQueries(['coin_overview'])` trong `useMarkDayWatched`.
+
+**Phần Postgres giữ nguyên** (`coin_entries`, `coin_gift_claims`,
+`coin_settings`, các RPC `coin_*`/`claim_*`, trigger `notify_coin_threshold`
+và `notify_coin_gift_sent`, và màn Xu trong WEB Admin) — nhưng nay không ai
+chạm tới được: xu chỉ sinh ra qua `claim_day_coins`/`claim_streak_coins`, và
+hai RPC đó chỉ có app gọi. Nên sau thay đổi này không thể có thêm
+`coin_entries` nào, hai trigger thông báo không bao giờ kích được nữa (đã
+kiểm: 0 dòng `notifications` có `destination = 'coins'` từ trước tới giờ, 0
+`coin_gift_claims`), và 6 dòng `coin_entries` cũ nằm im.
+
+Còn một chỗ hứa suông: `subscription_plans.features` của `premium_plus` và
+`premium_lifetime` vẫn có dòng "Tham gia chương trình tích xu khi tập luyện
+đều đặn". Hai gói đang `active = false` nên không hiện, nhưng nếu bật bán
+lại thì paywall sẽ hứa một tính năng không còn trong app — sửa ở WEB Admin →
+"Gói đăng ký". Cùng lý do, `coin_settings.plan_codes` đã được bỏ khỏi danh
+sách quyền lợi "code có thực thi" trong `src/lib/features.ts`.
+
+## 2026-10-30 — "Tập cùng chuyên viên": khung hình đầu đen trên iPhone
+
+Chủ sở hữu: vào màn này trên Android thấy preview chuyên viên ngay, trên
+iPhone thì quay vòng "Đang tải..." xong là một ô đen.
+
+Lần sửa 2026-10-25 đã đặt `instance.play(); instance.pause();` trong callback
+`setup` của `useVideoPlayer` để ép ra khung hình đầu. Chỗ đó **chạy quá
+sớm**: `setup` gọi ngay lúc tạo player, khi clip chưa tải được gì để giải mã,
+nên play/pause không làm dịch chuyển hình nào. Sau đó không có gì nhắc lại
+lần nữa. Android không lộ lỗi vì ExoPlayer tự vẽ frame 0 khi item prepared
+xong; AVPlayer của iOS để trống layer cho tới khi có ai đó bảo nó di chuyển —
+và `clipReady` lại bật theo `status === 'readyToPlay'`, nên spinner biến mất,
+nhường chỗ cho đúng ô đen.
+
+Nay cú nhích nằm trong listener `statusChange`, lúc clip đã thật sự sẵn sàng:
+`play()` → `pause()` → `currentTime = 0.05`. Seek **0.05 chứ không phải 0**
+là cố ý — player đang ở 0, mà seek về đúng chỗ đang đứng có thể bị bỏ qua,
+đúng vào cái layer trống cần sửa. Lúc đếm ngược bắt đầu buổi tập thì
+`currentTime = 0` đưa về đầu như cũ.
+
+Hai chốt chặn đi kèm: chỉ nhích **một lần mỗi player** và **chỉ khi chưa ai
+bấm Bắt đầu** (`statusChange` còn bắn lại mỗi lần clip hồi từ buffering — tắt
+tiếng và pause giữa buổi tập đang chạy còn tệ hơn ô đen); và nếu clip đã sẵn
+sàng trước khi effect kịp gắn listener thì gọi thẳng, vì sự kiện đó đã qua.
+
+**Bổ sung cùng ngày — cú nhích không đủ, phải dùng ảnh tĩnh.** Chủ sở hữu
+thử lại: vẫn đen. Nên màn này không còn trông chờ player vẽ được gì nữa —
+nó tự lấy một ảnh tĩnh của chuyên viên và phủ lên trên player cho tới khi
+clip thật sự chạy (`phase` là `intro` hoặc `countdown`), rồi nhường chỗ.
+`contentFit="contain"` giống hệt `VideoView` nên ảnh và video trùng khít.
+
+Hai bộ sinh ảnh, thử lần lượt, vì chúng hỏng vì lý do khác nhau:
+`player.generateThumbnailsAsync([0.1])` hỏi chính player này (không tải lại
+clip, và chạy được trên signed URL đang mở sẵn); nếu trượt thì
+`VideoThumbnails.getThumbnailAsync(clipUrl, { time: 100 })` tự mở URL bằng
+decoder riêng. Trượt cả hai thì quay về đúng hiện trạng cũ, không hỏng thêm.
+
+`posterDone` nghĩa là "đã thử xong", không phải "đã có ảnh" — spinner chờ
+lần thử, không chờ kết quả, nếu không thì một clip không bộ nào lấy được ảnh
+sẽ quay vòng mãi mãi. Cú nhích play/pause/seek vẫn giữ: trên Android nó vốn
+đủ, và nếu iOS vẽ được thì tốt, ảnh tĩnh chỉ là lớp phủ.
+
+## 2026-10-30 — "Tập cùng chuyên viên" bị khoá sau gói trả phí (lỗi thật, nặng hơn ô đen)
+
+Chủ sở hữu nói lần thứ ba rằng màn này **không cần mua gói**. Cờ
+`MOTION_TRACKING_ENABLED` đã bật và thẻ vào màn đã hiện cho mọi người — nhưng
+hai cái cổng quyết định **có gì để phát hay không** vẫn đứng nguyên trên
+`has_paid_access()`:
+
+- `public.exercise_references` — policy `read published exercise references
+  with a plan`
+- `storage.objects` — policy `read exercise clips with a plan` (bucket
+  `exercise-reference`)
+
+Hậu quả: khách không có gói mở màn ra và được báo "chưa có bài mẫu", vì
+`createSignedUrl` bị policy từ chối nên `clipUrl` là null và `body` rơi vào
+`no-reference`. Chủ sở hữu không bao giờ thấy, vì tài khoản của ông là admin
+và admin đi lọt **cả hai** policy theo vai trò — nên trên máy ông clip vẫn
+tải, và lỗi ông thấy là ô đen, một lỗi hoàn toàn khác.
+
+Migration `exercise_reference_no_plan_required` bỏ `has_paid_access()` khỏi cả
+hai. `published` vẫn bắt buộc, nên bản nháp vẫn chỉ nội bộ đọc được; cái mất
+đi chỉ là yêu cầu có gói. Đã kiểm bằng một tài khoản thật không có gói
+(`has_paid_access()` = false): đọc được 28 bản mẫu đã xuất bản và 14 clip,
+trước đó là 0 và 0.
+
+**Bài học cho mọi cờ tính năng sau này:** bật cờ trong app chỉ mở *đường vào*.
+Nếu nội dung của tính năng nằm sau RLS hay storage policy thì phải mở cả ở
+đó — và không được nghiệm thu bằng tài khoản admin, vì admin đi lọt mọi
+policy theo vai trò và sẽ không bao giờ nhìn thấy cái cổng còn đóng.
+
+**Đã dựng được vòng kiểm thử tại chỗ** (2026-10-30): build simulator rồi tự
+vào app bằng tài khoản thật. Hai cái bẫy đã gặp:
+1. `xcodebuild ... CODE_SIGNING_ALLOWED=NO` tạo ra bản **không có entitlement
+   keychain**, nên `expo-secure-store` ném `ERR_KEY_CHAIN` và app báo "Không
+   thể kết nối" ở mọi màn đăng nhập/đăng ký — trông y như lỗi mạng. Dùng
+   `CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO` thay cho nó.
+2. Bàn phím simulator đang ở Telex: gõ email qua `simctl` bị bỏ dấu
+   ("thera" → "thẻa", "example" → "ẽample"). Chọn chuỗi không có s/f/r/x/j
+   sau nguyên âm, hoặc kiểm lại bằng ảnh chụp trước khi bấm gửi.
+
+## 2026-10-31 — Viền sáng kiểu Siri: ba thứ làm nó "chưa mượt"
+
+`src/components/motion/SiriEdgeGlow.tsx`. Chủ đưa video Apple Intelligence
+glow thật và nói bản đang có "chưa mượt chưa mềm mại huyền bí". Đối chiếu
+từng khung hình video với mã, ba nguyên nhân, không cái nào là "thêm blur":
+
+1. **Bảng màu sai họ.** Bản cũ có `#3D8DFF` và `#34DFFF` — xanh dương và
+   xanh ngọc nguyên chất. Cả sáu màu Apple dùng thật (đọc từ
+   jacobamobin/AppleIntelligenceGlowEffect, MIT) đều là màu phấn:
+   `BC82F3 F5B9EA 8D9FFF FF6778 FFBA71 C686FF`. Một màu nguyên chất đứng
+   cạnh màu phấn luôn thắng mắt, nên viền đọc ra như thanh trạng thái.
+2. **Quầng sáng bị cắt cụt, và có sọc.** 12 vòng tròn đồng tâm cùng một
+   `strokeOpacity` thì độ đậm giảm theo đúng 12 bậc nhìn thấy được, rồi tới
+   mép trong là cắt phụt. Cách chữa là giải ngược: với đường cong mong muốn
+   `A(d) = peak·exp(-(d/σ)^falloff)`, mỗi vòng lấy
+   `a_k = 1 − (1−A(d_{k−1}))/(1−A(d_k))`, và đặt các vòng dày đặc ở sát mép
+   (`d_i = W·(i/N)^1.55`) nơi đường cong dốc nhất. Tổng hợp lại đúng bằng
+   một vệt nhoè Gauss, không tốn bộ lọc nào — xem `buildRings()`.
+3. **Nó nháy chứ không thở.** Lớp cũ dao động độ sáng ±20% ở ~1,5 Hz trên
+   toàn bộ overlay; mắt đọc ra là chớp. Giờ hai lớp thở ngược pha trong
+   7,3 s: quầng ngoài sáng lên thì dải trong dịu xuống.
+
+**Hai giới hạn của react-native-svg phải lách:**
+- **Không có `spreadMethod`.** Một gradient tuyến tính trải một lần ngang
+  màn hình chỉ cho thấy hai đầu của nó ở hai cạnh đối diện — đó là lý do
+  khung chỉ có một màu. Phải tự viết lặp vòng màu ra các `<Stop>`
+  (`wheelStops()`, `CYCLES = 2`). Trình duyệt hỗ trợ `spreadMethod`, nên
+  thử trên web sẽ đẹp mà lên máy thì hỏng.
+- **Không nên dùng bộ lọc `FeGaussianBlur`.** Gradient đổi mỗi khung hình
+  nên bộ lọc phải chạy lại mỗi khung; trên Android yếu (máy test A12) là
+  giật. Chồng vòng ở trên rẻ hơn nhiều.
+
+Apple làm chuyển động bằng cách cho vị trí các `<Stop>` trôi ngẫu nhiên mỗi
+0,5 s. SVG ở đây không animate `<Stop>` được (có thể crash iOS — xem ghi chú
+trong file), nên thay bằng hai trục gradient quay quanh tâm màn hình với chu
+kỳ khác nhau (17 s và 11 s, ngược chiều).
+
+**Cách kiểm nhanh**: dựng lại đúng công thức bằng HTML/SVG rồi mở trên trình
+duyệt (`?v=old|new|zoomnew`, tham số qua URL, `?t=` để đóng băng thời gian).
+Dò xong thông số mới build một lần duy nhất. Build lại native cho mỗi lần
+chỉnh một hằng số là quá đắt.
+
+## 2026-10-31 — Viền sáng chỉ còn ở lối vào, và trợ lý đổi thành nurse
+
+**Viền sáng.** Chủ chốt: chỉ cần lúc bấm "Tập cùng chuyên viên" rồi chuyển
+màn, bấm "Bắt đầu" là không cần nữa — trong lúc giữ tư thế mà còn một thứ
+chuyển động quanh màn hình thì chỉ tổ phân tán. Bỏ effect bật lại ở
+`countdown`/`running` trong `app/train/[dayId].tsx`, thay bằng: rời khỏi
+`intro` là tắt (để bấm Bắt đầu sớm thì ánh sáng tắt luôn chứ không cháy hết
+2,8 giây sau lưng màn đếm ngược). Kéo theo trạng thái `active` trong
+`useEdgeGlowTransition` không còn ai gọi nữa nên bỏ luôn; `SiriEdgeGlow` giờ
+chỉ còn `idle | ignite | settle`.
+
+**Trợ lý ảo.** Nhân vật cũ ("kamran") đổi thành nurse. Điểm đáng ghi: trợ lý
+**không phải ảnh tĩnh** — `src/components/home/MascotFace.tsx` lái hai tấm
+sprite 3×3 để nó quay đầu theo chỗ người dùng chạm và đổi biểu cảm theo việc
+thật trong app. Hai tấm chủ đưa khớp đúng lưới đó, kể cả vị trí từng ô, nên
+chỉ thay file, không sửa logic:
+`assets/mascot/nurse-directions.webp` + `nurse-reactions.webp` (648×648, nền
+trong suốt sẵn). Ảnh tĩnh `assets/ai-assistant.png` (đầu khung chat, trang
+trợ giúp, nút nổi bản không kính) dựng lại từ ô chính giữa tấm directions,
+đặt trên đĩa xanh thương hiệu lấy màu từ ảnh cũ; 1,29 MB → 171 KB.
+
+**Phải kiểm trước khi thay sprite — không có gì báo nếu sai:** chiều quay
+đầu. Một tấm vẽ đúng bố cục nhưng bị lật sẽ làm đầu ngoái *ngược* hướng
+chạm — app vẫn chạy, vẫn mượt, không log, không lỗi kiểu. Cách kiểm: cắt
+hàng giữa của tấm cũ và tấm mới đặt cạnh nhau, cột 0 phải quay mặt sang trái
+khung hình. Đã ghi lại thành chú thích ngay trên hai dòng `require`.
+
+Vệt bóng trắng nướng sẵn dưới vai trong sprite gốc: trên nền trắng thì vô
+hình, trên đĩa xanh thì thành vết bẩn. Xử lý bằng cắt bớt đáy rồi làm tan
+dần alpha ở 70px cuối, không phải tách nền.
+
+## 2026-11-01 — Roadmap calendar height, store panel, order notifications
+
+Four owner reports in one pass, plus one trap that had been quietly
+poisoning every JS-only install.
+
+**The month grid could push the day's button off the screen.**
+`RoadmapCalendar` sized its grid by the month: four to six rows. November
+2026 needs six, which grew the card by a full row and pushed "Bắt đầu buổi
+chăm sóc" below the fold — the opposite of what the measured `listSpacer`
+in `roadmap.tsx` is for. The owner asked for "chỉ hiện 5 hàng". Rendering
+five rows of dates would hide real days (in November 2026 the sixth row
+holds both the 1st and the 30th), so instead the grid is always five rows
+TALL: a six-row month compresses its rows to fit, a four-row month is
+padded with a dimmed trailing week, and the card's height never changes.
+The date circle shrinks with the row (`circleSize`), and every marker now
+lives in a fixed-height `marker` box so a row's height never depends on
+what is in it.
+
+**Store panel.** `ai-assistant.png` had been replaced with the nurse, which
+made the two rows of the chat picker — AI and human support — the same
+character; it is the robot again, and `MascotFace`'s animated FAB stays the
+nurse. The member line reads "Ưu đãi thành viên giảm {percent}%"
+(`storeDiscountOffer`) instead of a title, a middle dot and a minus sign.
+The buy button's `marginTop: 'auto'` gives no gap once the copy fills the
+panel, so the copy now lives in a `ScrollView` that shrinks and the button
+owns its own row; the hero also went from 33% to 28% of the screen, which
+is enough for the tallest product (two-line name + description + member
+card) to fit with no scrolling at all. The "SẢN PHẨM" title came out of the
+header: the tab bar already says which tab this is.
+
+**An order now announces itself.** `place-app-order` wrote the order into
+the customer's support thread and left everything else to the client, which
+fired `dispatch-push` AFTER the call returned — an order placed on a phone
+that was then backgrounded, killed or out of signal reached nobody. All
+three alerts moved server-side:
+  - the staff alert the chat-message trigger raises is retitled
+    "Đơn hàng mới · <product>" with the reference, quantity, total, name
+    and phone in the body (retitled, not duplicated, so a specialist's
+    reply still closes it);
+  - the buyer gets a `notifications` row — nothing inserts into that table
+    on its own, so an order used to leave no trace the customer could see;
+  - the staff push is sent by the function, with `alert: 'order'` giving
+    `dispatch-push` the title "Đơn hàng mới" instead of "Tin nhắn hỗ trợ
+    mới".
+The reply carries `staffNotified`. The app pushes only when that is false,
+so an app talking to an older deployment still pushes and a new app talking
+to the new one does not push twice.
+
+Both functions are deployed (`dispatch-push` v50, `place-app-order` v4) and
+the chain was tested end to end with two real orders against the catalog's
+cheapest VN item, placed as the `uitester@thera.local` fixture account. The
+first one found a FOURTH notification path nobody had listed: the
+`notify_chat_message_inbox` trigger writes every incoming message into
+`notifications` for staff as "Tin nhắn hỗ trợ mới", so an order sat under
+that generic title in the staff app while the push and the console both
+said "Đơn hàng mới". Same remedy as the staff alert — retitle the row the
+trigger just wrote, scoped by the message's own `created_at` so earlier
+unread messages in the same thread are left alone. The second order
+confirmed it: both staff accounts got "Đơn hàng mới · <product>" with the
+compact summary, the buyer got the receipt, and the first order's rows were
+provably untouched.
+
+Four paths exist in total, and anything that changes how an order announces
+itself has to account for all four: `staff_alerts` (console), the staff
+`notifications` rows (staff app inbox), the buyer's `notifications` row,
+and the Expo push.
+
+**The trap: a stale Metro cache serves old modules silently.**
+`npx expo export:embed` produced a bundle that crashed at startup with
+`ReferenceError: Property 'useAnimatedProps' doesn't exist` — a symbol that
+is imported correctly in `RoadmapReadyTimeline.tsx`. The transform cache
+had gone bad: some modules were old, some new. It also explains a header
+label that was in the source but had never appeared on a phone. `rm -rf
+"${TMPDIR}metro-cache" node_modules/.cache` before bundling, and treat any
+"Property 'X' doesn't exist" for a correctly-imported symbol as a cache
+problem rather than a code one.
+
+## 2026-11-01 (chiều) — Thanh trạng thái và tờ đặt hàng
+
+**A screen that declares no status bar inherits the one underneath it.**
+React Native's `StatusBar` is a stack: each mounted `<StatusBar>` pushes an
+entry and the last one in mount order wins, so the screen a user pushes
+from Home does not get a fresh default — it keeps Home's `style="light"`
+until something else pushes an entry. In light mode (the app's default,
+`useAppStore.darkMode` starts `false`) that painted white text on the white
+Thông báo screen: no clock, no battery. Profile, the chat screens, the day
+and train screens, Kích hoạt, the paywall and every profile sub-screen had
+exactly the same hole — fifteen-odd screens, all of them light.
+
+The fix is one component, not fifteen screens: `ScreenContainer` now pushes
+its own entry, derived from its `tone` (`app` follows the theme, `glass`
+and `violet` are dark skies and stay `light`). Because that entry is
+rendered *before* `children`, it is pushed first, so a screen that declares
+its own `<StatusBar>` inside still wins — `quiz`, `consent` and `questions`
+keep their overrides untouched. Verified on the simulator in light mode:
+Thông báo and Hồ sơ now draw a dark status bar, Home and a violet community
+post still draw a light one, and going back restores Home's.
+
+**The order sheet could not be submitted on a tall screen.**
+`OrderFormModal`'s sheet is `maxHeight: '92%'` with `overflow: 'hidden'`,
+and the `ScrollView` inside carried no height of its own. A ScrollView in
+an auto-height parent measures to its *content*, so the sheet clamped at
+92% and simply clipped it: "Đặt hàng" sat below the screen with nothing to
+scroll to it, on an iPhone 17 Pro with every field filled. `flexShrink: 1`
+on the ScrollView lets the clamp reach it. The component is new and
+uncommitted, so this never shipped.
+
+**…and `flexShrink` alone did not do it: the scrim was eating the drag.**
+With the clamp reaching the ScrollView the sheet still would not move. A
+control test ruled out the tooling — the community feed scrolled with the
+identical swipe — and the real cause turned out to be the shape of the
+modal, not its sizing: the dimming `Pressable` was the sheet's *parent*,
+with a second `Pressable` (the `stopPropagation` wrapper) directly around
+the `ScrollView`. A Pressable ancestor claims the touch responder on move,
+so the ScrollView never saw the gesture. The scrim is now a sibling
+rendered *behind* the sheet (`StyleSheet.absoluteFill` inside a plain
+`View` root) and the sheet itself is a `View`; tapping outside still closes
+it, and the form scrolls.
+
+**Three other modals share that shape — only one of them actually shares
+the bug.** `StoreCartModal` has the full pattern (Pressable scrim →
+Pressable sheet → ScrollView) and was restructured the same way, though it
+is latent today: the cart holds one row per catalogue product and four rows
+never reach the sheet's `maxHeight`. The two time pickers
+(`app/profile/notifications-settings.tsx`, `src/components/ReminderPopup.tsx`)
+only *look* like the same thing — their sheet is a plain `View`, and a
+Pressable scrim with no Pressable between it and the ScrollView does not
+steal the gesture. Checked on the simulator against the shipped build:
+the 48-option list scrolls fine. Both files were left alone.
+
+The distinguishing detail, for the next modal: it is a `Pressable` wrapping
+the scrollable area that breaks scrolling, not the scrim itself.
+
+## 2026-11-01 (tối) — Một vòng kiểm tra Trang chủ trên máy ảo
+
+Chạy hết các nút trên Home bằng máy ảo "TheraHOME 11 Pro Max" (bản Debug,
+JS lấy từ Metro nên là mã hiện tại trong máy). Hai điều đáng ghi lại.
+
+**Nút kính trên Expo dev client ăn chạm, không phải lỗi của app.** Nửa trên
+vòng "Uống nước" ở hàng chỉ số không nhận chạm: bấm ở y≈146 không lên cốc
+nào, bấm ở y≈155 trở xuống thì lên. Cùng một triệu chứng với công tắc
+"Nhắc tôi uống nước". Thủ phạm là **nút bánh răng nổi của Expo dev client**
+(dev menu → Tools button) đè lên góc trên bên phải; tắt nó đi thì vòng nước
+nhận chạm ngay ở y=140. Bản Release không có nút đó, nên **không có lỗi nào
+để sửa** — nhưng khi kiểm tra UI bằng máy ảo dev client thì phải tắt Tools
+button trước, nếu không sẽ đi báo một lỗi không tồn tại. Hai giả thuyết đã
+thử và loại trừ bằng thực nghiệm: `pointerEvents` trên `headerBackdrop` và
+trên `<Svg>` của `VerticalGradient` — cả hai đều không phải nguyên nhân.
+
+Cũng lưu ý: `simctl` bấm quá nhanh nên `<Switch>` của React Native (UISwitch
+nằm trong UIScrollView, `delaysContentTouches`) không đổi trạng thái khi
+"tap" — phải kéo ngang mới bật tắt được. Ngón tay thật không gặp chuyện này.
+
+**Trùng key React trong ô soạn bài Cộng Đồng (lỗi thật, đã sửa).**
+`COMPOSER_CHIPS` có hai mục cùng `type: 'image'` — "Ảnh" và "Video" cố ý mở
+chung một kiểu bài vì không có kiểu `video` riêng — nhưng danh sách lại
+`key={chip.type}`, nên React cảnh báo `Encountered two children with the
+same key, '.$image'` mỗi lần vẽ feed. Đổi sang `key={chip.label}`. Bản
+Release im lặng, nhưng key trùng thì React vẫn có quyền dùng lại nhầm
+component, nên đây là lỗi thật chứ không chỉ là cảnh báo của dev.
+
+Những thứ đã chạy đúng: vòng nước +1, thẻ nước +/− (nút − tự mờ ở 0), biểu
+đồ đau N8–N14, "Bắt đầu hôm nay" → Ngày 14, "Xem tất cả" → Cộng Đồng kèm bộ
+lọc bài TheraHOME, thẻ bài viết → trang bài, chuông → Thông báo (12 mới),
+ảnh đại diện → Hồ sơ, bốn tab + mascot → bảng chọn người trò chuyện. "Kết
+nối Apple Health" mở đúng bảng xin quyền; khi bấm Từ chối, thẻ Vận động
+chuyển sang "Hôm nay chưa ghi được gì" kèm đường dẫn Cài đặt và nút Thử
+lại — xử lý từ chối đã đầy đủ.
+
+Một điểm lệch chưa kết luận: màn Ngày 14 ghi "Đã hoàn thành", còn Lộ trình
+vẫn hiện thẻ hôm nay với nút "Bắt đầu buổi chăm sóc" và tiến trình 12/14.
+
+## 2026-11-01 (tối) — Lộ trình: lịch vẽ cả giai đoạn chưa bán
+
+Giai đoạn 3 của TheraNECK+ (ngày 15–28) đang `sales_enabled = false`, nghĩa
+là khoá VÀ không quảng cáo: danh sách ngày cố tình không hiện nó, thanh tiến
+trình nói 12/14. Nhưng `RoadmapCalendar` lại được truyền thẳng `days` — cả
+28 dòng — nên nó rải giai đoạn chưa bán ra lịch từ ngày kích hoạt + 14 trở
+đi. Với tài khoản kích hoạt 16/10, ngày 15 và 16 rơi vào 30 và 31/10, đã
+trôi qua, nên lịch vẽ **vòng tròn đỏ "Chưa hoàn thành"** cho hai ngày khách
+chưa bao giờ được bán; ngày 17–28 thành chấm "Sắp tới" suốt tháng 11. Ngay
+dưới đó thanh tiến trình vẫn ghi 12/14.
+
+Sửa: tách `visibleDays` (lọc `lockedPhaseIds`) thành một memo dùng chung và
+truyền nó cho lịch, cả `doneCount` cũng tính trên đó. `currentPhaseId` vốn
+tự lọc lại một lần nữa, nay dùng chung memo đó. Lịch giờ khớp đúng 14 ngày
+mà danh sách hiển thị.
+
+**Thẻ hôm nay giờ biết ngày đã xong.** `TodayCard` đọc mọi thứ từ `day` TRỪ
+trạng thái, nên sau khi tập xong nó vẫn vẽ nút đỏ "Bắt đầu buổi chăm sóc"
+trong khi màn ngày ghi "Đã hoàn thành" và nốt ngay bên dưới là dấu tích.
+Nay khi `status === 'done'`: chấm ngày đổi sang `tick` (cùng màu dấu tích
+của lịch), thêm dòng "✓ Đã hoàn thành", và nút chuyển thành viền mờ với chữ
+"Xem lại buổi hôm nay". Ngày đã xong vẫn mở được như trước — chỉ đổi chữ,
+không đổi hành vi. Khoá mới: `sessionDone`, `reviewSession`.
+
+Còn lại, KHÔNG phải lỗi (owner xác nhận 2026-11-01): lịch gán ngày theo
+`activatedAt + (day.id - 1)` nên Ngày 14 nằm ở 29/10, còn thẻ hôm nay (1/11)
+vẫn xưng Ngày 14 vì `program.currentDay` kẹp ở ngày cuối. Đó là vì khách đã
+đi quá 14 ngày — lộ trình hết ngày thì ngày cuối ở lại.
+
+## 2026-11-01 (tối) — Cửa hàng: chạy đúng, thiếu hai mô tả
+
+Chạy hết tab Cửa hàng trên máy ảo. Không tìm thấy lỗi mã nguồn nào.
+
+Đã kiểm: băng chuyền 4 sản phẩm (huy hiệu giảm giá đổi theo từng sản phẩm:
+−50% cho Combo và TheraNECK+, −10% cho gối và miếng dán), giỏ hàng rỗng và
+giỏ có hàng, nút thùng rác xoá từng món, chạm nền để đóng giỏ (đúng chỗ đã
+sửa chiều nay — scrim là anh em của tấm, không phải cha), "Mua ngay" vừa lưu
+vào giỏ vừa mở tờ đặt hàng, **tờ đặt hàng cuộn được** (xác nhận bản vá chiều
+nay chạy trên máy), tên và số điện thoại tự điền từ hồ sơ, bộ đếm số lượng
+(3 × 198.000 = 594.000đ đúng), và chặn gửi khi thiếu địa chỉ — báo đỏ "Vui
+lòng điền đủ họ tên, số điện thoại và địa chỉ nhận hàng", không tạo đơn.
+
+**Thiếu nội dung, không phải lỗi:** hai sản phẩm thị trường VN chưa có mô tả
+trong `store_items.description` — `item-1789442043284-vn` (Combo Phục hồi
+toàn diện) và `neck-plus` (Máy trị liệu cổ TheraNECK+). Hai món còn lại có,
+và bản US/Malay của TheraNECK+ cũng có mô tả riêng — chỉ bản tiếng Việt
+trống. Trên màn hình nó để lại một khoảng trống giữa dòng giá và thẻ ưu đãi.
+Sửa bằng WEB Admin, không cần build.
+
+Một điểm nhỏ về chữ: tóm tắt đơn ghi "Giá niêm yết" theo đơn giá (220.000đ)
+trong khi "Tổng cộng" đã nhân số lượng (594.000đ). Đọc kỹ thì đúng, nhưng
+hai dòng cạnh nhau dễ gây hiểu nhầm khi số lượng > 1.
+
+## 2026-11-01 (tối) — Cộng Đồng: tim và lưu bài trong feed không vẽ lại
+
+Lỗi nặng nhất tìm được trong cả buổi QA hôm nay, và nó im lặng tuyệt đối.
+
+**Triệu chứng.** Bấm tim hoặc bấm lưu trên một thẻ bài trong feed: **thẻ
+không đổi gì cả** — không tim, không số, không dấu lưu. Nhưng máy chủ thì
+đổi thật. Kiểm chứng bằng SQL trên production: tap lúc 21:29:55 ghi đúng một
+dòng `post_likes` reaction `heart` (`likes_count` lên 26) trong khi thẻ vẫn
+vẽ `♡ 25`; tap lưu lúc 21:31:24 ghi một dòng `post_saves` trong khi dấu
+trang vẫn rỗng.
+
+**Và đây mới là chỗ tệ.** Vì thẻ giữ nguyên trạng thái cũ, lần bấm thứ hai
+gửi lại ĐÚNG hành động cũ thay vì hành động ngược lại: `onSavePress` truyền
+`saved: savedByMe` đọc từ `savedSet` đã cũ, nên upsert thêm một lần nữa.
+Nghĩa là từ feed, khách **thích được nhưng không bỏ thích được, lưu được
+nhưng không bỏ lưu được** — bấm bao nhiêu lần cũng vậy. Kéo xuống làm mới
+mới đồng bộ lại; sau đó bấm một cái là bỏ được ngay (đã thử cả hai chiều).
+
+Màn chi tiết bài viết KHÔNG dính: bấm tim ở đó đổi ngay lập tức. Khác biệt
+duy nhất là feed dùng `FlatList`.
+
+**Nguyên nhân.** Trạng thái "đã thích / đã lưu" nằm NGOÀI `data` của
+`FlatList` — trong hai map `myReactions` và `savedSet`, mỗi cái một query
+riêng — mà danh sách lại không có `extraData`. `VirtualizedList` không có
+lý do gì để vẽ lại ô, nên ô giữ nguyên. Thêm
+`extraData={listExtraData}` (memo của hai map đó) là xong: thử lại ngay trên
+máy, tim và dấu lưu đổi tức thì, số đếm cũng đổi theo.
+
+Cách chẩn đoán đáng ghi lại: đọc code không ra. Thứ chốt được vấn đề là đối
+chiếu từng thao tác với `post_likes` / `post_saves` trên production — màn
+hình nói một đằng, cơ sở dữ liệu nói một nẻo, và chính khoảng cách đó chỉ ra
+rằng tay thì chạy, chỉ có mắt là không thấy.
+
+Đã kiểm và chạy đúng: feed và cảnh báo trùng key đã im (bản vá chiều nay),
+vòng tròn story mở thẻ thành viên (14 ngày liên tiếp, #3 chăm chỉ nhất),
+menu "..." của bài official hiện đúng ba mục Lưu / Ẩn / Báo cáo và không
+hiện "Chặn" (đúng, không chặn được trang chính thức), nút "+" mở màn Tạo bài
+viết với lời chào theo tên và nút Chia sẻ mờ khi chưa có nội dung, chuông
+của Cộng Đồng chỉ đếm thông báo cộng đồng (1) chứ không phải 12 của chuông
+Trang chủ, ô soạn bài mở ShareStoryModal, mở bài → màn chi tiết + ô bình
+luận.
+
+## 2026-11-01 (tối) — Ngày, Hồ sơ, Thông báo sang nền tối
+
+Ba màn cuối còn sáng trong luồng chính đã chuyển sang bảng màu
+`homeGlassColors`, theo yêu cầu của owner. Đi từ Cộng Đồng sang Thông báo
+trước đó là chói mắt.
+
+- `app/notifications.tsx`, `app/profile/index.tsx`, `app/day/[dayId].tsx`,
+  cộng `src/components/day/LiveFormCard.tsx` (thẻ "Tập cùng chuyên viên"
+  nằm trong màn Ngày). `ScreenContainer`/`BackBar` nhận `tone`, nên thanh
+  trạng thái tự chuyển sang chữ sáng.
+- **Thông báo đổi nền theo nơi mở nó** (quy tắc 31: mỗi mặt có nền riêng).
+  Mở từ chuông Cộng Đồng (`scope=community`) thì nền tím và nhấn tím; mở từ
+  chuông Trang chủ thì nền xanh và nhấn `tick`.
+- Các màu theo loại thông báo vốn là hex rời (hổ phách, xanh lá, tím) đọc
+  thành bùn trên nền gần đen, nay lấy từ bảng kính. Vòng tròn chữ cái bỏ nền
+  màu, chỉ còn `surfaceRaised` — thứ duy nhất có màu trong mỗi dòng là cái
+  huy hiệu nhỏ, đủ để phân biệt trái tim với tờ lịch.
+- Huy hiệu đó vẽ icon bằng **màu nền màn hình**, không phải trắng: trắng
+  trên `link`/`accent`/`dotDone` gần như mất hút, nhìn ra thành vòng tròn
+  rỗng.
+- `theme.shadows.card` bỏ hết, thay bằng viền `hairline`: bóng đổ trên nền
+  gần đen là vô hình, thẻ mất cạnh.
+- `errorTint` (hồng nhạt vẽ cho trang trắng) ở nút Đăng xuất đổi thành
+  `surfaceRaised` + chữ `dotMissed`.
+- `SkeletonBlock`/`SkeletonRow`/`SkeletonCard` nhận `tone="glass"`, nếu
+  không màn Thông báo và Hồ sơ nháy hai vạch xám sáng trước khi vẽ lần đầu.
+
+**Còn sáng, chưa đụng tới** (owner chỉ nêu ba màn): `profile/edit`,
+`profile/account`, `profile/help`, `profile/notifications-settings`,
+`subscription`, `chat/ai`, `chat/human`. Hai màn chat đáng kể nhất — mascot
+trên cả bốn tab tối đều mở thẳng vào đó.
+
+## 2026-11-01 (tối) — Nốt phần còn lại sang nền tối
+
+Chín màn còn sáng trong luồng khách hàng đã chuyển nốt: `profile/edit`,
+`profile/account`, `profile/help`, `profile/notifications-settings`,
+`profile/legal/[doc]`, `profile/delete-account`, `subscription`, `chat/ai`,
+`chat/human` — cùng các thành phần dùng chung mà chúng kéo theo
+(`LegalDocBody`, `DeleteAccountModal`, `OptionChip`).
+
+**`tone` chứ không đổi thẳng, ở ba chỗ dùng chung với màn hình nội bộ.**
+`Button`, `ChatMessageBubble` và `ChatComposer` cũng được console nhân viên
+(`app/chat/admin-thread`, `(staff)/*`) dùng; đổi thẳng là kéo luôn console
+sang tối mà chẳng ai yêu cầu. Nay cả ba nhận `tone?: 'app' | 'glass'`, mặc
+định `'app'`, hai màn chat của khách truyền `"glass"`. `OptionChip` thì đổi
+thẳng — chỉ Chỉnh sửa hồ sơ dùng nó.
+
+Mấy chỗ phải xem ảnh mới thấy:
+- Thanh soạn tin trong chat lấy `theme.colors.bgApp`, thành **một dải trắng
+  vắt ngang chân màn hình tối**. Nó nằm TRÊN cuộc trò chuyện nên phải lấy
+  nền của chính màn hình (`sky[4]`).
+- Bong bóng tin của chuyên viên là `bgCardAlt` — trắng, chữ đen, chói trên
+  nền đen. Nay là `surfaceRaised`.
+- `OptionChip` để nguyên thì vẽ **bốn viên thuốc trắng chữ đen**, và tệ hơn:
+  viên đang chọn trông y hệt ba viên kia.
+- Hộp chọn giờ và hộp xoá tài khoản ban đầu dùng `surface` — vốn trong mờ,
+  nên nhìn xuyên thấy trang bên dưới, đục như sương. Đổi sang `sky[3]`: đục
+  hẳn và vẫn đúng tông xanh của màn hình.
+- `<BackBar` viết nhiều dòng ở `subscription.tsx` lọt lưới lần đổi hàng
+  loạt, để lại nút quay lại trắng và tiêu đề xám trên nền đen.
+
+**Vẫn còn sáng, CỐ Ý, chưa ai yêu cầu:** `train/[dayId]` (Tập cùng chuyên
+viên — mở từ màn Ngày đã tối), `quiz/[phaseId]` (khảo sát giai đoạn — mở từ
+Lộ trình đã tối), `activate` (nằm giữa luồng onboarding vẫn sáng),
+`paywall/[phaseId]` và `call/[callId]` (cả hai sau cờ đang tắt), ba màn
+onboarding `consent`/`country`/`questions`, và toàn bộ `(staff)` +
+`chat/admin-thread` (console nội bộ, để nguyên là đúng).
+
+## 2026-11-01 (tối) — Tập cùng chuyên viên và Khảo sát giai đoạn sang tối
+
+Hai màn cuối mà khách thật sự bấm trúng từ một màn đã tối.
+
+- `app/train/[dayId].tsx`: khung video mẫu vốn đã đen, phần còn lại (ô
+  camera, các lớp phủ hướng dẫn, đồng hồ đếm ngược, thẻ điểm, nút Bắt đầu)
+  chuyển sang bảng kính. `poseColors` giữ nguyên — đó là thang điểm tư thế,
+  không phải màu giao diện, và nó vốn đã hợp trên nền tối.
+- `app/quiz/[phaseId].tsx`: **chỉ nhánh bộ câu hỏi.** Nhánh còn lại là màn
+  "Gợi ý từ TheraHOME" dựng trên ảnh wellness sáng do owner cung cấp, có
+  `<StatusBar style="dark" />` riêng và dấu X màu navy cố định — cố ý sáng,
+  để nguyên.
+- `Card` nhận `tone` như `Button`: màn Kích hoạt vẫn sáng và cũng dùng nó.
+
+**Chưa xem được bằng mắt, chỉ qua typecheck:** nhánh bộ câu hỏi của khảo sát.
+Tài khoản thử đã trả lời cả hai khảo sát có câu hỏi (`user_quiz_attempts` có
+1 dòng cho mỗi giai đoạn), mà giai đoạn 3 thì không có câu hỏi nào — nên
+nhánh đó không mở được nếu không xoá dữ liệu thật, và việc đó thì không làm.

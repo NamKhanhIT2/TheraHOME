@@ -2847,3 +2847,50 @@ rê chuột, menu mở tại tin nhắn, vạch ngày đủ, tìm "máy" ra 4 cu
 cuộc `kind='human'` chứa chữ đó trong database (6 cuộc tổng, 2 là chat AI),
 đính kèm xem và gỡ được, ảnh cũ vẫn tải sau khi tách theo hội thoại. Chưa kiểm
 được: chấm chưa đọc tự tắt khi khách nhắn lúc đang mở — cần tin thật từ khách.
+
+---
+
+## 2026-11-01 — Đơn đặt trong app cuối cùng cũng là một đơn hàng
+
+Trước hôm nay, khách bấm đặt hàng trong app thì `place-app-order` làm ba việc:
+viết một **đoạn chữ** vào luồng chat CSKH, đổi tên báo động cho nhân viên, gửi
+biên nhận cho khách. Không có dòng dữ liệu nào là "đơn hàng". Hệ quả: không lọc
+được, không tìm được theo số điện thoại, không đếm được, không đánh dấu "đã
+giao" được. Quản lý đơn = cuộn luồng chat đọc tay. Chủ sản phẩm chỉ ra điều này
+khi đọc lại phần kiểm tra hôm qua: thấy được đơn trên console không có nghĩa là
+**quản lý** được đơn.
+
+**Bảng `app_orders`** (migration `202611011800_orders_placed_in_the_app.sql`,
+nằm ở repo APP cùng mọi migration khác). Cố ý **không** dùng bảng `orders` có
+sẵn: `orders` là feed Shopify, mang `activation_code`, và là thứ
+`claim_user_access_contact` kiểm tra để mở quyền dùng app — một dòng rơi vào đó
+sẽ xếp hàng số điện thoại của khách vào `product_activation_contacts`. Đơn mua
+hàng trong app **không cấp quyền gì cả**, nên nó phải nằm riêng.
+
+Giá và tên sản phẩm được **chụp lại** vào đơn chứ không join sang `store_items`:
+đổi giá hay đổi tên trong kho hàng không được phép viết lại lịch sử một đơn đã
+đặt. `phone_digits` (chỉ chữ số) nằm cạnh `phone` để tìm "0328552894" vẫn ra
+đơn khách gõ "032 855 2894".
+
+RLS: admin/cskh đọc và sửa; **không có policy INSERT cho bất kỳ ai** — chỉ
+Edge Function (service_role) được ghi, vì một đơn là bản ghi app đã tính tiền,
+không phải thứ gõ tay vào console. Khách đọc được đơn của chính mình, để sau
+này làm "đơn của tôi" trong app không cần migration nữa. Trigger
+`touch_app_order` tự đóng dấu ai nhận xử lý và lúc nào, ngay lần đầu trạng thái
+rời khỏi "mới".
+
+**Trang "Đơn hàng"** (`src/components/views/OrdersView.tsx`) có mặt ở **cả
+Admin lẫn CSKH** — cùng một hàng đợi, cùng quyền. Bốn ô số (chờ xử lý, đang
+xác nhận/giao, đã giao, doanh thu đã giao trong tháng), bảng tìm theo mã/tên/số
+điện thoại, lọc theo trạng thái, mở từng đơn xem địa chỉ và ghi chú của khách.
+Chỉ **trạng thái** và **ghi chú nội bộ** sửa được; phần còn lại là thứ khách đã
+mua và app đã tính, một console sửa lén được những con số đó còn tệ hơn console
+không sửa được.
+
+**Kiểm chứng:** typecheck sạch, `/admin` biên dịch và phục vụ 200. Policy và
+trigger thử trực tiếp trên database bằng danh tính Google của chủ sản phẩm
+(`set local request.jwt.claims`): đọc được, chuyển trạng thái được,
+`handled_at`/`handled_by` tự đóng dấu đúng; một tài khoản khách lạ đọc ra 0
+dòng. **Chưa kiểm được bằng mắt trên giao diện** — vào console phải đăng nhập
+Google, việc tôi không được phép tự làm, nên phần nhìn thấy trang phải do chủ
+sản phẩm mở.

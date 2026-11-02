@@ -326,6 +326,26 @@ launch), `app/call/[callId].tsx` (one screen for both sides — role comes from
 `src/components/chat/CallButton.tsx` (the customer's entry point, in the
 `chat/human` header).
 
+**app_orders** (added 2026-11-01, `202611011800_orders_placed_in_the_app.sql`)
+— an order placed in the app's store, as a row. Written only by
+`place-app-order` (service_role; there is deliberately no INSERT policy for
+anybody), read and worked by Admin/CSKH in the web console's "Đơn hàng" tab.
+Before it, an in-app order existed solely as a paragraph of text inside the
+buyer's support thread, so nothing could list, search, count or close one.
+
+Not to be confused with **orders**, the Shopify feed: that one carries an
+`activation_code`, is what `claim_user_access_contact` checks a purchase
+against, and queues the buyer's contact into `product_activation_contacts`.
+An `app_orders` row grants no app access at all.
+
+Product name and both prices are snapshots, not joins — repricing the
+catalogue must not rewrite what a customer already bought. `phone_digits`
+sits beside `phone` so a search for `0328552894` still finds `032 855 2894`.
+Staff may change `status` (`new` → `confirmed` → `shipped` → `delivered`, or
+`cancelled`) and `staff_note`; the `touch_app_order` trigger stamps
+`handled_at`/`handled_by` the first time an order leaves `new`. The buyer can
+read their own rows, so an "đơn của tôi" screen needs no further migration.
+
 ## Edge Functions
 
 Three, all on project `nyjvtvmllwbyfokldgtj`. None of their source is
