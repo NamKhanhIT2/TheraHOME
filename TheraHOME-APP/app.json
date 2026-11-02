@@ -3,14 +3,14 @@
     "name": "TheraHOME",
     "slug": "therahome-mobile-app",
     "scheme": "therahome",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ai.therahome",
-      "buildNumber": "46",
+      "buildNumber": "47",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -114,7 +114,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "TheraHOME đọc số bước và vòng vận động hôm nay từ ứng dụng Sức khoẻ để hiển thị trên trang chủ. Dữ liệu chỉ nằm trên máy bạn.",
-          "NSHealthUpdateUsageDescription": false,
+          "NSHealthUpdateUsageDescription": "TheraHOME không ghi dữ liệu nào vào ứng dụng Sức khoẻ — ứng dụng chỉ đọc số bước và vòng vận động để hiển thị trên trang chủ.",
           "background": false
         }
       ],
