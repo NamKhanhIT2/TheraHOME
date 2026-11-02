@@ -920,6 +920,50 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_check_ins: {
+        Row: {
+          check_in_date: string
+          created_at: string
+          day_number: number | null
+          id: string
+          mood: string
+          post_id: string | null
+          shared: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          check_in_date: string
+          created_at?: string
+          day_number?: number | null
+          id?: string
+          mood: string
+          post_id?: string | null
+          shared?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          check_in_date?: string
+          created_at?: string
+          day_number?: number | null
+          id?: string
+          mood?: string
+          post_id?: string | null
+          shared?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_check_ins_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercise_references: {
         Row: {
           clip_path: string | null
@@ -2221,6 +2265,7 @@ export type Database = {
           accent_color_key: string
           category_id: string
           description: string | null
+          discount_percent: number
           external_link: string | null
           group_key: string
           id: string
@@ -2236,6 +2281,7 @@ export type Database = {
           accent_color_key?: string
           category_id: string
           description?: string | null
+          discount_percent?: number
           external_link?: string | null
           group_key?: string
           id: string
@@ -2251,6 +2297,7 @@ export type Database = {
           accent_color_key?: string
           category_id?: string
           description?: string | null
+          discount_percent?: number
           external_link?: string | null
           group_key?: string
           id?: string
@@ -3145,6 +3192,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_community_highlights: {
+        Args: { p_limit?: number }
+        Returns: {
+          avatar_url: string
+          checked_in_today: boolean
+          completed_days: number
+          current_streak: number
+          full_name: string
+          missed_days: number
+          today_mood: string
+          user_id: string
+        }[]
+      }
       get_community_profile: {
         Args: { p_user_id: string }
         Returns: {
@@ -3158,6 +3218,17 @@ export type Database = {
         }[]
       }
       get_default_product_for_contact: { Args: never; Returns: string }
+      get_my_check_in_today: {
+        Args: never
+        Returns: {
+          check_in_date: string
+          checked_in: boolean
+          day_number: number
+          mood: string
+          post_id: string
+          shared: boolean
+        }[]
+      }
       get_winback_candidates: {
         Args: never
         Returns: {
@@ -3359,6 +3430,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      submit_daily_check_in: {
+        Args: { p_mood: string; p_share?: boolean }
+        Returns: {
+          check_in_date: string
+          day_number: number
+          mood: string
+          post_id: string
+          shared: boolean
+        }[]
       }
       subscription_holders: {
         Args: { p_limit?: number }

@@ -21,7 +21,10 @@ type RequestBody =
       mode: 'broadcast'; userIds?: string[]; all?: boolean; title: string; body: string; data?: Record<string, unknown>;
       targetMarkets?: Market[]; titleUs?: string; bodyUs?: string; titleMalay?: string; bodyMalay?: string;
     }
-  | { mode: 'chat'; threadId: string; senderType: 'user' | 'specialist'; preview?: string; attachment?: boolean }
+  // `alert: 'order'` only changes the title staff see: an order and a
+  // question both arrive as a message on the same thread, and on a lock
+  // screen the title is most of what gets read.
+  | { mode: 'chat'; threadId: string; senderType: 'user' | 'specialist'; preview?: string; attachment?: boolean; alert?: 'order' }
   // A customer is ringing the support line. Reaches staff whose app is not
   // in the foreground — a foreground one is already rung over Realtime.
   | { mode: 'call'; callId: string }
@@ -303,7 +306,8 @@ Deno.serve(async (request) => {
         if (thread.user_id !== user.id) return json({ error: 'thread_owner_required' }, 403);
         recipientIds = await staffRecipientIds(admin);
         // Staff read Vietnamese.
-        compose = () => ({ title: 'Tin nhắn hỗ trợ mới', body: isAttachment ? COPY.vi.sentImage : rawPreview || COPY.vi.newMessage });
+        const staffTitle = input.alert === 'order' ? 'Đơn hàng mới' : 'Tin nhắn hỗ trợ mới';
+        compose = () => ({ title: staffTitle, body: isAttachment ? COPY.vi.sentImage : rawPreview || COPY.vi.newMessage });
       }
     }
 
