@@ -4,14 +4,17 @@ import { Image, type ImageSourcePropType } from 'react-native';
 // still reading the Welcome screen. The first question gets its own smaller
 // batch so navigation never has to wait for illustrations from all 8 steps.
 const FIRST_QUESTION_IMAGES: ImageSourcePropType[] = [
-  require('../../assets/onboarding/goal-hero.png'),
-  require('../../assets/onboarding/goal-sleep.png'),
-  require('../../assets/onboarding/goal-work.png'),
-  require('../../assets/onboarding/goal-spine.png'),
-  require('../../assets/onboarding/goal-complete.png'),
+  require('../../assets/onboarding/goal-main-cinematic.jpg'),
 ];
 
 const REMAINING_QUESTION_IMAGES: ImageSourcePropType[] = [
+  require('../../assets/onboarding/priority-cinematic.jpg'),
+  require('../../assets/onboarding/home-reason-cinematic.jpg'),
+  require('../../assets/onboarding/tension-level-cinematic.jpg'),
+  require('../../assets/onboarding/tension-timing-cinematic.jpg'),
+  require('../../assets/onboarding/age-group-cinematic.jpg'),
+  require('../../assets/onboarding/daily-activity-cinematic.jpg'),
+  require('../../assets/onboarding/daily-time-cinematic.jpg'),
   require('../../assets/onboarding/priority-neck.png'),
   require('../../assets/onboarding/priority-back.png'),
   require('../../assets/onboarding/priority-full.png'),

@@ -101,23 +101,30 @@ export async function signUpAccount({
   email,
   password,
 }: {
-  username: string;
+  /** Optional since 2026-10-28: the sign-up form asks for an email and a
+   * password and nothing else (owner). An account made that way carries no
+   * name at all, and every screen that shows one falls back for it — the
+   * person can set a real name later in their profile. Staff accounts made
+   * elsewhere still pass one. */
+  username?: string;
   email: string;
   password: string;
 }): Promise<{ email: string; needsConfirmation: boolean }> {
   const trimmedEmail = email.trim();
-  const trimmedUsername = username.trim();
+  const trimmedUsername = username?.trim() ?? '';
 
   // A customer's username is a repeatable display name (owner, 2026-09-08),
   // so only its shape is checked, not whether it is free. Staff-name
   // uniqueness lives in a partial index, not on this path.
-  if (!isUsernameWellFormed(trimmedUsername)) throw new AuthError('username_invalid');
+  if (trimmedUsername && !isUsernameWellFormed(trimmedUsername)) throw new AuthError('username_invalid');
   if (!isPasswordStrongEnough(password)) throw new AuthError('weak_password');
 
   const { data, error } = await supabase.auth.signUp({
     email: trimmedEmail,
     password,
-    options: { data: { username: trimmedUsername } },
+    // `handle_new_user` only writes a username when the key is there and
+    // well-formed, so an absent one leaves profiles.username null.
+    options: trimmedUsername ? { data: { username: trimmedUsername } } : undefined,
   });
   if (error) throw new AuthError(classify(error));
 

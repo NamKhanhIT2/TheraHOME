@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Easing,
   Image,
+  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +17,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 import { useOnboardingContent } from '@/hooks/useOnboardingContent';
@@ -24,8 +27,10 @@ import { BackBar } from '@/components/ui/BackBar';
 import { OptionCard } from '@/components/ui/OptionCard';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
+import { NeumorphicBox } from '@/components/home/NeumorphicBox';
 import { useI18n } from '@/lib/i18n';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
+import { useSession } from '@/hooks/useSession';
 import {
   areFirstQuestionImagesReady,
   preloadAllOnboardingImages,
@@ -71,6 +76,14 @@ const AGE_HERO_IMAGE = require('../../assets/onboarding/age-hero.png');
 const HOME_REASON_SPRITE = require('../../assets/onboarding/home-reason-sprite.png');
 const TENSION_TIMING_SPRITE = require('../../assets/onboarding/tension-timing-sprite.png');
 const TENSION_TIMING_HERO = require('../../assets/onboarding/tension-timing-hero.png');
+const GOAL_CINEMATIC_IMAGE = require('../../assets/onboarding/goal-main-cinematic.jpg');
+const PRIORITY_CINEMATIC_IMAGE = require('../../assets/onboarding/priority-cinematic.jpg');
+const HOME_REASON_CINEMATIC_IMAGE = require('../../assets/onboarding/home-reason-cinematic.jpg');
+const TENSION_LEVEL_CINEMATIC_IMAGE = require('../../assets/onboarding/tension-level-cinematic.jpg');
+const TENSION_TIMING_CINEMATIC_IMAGE = require('../../assets/onboarding/tension-timing-cinematic.jpg');
+const AGE_GROUP_CINEMATIC_IMAGE = require('../../assets/onboarding/age-group-cinematic.jpg');
+const DAILY_ACTIVITY_CINEMATIC_IMAGE = require('../../assets/onboarding/daily-activity-cinematic.jpg');
+const DAILY_TIME_CINEMATIC_IMAGE = require('../../assets/onboarding/daily-time-cinematic.jpg');
 
 const TENSION_TITLES = {
   vi: ['Cơ thể bạn', 'thường cảm thấy ', 'thế nào?'],
@@ -182,10 +195,12 @@ function SpriteCell({
 function OptionReveal({
   progress,
   fill = true,
+  distance = 10,
   children,
 }: {
   progress: Animated.Value;
   fill?: boolean;
+  distance?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -195,7 +210,7 @@ function OptionReveal({
         {
           opacity: progress,
           transform: [
-            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+            { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [distance, 0] }) },
             { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) },
           ],
         },
@@ -229,6 +244,14 @@ export default function QuestionsScreen() {
   const { width, height } = useWindowDimensions();
   const { t } = useI18n();
   const reduceMotion = useReduceMotion();
+  // Claim the questionnaire for whoever is signed in BEFORE reading it: a
+  // half-finished one left behind by a different account on this phone
+  // would otherwise be resumed here and written onto this profile at the
+  // consent step (QA pass, 2026-10-30).
+  const { session } = useSession();
+  const onboardingUserId = session?.user.id;
+  const claimOnboardingFor = useAppStore((s) => s.claimOnboardingFor);
+  if (onboardingUserId) claimOnboardingFor(onboardingUserId);
   const savedQuestionIndex = useAppStore((s) => s.onboardingQuestionIndex);
   const setSavedQuestionIndex = useAppStore((s) => s.setOnboardingQuestionIndex);
   const [qIndex, setQIndex] = useState(savedQuestionIndex);
@@ -268,6 +291,7 @@ export default function QuestionsScreen() {
   const isDailyActivity = q.key === 'daily_activity';
   const isDailyTime = q.key === 'daily_time';
   const isLifestyleQuestion = isDailyActivity || isDailyTime;
+  const isCinematicQuestion = isGoalMain || isPriorityZone || isHomeReason || isTensionLevel || isTensionTiming || isAgeGroup || isLifestyleQuestion;
   const isShowcaseQuestion = isGoalMain || isPriorityZone || isTensionLevel || isEditorialMulti || isAgeGroup || isLifestyleQuestion;
   const priorityCardImageWidth = Math.min(178, Math.max(132, width * 0.4));
   const goalTitle = GOAL_TITLES[language];
@@ -289,6 +313,8 @@ export default function QuestionsScreen() {
   const progressAnim = useRef(new Animated.Value((qIndex + 1) / questions.length)).current;
   const contentAnim = useRef(new Animated.Value(0)).current;
   const optionAnims = useRef(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
+  const goalTitleAnim = useRef(new Animated.Value(0)).current;
+  const goalCtaAnim = useRef(new Animated.Value(0)).current;
   const skeletonPulse = useRef(new Animated.Value(0.48)).current;
   const ambientAnim = useRef(new Animated.Value(0)).current;
 
@@ -352,8 +378,10 @@ export default function QuestionsScreen() {
       }
       contentAnim.setValue(1);
       optionAnims.forEach((animation) => animation.setValue(1));
+      goalTitleAnim.setValue(1);
+      goalCtaAnim.setValue(1);
       setIsTransitioning(false);
-    }, [contentAnim, optionAnims]),
+    }, [contentAnim, goalCtaAnim, goalTitleAnim, optionAnims]),
   );
 
   useEffect(() => {
@@ -366,36 +394,82 @@ export default function QuestionsScreen() {
     }).start();
     contentAnim.setValue(0);
     optionAnims.forEach((animation) => animation.setValue(0));
+    goalTitleAnim.setValue(0);
+    goalCtaAnim.setValue(0);
 
     if (reduceMotion) {
       contentAnim.setValue(1);
       optionAnims.slice(0, q.options.length).forEach((animation) => animation.setValue(1));
+      goalTitleAnim.setValue(1);
+      goalCtaAnim.setValue(1);
       setIsTransitioning(false);
       return;
     }
 
-    Animated.parallel([
-      Animated.timing(contentAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.stagger(
-        42,
-        optionAnims.slice(0, q.options.length).map((animation) =>
-          Animated.spring(animation, {
+    const entrance = isCinematicQuestion
+      ? Animated.parallel([
+          // The photograph is intentionally outside this animation. It is
+          // the first thing the user sees; the chrome, question and answers
+          // then arrive as separate, gently staggered layers.
+          Animated.timing(contentAnim, {
             toValue: 1,
-            damping: 18,
-            stiffness: 180,
-            mass: 0.75,
+            delay: 55,
+            duration: 390,
+            easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
-        ),
-      ),
-    ]).start(({ finished }) => {
+          Animated.timing(goalTitleAnim, {
+            toValue: 1,
+            delay: 190,
+            duration: 540,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.sequence([
+            Animated.delay(370),
+            Animated.stagger(
+              96,
+              optionAnims.slice(0, q.options.length).map((animation) =>
+                Animated.timing(animation, {
+                  toValue: 1,
+                  duration: 430,
+                  easing: Easing.out(Easing.cubic),
+                  useNativeDriver: true,
+                }),
+              ),
+            ),
+            Animated.timing(goalCtaAnim, {
+              toValue: 1,
+              duration: 360,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+          ]),
+        ])
+      : Animated.parallel([
+          Animated.timing(contentAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.stagger(
+            42,
+            optionAnims.slice(0, q.options.length).map((animation) =>
+              Animated.spring(animation, {
+                toValue: 1,
+                damping: 18,
+                stiffness: 180,
+                mass: 0.75,
+                useNativeDriver: true,
+              }),
+            ),
+          ),
+        ]);
+
+    entrance.start(({ finished }) => {
       if (finished) setIsTransitioning(false);
     });
-  }, [assetsReady, q.options.length, qIndex, contentAnim, optionAnims, progressAnim, questions.length, reduceMotion]);
+  }, [assetsReady, q.options.length, qIndex, contentAnim, goalCtaAnim, goalTitleAnim, isCinematicQuestion, optionAnims, progressAnim, questions.length, reduceMotion]);
 
   function selectAnswer(v: string) {
     if (!assetsReady || isTransitioning) return;
@@ -450,6 +524,455 @@ export default function QuestionsScreen() {
         },
       ]);
     }
+  }
+
+  if (isCinematicQuestion) {
+    const isGoalCinematic = isGoalMain;
+    const isPriorityCinematic = isPriorityZone;
+    const isHomeReasonCinematic = isHomeReason;
+    const isTensionCinematic = isTensionLevel;
+    const isTensionTimingCinematic = isTensionTiming;
+    const isAgeCinematic = isAgeGroup;
+    const isDailyActivityCinematic = isDailyActivity;
+    const isDailyTimeCinematic = isDailyTime;
+    const cinematicImage = isDailyTimeCinematic
+      ? DAILY_TIME_CINEMATIC_IMAGE
+      : isDailyActivityCinematic
+        ? DAILY_ACTIVITY_CINEMATIC_IMAGE
+        : isAgeCinematic
+          ? AGE_GROUP_CINEMATIC_IMAGE
+          : isTensionTimingCinematic
+            ? TENSION_TIMING_CINEMATIC_IMAGE
+            : isTensionCinematic
+              ? TENSION_LEVEL_CINEMATIC_IMAGE
+              : isHomeReasonCinematic
+                ? HOME_REASON_CINEMATIC_IMAGE
+                : isPriorityCinematic
+                  ? PRIORITY_CINEMATIC_IMAGE
+                  : GOAL_CINEMATIC_IMAGE;
+    const cinematicPalette = isDailyTimeCinematic
+      ? {
+          accent: '#FF9E59',
+          backColor: 'rgba(29,25,22,0.27)',
+          backGradient: ['rgba(112,83,60,0.43)', 'rgba(12,16,17,0.68)'] as [string, string],
+          backLight: '#D7A67F',
+          inactiveBorder: 'rgba(227,203,183,0.25)',
+          activeColor: 'rgba(103,52,24,0.34)',
+          activeGradient: ['rgba(185,92,42,0.72)', 'rgba(55,29,19,0.68)'] as [string, string],
+          inactiveColor: 'rgba(20,25,26,0.30)',
+          inactiveGradient: ['rgba(82,72,65,0.52)', 'rgba(8,13,14,0.70)'] as [string, string],
+          activeLight: '#FFD0AD',
+          inactiveLight: '#9F938A',
+          ctaColor: 'rgba(165,73,30,0.40)',
+          ctaGradient: ['rgba(255,158,89,0.97)', 'rgba(188,76,35,0.94)'] as [string, string],
+          ctaLight: '#FFE0C5',
+        }
+      : isDailyActivityCinematic
+      ? {
+          accent: '#6BD3ED',
+          backColor: 'rgba(16,34,42,0.26)',
+          backGradient: ['rgba(87,125,137,0.44)', 'rgba(7,18,24,0.66)'] as [string, string],
+          backLight: '#A5D6DF',
+          inactiveBorder: 'rgba(197,226,233,0.27)',
+          activeColor: 'rgba(16,79,97,0.34)',
+          activeGradient: ['rgba(55,149,171,0.70)', 'rgba(8,44,58,0.67)'] as [string, string],
+          inactiveColor: 'rgba(14,31,39,0.28)',
+          inactiveGradient: ['rgba(70,105,116,0.53)', 'rgba(6,17,23,0.68)'] as [string, string],
+          activeLight: '#A9EEFA',
+          inactiveLight: '#83A6AD',
+          ctaColor: 'rgba(26,123,147,0.38)',
+          ctaGradient: ['rgba(107,211,237,0.96)', 'rgba(30,125,161,0.93)'] as [string, string],
+          ctaLight: '#C5F4FC',
+        }
+      : isAgeCinematic
+      ? {
+          accent: '#B7D88A',
+          backColor: 'rgba(27,34,25,0.25)',
+          backGradient: ['rgba(103,116,88,0.42)', 'rgba(15,21,14,0.63)'] as [string, string],
+          backLight: '#BBC9A8',
+          inactiveBorder: 'rgba(220,229,204,0.27)',
+          activeColor: 'rgba(76,96,49,0.34)',
+          activeGradient: ['rgba(139,163,94,0.69)', 'rgba(43,59,30,0.66)'] as [string, string],
+          inactiveColor: 'rgba(26,33,24,0.27)',
+          inactiveGradient: ['rgba(91,99,79,0.52)', 'rgba(13,19,13,0.66)'] as [string, string],
+          activeLight: '#E2F0BF',
+          inactiveLight: '#A5AE96',
+          ctaColor: 'rgba(110,139,69,0.38)',
+          ctaGradient: ['rgba(177,211,127,0.96)', 'rgba(86,125,65,0.93)'] as [string, string],
+          ctaLight: '#EDF7D2',
+        }
+      : isTensionTimingCinematic
+      ? {
+          accent: '#F5C66A',
+          backColor: 'rgba(25,31,42,0.25)',
+          backGradient: ['rgba(105,111,121,0.42)', 'rgba(12,17,28,0.63)'] as [string, string],
+          backLight: '#C6C8CD',
+          inactiveBorder: 'rgba(224,225,229,0.27)',
+          activeColor: 'rgba(98,74,31,0.34)',
+          activeGradient: ['rgba(172,132,55,0.70)', 'rgba(55,42,23,0.66)'] as [string, string],
+          inactiveColor: 'rgba(25,31,42,0.27)',
+          inactiveGradient: ['rgba(92,98,109,0.52)', 'rgba(12,17,27,0.66)'] as [string, string],
+          activeLight: '#FFE4A8',
+          inactiveLight: '#A8ACB5',
+          ctaColor: 'rgba(157,112,31,0.37)',
+          ctaGradient: ['rgba(247,198,102,0.97)', 'rgba(181,116,40,0.94)'] as [string, string],
+          ctaLight: '#FFF0C8',
+        }
+      : isTensionCinematic
+      ? {
+          accent: '#F07A95',
+          backColor: 'rgba(31,31,32,0.24)',
+          backGradient: ['rgba(104,102,99,0.40)', 'rgba(15,18,19,0.61)'] as [string, string],
+          backLight: '#C4B8B4',
+          inactiveBorder: 'rgba(224,217,212,0.27)',
+          activeColor: 'rgba(91,31,50,0.30)',
+          activeGradient: ['rgba(168,69,93,0.67)', 'rgba(52,22,34,0.64)'] as [string, string],
+          inactiveColor: 'rgba(27,29,29,0.25)',
+          inactiveGradient: ['rgba(94,92,88,0.50)', 'rgba(14,17,18,0.65)'] as [string, string],
+          activeLight: '#FFC0CD',
+          inactiveLight: '#AAA19D',
+          ctaColor: 'rgba(150,53,80,0.34)',
+          ctaGradient: ['rgba(240,122,149,0.95)', 'rgba(163,56,91,0.92)'] as [string, string],
+          ctaLight: '#FFD1DA',
+        }
+      : isHomeReasonCinematic
+      ? {
+          accent: '#67D6CC',
+          backColor: 'rgba(16,31,35,0.25)',
+          backGradient: ['rgba(81,108,109,0.40)', 'rgba(5,14,18,0.58)'] as [string, string],
+          backLight: '#89B5B0',
+          inactiveBorder: 'rgba(199,222,220,0.27)',
+          activeColor: 'rgba(17,72,70,0.30)',
+          activeGradient: ['rgba(58,139,132,0.62)', 'rgba(7,42,44,0.61)'] as [string, string],
+          inactiveColor: 'rgba(13,27,31,0.25)',
+          inactiveGradient: ['rgba(68,91,92,0.50)', 'rgba(5,14,18,0.63)'] as [string, string],
+          activeLight: '#9BE7DC',
+          inactiveLight: '#7F9D9A',
+          ctaColor: 'rgba(35,126,119,0.33)',
+          ctaGradient: ['rgba(103,214,204,0.94)', 'rgba(35,119,127,0.91)'] as [string, string],
+          ctaLight: '#C1F5EC',
+        }
+      : isPriorityCinematic
+        ? {
+            accent: '#5AC7ED',
+            backColor: 'rgba(17,37,50,0.24)',
+            backGradient: ['rgba(86,112,128,0.42)', 'rgba(7,17,24,0.54)'] as [string, string],
+            backLight: '#71879A',
+            inactiveBorder: 'rgba(200,220,232,0.28)',
+            activeColor: 'rgba(10,63,86,0.28)',
+            activeGradient: ['rgba(42,131,163,0.64)', 'rgba(5,38,55,0.57)'] as [string, string],
+            inactiveColor: 'rgba(13,30,41,0.24)',
+            inactiveGradient: ['rgba(69,93,108,0.52)', 'rgba(5,15,22,0.59)'] as [string, string],
+            activeLight: '#91DAF3',
+            inactiveLight: '#718899',
+            ctaColor: 'rgba(22,116,154,0.32)',
+            ctaGradient: ['rgba(91,201,239,0.94)', 'rgba(35,108,156,0.90)'] as [string, string],
+            ctaLight: '#B5EEFF',
+          }
+        : {
+            accent: '#E9A17F',
+            backColor: 'rgba(38,30,29,0.24)',
+            backGradient: ['rgba(124,97,88,0.43)', 'rgba(20,15,17,0.61)'] as [string, string],
+            backLight: '#D8C0B6',
+            inactiveBorder: 'rgba(235,219,212,0.27)',
+            activeColor: 'rgba(104,54,45,0.32)',
+            activeGradient: ['rgba(182,105,82,0.69)', 'rgba(58,30,29,0.65)'] as [string, string],
+            inactiveColor: 'rgba(34,29,30,0.27)',
+            inactiveGradient: ['rgba(104,88,83,0.51)', 'rgba(17,13,16,0.67)'] as [string, string],
+            activeLight: '#FFD0BC',
+            inactiveLight: '#B4A49E',
+            ctaColor: 'rgba(166,83,61,0.38)',
+            ctaGradient: ['rgba(237,164,129,0.96)', 'rgba(174,79,67,0.93)'] as [string, string],
+            ctaLight: '#FFE0D2',
+          };
+    const cinematicAccent = cinematicPalette.accent;
+    const cinematicTitleCopy = isGoalMain ? `${goalTitle[0]}${goalTitle[1]}` : q.title;
+    const optionHeight = isAgeCinematic
+      ? (isCompactGoal ? 52 : 58)
+      : isHomeReasonCinematic
+        ? (isCompactGoal ? 64 : 74)
+        : isCompactGoal ? 58 : 68;
+    const optionRadius = isCompactGoal ? 17 : 20;
+    const optionGap = isAgeCinematic
+      ? (isCompactGoal ? 7 : 8)
+      : isHomeReasonCinematic
+        ? (isCompactGoal ? 9 : 12)
+        : isCompactGoal ? 8 : 11;
+
+    return (
+      <ImageBackground
+        source={cinematicImage}
+        resizeMode="cover"
+        style={[
+          styles.cinematicScreen,
+          isGoalCinematic ? styles.goalCinematicScreen : undefined,
+          isPriorityCinematic ? styles.priorityCinematicScreen : undefined,
+          isHomeReasonCinematic ? styles.homeReasonCinematicScreen : undefined,
+          isTensionCinematic ? styles.tensionCinematicScreen : undefined,
+          isTensionTimingCinematic ? styles.tensionTimingCinematicScreen : undefined,
+          isAgeCinematic ? styles.ageCinematicScreen : undefined,
+          isDailyActivityCinematic ? styles.dailyActivityCinematicScreen : undefined,
+          isDailyTimeCinematic ? styles.dailyTimeCinematicScreen : undefined,
+        ]}
+        imageStyle={[
+          styles.cinematicBackground,
+          isGoalCinematic ? styles.goalCinematicBackground : undefined,
+          isTensionTimingCinematic ? styles.tensionTimingCinematicBackground : undefined,
+        ]}
+      >
+        <StatusBar style="light" />
+        <View
+          pointerEvents="none"
+          style={[
+            styles.cinematicPhotoWash,
+            isGoalCinematic ? styles.goalCinematicPhotoWash : undefined,
+            isPriorityCinematic ? styles.priorityCinematicPhotoWash : undefined,
+            isHomeReasonCinematic ? styles.homeReasonCinematicPhotoWash : undefined,
+            isTensionCinematic ? styles.tensionCinematicPhotoWash : undefined,
+            isTensionTimingCinematic ? styles.tensionTimingCinematicPhotoWash : undefined,
+            isAgeCinematic ? styles.ageCinematicPhotoWash : undefined,
+            isDailyActivityCinematic ? styles.dailyActivityCinematicPhotoWash : undefined,
+            isDailyTimeCinematic ? styles.dailyTimeCinematicPhotoWash : undefined,
+          ]}
+        />
+
+        <SafeAreaView style={styles.cinematicSafeArea}>
+          <Animated.View
+            pointerEvents={assetsReady ? 'auto' : 'none'}
+            style={[styles.cinematicForeground, { opacity: contentAnim }]}
+          >
+            <View style={styles.cinematicTopRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('backLabel')}
+                onPress={onBack}
+                hitSlop={12}
+                style={({ pressed }) => [
+                  styles.cinematicBackButton,
+                  pressed ? styles.cinematicPressed : undefined,
+                ]}
+              >
+                <NeumorphicBox
+                  color={cinematicPalette.backColor}
+                  gradient={cinematicPalette.backGradient}
+                  radius={24}
+                  topHighlight
+                  lightColor={cinematicPalette.backLight}
+                  lightOpacity={0.14}
+                  lightBlur={11}
+                  lightOffset={{ width: -3, height: -3 }}
+                  shadeBlur={15}
+                  shadeOpacity={0.76}
+                  shadeOffset={{ width: 5, height: 7 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Icon name="chevron-left" size={26} color="#F6FAFF" strokeWidth={2.3} />
+              </Pressable>
+              <Text style={[styles.cinematicStep, { fontFamily: theme.fontFamily.semiBold }]}>
+                {qIndex + 1}/{questions.length}
+              </Text>
+            </View>
+
+            <View style={styles.cinematicTrack}>
+              <Animated.View
+                style={[
+                  styles.cinematicTrackFill,
+                  {
+                    backgroundColor: cinematicAccent,
+                    width: progressAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]}
+              />
+            </View>
+
+            <Animated.View
+              style={[
+                styles.cinematicTitleWrap,
+                isHomeReasonCinematic ? styles.homeReasonCinematicTitleWrap : undefined,
+                isTensionCinematic ? styles.tensionCinematicTitleWrap : undefined,
+                isTensionTimingCinematic ? styles.tensionTimingCinematicTitleWrap : undefined,
+                isAgeCinematic ? styles.ageCinematicTitleWrap : undefined,
+                isDailyActivityCinematic ? styles.dailyActivityCinematicTitleWrap : undefined,
+                isDailyTimeCinematic ? styles.dailyTimeCinematicTitleWrap : undefined,
+                {
+                  opacity: goalTitleAnim,
+                  transform: [
+                    {
+                      translateY: goalTitleAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [34, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Text
+                adjustsFontSizeToFit
+                minimumFontScale={isDailyTimeCinematic ? 0.74 : 0.82}
+                numberOfLines={isDailyTimeCinematic ? 4 : 3}
+                style={[
+                  styles.cinematicTitle,
+                  {
+                    fontFamily: theme.fontFamily.bold,
+                    fontSize: isDailyTimeCinematic
+                      ? isCompactGoal ? 26 : 30
+                      : isCompactGoal ? 30 : 34,
+                    lineHeight: isDailyTimeCinematic
+                      ? isCompactGoal ? 31 : 36
+                      : isCompactGoal ? 35 : 40,
+                  },
+                ]}
+              >
+                {cinematicTitleCopy}
+              </Text>
+            </Animated.View>
+
+            <View style={styles.cinematicSpacer} />
+
+            <View style={[styles.cinematicOptions, { gap: optionGap }]}>
+              {q.options.map((opt, i) => {
+                const active = isMulti ? selectedMulti.includes(opt) : selectedSingle === opt;
+                const visibleOption = isDailyTimeCinematic
+                  ? opt.replace(/(\d)\s*-\s*(\d)/g, '$1–$2')
+                  : opt;
+                return (
+                  <OptionReveal key={opt} progress={optionAnims[i]} fill={false} distance={28}>
+                    <Pressable
+                      accessibilityRole={isMulti ? 'checkbox' : 'button'}
+                      accessibilityState={isMulti ? { checked: active } : { selected: active }}
+                      accessibilityLabel={visibleOption}
+                      onPress={() => selectAnswer(opt)}
+                      style={({ pressed }) => [
+                        styles.cinematicOption,
+                        {
+                          height: optionHeight,
+                          borderRadius: optionRadius,
+                          borderColor: active
+                            ? cinematicAccent
+                            : cinematicPalette.inactiveBorder,
+                          opacity: pressed ? 0.78 : 1,
+                          transform: [{ scale: pressed ? 0.988 : 1 }],
+                        },
+                      ]}
+                    >
+                      <NeumorphicBox
+                        color={active ? cinematicPalette.activeColor : cinematicPalette.inactiveColor}
+                        gradient={active ? cinematicPalette.activeGradient : cinematicPalette.inactiveGradient}
+                        radius={optionRadius}
+                        topHighlight
+                        lightColor={active ? cinematicPalette.activeLight : cinematicPalette.inactiveLight}
+                        lightOpacity={active ? 0.19 : 0.13}
+                        lightBlur={12}
+                        lightOffset={{ width: -3, height: -3 }}
+                        shadeBlur={17}
+                        shadeOpacity={0.75}
+                        shadeOffset={{ width: 6, height: 8 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <Text
+                        numberOfLines={2}
+                        style={[
+                          styles.cinematicOptionLabel,
+                          {
+                            fontFamily: theme.fontFamily.semiBold,
+                            fontSize: isCompactGoal ? 15.5 : 17,
+                            lineHeight: isCompactGoal ? 19 : 22,
+                          },
+                        ]}
+                      >
+                        {visibleOption}
+                      </Text>
+                      <View
+                        style={[
+                          styles.cinematicRadio,
+                          active
+                            ? { borderColor: cinematicAccent, backgroundColor: cinematicAccent }
+                            : undefined,
+                        ]}
+                      >
+                        {active ? <Icon name="check" size={16} color="#FFFFFF" strokeWidth={3} /> : null}
+                      </View>
+                    </Pressable>
+                  </OptionReveal>
+                );
+              })}
+            </View>
+
+            <Animated.View
+              style={[
+                styles.cinematicCtaReveal,
+                {
+                  opacity: goalCtaAnim,
+                  transform: [
+                    {
+                      translateY: goalCtaAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [24, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canContinue || isTransitioning }}
+                disabled={!assetsReady || !canContinue || isTransitioning}
+                onPress={onNext}
+                style={({ pressed }) => [
+                  styles.cinematicCta,
+                  pressed ? styles.cinematicPressed : undefined,
+                ]}
+              >
+                <NeumorphicBox
+                  color={
+                    canContinue
+                      ? cinematicPalette.ctaColor
+                      : 'rgba(13,26,36,0.20)'
+                  }
+                  gradient={
+                    canContinue
+                      ? cinematicPalette.ctaGradient
+                      : ['rgba(62,81,96,0.42)', 'rgba(8,17,24,0.52)']
+                  }
+                  radius={999}
+                  topHighlight
+                  lightColor={canContinue ? cinematicPalette.ctaLight : '#607384'}
+                  lightOpacity={canContinue ? 0.25 : 0.1}
+                  lightBlur={13}
+                  lightOffset={{ width: -3, height: -3 }}
+                  shadeBlur={20}
+                  shadeOpacity={0.82}
+                  shadeOffset={{ width: 7, height: 10 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text
+                  style={[
+                    styles.cinematicCtaLabel,
+                    {
+                      color: canContinue ? '#FFFFFF' : '#82909C',
+                      fontFamily: theme.fontFamily.bold,
+                    },
+                  ]}
+                >
+                  {t('continue')}
+                </Text>
+                <Icon
+                  name="chevron-right"
+                  size={21}
+                  color={canContinue ? '#FFFFFF' : '#82909C'}
+                  strokeWidth={2.2}
+                />
+              </Pressable>
+            </Animated.View>
+          </Animated.View>
+        </SafeAreaView>
+      </ImageBackground>
+    );
   }
 
   return (
@@ -1520,6 +2043,215 @@ const styles = StyleSheet.create({
   revealFill: {
     flex: 1,
     minHeight: 0,
+  },
+  cinematicScreen: {
+    flex: 1,
+    backgroundColor: '#040B11',
+  },
+  goalCinematicScreen: {
+    backgroundColor: '#2C2322',
+  },
+  priorityCinematicScreen: {
+    backgroundColor: '#14222C',
+  },
+  homeReasonCinematicScreen: {
+    backgroundColor: '#111C1F',
+  },
+  tensionCinematicScreen: {
+    backgroundColor: '#202324',
+  },
+  tensionTimingCinematicScreen: {
+    backgroundColor: '#151A24',
+  },
+  ageCinematicScreen: {
+    backgroundColor: '#182017',
+  },
+  dailyActivityCinematicScreen: {
+    backgroundColor: '#10242D',
+  },
+  dailyTimeCinematicScreen: {
+    backgroundColor: '#111718',
+  },
+  cinematicBackground: {
+    width: '100%',
+    height: '100%',
+  },
+  goalCinematicBackground: {
+    top: '-4%',
+    height: '104%',
+  },
+  tensionTimingCinematicBackground: {
+    top: '-8%',
+    height: '108%',
+  },
+  cinematicPhotoWash: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(2,8,13,0.05)',
+  },
+  goalCinematicPhotoWash: {
+    backgroundColor: 'rgba(31,23,24,0.45)',
+  },
+  priorityCinematicPhotoWash: {
+    backgroundColor: 'rgba(5,18,28,0.36)',
+  },
+  homeReasonCinematicPhotoWash: {
+    backgroundColor: 'rgba(5,14,17,0.27)',
+  },
+  tensionCinematicPhotoWash: {
+    backgroundColor: 'rgba(15,18,19,0.42)',
+  },
+  tensionTimingCinematicPhotoWash: {
+    backgroundColor: 'rgba(12,17,28,0.47)',
+  },
+  ageCinematicPhotoWash: {
+    backgroundColor: 'rgba(11,17,10,0.39)',
+  },
+  dailyActivityCinematicPhotoWash: {
+    backgroundColor: 'rgba(6,23,30,0.38)',
+  },
+  dailyTimeCinematicPhotoWash: {
+    backgroundColor: 'rgba(7,12,13,0.20)',
+  },
+  cinematicSafeArea: {
+    flex: 1,
+  },
+  cinematicForeground: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  cinematicTopRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cinematicBackButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cinematicPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.985 }],
+  },
+  cinematicStep: {
+    color: '#E4EDF5',
+    fontSize: 16,
+    lineHeight: 21,
+    letterSpacing: -0.2,
+  },
+  cinematicTrack: {
+    height: 5,
+    marginTop: 15,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(194,211,224,0.48)',
+  },
+  cinematicTrackFill: {
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#15A8FF',
+  },
+  cinematicTitleWrap: {
+    width: '78%',
+    marginTop: 42,
+  },
+  homeReasonCinematicTitleWrap: {
+    width: '91%',
+    marginTop: 38,
+  },
+  tensionCinematicTitleWrap: {
+    width: '91%',
+    marginTop: 38,
+  },
+  tensionTimingCinematicTitleWrap: {
+    width: '91%',
+    marginTop: 34,
+  },
+  ageCinematicTitleWrap: {
+    width: '88%',
+    marginTop: 32,
+  },
+  dailyActivityCinematicTitleWrap: {
+    width: '91%',
+    marginTop: 34,
+  },
+  dailyTimeCinematicTitleWrap: {
+    width: '94%',
+    marginTop: 30,
+  },
+  cinematicTitle: {
+    color: '#F8FBFE',
+    letterSpacing: -1.15,
+    textShadowColor: 'rgba(0,0,0,0.42)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 7,
+  },
+  cinematicSpacer: {
+    flex: 1,
+    minHeight: 24,
+  },
+  cinematicOptions: {
+    width: '100%',
+  },
+  cinematicOption: {
+    width: '100%',
+    borderWidth: 1,
+    paddingLeft: 20,
+    paddingRight: 17,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cinematicOptionLabel: {
+    flex: 1,
+    color: '#F4F8FB',
+    letterSpacing: -0.2,
+    paddingRight: 14,
+    textShadowColor: 'rgba(0,0,0,0.24)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  cinematicRadio: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.4,
+    borderColor: '#B9C8D4',
+    backgroundColor: 'rgba(5,12,18,0.36)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cinematicRadioActive: {
+    borderColor: '#18A9FF',
+    backgroundColor: '#159DFF',
+  },
+  cinematicCtaReveal: {
+    marginTop: 16,
+  },
+  cinematicCta: {
+    width: '100%',
+    height: 58,
+    borderRadius: 999,
+    paddingHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cinematicCtaLabel: {
+    flex: 1,
+    textAlign: 'center',
+    marginLeft: 21,
+    fontSize: 17,
+    lineHeight: 22,
+    letterSpacing: -0.2,
   },
   preloadOverlay: {
     position: 'absolute',

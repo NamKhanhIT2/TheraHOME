@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useTheme } from '@/theme';
 import { countryQuestion } from '@/lib/mockData';
 import { useAppStore, type AppLanguage, type AppMarket } from '@/store/useAppStore';
@@ -8,7 +9,7 @@ import { useUpdateProfile } from '@/hooks/useProfile';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { OptionCard } from '@/components/ui/OptionCard';
 import { Button } from '@/components/ui/Button';
-import { Icon } from '@/components/icons/Icon';
+import { BackBar } from '@/components/ui/BackBar';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
 import { marketForCountryOption } from '@/hooks/useMarket';
 
@@ -30,6 +31,12 @@ const OPTION_LABEL_KEY: Record<string, TranslationKey> = {
   'US/EU': 'countryOptionUS',
   'VIET NAM': 'countryNameVN',
   MALAY: 'countryNameMY',
+};
+
+const OPTION_FLAG: Record<string, string> = {
+  'US/EU': '🇺🇸',
+  'VIET NAM': '🇻🇳',
+  MALAY: '🇲🇾',
 };
 
 export default function CountryScreen() {
@@ -77,7 +84,9 @@ export default function CountryScreen() {
       <ScreenContainer>
         <View style={styles.confirmWrap}>
           <View style={[styles.confirmIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-            <Icon name="globe" size={26} color={theme.colors.primary} />
+            <Text accessibilityLabel={optionLabel(selected)} style={styles.confirmFlag}>
+              {OPTION_FLAG[selected]}
+            </Text>
           </View>
           <Text style={[theme.type.h1, { color: theme.colors.textPrimary, textAlign: 'center', marginTop: 16 }]}>
             {t('countryConfirmTitle')}
@@ -100,14 +109,17 @@ export default function CountryScreen() {
 
   return (
     <ScreenContainer>
+      <BackBar onBack={() => router.replace('/consent')} />
       <View style={styles.body}>
         <Text style={[theme.type.h1, { color: theme.colors.textPrimary }]}>{question.title}</Text>
-        {question.subtitle ? (
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary, marginTop: 6 }]}>{question.subtitle}</Text>
-        ) : null}
         <View style={styles.options}>
           {question.options.map((opt) => (
-            <OptionCard key={opt} label={optionLabel(opt)} active={selected === opt} onPress={() => setSelected(opt)} />
+            <OptionCard
+              key={opt}
+              label={`${OPTION_FLAG[opt]}  ${optionLabel(opt)}`}
+              active={selected === opt}
+              onPress={() => setSelected(opt)}
+            />
           ))}
         </View>
       </View>
@@ -124,7 +136,7 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 28,
+    paddingTop: 18,
   },
   options: {
     gap: 10,
@@ -142,6 +154,10 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  confirmFlag: {
+    fontSize: 38,
+    lineHeight: 46,
   },
   footer: {
     padding: 20,

@@ -14,9 +14,9 @@ import { isPasswordStrongEnough } from '@/lib/authAccount';
 const BACKGROUND = require('../../../assets/auth-wellness-background.png');
 const BRANDMARK = require('../../../assets/brandmark-gradient.png');
 const COPY = {
-  vi: { signInTitle: 'Chào mừng trở lại', signInSubtitle: 'Đăng nhập để tiếp tục hành trình chăm sóc sức khỏe', createTitle: 'Tạo tài khoản', createSubtitle: 'Bắt đầu hành trình khỏe mạnh hơn cùng TheraHOME', identity: 'Email hoặc tên đăng nhập', username: 'Tên đăng nhập', email: 'Email', password: 'Mật khẩu', passwordHint: 'Tối thiểu 8 ký tự · gồm chữ, số và ký tự đặc biệt', forgot: 'Quên mật khẩu?', signIn: 'Đăng nhập', create: 'Đăng ký', or: 'hoặc', newUser: 'Bạn mới biết đến TheraHOME?', createLink: 'Tạo tài khoản', haveAccount: 'Bạn đã có tài khoản?', signInLink: 'Đăng nhập', legalPrefix: 'Bằng việc tiếp tục, bạn đồng ý với', terms: 'Điều khoản sử dụng', and: 'và', privacy: 'Chính sách quyền riêng tư' },
-  en: { signInTitle: 'Welcome back', signInSubtitle: 'Sign in to continue your wellness journey', createTitle: 'Create account', createSubtitle: 'Begin your healthier journey with TheraHOME', identity: 'Email or username', username: 'Username', email: 'Email', password: 'Password', passwordHint: 'At least 8 characters · a letter, a number and a special character', forgot: 'Forgot password?', signIn: 'Login', create: 'Register', or: 'or', newUser: 'New to TheraHOME?', createLink: 'Create account', haveAccount: 'Already have an account?', signInLink: 'Login', legalPrefix: 'By continuing, you agree to our', terms: 'Terms of Service', and: 'and', privacy: 'Privacy Policy' },
-  ms: { signInTitle: 'Selamat kembali', signInSubtitle: 'Log masuk untuk meneruskan perjalanan kesejahteraan anda', createTitle: 'Cipta akaun', createSubtitle: 'Mulakan perjalanan lebih sihat bersama TheraHOME', identity: 'E-mel atau nama pengguna', username: 'Nama pengguna', email: 'E-mel', password: 'Kata laluan', passwordHint: 'Sekurang-kurangnya 8 aksara · huruf, nombor dan aksara khas', forgot: 'Lupa kata laluan?', signIn: 'Log masuk', create: 'Daftar', or: 'atau', newUser: 'Baharu di TheraHOME?', createLink: 'Cipta akaun', haveAccount: 'Sudah mempunyai akaun?', signInLink: 'Log masuk', legalPrefix: 'Dengan meneruskan, anda bersetuju dengan', terms: 'Terma Perkhidmatan', and: 'dan', privacy: 'Dasar Privasi' },
+  vi: { signInTitle: 'Chào mừng trở lại', signInSubtitle: 'Đăng nhập để tiếp tục hành trình chăm sóc sức khỏe', createTitle: 'Tạo tài khoản', createSubtitle: 'Bắt đầu hành trình khỏe mạnh hơn cùng TheraHOME', identity: 'Email hoặc tên đăng nhập', username: 'Tên đăng nhập', email: 'Email', password: 'Mật khẩu', passwordHint: 'Tối thiểu 8 ký tự · gồm chữ, số và ký tự đặc biệt', forgot: 'Quên mật khẩu?', signIn: 'Đăng nhập', create: 'Đăng ký', or: 'hoặc', newUser: 'Bạn mới biết đến TheraHOME?', createLink: 'Tạo tài khoản', haveAccount: 'Bạn đã có tài khoản?', signInLink: 'Đăng nhập', legalPrefix: 'Bằng việc tiếp tục, bạn đồng ý với', terms: 'Điều khoản sử dụng', and: 'và', privacy: 'Chính sách quyền riêng tư', confirmPassword: 'Nhập lại mật khẩu', passwordMismatch: 'Mật khẩu nhập lại chưa khớp' },
+  en: { signInTitle: 'Welcome back', signInSubtitle: 'Sign in to continue your wellness journey', createTitle: 'Create account', createSubtitle: 'Begin your healthier journey with TheraHOME', identity: 'Email or username', username: 'Username', email: 'Email', password: 'Password', passwordHint: 'At least 8 characters · a letter, a number and a special character', forgot: 'Forgot password?', signIn: 'Login', create: 'Register', or: 'or', newUser: 'New to TheraHOME?', createLink: 'Create account', haveAccount: 'Already have an account?', signInLink: 'Login', legalPrefix: 'By continuing, you agree to our', terms: 'Terms of Service', and: 'and', privacy: 'Privacy Policy', confirmPassword: 'Confirm password', passwordMismatch: 'The passwords do not match' },
+  ms: { signInTitle: 'Selamat kembali', signInSubtitle: 'Log masuk untuk meneruskan perjalanan kesejahteraan anda', createTitle: 'Cipta akaun', createSubtitle: 'Mulakan perjalanan lebih sihat bersama TheraHOME', identity: 'E-mel atau nama pengguna', username: 'Nama pengguna', email: 'E-mel', password: 'Kata laluan', passwordHint: 'Sekurang-kurangnya 8 aksara · huruf, nombor dan aksara khas', forgot: 'Lupa kata laluan?', signIn: 'Log masuk', create: 'Daftar', or: 'atau', newUser: 'Baharu di TheraHOME?', createLink: 'Cipta akaun', haveAccount: 'Sudah mempunyai akaun?', signInLink: 'Log masuk', legalPrefix: 'Dengan meneruskan, anda bersetuju dengan', terms: 'Terma Perkhidmatan', and: 'dan', privacy: 'Dasar Privasi', confirmPassword: 'Sahkan kata laluan', passwordMismatch: 'Kata laluan tidak sepadan' },
 } satisfies Record<AppLanguage, Record<string, string>>;
 
 export interface AuthFormValues { username: string; email: string; password: string }
@@ -39,11 +39,18 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
   const copy = COPY[language];
   const creating = mode === 'create';
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
-  const canContinue = creating ? !!username.trim() && !!email.trim() && isPasswordStrongEnough(password) : !!username.trim() && !!password;
+  const [confirmFocused, setConfirmFocused] = useState(false);
+  // Only once they have typed something: nobody wants to be told they got it
+  // wrong before they have finished getting it right.
+  const showMismatch = creating && confirm.length > 0 && confirm !== password;
+  const canContinue = creating
+    ? !!username.trim() && isPasswordStrongEnough(password) && confirm === password
+    : !!username.trim() && !!password;
   return (
     <AuthLayout brandGap={creating ? 26 : 38}>
       <>
@@ -57,21 +64,34 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
                 {/* Sign-in is by email only (owner, 2026-09-10) — username
                     login was retired. The value state is still named `username`
                     for the shared form shape, but it carries an email here. */}
-                <AuthInput icon={creating ? 'user' : 'mail'} value={username} onChangeText={setUsername} placeholder={creating ? copy.username : copy.email} keyboardType={creating ? 'default' : 'email-address'} textContentType={creating ? 'none' : 'emailAddress'} autoComplete={creating ? 'off' : 'email'} importantForAutofill="no" />
-                {/* Autofill off on create too: with a username/email field
-                    advertising an account name, iOS paired it against the
-                    password field and popped the "suggested username" strip
-                    over the form (owner report 2026-09-09). The keyboard stays
+                {/* One identity field in both modes. Sign-up asked for a
+                    display name as well until 2026-10-28; the owner dropped
+                    it, so an account made here has no name until its owner
+                    sets one in their profile.
+                    Autofill is off on create: with a field advertising an
+                    account name, iOS paired it against the password field
+                    and popped the "suggested username" strip over the form
+                    (owner report 2026-09-09). The keyboard stays
                     email-address; only the autofill semantic is dropped. */}
-                {creating ? <AuthInput icon="mail" value={email} onChangeText={setEmail} placeholder={copy.email} keyboardType="email-address" textContentType="none" autoComplete="off" importantForAutofill="no" /> : null}
+                <AuthInput icon="mail" value={username} onChangeText={setUsername} placeholder={copy.email} keyboardType="email-address" textContentType={creating ? 'none' : 'emailAddress'} autoComplete={creating ? 'off' : 'email'} importantForAutofill="no" />
                 <View style={[styles.inputRow, passwordFocused && styles.inputRowFocused]}>
                   <Icon name="lock" size={20} color="#6E84A2" />
                   <TextInput value={password} onChangeText={setPassword} onFocus={() => setPasswordFocused(true)} onBlur={() => setPasswordFocused(false)} placeholder={copy.password} placeholderTextColor="#8292AA" secureTextEntry={!showPassword} textContentType={creating ? 'newPassword' : 'password'} autoCapitalize="none" style={styles.input} />
                   <Pressable accessibilityRole="button" onPress={() => setShowPassword((value) => !value)} hitSlop={10}><Icon name={showPassword ? 'eye-off' : 'eye'} size={22} color="#627999" /></Pressable>
                 </View>
                 {creating ? (
-                  <Text style={{ fontSize: 12, marginTop: 6, marginLeft: 4, color: password.length > 0 && !isPasswordStrongEnough(password) ? '#D14343' : '#6E84A2' }}>
-                    {copy.passwordHint}
+                  <View style={[styles.inputRow, confirmFocused && styles.inputRowFocused]}>
+                    <Icon name="lock" size={20} color="#6E84A2" />
+                    <TextInput value={confirm} onChangeText={setConfirm} onFocus={() => setConfirmFocused(true)} onBlur={() => setConfirmFocused(false)} placeholder={copy.confirmPassword} placeholderTextColor="#8292AA" secureTextEntry={!showConfirm} textContentType="newPassword" autoCapitalize="none" style={styles.input} />
+                    {/* Its own eye, not the first field's: these are two
+                        separate things to check, and people check the
+                        second one precisely because they cannot see it. */}
+                    <Pressable accessibilityRole="button" onPress={() => setShowConfirm((value) => !value)} hitSlop={10}><Icon name={showConfirm ? 'eye-off' : 'eye'} size={22} color="#627999" /></Pressable>
+                  </View>
+                ) : null}
+                {creating ? (
+                  <Text style={{ fontSize: 12, marginTop: 6, marginLeft: 4, color: showMismatch || (password.length > 0 && !isPasswordStrongEnough(password)) ? '#D14343' : '#6E84A2' }}>
+                    {showMismatch ? copy.passwordMismatch : copy.passwordHint}
                   </Text>
                 ) : null}
               </View>
@@ -85,7 +105,7 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
                 disabled={!canContinue || !!busy}
                 busy={!!busy}
                 label={creating ? copy.create : copy.signIn}
-                onPress={() => onSubmit?.({ username: username.trim(), email: email.trim(), password })}
+                onPress={() => onSubmit?.({ username: username.trim(), email: username.trim(), password })}
               />
               <View style={styles.divider}><View style={styles.line} /><Text style={styles.or}>{copy.or}</Text><View style={styles.line} /></View>
               <View style={styles.socialRow}>
@@ -94,7 +114,10 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
               </View>
               <View style={styles.switchRow}>
                 <Text style={styles.switchText}>{creating ? copy.haveAccount : copy.newUser} </Text>
-                <Pressable hitSlop={8} onPress={() => router.push(creating ? '/login' : '/create-account')}>
+                {/* `force` so this reaches the sign-in form even on a
+                    device that has never signed in, where /login renders
+                    sign-up by default. */}
+                <Pressable hitSlop={8} onPress={() => (creating ? router.push({ pathname: '/login', params: { force: '1' } }) : router.push('/create-account'))}>
                   <Text style={styles.link}>{creating ? copy.signInLink : copy.createLink}</Text>
                 </Pressable>
               </View>

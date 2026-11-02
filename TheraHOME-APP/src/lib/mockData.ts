@@ -49,7 +49,7 @@ export const questions: Question[] = [
   { key: 'tension_timing', part: 'status', multi: true, title: 'Khi nào bạn thường cảm thấy căng mỏi nhất?', options: ['Sau khi ngủ dậy', 'Khi ngồi hoặc làm việc lâu', 'Vào cuối ngày', 'Cả ngày'] },
   { key: 'age_group', part: 'intro', title: 'Bạn thuộc nhóm tuổi nào?', options: ['Dưới 25', '25–34', '35–44', '45–54', '55+'] },
   { key: 'daily_activity', part: 'intro', title: 'Một ngày của bạn thường vận động như thế nào?', subtitle: 'Chọn mức phù hợp nhất với thói quen và lối sống hiện tại của bạn.', options: ['Ngồi, cúi làm việc nhiều', 'Đứng hoặc đi lại nhiều', 'Lao động/vận động thể chất nhiều', 'Kết hợp cả ngồi và vận động'] },
-  { key: 'daily_time', part: 'intro', title: 'Bạn có thể dành bao nhiêu thời gian mỗi ngày để chăm sóc cơ thể?', subtitle: 'Thời gian phù hợp sẽ giúp bạn duy trì thói quen và đạt hiệu quả tốt nhất.', options: ['10 - 20 phút', '20 - 30 phút', '30 phút trở lên'] },
+  { key: 'daily_time', part: 'intro', title: 'Bạn có thể dành bao nhiêu thời gian mỗi ngày để chăm sóc cơ thể?', subtitle: 'Thời gian phù hợp sẽ giúp bạn duy trì thói quen và đạt hiệu quả tốt nhất.', options: ['10–20 phút', '20–30 phút', '30 phút trở lên'] },
 ];
 
 const englishQuestions: Question[] = [
