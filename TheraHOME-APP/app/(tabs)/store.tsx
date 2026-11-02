@@ -253,21 +253,26 @@ export default function StoreScreen() {
                   bounces={false}
                 >
                 <Reanimated.View style={copyStyle}>
-                  <View style={styles.titleRow}>
-                    <View style={styles.titleCopy}>
-                      <Text style={[styles.productName, heroFont('700'), { color: storeColors.panelText }]} numberOfLines={2}>
-                        {activeItem?.name ?? ''}
-                      </Text>
-                      <Text style={[styles.tagline, { color: storeColors.panelMuted }]} numberOfLines={1}>
-                        {current?.categoryTitle ?? ''}
-                      </Text>
-                    </View>
-                    <View style={styles.priceBlock}>
-                      <Text style={[styles.price, heroFont('700'), { color: storeColors.panelText }]}>{memberPrice}</Text>
-                      {saving ? (
-                        <Text style={[styles.strike, { color: storeColors.panelFaint }]}>{activeItem?.priceText}</Text>
-                      ) : null}
-                    </View>
+                  {/* Name and price used to share one row, and they fought
+                      over it: "Combo Phục hồi toàn diện" broke across two
+                      lines while the struck-through original price landed
+                      level with the second one, so the middle of the panel
+                      read as a crowd (owner, 2026-11-02). The name now owns
+                      the full width — most names then fit on one line — and
+                      the two prices sit together on their own row, where
+                      being on one baseline is what makes the discount
+                      legible at a glance. */}
+                  <Text style={[styles.productName, heroFont('700'), { color: storeColors.panelText }]} numberOfLines={2}>
+                    {activeItem?.name ?? ''}
+                  </Text>
+                  <Text style={[styles.tagline, { color: storeColors.panelMuted }]} numberOfLines={1}>
+                    {current?.categoryTitle ?? ''}
+                  </Text>
+                  <View style={styles.priceRow}>
+                    <Text style={[styles.price, heroFont('700'), { color: storeColors.panelText }]}>{memberPrice}</Text>
+                    {saving ? (
+                      <Text style={[styles.strike, { color: storeColors.panelFaint }]}>{activeItem?.priceText}</Text>
+                    ) : null}
                   </View>
 
                   {activeItem?.description ? (
@@ -423,13 +428,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 22,
   },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  titleCopy: { flex: 1 },
   productName: { fontSize: 25, lineHeight: 30 },
   tagline: { fontSize: 15, marginTop: 2 },
-  priceBlock: { alignItems: 'flex-end' },
-  price: { fontSize: 23, lineHeight: 28 },
-  strike: { fontSize: 13, textDecorationLine: 'line-through', marginTop: 2 },
+  // One baseline, so the eye reads "now" and "was" as a single statement
+  // instead of two stacked numbers.
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 10, marginTop: 10 },
+  price: { fontSize: 26, lineHeight: 31 },
+  strike: { fontSize: 15, textDecorationLine: 'line-through' },
 
   description: { fontSize: 15, lineHeight: 22, marginTop: 14 },
   savingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
