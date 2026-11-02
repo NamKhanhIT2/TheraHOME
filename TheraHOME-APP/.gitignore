@@ -74,4 +74,5 @@ scripts/pose-preview/dist/
 # Design-comparison renders (previews/*.png) — 38 MB of throwaway side-by-side
 # mockups from the Home v3 work. The Swift renderer that produces them IS
 # tracked; its output is not, because git keeps every byte forever.
-previews/*.png
+previews/**/*.png
+previews/**/*.mp4
