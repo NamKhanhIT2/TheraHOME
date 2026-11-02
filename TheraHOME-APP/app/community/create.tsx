@@ -185,7 +185,7 @@ export default function CreatePostScreen() {
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {params.achievement ? <View style={[styles.achievementBanner, { backgroundColor: homeGlassColors.surfaceRaised, borderColor: homeGlassColors.purpleStrong }]}><Text style={styles.achievementEmoji}>🎉</Text><View style={{ flex: 1 }}><Text style={[theme.type.bodyStrong, { color: homeGlassColors.purple }]}>{t('newAchievement')}</Text><Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{t('achievementCardHint')}</Text></View></View> : null}
         <View style={styles.userRow}>
-          <AvatarImg size={40} uri={profile?.avatarUrl} />
+          <AvatarImg tone="glass" size={40} uri={profile?.avatarUrl} />
           {/* flex: 1 bounds this column to the row. Without it the column grew
               to fit the untruncated phase label, which pushed the pill past the
               right edge of the screen — visible in Malay, whose phase names run

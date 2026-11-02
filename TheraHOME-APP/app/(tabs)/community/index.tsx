@@ -455,7 +455,7 @@ export default function CommunityScreen() {
         // composer with that kind selected (owner, 2026-10-25).
         <View style={[styles.composer, { backgroundColor: homeGlassColors.surface, borderColor: homeGlassColors.hairline }]}>
           <Pressable onPress={() => setShowShare(true)} style={styles.composerPrompt}>
-            <AvatarImg size={38} uri={profile?.avatarUrl} />
+            <AvatarImg tone="glass" size={38} uri={profile?.avatarUrl} />
             {/* flex+1-line+capped font scaling: on narrow screens / large
                 system text the placeholder used to overflow and get clipped
                 mid-glyph (device-dependent) — now it ellipsizes. */}

@@ -148,7 +148,7 @@ export default function EditProfileScreen() {
       <BackBar tone="glass" onBack={() => router.back()} title={t('editProfile')} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.avatarRow}>
-          <AvatarImg size={84} editable uri={avatarUri ?? profileQuery.data?.avatarUrl} onPress={pickAvatar} />
+          <AvatarImg tone="glass" size={84} editable uri={avatarUri ?? profileQuery.data?.avatarUrl} onPress={pickAvatar} />
           {uploadingAvatar ? <ActivityIndicator style={{ marginTop: 8 }} color={homeGlassColors.tick} /> : null}
         </View>
         <FieldRow label={t('name')} value={name} onChangeText={setName} />

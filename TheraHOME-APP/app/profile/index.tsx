@@ -62,7 +62,7 @@ export default function ProfileScreen() {
       <BackBar tone="glass" onBack={() => router.back()} title={t('profile')} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.profileHead}>
-          <AvatarImg size={84} editable uri={profile?.avatarUrl} onPress={() => router.push('/profile/edit')} />
+          <AvatarImg tone="glass" size={84} editable uri={profile?.avatarUrl} onPress={() => router.push('/profile/edit')} />
           {/* An account created with just an email carries no name until its
               owner sets one (owner, 2026-10-28). "Bạn" is how the app
               addresses them, not what they are called. */}

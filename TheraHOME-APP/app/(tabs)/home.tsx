@@ -801,7 +801,18 @@ export default function HomeScreen() {
                         style={styles.startButton}
                       >
                         <Icon name="play" size={14} color={homeGlassColors.navIconActive} strokeWidth={2} />
-                        <Text style={[theme.type.bodyStrong, heroFont('600'), { color: homeGlassColors.text }]}>{t('startToday')}</Text>
+                        {/* The label was hardcoded to "Bắt đầu hôm nay", so after
+                            finishing today's session Home still invited you to
+                            start it while Roadmap's card for the SAME day said
+                            "Đã hoàn thành" and offered "Xem lại" — the two
+                            screens contradicting each other (QA on device,
+                            2026-11-02). The Roadmap card was fixed the day
+                            before and this one was missed. Finished days stay
+                            openable, so this changes what the button says, not
+                            where it goes. */}
+                        <Text style={[theme.type.bodyStrong, heroFont('600'), { color: homeGlassColors.text }]}>
+                          {today.status === 'done' ? t('reviewSession') : t('startToday')}
+                        </Text>
                       </NeumorphicBox>
                     </Pressable>
                   </View>
@@ -922,7 +933,7 @@ export default function HomeScreen() {
           style={[styles.headerButton, glassRaised, styles.headerButtonFlat]}
         >
           <NeumorphicSurface radius={25} />
-          <AvatarImg size={42} uri={profile?.avatarUrl} />
+          <AvatarImg tone="glass" size={42} uri={profile?.avatarUrl} />
         </Pressable>
         <Text
           numberOfLines={1}

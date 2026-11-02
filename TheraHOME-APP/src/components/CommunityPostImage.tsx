@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { isVideoUri } from '@/lib/mediaKind';
 import { CommunityVideoPlayer } from '@/components/community/CommunityVideoPlayer';
 import { CommunityMediaViewer } from '@/components/community/CommunityMediaViewer';
@@ -49,7 +49,9 @@ export function CommunityPostImage({
 
   return (
     <>
-      <Pressable onPress={openViewer} style={[styles.frame, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md, aspectRatio: FEED_MEDIA_RATIO }]}>
+      <Pressable onPress={openViewer} style={[styles.frame, { // Light-theme #F6F8FC behind every feed photo: on this screen that is a
+      // white rectangle flashing in a dark feed each time one loads.
+      backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md, aspectRatio: FEED_MEDIA_RATIO }]}>
         <ResilientCommunityImage uri={uri} fallbackUri={originalUri} contentFit="cover" style={styles.image} />
       </Pressable>
       {/* Full screen must show the ORIGINAL, not the downsized feed copy —
