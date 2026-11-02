@@ -533,7 +533,14 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="profile/notifications-settings" />
           <Stack.Screen name="profile/account" />
           <Stack.Screen name="profile/help" />
-          <Stack.Screen name="profile/delete-account" options={{ presentation: 'modal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'default' }} />
+          {/* transparentModal, not modal: the route itself draws nothing but
+              DeleteAccountModal's own scrim, and a plain 'modal' puts the
+              system's grey sheet underneath it — so the dark 78% scrim landed
+              on grey and the whole dialog sat in a slab of the wrong colour
+              (QA on device, 2026-11-02). Transparent lets Profile show
+              through it, which is what a confirmation dialog should look
+              like. */}
+          <Stack.Screen name="profile/delete-account" options={{ presentation: 'transparentModal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'fade' }} />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="community/profile/[userId]" />
           <Stack.Screen name="community/article/[articleId]" />

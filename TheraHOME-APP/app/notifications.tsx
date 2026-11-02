@@ -125,6 +125,16 @@ export default function NotificationInboxScreen() {
     return headings.map((heading) => ({ ...heading, items: notifications.filter((item) => timeGroup(item, todayStart) === heading.id) })).filter((section) => section.items.length > 0);
   }, [notifications]);
 
+  /** Where a row's own `destination` column points, for the types that carry
+   * one instead of a related row id. */
+  function destinationRoute(destination: string | null, fallback: '/roadmap' | '/store') {
+    if (destination === 'community') return '/community' as const;
+    if (destination === 'roadmap') return '/roadmap' as const;
+    if (destination === 'home') return '/home' as const;
+    if (destination === 'store') return '/store' as const;
+    return fallback;
+  }
+
   function openNotification(notification: NotificationRow) {
     if (!notification.read) markRead.mutate(notification.id);
     if (notification.type === 'chat' && notification.relatedChatThreadId) {
@@ -135,12 +145,19 @@ export default function NotificationInboxScreen() {
       router.push({ pathname: '/community/[postId]', params: { postId: notification.relatedPostId } });
     } else if (notification.type === 'schedule' && notification.relatedDayNumber != null && notification.relatedProductId) {
       router.push({ pathname: '/day/[dayId]', params: { dayId: String(notification.relatedDayNumber), productId: notification.relatedProductId } });
+    } else if (notification.type === 'schedule') {
+      // The two daily reminders are written by `record_local_reminder_notification`,
+      // which has no day or product to record — only `destination`. Without this
+      // they fell to the catch-all below, so "Đã đến giờ tập luyện · bài tập hôm
+      // nay đã sẵn sàng" opened Home and left the customer to find the roadmap
+      // themselves (QA on device, 2026-11-02).
+      router.push(destinationRoute(notification.destination, '/roadmap'));
     } else if (notification.type === 'roadmap_ready') {
       // Jump straight to the roadmap that just got published.
       if (notification.relatedProductId) useAppStore.getState().selectProduct(notification.relatedProductId);
       router.push('/roadmap');
     } else if (notification.type === 'ad') {
-      router.push(notification.destination === 'community' ? '/community' : notification.destination === 'roadmap' ? '/roadmap' : notification.destination === 'home' ? '/home' : '/store');
+      router.push(destinationRoute(notification.destination, '/store'));
     } else if (notification.type === 'blog') {
       router.push({ pathname: '/community', params: { filter: 'official', content: 'blog' } });
     } else if (notification.type === 'post_moderation') {
