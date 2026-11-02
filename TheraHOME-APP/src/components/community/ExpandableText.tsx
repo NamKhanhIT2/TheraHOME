@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 
 /** Truncates long post content to a fixed number of lines with a trailing
@@ -21,10 +21,14 @@ export function ExpandableText({
   text,
   collapsedLines = 3,
   style,
+  toggleColor = homeGlassColors.textMuted,
 }: {
   text: string;
   collapsedLines?: number;
   style?: StyleProp<TextStyle>;
+  /** The default is tuned for the dark community feed. A light surface has
+   * to pass its own, or the toggle disappears into the panel. */
+  toggleColor?: string;
 }) {
   const theme = useTheme();
   const { t } = useI18n();
@@ -47,10 +51,16 @@ export function ExpandableText({
       <Text style={style} numberOfLines={expanded || !truncatable ? undefined : collapsedLines}>
         {text}
       </Text>
-      {truncatable && !expanded ? (
-        <Pressable onPress={() => setExpanded(true)} hitSlop={6}>
-          <Text style={[style, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold, marginTop: 2 }]}>
-            {t('seeMore')}
+      {truncatable ? (
+        // Expanding without a way back left the reader stuck with a wall of
+        // text (owner, 2026-10-26), so the toggle stays after it opens.
+        <Pressable onPress={() => setExpanded((open) => !open)} hitSlop={8}>
+          {/* Not purple: on a violet ground, beside a violet tick and a
+              violet bookmark, a violet "Xem thêm" read as one more accent
+              rather than as a control (owner, 2026-10-26). Muted grey is
+              what every feed uses for it. */}
+          <Text style={[style, { color: toggleColor, fontFamily: theme.fontFamily.semiBold, marginTop: 2 }]}>
+            {expanded ? t('seeLess') : t('seeMore')}
           </Text>
         </Pressable>
       ) : null}

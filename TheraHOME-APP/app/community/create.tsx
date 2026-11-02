@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms, useProgramDays, usePainLogs } from '@/hooks/usePrograms';
@@ -12,7 +13,6 @@ import { useCreatePost, friendlyCommunityError, type PostMediaItem, type PostTyp
 import { ProgressShareCard } from '@/components/ProgressShareCard';
 import { Icon } from '@/components/icons/Icon';
 import { AvatarImg } from '@/components/AvatarImg';
-import { Button } from '@/components/ui/Button';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useI18n } from '@/lib/i18n';
 
@@ -22,15 +22,16 @@ const isVideoItem = (item: PostMediaItem) => !!item.mimeType?.startsWith('video/
 
 export default function CreatePostScreen() {
   const theme = useTheme();
+  // Inside the full-screen modal the context inset came back as 0, so the
+  // title and the Chia sẻ pill were drawn across the clock and the battery
+  // (owner's screenshot, 2026-10-26). `initialWindowMetrics` is read from
+  // the window at launch, outside any provider, so it still knows how tall
+  // this phone's status bar is; the larger of the two is the safe one.
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, initialWindowMetrics?.insets.top ?? 0);
   const { t } = useI18n();
-  const typeOptions: { key: PostType; emoji: string; label: string }[] = [
-    { key: 'text', emoji: '📝', label: t('writeShare') },
-    { key: 'image', emoji: '📷', label: t('image') },
-    { key: 'progress', emoji: '📈', label: t('progress') },
-    { key: 'exercise', emoji: '🏃', label: t('exercise') },
-  ];
   const { session } = useSession();
-  const params = useLocalSearchParams<{ achievement?: string; milestone?: string }>();
+  const params = useLocalSearchParams<{ achievement?: string; milestone?: string; type?: string }>();
   const userId = session?.user.id;
   const profile = useProfile(userId).data;
   const displayName =
@@ -38,7 +39,7 @@ export default function CreatePostScreen() {
     (session?.user.user_metadata?.full_name as string | undefined) ??
     (session?.user.user_metadata?.name as string | undefined) ??
     session?.user.email ??
-    t('you');
+    t('defaultUserName');
 
   // Offers to tag the post with the phase the user is currently on, matching
   // the "Hoàn thành Giai đoạn X" badge shown on milestone posts in the feed —
@@ -65,7 +66,14 @@ export default function CreatePostScreen() {
     : params.milestone
       ? t('streakShare', { days: params.milestone })
       : '';
-  const [postType, setPostType] = useState<PostType>(params.achievement ? 'progress' : 'text');
+  // The composer's chips open this screen with the kind already chosen.
+  const [postType, setPostType] = useState<PostType>(
+    params.achievement
+      ? 'progress'
+      : params.type === 'image' || params.type === 'progress' || params.type === 'exercise'
+        ? params.type
+        : 'text',
+  );
   const [text, setText] = useState(achievementText);
   const [tagPhase, setTagPhase] = useState(!!params.achievement);
   const [media, setMedia] = useState<PostMediaItem[]>([]);
@@ -149,46 +157,33 @@ export default function CreatePostScreen() {
   }
 
   return (
-    <ScreenContainer edges={['top', 'bottom']}>
-      <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}>
-        <View style={{ width: 32 }} />
-        <Text style={[theme.type.h2, { color: theme.colors.textPrimary }]}>{t('createPost')}</Text>
-        <Pressable onPress={closeComposer} style={[styles.closeBtn, { backgroundColor: theme.colors.bgCardAlt }]}>
-          <Icon name="x" size={16} color={theme.colors.textPrimary} />
+    <ScreenContainer tone="violet" edges={['bottom']}>
+      {/* Close left, title centred, the action as a filled pill on the
+          right — the owner's reference for this screen (2026-10-25). */}
+      <View style={[styles.header, { paddingTop: topInset + 10 }]}>
+        <Pressable onPress={closeComposer} hitSlop={8} style={[styles.closeBtn, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+          <Icon name="x" size={17} color={homeGlassColors.text} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: homeGlassColors.text }]}>{t('createPost')}</Text>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!canSubmit || createPost.isPending}
+          onPress={handleSubmit}
+          style={({ pressed }) => [
+            styles.postPill,
+            {
+              backgroundColor: homeGlassColors.purpleStrong,
+              opacity: !canSubmit || createPost.isPending ? 0.4 : pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          <Text style={[styles.postPillLabel, { color: '#FFFFFF' }]}>{t('share')}</Text>
         </Pressable>
       </View>
 
       <KeyboardAvoidingView style={styles.flex} behavior="padding">
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
-        {params.achievement ? <View style={[styles.achievementBanner, { backgroundColor: theme.colors.primaryTint10, borderColor: theme.colors.primary }]}><Text style={styles.achievementEmoji}>🎉</Text><View style={{ flex: 1 }}><Text style={[theme.type.bodyStrong, { color: theme.colors.primaryDark }]}>{t('newAchievement')}</Text><Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('achievementCardHint')}</Text></View></View> : null}
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginBottom: 10 }]}>{t('shareWhat')}</Text>
-        <View style={styles.typeRow}>
-          {typeOptions.map((opt) => {
-            const active = postType === opt.key;
-            const disabled = (opt.key === 'progress' || opt.key === 'exercise') && !activeProgram;
-            return (
-              <Pressable
-                key={opt.key}
-                onPress={() => selectType(opt.key)}
-                disabled={disabled}
-                style={[
-                  styles.typeChip,
-                  {
-                    backgroundColor: active ? theme.colors.primaryTint10 : theme.colors.bgCardAlt,
-                    borderColor: active ? theme.colors.primary : 'transparent',
-                    opacity: disabled ? 0.4 : 1,
-                  },
-                ]}
-              >
-                <Text style={{ fontSize: 15 }}>{opt.emoji}</Text>
-                <Text style={[theme.type.captionSm, { color: active ? theme.colors.primaryDark : theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
+        {params.achievement ? <View style={[styles.achievementBanner, { backgroundColor: homeGlassColors.surfaceRaised, borderColor: homeGlassColors.purpleStrong }]}><Text style={styles.achievementEmoji}>🎉</Text><View style={{ flex: 1 }}><Text style={[theme.type.bodyStrong, { color: homeGlassColors.purple }]}>{t('newAchievement')}</Text><Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{t('achievementCardHint')}</Text></View></View> : null}
         <View style={styles.userRow}>
           <AvatarImg size={40} uri={profile?.avatarUrl} />
           {/* flex: 1 bounds this column to the row. Without it the column grew
@@ -197,21 +192,21 @@ export default function CreatePostScreen() {
               longer than the English ones ("Kurangkan ketidakselesaan &
               penyesuaian" against "Reduce discomfort & adapt"). */}
           <View style={styles.userRowText}>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, fontFamily: theme.fontFamily.bold }]}>
               {displayName}
             </Text>
             {currentPhase ? (
               <Pressable
                 onPress={() => setTagPhase((t) => !t)}
-                style={[styles.pill, { backgroundColor: tagPhase ? theme.colors.primaryTint10 : theme.colors.bgCardAlt, marginTop: 4 }]}
+                style={[styles.pill, { backgroundColor: tagPhase ? homeGlassColors.surfaceRaised : homeGlassColors.surfaceRaised, marginTop: 4 }]}
               >
                 <Text
                   numberOfLines={1}
-                  style={[theme.type.captionSm, styles.pillLabel, { color: tagPhase ? theme.colors.primaryDark : theme.colors.textSecondary }]}
+                  style={[theme.type.captionSm, styles.pillLabel, { color: tagPhase ? homeGlassColors.purple : homeGlassColors.textMuted }]}
                 >
                   {tagPhase ? t('tagPhase', { phase: currentPhase }) : t('noTagPhase')}
                 </Text>
-                <Icon name="chevron-down" size={12} color={tagPhase ? theme.colors.primaryDark : theme.colors.textSecondary} />
+                <Icon name="chevron-down" size={12} color={tagPhase ? homeGlassColors.purple : homeGlassColors.textMuted} />
               </Pressable>
             ) : null}
           </View>
@@ -223,10 +218,10 @@ export default function CreatePostScreen() {
           value={text}
           onChangeText={setText}
           placeholder={snapshot ? t('addThought') : t('thinkingAbout', { name: displayName })}
-          placeholderTextColor={theme.colors.textMuted}
+          placeholderTextColor={homeGlassColors.textFaint}
           multiline
           maxLength={3000}
-          style={[styles.textArea, { color: theme.colors.textPrimary, minHeight: snapshot ? 70 : 140 }]}
+          style={[styles.textArea, { color: homeGlassColors.text, minHeight: snapshot ? 70 : 140 }]}
         />
 
         {media.length ? (
@@ -234,38 +229,111 @@ export default function CreatePostScreen() {
             {media.map((item, index) => (
               <View key={`${item.uri}-${index}`} style={styles.mediaThumbWrap}>
                 {isVideoItem(item) ? (
-                  <View style={[styles.mediaThumb, styles.videoPreview, { borderRadius: theme.radius.sm, backgroundColor: theme.colors.bgCardAlt }]}>
-                    <Icon name="film" size={22} color={theme.colors.textSecondary} />
+                  <View style={[styles.mediaThumb, styles.videoPreview, { borderRadius: theme.radius.sm, backgroundColor: homeGlassColors.surfaceRaised }]}>
+                    <Icon name="film" size={22} color={homeGlassColors.textMuted} />
                   </View>
                 ) : (
                   <Image source={{ uri: item.uri }} style={[styles.mediaThumb, { borderRadius: theme.radius.sm }]} resizeMode="cover" />
                 )}
-                <Pressable onPress={() => removeMedia(index)} style={[styles.removeThumb, { backgroundColor: theme.colors.textPrimary }]}>
+                <Pressable onPress={() => removeMedia(index)} style={[styles.removeThumb, { backgroundColor: homeGlassColors.text }]}>
                   {/* Inverse-of-theme disc: the icon must invert too, or it is
                       white-on-white in dark mode (owner report 2026-09-12). */}
-                  <Icon name="x" size={12} color={theme.colors.bgCard} />
+                  <Icon name="x" size={12} color={homeGlassColors.surface} />
                 </Pressable>
               </View>
             ))}
           </ScrollView>
         ) : null}
-        <Text style={[theme.type.captionSm, styles.characterCount, { color: text.length > 2800 ? theme.colors.warning : theme.colors.textMuted }]}>{text.length}/3000</Text>
+        <Text style={[theme.type.captionSm, styles.characterCount, { color: text.length > 2800 ? homeGlassColors.badge : homeGlassColors.textFaint }]}>{text.length}/3000</Text>
       </ScrollView>
 
+      {/* A row of outline icons under the text, as the reference has it —
+          only the ones this app can actually do. Posting moved to the pill
+          in the header. */}
       <View style={styles.footer}>
-        <View style={[styles.addRow, { borderColor: theme.colors.borderInput, borderRadius: theme.radius.md }]}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('addToPost')}</Text>
-          <View style={styles.addIcons}>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('a11yPickMedia')} onPress={pickMedia} disabled={media.length >= MAX_MEDIA}>
-              <Icon name="image" size={20} color={media.length >= MAX_MEDIA ? theme.colors.textMuted : theme.colors.success} />
-            </Pressable>
-          </View>
+        <View style={[styles.addRow, { borderTopColor: homeGlassColors.hairline }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('a11yPickMedia')}
+            onPress={pickMedia}
+            disabled={media.length >= MAX_MEDIA}
+            hitSlop={10}
+            style={({ pressed }) => [styles.toolBtn, pressed ? { opacity: 0.55 } : null]}
+          >
+            <Icon
+              name="image"
+              size={27}
+              color={media.length >= MAX_MEDIA ? homeGlassColors.textFaint : homeGlassColors.textMuted}
+              strokeWidth={1.9}
+            />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('a11yPickMedia')}
+            onPress={pickMedia}
+            disabled={media.length >= MAX_MEDIA}
+            hitSlop={10}
+            style={({ pressed }) => [styles.toolBtn, pressed ? { opacity: 0.55 } : null]}
+          >
+            <Icon
+              name="film"
+              size={27}
+              color={media.length >= MAX_MEDIA ? homeGlassColors.textFaint : homeGlassColors.textMuted}
+              strokeWidth={1.9}
+            />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('progress')}
+            onPress={() => selectType(postType === 'progress' ? 'text' : 'progress')}
+            disabled={!activeProgram}
+            hitSlop={10}
+            style={({ pressed }) => [styles.toolBtn, pressed ? { opacity: 0.55 } : null]}
+          >
+            <Icon
+              name="activity"
+              size={27}
+              color={
+                !activeProgram
+                  ? homeGlassColors.textFaint
+                  : postType === 'progress'
+                    ? homeGlassColors.purple
+                    : homeGlassColors.textMuted
+              }
+              strokeWidth={1.9}
+            />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('exercise')}
+            onPress={() => selectType(postType === 'exercise' ? 'text' : 'exercise')}
+            disabled={!activeProgram}
+            hitSlop={10}
+            style={({ pressed }) => [styles.toolBtn, pressed ? { opacity: 0.55 } : null]}
+          >
+            <Icon
+              name="calendar"
+              size={27}
+              color={
+                !activeProgram
+                  ? homeGlassColors.textFaint
+                  : postType === 'exercise'
+                    ? homeGlassColors.purple
+                    : homeGlassColors.textMuted
+              }
+              strokeWidth={1.9}
+            />
+          </Pressable>
         </View>
-        <Button style={{ width: '100%' }} disabled={!canSubmit} loading={createPost.isPending} onPress={handleSubmit}>
-          {t('share')}
-        </Button>
-        <Pressable onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'community' } })} style={{ marginTop: 10, alignItems: 'center' }}>
-          <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, textDecorationLine: 'underline' }]}>{t('viewCommunityGuidelines')}</Text>
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'community' } })}
+          hitSlop={8}
+          style={styles.guidelines}
+        >
+          <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint, textDecorationLine: 'underline' }]}>
+            {t('viewCommunityGuidelines')}
+          </Text>
         </Pressable>
       </View>
       </KeyboardAvoidingView>
@@ -275,20 +343,44 @@ export default function CreatePostScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  headerTitle: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  postPill: {
+    paddingHorizontal: 20,
+    paddingVertical: 9,
+    borderRadius: 999,
+  },
+  postPillLabel: {
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: '700',
+  },
+  guidelines: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 2,
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    // paddingTop is the status-bar inset plus the reference's own breathing
+    // room — the close button and the pill sit BELOW the clock, not level
+    // with it (owner, 2026-10-26).
     paddingBottom: 12,
     borderBottomWidth: 1,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   body: {
     padding: 20,
@@ -381,14 +473,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
   },
+  // Spread, not gapped: four icons bunched at the left edge of a wide row
+  // looked unfinished (owner, 2026-10-25).
   addRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 2,
+    borderTopWidth: 1,
+  },
+  // 44pt targets around the 27pt icons (owner, 2026-10-26): the icons are
+  // the only way to attach anything, so they get a real button each.
+  toolBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addIcons: {
     flexDirection: 'row',

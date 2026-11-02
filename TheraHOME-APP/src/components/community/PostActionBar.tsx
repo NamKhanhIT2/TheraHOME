@@ -1,11 +1,10 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { homeGlassColors } from '@/theme';
 import { useI18n } from '@/lib/i18n';
-import { reactionLabel, type PostReaction } from '@/hooks/useCommunity';
+import type { PostReaction } from '@/hooks/useCommunity';
 import { Icon } from '@/components/icons/Icon';
 import { ReactionButton, type ReactionGesturePoint } from './ReactionButton';
-import { ReactionSummary } from './ReactionSummary';
 
 export interface PostActionBarProps {
   currentReaction: PostReaction | null;
@@ -22,15 +21,30 @@ export interface PostActionBarProps {
   onSavePress: () => void;
 }
 
-/** Facebook-style stats row (reaction icons + count, comments, saves) plus a
- * Thích / Bình luận / Lưu bài row — shared by the feed card and post detail
- * so both stay in sync. */
+/** Compact counts, rounded to the thousand — "2.2K" in the reference. */
+function short(value: number): string {
+  if (value < 1000) return String(value);
+  const thousands = value / 1000;
+  return `${thousands >= 10 ? Math.round(thousands) : Math.round(thousands * 10) / 10}K`;
+}
+
+/**
+ * One row: react and comment on the left, saving on the right — the owner's
+ * reference for Cộng đồng (2026-10-25), replacing the stats-row-plus-
+ * button-row this had before.
+ *
+ * The reference's third item is a share count. There is no sharing here and
+ * the owner does not want one, so the row is two actions and the bookmark.
+ *
+ * Only the heart carries a number (owner, 2026-10-26). The count lives
+ * INSIDE the heart's own pressable so it sits 5pt from the icon instead of
+ * across a 44pt box's worth of air, and so the number is part of the target
+ * rather than dead space beside it.
+ */
 export function PostActionBar({
   currentReaction,
-  reactionCounts,
   likesCount,
   commentsCount,
-  savesCount,
   saved,
   onQuickReact,
   onReactionLongPress,
@@ -39,45 +53,84 @@ export function PostActionBar({
   onCommentPress,
   onSavePress,
 }: PostActionBarProps) {
-  const theme = useTheme();
-  const { t, language } = useI18n();
-  const currentReactionLabel = reactionLabel(currentReaction ?? 'like', language);
+  const { t } = useI18n();
 
   return (
-    <View>
-      <View style={[styles.stats, { borderTopColor: theme.colors.divider, borderBottomColor: theme.colors.divider }]}>
-        {likesCount > 0 ? <ReactionSummary counts={reactionCounts} total={likesCount} /> : <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{t('noLikesYet')}</Text>}
-        <View style={styles.statsRight}>
-          <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{commentsCount} {t('comments')}</Text>
-          {savesCount > 0 ? <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{savesCount} {t('saves')}</Text> : null}
-        </View>
-      </View>
-      <View style={styles.actions}>
+    <View style={styles.row}>
+      <View style={styles.left}>
         <ReactionButton
           currentReaction={currentReaction}
+          label={short(likesCount)}
           onQuickPress={onQuickReact}
           onLongPress={onReactionLongPress}
           onLongPressMove={onReactionLongPressMove}
           onLongPressRelease={onReactionLongPressRelease}
-          label={currentReactionLabel}
-          labelColor={currentReaction ? theme.colors.primary : theme.colors.textSecondary}
         />
-        <Pressable accessibilityRole="button" accessibilityLabel={`${t('commentAction')}, ${commentsCount} ${t('comments')}`} onPress={onCommentPress} style={styles.actionBtn}>
-          <Icon name="message-circle" size={18} color={theme.colors.textMuted} />
-          <Text style={[theme.type.caption, { color: theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>{t('commentAction')}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityState={{ selected: saved }} accessibilityLabel={saved ? t('savedShort') : t('savePostShort')} onPress={onSavePress} style={styles.actionBtn}>
-          <Icon name="bookmark" size={18} color={saved ? theme.colors.primary : theme.colors.textMuted} />
-          <Text style={[theme.type.caption, { color: saved ? theme.colors.primary : theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>{saved ? t('savedShort') : t('savePostShort')}</Text>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${t('commentAction')}, ${commentsCount} ${t('comments')}`}
+          onPress={onCommentPress}
+          hitSlop={8}
+          style={styles.iconHit}
+        >
+          <Icon name="message-circle" size={21} color={homeGlassColors.textMuted} strokeWidth={1.9} />
         </Pressable>
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: saved }}
+        accessibilityLabel={saved ? t('savedShort') : t('savePostShort')}
+        onPress={onSavePress}
+        hitSlop={8}
+        style={styles.saveHit}
+      >
+        <Icon
+          name="bookmark"
+          size={21}
+          color={saved ? homeGlassColors.purple : homeGlassColors.textMuted}
+          strokeWidth={saved ? 2.4 : 1.9}
+        />
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stats: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, marginTop: 12, borderTopWidth: 1, borderBottomWidth: 1 },
-  statsRight: { flexDirection: 'row', gap: 12 },
-  actions: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 },
-  actionBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9 },
+  // marginTop was 12 on top of the 44pt targets' own built-in air, which
+  // pushed the row a long way from the photo/text it belongs to (owner,
+  // 2026-10-26, twice). The targets stay 44pt so they stay easy to hit —
+  // the negative margin cancels the ~11pt of padding a 21pt icon centred in
+  // a 44pt box carries at its top edge, which is the air that was actually
+  // being seen.
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: -4,
+  },
+  left: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  // Left-aligned for the same reason the bookmark is right-aligned: the
+  // 44pt target grows away from the icon, not around it, so the gap between
+  // the heart's number and the comment icon stays the ~22pt that says "new
+  // pair" without the box inflating it.
+  iconHit: {
+    width: 40,
+    height: 44,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  // Right-aligned inside its own target so the icon stays flush with the
+  // card's padding while the tappable area reaches back into the row.
+  saveHit: {
+    width: 44,
+    height: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
 });

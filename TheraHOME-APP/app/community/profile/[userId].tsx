@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { useAuthorPosts, useCommunityProfile, useSavedPosts } from '@/hooks/useCommunity';
@@ -45,26 +45,26 @@ export default function CommunityProfileScreen() {
   ];
 
   if ((!official && profileQuery.isPending) || postsQuery.isPending) {
-    return <ScreenContainer><BackBar onBack={() => router.back()} title={t('communityProfile')} /><View style={styles.loading}><ActivityIndicator color={theme.colors.primary} /></View></ScreenContainer>;
+    return <ScreenContainer tone="violet"><BackBar tone="violet" onBack={() => router.back()} title={t('communityProfile')} /><View style={styles.loading}><ActivityIndicator color={homeGlassColors.purpleStrong} /></View></ScreenContainer>;
   }
   // A failed request used to render as "Chưa có nội dung" — indistinguishable
   // from an empty profile, with no way to retry.
   if (profileQuery.isError || postsQuery.isError) {
     return (
-      <ScreenContainer>
-        <BackBar onBack={() => router.back()} title={t('communityProfile')} />
+      <ScreenContainer tone="violet">
+        <BackBar tone="violet" onBack={() => router.back()} title={t('communityProfile')} />
         <View style={styles.loading}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('homeLoadErrorTitle')}</Text>
-          <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }]}>{t('checkNetworkRetry')}</Text>
+          <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, textAlign: 'center' }]}>{t('homeLoadErrorTitle')}</Text>
+          <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 6 }]}>{t('checkNetworkRetry')}</Text>
           <Pressable onPress={() => { void profileQuery.refetch(); void postsQuery.refetch(); }} style={{ marginTop: 14 }}>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('retry')}</Text>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.purpleStrong }]}>{t('retry')}</Text>
           </Pressable>
         </View>
       </ScreenContainer>
     );
   }
   if (!official && !profile) {
-    return <ScreenContainer><BackBar onBack={() => router.back()} title={t('communityProfile')} /><View style={styles.loading}><Text style={{ color: theme.colors.textMuted }}>{t('profileNotFound')}</Text></View></ScreenContainer>;
+    return <ScreenContainer tone="violet"><BackBar tone="violet" onBack={() => router.back()} title={t('communityProfile')} /><View style={styles.loading}><Text style={{ color: homeGlassColors.textFaint }}>{t('profileNotFound')}</Text></View></ScreenContainer>;
   }
 
   const name = official ? 'TheraHOME' : profile!.fullName;
@@ -77,14 +77,14 @@ export default function CommunityProfileScreen() {
   const renderedPosts = tab === 'saved' ? savedPosts : tab === 'journey' ? journeyPosts : posts;
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={official ? 'TheraHOME' : ownProfile ? t('myCommunityProfile') : t('communityProfile')} />
+    <ScreenContainer tone="violet">
+      <BackBar tone="violet" onBack={() => router.back()} title={official ? 'TheraHOME' : ownProfile ? t('myCommunityProfile') : t('communityProfile')} />
       <ScrollView
         contentContainerStyle={styles.body}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            tintColor={theme.colors.primary}
+            tintColor={homeGlassColors.purpleStrong}
             onRefresh={async () => {
               setRefreshing(true);
               try {
@@ -96,27 +96,27 @@ export default function CommunityProfileScreen() {
           />
         }
       >
-        <View style={[styles.profileCard, theme.shadows.card, { backgroundColor: official ? theme.colors.primaryTint10 : theme.colors.bgCard, borderColor: official ? theme.colors.primary : theme.colors.borderLight }]}> 
+        <View style={[styles.profileCard, theme.shadows.card, { backgroundColor: official ? homeGlassColors.surfaceRaised : homeGlassColors.surface, borderColor: official ? homeGlassColors.purpleStrong : homeGlassColors.hairline }]}> 
           <CommunityAvatar name={name} authorId={official ? null : userId} avatarUrl={avatarUrl} size={76} isOfficial={official} />
           <View style={styles.nameRow}>
-            <Text style={[theme.type.h2, { color: theme.colors.textPrimary }]}>{name}</Text>
-            {official ? <View style={[styles.verifiedBadge, { backgroundColor: theme.colors.primary }]}><Icon name="check" size={12} color="#fff" strokeWidth={3} /></View> : null}
+            <Text style={[theme.type.h2, { color: homeGlassColors.text }]}>{name}</Text>
+            {official ? <View style={[styles.verifiedBadge, { backgroundColor: homeGlassColors.purpleStrong }]}><Icon name="check" size={12} color="#fff" strokeWidth={3} /></View> : null}
           </View>
           {official ? (
-            <Text style={[theme.type.caption, styles.bio, { color: theme.colors.textSecondary }]}>{t('officialBio')}</Text>
+            <Text style={[theme.type.caption, styles.bio, { color: homeGlassColors.textMuted }]}>{t('officialBio')}</Text>
           ) : (
             <View style={styles.stats}>
-              <View style={styles.stat}><Text style={[styles.statValue, { color: theme.colors.textPrimary }]}>🔥 {profile!.currentStreak}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('dayStreak')}</Text></View>
-              <View style={[styles.stat, { borderLeftColor: theme.colors.divider }]}><Text style={[styles.statValue, { color: theme.colors.textPrimary }]}>✓ {profile!.completedPrograms}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('completedRoadmaps')}</Text></View>
-              <View style={[styles.stat, { borderLeftColor: theme.colors.divider }]}><Text style={[styles.statValue, { color: theme.colors.textPrimary }]}>📝 {profile!.postsCount}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('sharedPosts')}</Text></View>
+              <View style={styles.stat}><Text style={[styles.statValue, { color: homeGlassColors.text }]}>🔥 {profile!.currentStreak}</Text><Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>{t('dayStreak')}</Text></View>
+              <View style={[styles.stat, { borderLeftColor: homeGlassColors.hairline }]}><Text style={[styles.statValue, { color: homeGlassColors.text }]}>✓ {profile!.completedPrograms}</Text><Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>{t('completedRoadmaps')}</Text></View>
+              <View style={[styles.stat, { borderLeftColor: homeGlassColors.hairline }]}><Text style={[styles.statValue, { color: homeGlassColors.text }]}>📝 {profile!.postsCount}</Text><Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>{t('sharedPosts')}</Text></View>
             </View>
           )}
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
           {tabs.map(([key, label]) => (
-            <Pressable key={key} onPress={() => setTab(key)} style={[styles.tab, { borderColor: tab === key ? theme.colors.primary : theme.colors.borderInput, backgroundColor: tab === key ? theme.colors.primaryTint10 : theme.colors.bgCard }]}>
-              <Text style={[theme.type.caption, { color: tab === key ? theme.colors.primary : theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>{label}</Text>
+            <Pressable key={key} onPress={() => setTab(key)} style={[styles.tab, { borderColor: tab === key ? homeGlassColors.purpleStrong : homeGlassColors.hairline, backgroundColor: tab === key ? homeGlassColors.surfaceRaised : homeGlassColors.surface }]}>
+              <Text style={[theme.type.caption, { color: tab === key ? homeGlassColors.purpleStrong : homeGlassColors.textMuted, fontFamily: theme.fontFamily.semiBold }]}>{label}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -124,27 +124,27 @@ export default function CommunityProfileScreen() {
         {tab === 'achievements' && ownProfile ? (
           <View style={styles.achievementGrid}>
             {achievements.map((achievement) => (
-              <View key={achievement.id} style={[styles.achievementCard, { backgroundColor: achievement.unlocked ? theme.colors.primaryTint10 : theme.colors.bgCardAlt, borderColor: achievement.unlocked ? theme.colors.primary : theme.colors.borderLight }]}> 
+              <View key={achievement.id} style={[styles.achievementCard, { backgroundColor: achievement.unlocked ? homeGlassColors.surfaceRaised : homeGlassColors.surfaceRaised, borderColor: achievement.unlocked ? homeGlassColors.purpleStrong : homeGlassColors.hairline }]}> 
                 <Text style={[styles.achievementIcon, { opacity: achievement.unlocked ? 1 : 0.45 }]}>{achievement.icon}</Text>
-                <View style={{ flex: 1 }}><Text style={[theme.type.caption, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>{achievement.title}</Text><Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>{achievement.unlocked ? t('achieved') : achievement.detail}</Text></View>
-                {achievement.unlocked ? <Icon name="check" size={17} color={theme.colors.primary} /> : <Icon name="lock" size={16} color={theme.colors.textMuted} />}
+                <View style={{ flex: 1 }}><Text style={[theme.type.caption, { color: homeGlassColors.text, fontFamily: theme.fontFamily.bold }]}>{achievement.title}</Text><Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint, marginTop: 2 }]}>{achievement.unlocked ? t('achieved') : achievement.detail}</Text></View>
+                {achievement.unlocked ? <Icon name="check" size={17} color={homeGlassColors.purpleStrong} /> : <Icon name="lock" size={16} color={homeGlassColors.textFaint} />}
               </View>
             ))}
           </View>
         ) : official && tab === 'journey' ? officialArticles.map((article) => (
-          <Pressable key={article.id} onPress={() => router.push({ pathname: '/community/article/[articleId]', params: { articleId: article.id } })} style={[styles.post, { backgroundColor: theme.colors.bgCard }]}> 
-            <Text style={[theme.type.captionSm, { color: theme.colors.primary }]}>{article.tag}</Text>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginTop: 4 }]}>{article.title}</Text>
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 4 }]}>{article.summary}</Text>
-            <Text style={[theme.type.captionSm, { color: theme.colors.primary, marginTop: 8 }]}>{t('readMore')}</Text>
+          <Pressable key={article.id} onPress={() => router.push({ pathname: '/community/article/[articleId]', params: { articleId: article.id } })} style={[styles.post, { backgroundColor: homeGlassColors.surface }]}> 
+            <Text style={[theme.type.captionSm, { color: homeGlassColors.purpleStrong }]}>{article.tag}</Text>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, marginTop: 4 }]}>{article.title}</Text>
+            <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 4 }]}>{article.summary}</Text>
+            <Text style={[theme.type.captionSm, { color: homeGlassColors.purpleStrong, marginTop: 8 }]}>{t('readMore')}</Text>
           </Pressable>
         )) : tab === 'journey' && ownProfile ? (
           <View style={{ gap: 10 }}>
             {programs.map((program) => (
-              <Pressable key={program.userProgramId} onPress={() => router.push('/roadmap')} style={[styles.journeyCard, { backgroundColor: theme.colors.bgCard, borderColor: theme.colors.borderLight }]}> 
-                <View style={[styles.journeyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="dumbbell" size={18} color={theme.colors.primary} /></View>
-                <View style={{ flex: 1 }}><Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{program.product.name}</Text><Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('journeyProgress', { current: program.currentDay, total: program.product.totalDays, streak: program.streak })}</Text><View style={[styles.progressTrack, { backgroundColor: theme.colors.bgCardAlt }]}><View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${Math.min(100, program.adherencePct)}%` }]} /></View></View>
-                <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+              <Pressable key={program.userProgramId} onPress={() => router.push('/roadmap')} style={[styles.journeyCard, { backgroundColor: homeGlassColors.surface, borderColor: homeGlassColors.hairline }]}> 
+                <View style={[styles.journeyIcon, { backgroundColor: homeGlassColors.surfaceRaised }]}><Icon name="dumbbell" size={18} color={homeGlassColors.purpleStrong} /></View>
+                <View style={{ flex: 1 }}><Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{program.product.name}</Text><Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{t('journeyProgress', { current: program.currentDay, total: program.product.totalDays, streak: program.streak })}</Text><View style={[styles.progressTrack, { backgroundColor: homeGlassColors.surfaceRaised }]}><View style={[styles.progressFill, { backgroundColor: homeGlassColors.purpleStrong, width: `${Math.min(100, program.adherencePct)}%` }]} /></View></View>
+                <Icon name="chevron-right" size={18} color={homeGlassColors.textFaint} />
               </Pressable>
             ))}
             {programs.length === 0 ? <EmptyState label={t('noJourneys')} theme={theme} /> : null}
@@ -152,25 +152,25 @@ export default function CommunityProfileScreen() {
         ) : (
           <View style={{ gap: 10 }}>
             {renderedPosts.map((post) => (
-              <Pressable key={post.id} onPress={() => router.push({ pathname: '/community/[postId]', params: { postId: post.id } })} style={[styles.post, { backgroundColor: theme.colors.bgCard }]}> 
+              <Pressable key={post.id} onPress={() => router.push({ pathname: '/community/[postId]', params: { postId: post.id } })} style={[styles.post, { backgroundColor: homeGlassColors.surface }]}> 
                 <View style={styles.postAuthor}>
                   <CommunityAvatar name={post.authorName} authorId={post.authorId} avatarUrl={post.authorAvatarUrl} size={34} isOfficial={post.isOfficial} />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Text style={[theme.type.caption, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>{post.authorName}</Text>
-                      {post.isOfficial ? <View style={[styles.smallVerifiedBadge, { backgroundColor: theme.colors.primary }]}><Icon name="check" size={10} color="#fff" strokeWidth={3} /></View> : null}
+                      <Text style={[theme.type.caption, { color: homeGlassColors.text, fontFamily: theme.fontFamily.bold }]}>{post.authorName}</Text>
+                      {post.isOfficial ? <View style={[styles.smallVerifiedBadge, { backgroundColor: homeGlassColors.purpleStrong }]}><Icon name="check" size={10} color="#fff" strokeWidth={3} /></View> : null}
                     </View>
-                    <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{timeAgo(post.createdAt, t)}</Text>
+                    <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>{timeAgo(post.createdAt, t)}</Text>
                   </View>
                 </View>
                 <ExpandableText
                   text={post.text}
                   collapsedLines={3}
-                  style={[theme.type.body, { color: theme.colors.textPrimary, marginTop: 10 }]}
+                  style={[theme.type.body, { color: homeGlassColors.text, marginTop: 10 }]}
                 />
                 <MediaGrid uris={post.mediaUrls} feedUris={post.mediaThumbnailUrls} posterUris={post.mediaPosterUrls} mediaWidths={post.mediaWidths} mediaHeights={post.mediaHeights} postId={post.id} shouldAutoplay={false} />
                 {post.progressSnapshot ? <ProgressShareCard postType={post.postType} snapshot={post.progressSnapshot} /> : null}
-                <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 8 }]}>{post.likesCount} {t('reactions')} · {post.commentsCount} {t('comments')}</Text>
+                <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint, marginTop: 8 }]}>{post.likesCount} {t('reactions')} · {post.commentsCount} {t('comments')}</Text>
               </Pressable>
             ))}
             {renderedPosts.length === 0 ? <EmptyState label={tab === 'saved' ? t('noSavedPosts') : t('noContent')} theme={theme} /> : null}
@@ -182,7 +182,7 @@ export default function CommunityProfileScreen() {
 }
 
 function EmptyState({ label, theme }: { label: string; theme: ReturnType<typeof useTheme> }) {
-  return <View style={[styles.empty, { backgroundColor: theme.colors.bgCardAlt }]}><Icon name="bookmark" size={22} color={theme.colors.textMuted} /><Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>{label}</Text></View>;
+  return <View style={[styles.empty, { backgroundColor: homeGlassColors.surfaceRaised }]}><Icon name="bookmark" size={22} color={homeGlassColors.textFaint} /><Text style={[theme.type.caption, { color: homeGlassColors.textFaint }]}>{label}</Text></View>;
 }
 
 const styles = StyleSheet.create({

@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { isVideoUri } from '@/lib/mediaKind';
 import { CommunityPostImage } from '@/components/CommunityPostImage';
 import { CommunityVideoPlayer } from '@/components/community/CommunityVideoPlayer';
 import { CommunityMediaViewer } from '@/components/community/CommunityMediaViewer';
 import { ResilientCommunityImage } from '@/components/community/ResilientCommunityImage';
+import { FEED_MEDIA_RATIO } from '@/components/community/feedMedia';
 
 function GridCell({ uri, displayUri, posterUri, itemId, shouldAutoplay, overlayCount, onOpenViewer }: { uri: string; displayUri: string; posterUri?: string | null; itemId: string; shouldAutoplay: boolean; overlayCount?: number; onOpenViewer: () => void }) {
   const theme = useTheme();
   const isVideo = isVideoUri(uri);
   return (
-    <View style={[styles.cell, { backgroundColor: theme.colors.bgCardAlt }]}>
+    <View style={[styles.cell, { backgroundColor: homeGlassColors.surfaceRaised }]}>
       {isVideo ? (
         <CommunityVideoPlayer uri={uri} posterUri={posterUri} itemId={itemId} shouldAutoplay={shouldAutoplay} mode="grid" onOpenViewer={onOpenViewer} />
       ) : (
@@ -44,10 +45,10 @@ export interface MediaGridProps {
 }
 
 /**
- * Community post media, 1..N images/videos, laid out Facebook/Instagram-style:
- * 1 → full width (delegates to CommunityPostImage for its aspect-ratio
- * handling), 2 → two columns, 3 → one large + two stacked small, 4 → 2×2,
- * 5+ → 2×2 with a "+N" scrim over the last cell. Shared by the Community
+ * Community post media, 1..N images/videos, in ONE fixed box whatever the
+ * count (see feedMedia.ts): 1 → the box, 2 → two columns, 3 → one tall left
+ * plus two stacked right, 4 → 2×2, 5+ → 2×2 with a "+N" scrim over the last
+ * cell. Shared by the Community
  * feed, Post Detail, and the profile post grid — none of them lay out
  * media on their own. Also owns the immersive full-screen viewer — tapping
  * any cell opens it at that item.
@@ -70,7 +71,7 @@ export function MediaGrid({ uris, feedUris = uris, posterUris = [], mediaWidths 
     );
   }
 
-  const frame = [styles.frame, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md }];
+  const frame = [styles.frame, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md }];
   const cell = (index: number, overlayCount?: number) => (
     <GridCell
       uri={uris[index]}
@@ -135,7 +136,7 @@ export function MediaGrid({ uris, feedUris = uris, posterUris = [], mediaWidths 
 }
 
 const styles = StyleSheet.create({
-  frame: { width: '100%', marginTop: 10, aspectRatio: 1, overflow: 'hidden' },
+  frame: { width: '100%', marginTop: 10, aspectRatio: FEED_MEDIA_RATIO, overflow: 'hidden' },
   row: { flex: 1, flexDirection: 'row', gap: 2 },
   column: { flex: 1, flexDirection: 'column', gap: 2 },
   cell: { flex: 1, overflow: 'hidden' },

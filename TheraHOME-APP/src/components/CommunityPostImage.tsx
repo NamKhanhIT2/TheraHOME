@@ -5,6 +5,7 @@ import { isVideoUri } from '@/lib/mediaKind';
 import { CommunityVideoPlayer } from '@/components/community/CommunityVideoPlayer';
 import { CommunityMediaViewer } from '@/components/community/CommunityMediaViewer';
 import { ResilientCommunityImage } from '@/components/community/ResilientCommunityImage';
+import { FEED_MEDIA_RATIO } from '@/components/community/feedMedia';
 
 /** Shows the complete post/comment image or video without stretching or
  * horizontal cropping. `uri` may point to either — decided by file
@@ -36,7 +37,8 @@ export function CommunityPostImage({
   onOpenViewer?: () => void;
 }) {
   const theme = useTheme();
-  const [aspectRatio, setAspectRatio] = useState(mediaWidth && mediaHeight ? mediaWidth / mediaHeight : 4 / 3);
+  // Fixed, not measured: see feedMedia.ts. The photo's own dimensions no
+  // longer decide anything here — tapping opens the full frame.
   const [localViewerOpen, setLocalViewerOpen] = useState(false);
   const isVideo = isVideoUri(originalUri);
   const openViewer = onOpenViewer ?? (() => setLocalViewerOpen(true));
@@ -47,16 +49,8 @@ export function CommunityPostImage({
 
   return (
     <>
-      <Pressable onPress={openViewer} style={[styles.frame, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md, aspectRatio }]}>
-        <ResilientCommunityImage
-          uri={uri}
-          fallbackUri={originalUri}
-          contentFit="contain"
-          style={styles.image}
-          onLoad={({ source }) => {
-            if (source.width > 0 && source.height > 0) setAspectRatio(Math.max(0.62, Math.min(1.9, source.width / source.height)));
-          }}
-        />
+      <Pressable onPress={openViewer} style={[styles.frame, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md, aspectRatio: FEED_MEDIA_RATIO }]}>
+        <ResilientCommunityImage uri={uri} fallbackUri={originalUri} contentFit="cover" style={styles.image} />
       </Pressable>
       {/* Full screen must show the ORIGINAL, not the downsized feed copy —
           `uri` is the feed-resolution image. */}

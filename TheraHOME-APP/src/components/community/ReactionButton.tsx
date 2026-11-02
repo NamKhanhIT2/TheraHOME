@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, type GestureResponderEvent } from 'react-native';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { POST_REACTIONS, reactionLabel, type PostReaction } from '@/hooks/useCommunity';
 import { Icon } from '@/components/icons/Icon';
@@ -14,11 +14,13 @@ export interface ReactionButtonProps {
   onLongPress: (point: ReactionGesturePoint) => void;
   onLongPressMove?: (point: ReactionGesturePoint) => void;
   onLongPressRelease?: () => void;
-  /** When set, a text label is rendered next to the icon and the whole row —
+  /** When set, a label is rendered next to the icon and the whole pair —
    * not just the 44px icon — becomes the tap/long-press/drag target, so
-   * pressing or holding the word does exactly what pressing the icon does.
-   * Used by the post-level "Thích" action; left unset for the icon-only
-   * comment/reply control. */
+   * pressing or holding the label does exactly what pressing the icon does.
+   * The feed passes the like COUNT here: the number has to sit tight against
+   * its own heart to read as that heart's number (owner, 2026-10-26), and a
+   * 44pt box around a centred icon puts ~16pt of air between the two. Inside
+   * one target that gap is 5pt and the number is tappable as well. */
   label?: string;
   labelColor?: string;
 }
@@ -101,8 +103,12 @@ export function ReactionButton({ currentReaction, onQuickPress, onLongPress, onL
       style={label ? styles.hitLabelled : styles.hit}
     >
       <Animated.View style={[label ? styles.row : null, { transform: [{ scale: Animated.multiply(pressScale, reactionPop) }] }]}>
-        {selected ? <Text style={label ? styles.emojiSm : styles.emoji}>{selected.emoji}</Text> : <Icon name="heart" size={label ? 18 : 17} color={theme.colors.textMuted} />}
-        {label ? <Text style={[theme.type.caption, styles.label, { color: labelColor ?? theme.colors.textSecondary, fontFamily: theme.fontFamily.semiBold }]}>{label}</Text> : null}
+        {selected ? (
+          <Text style={label ? styles.emojiSm : styles.emoji}>{selected.emoji}</Text>
+        ) : (
+          <Icon name="heart" size={21} color={homeGlassColors.textMuted} strokeWidth={1.9} />
+        )}
+        {label ? <Text style={[theme.type.caption, styles.label, { color: labelColor ?? homeGlassColors.textMuted }]}>{label}</Text> : null}
       </Animated.View>
     </Pressable>
   );
@@ -110,9 +116,11 @@ export function ReactionButton({ currentReaction, onQuickPress, onLongPress, onL
 
 const styles = StyleSheet.create({
   hit: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  hitLabelled: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, gap: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // Hugs its content rather than filling the row: this is one icon+number
+  // pair sitting next to other pairs, not a full-width button.
+  hitLabelled: { minHeight: 44, flexDirection: 'row', alignItems: 'center', paddingLeft: 2, paddingRight: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   emoji: { fontSize: 18 },
   emojiSm: { fontSize: 18 },
-  label: { includeFontPadding: false },
+  label: { includeFontPadding: false, fontSize: 14, fontVariant: ['tabular-nums'] },
 });

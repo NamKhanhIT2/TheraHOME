@@ -10,20 +10,18 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { useAppIsActive } from '@/hooks/useAppIsActive';
 import { useVideoPlaybackStore } from '@/store/useVideoPlaybackStore';
 import { RemoteImage } from '@/components/ui/RemoteImage';
+import { FEED_MEDIA_RATIO } from './feedMedia';
 
-// In-feed videos narrower than 4:5 (this includes 9:16) are cropped to a
-// 4:5 "preview" via `cover` rather than shown at their full tall height —
-// the uncropped video is still reachable via the immersive viewer's
-// `contain`. Landscape/square/4:5 videos are shown at their true ratio,
-// clamped the same way CommunityPostImage clamps images.
-const PREVIEW_MIN_RATIO = 4 / 5;
-const MAX_RATIO = 1.9;
-const DEFAULT_RATIO = 4 / 3;
+// The frame is FIXED — see feedMedia.ts. Only what happens inside it
+// depends on the video: a portrait or square video fills it (`cover`), a
+// landscape one is letterboxed inside it (`contain`), because cropping a
+// landscape video to a portrait box throws away most of the picture rather
+// than its margins. The uncropped frame is one tap away in the viewer.
 
 export interface CommunityVideoPlayerProps {
   uri: string;
@@ -41,8 +39,8 @@ export function CommunityVideoPlayer({ uri, posterUri, itemId, shouldAutoplay, m
       <Pressable
         onPress={onOpenViewer}
         style={mode === 'single'
-          ? [styles.frame, styles.poster, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md, aspectRatio: DEFAULT_RATIO }]
-          : [StyleSheet.absoluteFill, styles.poster, { backgroundColor: theme.colors.bgCardAlt }]}
+          ? [styles.frame, styles.poster, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md, aspectRatio: FEED_MEDIA_RATIO }]
+          : [StyleSheet.absoluteFill, styles.poster, { backgroundColor: homeGlassColors.surfaceRaised }]}
       >
         {posterUri ? <RemoteImage uri={posterUri} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
         <View style={styles.posterPlay}><Icon name="play" size={22} color="#fff" /></View>
@@ -97,13 +95,12 @@ function ActiveCommunityVideoPlayer({ uri, itemId, shouldAutoplay, mode, onOpenV
 
   const size = availableVideoTracks[0]?.size;
   const rawRatio = size && size.height > 0 ? size.width / size.height : null;
-  const cropped = rawRatio != null && rawRatio < PREVIEW_MIN_RATIO;
-  const displayRatio = rawRatio == null ? DEFAULT_RATIO : cropped ? PREVIEW_MIN_RATIO : Math.min(rawRatio, MAX_RATIO);
+  const letterboxed = rawRatio != null && rawRatio > 1;
   const loading = status === 'idle' || status === 'loading';
 
   const video = (
-    <View style={mode === 'single' ? [styles.frame, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md, aspectRatio: displayRatio }] : StyleSheet.absoluteFill}>
-      <VideoView player={player} nativeControls={false} contentFit={mode === 'grid' || cropped ? 'cover' : 'contain'} style={styles.media} />
+    <View style={mode === 'single' ? [styles.frame, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md, aspectRatio: FEED_MEDIA_RATIO }] : StyleSheet.absoluteFill}>
+      <VideoView player={player} nativeControls={false} contentFit={mode === 'grid' || !letterboxed ? 'cover' : 'contain'} style={styles.media} />
       {loading ? (
         <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]} pointerEvents="none">
           <ActivityIndicator color="#fff" />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { timeAgo } from '@/lib/timeAgo';
 import { RemoteImage } from '@/components/ui/RemoteImage';
@@ -34,32 +34,32 @@ export function ArticleCard({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+      style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
     >
       <View style={styles.row}>
         <View style={styles.left}>
           <View style={styles.brandRow}>
             <Image source={LOGO} style={styles.logo} resizeMode="contain" />
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, fontFamily: theme.fontFamily.bold }]}>
               TheraHOME
             </Text>
-            <View style={[styles.verifiedBadge, { backgroundColor: theme.colors.primary }]}>
+            <View style={[styles.verifiedBadge, { backgroundColor: homeGlassColors.purpleStrong }]}>
               <Text style={styles.verifiedTick}>✓</Text>
             </View>
-            <Text style={[theme.type.caption, { color: theme.colors.textMuted }]}> · {timeAgo(createdAt, t)}</Text>
+            <Text style={[theme.type.caption, { color: homeGlassColors.textFaint }]}> · {timeAgo(createdAt, t)}</Text>
           </View>
-          <Text numberOfLines={2} style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginTop: 6 }]}>
+          <Text numberOfLines={2} style={[theme.type.bodyStrong, { color: homeGlassColors.text, marginTop: 6 }]}>
             {title}
           </Text>
-          <Text numberOfLines={2} style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 3, lineHeight: 18 }]}>
+          <Text numberOfLines={2} style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 3, lineHeight: 18 }]}>
             {description}
           </Text>
         </View>
         {thumbnailUrl ? (
-          <RemoteImage uri={thumbnailUrl} contentFit="cover" style={[styles.thumb, { borderRadius: theme.radius.md, backgroundColor: theme.colors.bgCardAlt }]} />
+          <RemoteImage uri={thumbnailUrl} contentFit="cover" style={[styles.thumb, { borderRadius: theme.radius.md, backgroundColor: homeGlassColors.surfaceRaised }]} />
         ) : null}
       </View>
-      <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold, marginTop: 10 }]}>
+      <Text style={[theme.type.captionSm, { color: homeGlassColors.purpleStrong, fontFamily: theme.fontFamily.semiBold, marginTop: 10 }]}>
         {t('readMore')}
       </Text>
     </Pressable>

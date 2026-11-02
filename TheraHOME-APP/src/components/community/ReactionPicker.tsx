@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { POST_REACTIONS, reactionLabel, type PostReaction } from '@/hooks/useCommunity';
 import { ReactionAsset } from '@/components/ReactionAsset';
@@ -22,7 +22,6 @@ export interface ReactionPickerProps {
  * hover pop/lift here is a separate interaction-feedback layer applied to
  * that whole composed asset, not the animation itself. */
 export function ReactionPicker({ onSelect, style, accessibilityLabel, highlightedReaction = null }: ReactionPickerProps) {
-  const theme = useTheme();
   const { t, language } = useI18n();
   const resolvedAccessibilityLabel = accessibilityLabel ?? t('chooseReaction');
   const enter = useRef(new Animated.Value(0)).current;
@@ -56,7 +55,10 @@ export function ReactionPicker({ onSelect, style, accessibilityLabel, highlighte
       accessibilityLabel={resolvedAccessibilityLabel}
       style={[
         styles.tray,
-        { backgroundColor: theme.colors.bgCard, borderColor: theme.colors.borderInput },
+        // Opaque: the tray floats directly over a post, and on the
+        // translucent `surface` the text underneath read through the emoji
+        // (same fix as the "..." menus, owner 2026-10-26).
+        { backgroundColor: homeGlassColors.menu, borderColor: homeGlassColors.hairline },
         { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }, { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }] },
         style,
       ]}

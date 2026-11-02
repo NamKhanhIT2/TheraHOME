@@ -19,7 +19,7 @@ import { useMarket, type StoreMarket } from '@/hooks/useMarket';
 import { translate, type TranslationKey } from '@/lib/i18n';
 import { errorMessage } from '@/lib/errorMessage';
 
-export type PostType = 'text' | 'image' | 'progress' | 'exercise';
+export type PostType = 'text' | 'image' | 'progress' | 'exercise' | 'checkin';
 export type PostReaction = 'heart' | 'like' | 'haha' | 'celebrate' | 'support';
 
 // Emoji + key are language-independent — only the display label varies,
@@ -1226,6 +1226,136 @@ export interface CommunityProfileRow {
   completedPrograms: number;
   postsCount: number;
   completedDays: number;
+}
+
+export type CheckInMood = 'easy' | 'normal' | 'hard';
+
+export interface CommunityHighlightRow {
+  userId: string;
+  fullName: string;
+  avatarUrl: string | null;
+  currentStreak: number;
+  completedDays: number;
+  /** Days the calendar opened and they did not do. 0 is the thing worth
+   * honouring — "không bỏ ngày nào". */
+  missedDays: number;
+  checkedInToday: boolean;
+  todayMood: CheckInMood | null;
+}
+
+export interface DailyCheckIn {
+  checkInDate: string;
+  mood: CheckInMood;
+  dayNumber: number | null;
+  shared: boolean;
+  postId: string | null;
+}
+
+/** Today's state AND the roadmap's own day count, whether or not a check-in
+ * exists yet — one source of truth for the sheet's progress line and for the
+ * post the write generates. */
+export interface CheckInToday {
+  checkedIn: boolean;
+  dayNumber: number | null;
+  checkIn: DailyCheckIn | null;
+}
+
+const CHECK_IN_KEY = ['check_in_today'] as const;
+
+/** Today's own check-in. The LOCAL day is resolved by the server (the write
+ * uses the same Asia/Ho_Chi_Minh calendar), so the client never does that
+ * date arithmetic — a phone on UTC would roll over at 07:00. */
+export function useMyCheckInToday(userId: string | undefined) {
+  return useQuery({
+    queryKey: CHECK_IN_KEY,
+    queryFn: async (): Promise<CheckInToday> => {
+      const { data, error } = await supabase.rpc('get_my_check_in_today');
+      if (error) throw error;
+      const row = data?.[0];
+      if (!row) return { checkedIn: false, dayNumber: null, checkIn: null };
+      return {
+        checkedIn: row.checked_in,
+        dayNumber: row.day_number,
+        checkIn: row.checked_in
+          ? {
+              checkInDate: row.check_in_date,
+              mood: (row.mood as CheckInMood | null) ?? 'normal',
+              dayNumber: row.day_number,
+              shared: row.shared,
+              postId: row.post_id,
+            }
+          : null,
+      };
+    },
+    enabled: !!userId,
+  });
+}
+
+/** "Điểm danh hôm nay". The RPC owns the feed post too, so sharing (or
+ * un-sharing) is one call, not a check-in plus a post the client has to
+ * keep in step with it. */
+export function useSubmitCheckIn(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { mood: CheckInMood; share: boolean }): Promise<DailyCheckIn | null> => {
+      const { data, error } = await supabase.rpc('submit_daily_check_in', {
+        p_mood: vars.mood,
+        p_share: vars.share,
+      });
+      if (error) throw error;
+      const row = data?.[0];
+      return row
+        ? {
+            checkInDate: row.check_in_date,
+            mood: row.mood as CheckInMood,
+            dayNumber: row.day_number,
+            shared: row.shared,
+            postId: row.post_id,
+          }
+        : null;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CHECK_IN_KEY });
+      queryClient.invalidateQueries({ queryKey: ['community_highlights'] });
+      queryClient.invalidateQueries({ queryKey: POSTS_KEY });
+      if (userId) queryClient.invalidateQueries({ queryKey: ['community_profile', userId] });
+    },
+  });
+}
+
+/**
+ * The members for the feed's avatar strip: whoever has actually trained the
+ * most, with a photo to show for it.
+ *
+ * This has to be an RPC. `profiles` RLS returns only your own row — there is
+ * deliberately no public user directory — so no client can rank members for
+ * itself. `get_community_highlights` is read-only and SECURITY DEFINER, the
+ * same exception `get_community_profile` already is, and projects only what
+ * the community already shows about anyone who posts (owner, 2026-10-26).
+ *
+ * Cached for half an hour: the ranking moves once a day at most, and the
+ * strip is the first thing drawn on the screen.
+ */
+export function useCommunityHighlights(userId: string | undefined, limit = 20) {
+  return useQuery({
+    queryKey: ['community_highlights', limit],
+    queryFn: async (): Promise<CommunityHighlightRow[]> => {
+      const { data, error } = await supabase.rpc('get_community_highlights', { p_limit: limit });
+      if (error) throw error;
+      return (data ?? []).map((row) => ({
+        userId: row.user_id,
+        fullName: row.full_name,
+        avatarUrl: row.avatar_url,
+        currentStreak: row.current_streak,
+        completedDays: row.completed_days,
+        missedDays: row.missed_days,
+        checkedInToday: row.checked_in_today,
+        todayMood: (row.today_mood as CheckInMood | null) ?? null,
+      }));
+    },
+    enabled: !!userId,
+    staleTime: 30 * 60 * 1000,
+  });
 }
 
 export function useCommunityProfile(profileUserId: string | undefined) {

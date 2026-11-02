@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ImageStyle, type StyleProp } from 'react-native';
 import type { ImageProps } from 'expo-image';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { RemoteImage } from '@/components/ui/RemoteImage';
 import { Icon } from '@/components/icons/Icon';
@@ -63,11 +63,11 @@ export function ResilientCommunityImage({
           setFailed(true);
         }}
       />
-      {loading ? <View pointerEvents="none" style={styles.status}><ActivityIndicator color={theme.colors.primary} /></View> : null}
+      {loading ? <View pointerEvents="none" style={styles.status}><ActivityIndicator color={homeGlassColors.purpleStrong} /></View> : null}
       {failed ? (
         <Pressable accessibilityRole="button" accessibilityLabel={t('a11yReloadImage')} onPress={retry} style={styles.status}>
-          <Icon name="rotate-ccw" size={20} color={theme.colors.textSecondary} />
-          <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>{t('tapToReloadImage')}</Text>
+          <Icon name="rotate-ccw" size={20} color={homeGlassColors.textMuted} />
+          <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted }]}>{t('tapToReloadImage')}</Text>
         </Pressable>
       ) : null}
     </View>

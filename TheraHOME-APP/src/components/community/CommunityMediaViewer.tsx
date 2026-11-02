@@ -76,13 +76,14 @@ export function CommunityMediaViewer({ uris, initialIndex, onClose }: CommunityM
         maxToRenderPerBatch={1}
         windowSize={3}
         removeClippedSubviews
+        style={styles.pager}
         renderItem={({ item, index }) =>
           isVideoUri(item) ? (
-            <View style={{ width }}>
+            <View style={[styles.page, { width }]}>
               <ImmersiveVideoPage uri={item} isCurrent={index === currentIndex} />
             </View>
           ) : (
-            <View style={{ width }}>
+            <View style={[styles.page, { width }]}>
               <RemoteImage uri={item} contentFit="contain" priority="high" style={styles.media} />
             </View>
           )
@@ -93,8 +94,8 @@ export function CommunityMediaViewer({ uris, initialIndex, onClose }: CommunityM
           <Text style={styles.pageIndicatorText}>{currentIndex + 1}/{uris.length}</Text>
         </View>
       ) : null}
-      <Pressable onPress={onClose} style={styles.close} hitSlop={10}>
-        <Icon name="x" size={24} color="#fff" />
+      <Pressable accessibilityRole="button" onPress={onClose} style={({ pressed }) => [styles.close, pressed ? { opacity: 0.6 } : null]} hitSlop={14}>
+        <Icon name="x" size={26} color="#fff" strokeWidth={2.2} />
       </Pressable>
     </View>
     </Modal>
@@ -102,9 +103,17 @@ export function CommunityMediaViewer({ uris, initialIndex, onClose }: CommunityM
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  media: { width: '100%', height: '82%' },
-  close: { position: 'absolute', top: 58, right: 22, width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  backdrop: { flex: 1, backgroundColor: '#000' },
+  pager: { flex: 1 },
+  // The page used to be a bare `<View style={{ width }}>`, so the image's
+  // `height: '82%'` had no parent height to resolve against: it came out
+  // pinned to the top of the screen with a black slab under it, and the
+  // close button landed on the photo (owner's screenshot, 2026-10-26). The
+  // page is now a full-height box that centres what is inside it, padded
+  // clear of the close button and the home indicator.
+  page: { height: '100%', alignItems: 'center', justifyContent: 'center', paddingTop: 112, paddingBottom: 56 },
+  media: { width: '100%', height: '100%' },
+  close: { position: 'absolute', top: 58, right: 22, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   pageIndicator: { position: 'absolute', top: 66, alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.55)' },
   pageIndicatorText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });

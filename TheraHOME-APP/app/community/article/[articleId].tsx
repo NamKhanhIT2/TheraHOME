@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { getOfficialArticle } from '@/lib/officialArticles';
 import { useI18n } from '@/lib/i18n';
 
@@ -15,29 +15,29 @@ export default function OfficialArticleScreen() {
   const article = getOfficialArticle(articleId, language);
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={t('articles')} />
+    <ScreenContainer tone="violet">
+      <BackBar tone="violet" onBack={() => router.back()} title={t('articles')} />
       <ScrollView contentContainerStyle={styles.body}>
         {!article ? (
-          <Text style={[theme.type.body, { color: theme.colors.textMuted, textAlign: 'center', marginTop: 80 }]}>{t('noContent')}</Text>
+          <Text style={[theme.type.body, { color: homeGlassColors.textFaint, textAlign: 'center', marginTop: 80 }]}>{t('noContent')}</Text>
         ) : (
           <>
-            <View style={[styles.hero, { backgroundColor: theme.colors.primaryTint10, borderRadius: theme.radius.lg }]}>
-              <View style={[styles.brand, { backgroundColor: theme.colors.primary }]}>
+            <View style={[styles.hero, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.lg }]}>
+              <View style={[styles.brand, { backgroundColor: homeGlassColors.purpleStrong }]}>
                 <Icon name="heart" size={22} color="#fff" />
               </View>
-              <Text style={[theme.type.caption, { color: theme.colors.primaryDark }]}>TheraHOME · {article.tag}</Text>
-              <Text style={[theme.type.display, styles.title, { color: theme.colors.textPrimary }]}>{article.title}</Text>
-              <Text style={[theme.type.body, { color: theme.colors.textSecondary, lineHeight: 22 }]}>{article.summary}</Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>{t('minutesRead', { count: article.readTimeMinutes })}</Text>
+              <Text style={[theme.type.caption, { color: homeGlassColors.purple }]}>TheraHOME · {article.tag}</Text>
+              <Text style={[theme.type.display, styles.title, { color: homeGlassColors.text }]}>{article.title}</Text>
+              <Text style={[theme.type.body, { color: homeGlassColors.textMuted, lineHeight: 22 }]}>{article.summary}</Text>
+              <Text style={[theme.type.caption, { color: homeGlassColors.textFaint }]}>{t('minutesRead', { count: article.readTimeMinutes })}</Text>
             </View>
-            <View style={[styles.article, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+            <View style={[styles.article, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
               {article.body.map((paragraph, index) => (
-                <Text key={index} style={[theme.type.body, styles.paragraph, { color: theme.colors.textPrimary }]}>{paragraph}</Text>
+                <Text key={index} style={[theme.type.body, styles.paragraph, { color: homeGlassColors.text }]}>{paragraph}</Text>
               ))}
-              <View style={[styles.support, { borderColor: theme.colors.divider }]}>
-                <Icon name="message-circle" size={18} color={theme.colors.primary} />
-                <Text style={[theme.type.caption, { color: theme.colors.textSecondary, flex: 1 }]}>{t('articleSupport')}</Text>
+              <View style={[styles.support, { borderColor: homeGlassColors.hairline }]}>
+                <Icon name="message-circle" size={18} color={homeGlassColors.purpleStrong} />
+                <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, flex: 1 }]}>{t('articleSupport')}</Text>
               </View>
             </View>
           </>
