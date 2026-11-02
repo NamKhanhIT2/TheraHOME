@@ -1,105 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Tabs, router, usePathname } from 'expo-router';
+import { View } from 'react-native';
+import { Tabs, router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
-import { TAB_BAR_BODY_HEIGHT, TAB_BAR_BODY_PADDING_BOTTOM, useTabBarInset } from '@/hooks/useTabBarInset';
-import { useTheme } from '@/theme';
-import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
-import { useIsStaff } from '@/hooks/useWebRoles';
 import { registerUpsaleNotificationActions, syncPushTokenIfGranted } from '@/lib/pushNotifications';
-import { Icon } from '@/components/icons/Icon';
-import { AssistantBubble } from '@/components/AssistantBubble';
 import { ReminderPopup } from '@/components/ReminderPopup';
-import { useI18n } from '@/lib/i18n';
 
-const TAB_ITEMS: { name: string; icon: string; label: string }[] = [
-  { name: 'home', icon: 'home', label: 'Trang chủ' },
-  { name: 'roadmap', icon: 'calendar', label: 'Lộ trình' },
-  { name: 'store', icon: 'shopping-bag', label: 'Cửa hàng' },
-  { name: 'community', icon: 'users-round', label: 'Cộng đồng' },
-];
-
-function tabItemForRoute(routeName: string) {
-  const normalizedName = routeName === 'community/index' ? 'community' : routeName;
-  return TAB_ITEMS.find((item) => item.name === normalizedName);
-}
-
-type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
-
-function TabBarButton({ item, isFocused, onPress }: { item: (typeof TAB_ITEMS)[number]; isFocused: boolean; onPress: () => void }) {
-  const theme = useTheme();
-  const { t } = useI18n();
-  const reduceMotion = useReduceMotion();
-  const color = isFocused ? theme.colors.primary : theme.colors.textMuted;
-  const scale = useSharedValue(1);
-  const wasFocused = useRef(isFocused);
-
-  useEffect(() => {
-    if (isFocused && !wasFocused.current && !reduceMotion) {
-      scale.value = withSequence(withSpring(1.14, { damping: 10, stiffness: 260 }), withSpring(1, { damping: 12, stiffness: 220 }));
-    }
-    wasFocused.current = isFocused;
-  }, [isFocused, reduceMotion, scale]);
-
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
-  return (
-    <Pressable onPress={onPress} style={styles.tabBtn}>
-      <Animated.View style={animatedStyle}>
-        <Icon name={item.icon} size={23} color={color} />
-      </Animated.View>
-      <Text style={[theme.type.captionSm, { color }]}>{t(item.name as 'home' | 'roadmap' | 'store' | 'community')}</Text>
-    </Pressable>
-  );
-}
-
-function CustomTabBar({ state, navigation }: TabBarProps) {
-  const theme = useTheme();
-  // Android only — see useTabBarInset. There the system navigation bar sits
-  // ON TOP of this bar unless its height is reserved (the tab labels were
-  // half-hidden behind the three-button nav). On iOS the 84pt barInner below
-  // already includes the home-indicator strip, so adding an inset here lifted
-  // the whole bar off the bottom of the screen.
-  const tabBarInset = useTabBarInset();
-  return (
-    <View
-      style={[
-        styles.bar,
-        theme.shadows.nav,
-        // The strip behind the system navigation buttons is painted here, not
-        // by the OS: with edge-to-edge the app owns those pixels, and a white
-        // bar left the buttons floating on the same white as the tab labels.
-        // Colouring android:navigationBarColor instead would work on this
-        // device and be ignored from Android 15 on, where a transparent
-        // navigation bar is enforced — so the app paints it.
-        { backgroundColor: theme.colors.bgApp, borderTopColor: theme.colors.borderLight, paddingBottom: tabBarInset },
-      ]}
-    >
-      <View style={[styles.barInner, { backgroundColor: theme.dark ? theme.colors.bgCard : '#fff' }]}>
-        {state.routes.map((route, index) => {
-          const item = tabItemForRoute(route.name);
-          if (!item) return null;
-          const isFocused = state.index === index;
-          return (
-            <TabBarButton
-              key={route.key}
-              item={item}
-              isFocused={isFocused}
-              onPress={() => {
-                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-                if (!isFocused && !event.defaultPrevented) {
-                  navigation.navigate(route.name);
-                }
-              }}
-            />
-          );
-        })}
-      </View>
-    </View>
-  );
+/**
+ * Every tab paints its own floating glass bar now — Home, Lộ trình, Cửa hàng
+ * and Cộng đồng each render `HomeGlassNav` inside their own screen, over
+ * their own background. The shared opaque strip that used to live here, and
+ * the per-route opt-outs that let it stand down one tab at a time, are gone
+ * with the last of the light screens (2026-10-25).
+ *
+ * The navigator still needs a `tabBar`, so this is it.
+ */
+function NoTabBar() {
+  return null;
 }
 
 export default function TabsLayout() {
@@ -114,11 +32,12 @@ export default function TabsLayout() {
   // The assistant bubble stays off the Community tab (per explicit request
   // 2026-09-04) — it overlapped the feed's action row; chat stays reachable
   // from every other tab.
-  const pathname = usePathname();
-  const onCommunityTab = pathname.startsWith('/community');
+  // Nothing in the tabs carries the blue assistant bubble any more: Home and
+  // Lộ trình seat the mascot in their own floating bar, and the owner asked
+  // for it off Cửa hàng and Cộng đồng too (2026-10-25). The chat entrances
+  // live in the mascot's sheet and in Hồ sơ.
   const { session } = useSession();
   const userId = session?.user.id;
-  const isStaff = useIsStaff(userId);
 
   const showReminderPrompt = !hasSeenReminderPrompt && !reminderDoneThisSession;
 
@@ -200,43 +119,15 @@ export default function TabsLayout() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Tabs tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tabs tabBar={() => <NoTabBar />} screenOptions={{ headerShown: false }}>
         <Tabs.Screen name="home" />
         <Tabs.Screen name="roadmap" />
         <Tabs.Screen name="store" />
         <Tabs.Screen name="community/index" />
       </Tabs>
-      {!onCommunityTab ? (
-        <AssistantBubble
-          isStaff={isStaff}
-          onOpenAIChat={() => router.push('/chat/ai')}
-          onOpenSupportChat={() => router.push(isStaff ? '/chat/admin-conversations' : '/chat/human')}
-        />
-      ) : null}
       {showReminderPrompt && userId ? (
         <ReminderPopup userId={userId} onDone={() => setReminderDoneThisSession(true)} />
       ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  bar: {
-    borderTopWidth: 1,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  barInner: {
-    height: TAB_BAR_BODY_HEIGHT,
-    paddingBottom: TAB_BAR_BODY_PADDING_BOTTOM,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tabBtn: {
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-});

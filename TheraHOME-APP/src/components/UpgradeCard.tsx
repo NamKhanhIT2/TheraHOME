@@ -23,7 +23,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
+import { heroFont } from '@/components/home/glass';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
 import { useAppConfig } from '@/hooks/useAppConfig';
@@ -53,40 +54,46 @@ export function UpgradeCard({ userId }: { userId: string | undefined }) {
   const title = held >= 0 ? feature.name : get('upgrade_card_title') || feature.name;
   const body = held >= 0 ? feature.tagline : get('upgrade_card_body') || feature.tagline;
 
+  // Drawn in Home v3's palette rather than the app theme's: this card renders
+  // on exactly one screen, and that screen is a photograph under a dark scrim
+  // where `bgCard` and `textPrimary` would read as a sheet of paper dropped on
+  // it. Flat, like every other block in that stack — the pill is the only
+  // thing left that paints a surface, because it is the thing to press.
   return (
     <Pressable
       onPress={() => router.push('/subscription')}
-      style={[
-        styles.card,
-        theme.shadows.card,
-        {
-          backgroundColor: theme.colors.primaryTint10,
-          borderRadius: theme.radius.lg,
-          borderColor: theme.colors.primary,
-          padding: theme.cardPadding,
-        },
-      ]}
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.6 }]}
     >
       <View style={styles.row}>
-        <View style={[styles.icon, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md }]}>
-          <Icon name="crown" size={20} color={theme.colors.textOnPrimary} />
+        <View style={[styles.icon, { backgroundColor: homeGlassColors.surfaceInset, borderRadius: 13 }]}>
+          <Icon name="crown" size={20} color={homeGlassColors.accent} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+          <Text
+            style={[theme.type.bodyStrong, heroFont('600'), { color: homeGlassColors.text }]}
+            numberOfLines={2}
+          >
             {title}
           </Text>
           {body ? (
-            <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginTop: 3, lineHeight: 18 }]} numberOfLines={3}>
+            <Text
+              style={[
+                theme.type.captionSm,
+                heroFont('400'),
+                { color: homeGlassColors.textMuted, marginTop: 3, lineHeight: 18 },
+              ]}
+              numberOfLines={3}
+            >
               {body}
             </Text>
           ) : null}
         </View>
       </View>
-      <View style={[styles.cta, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.sm }]}>
-        <Text style={[theme.type.captionSm, { color: theme.colors.textOnPrimary, fontFamily: theme.fontFamily.semiBold }]}>
+      <View style={[styles.cta, { backgroundColor: homeGlassColors.surfaceAction }]}>
+        <Text style={[theme.type.captionSm, heroFont('600'), { color: homeGlassColors.text }]}>
           {onTopTier ? t('plansCurrentPlan') : t('plansUpgrade')}
         </Text>
-        <Icon name="chevron-right" size={13} color={theme.colors.textOnPrimary} />
+        <Icon name="chevron-right" size={13} color={homeGlassColors.text} />
       </View>
     </Pressable>
   );
@@ -94,9 +101,7 @@ export function UpgradeCard({ userId }: { userId: string | undefined }) {
 
 const styles = StyleSheet.create({
   card: {
-    marginTop: 16,
-    borderWidth: 1.5,
-    overflow: 'hidden',
+    paddingHorizontal: 8,
   },
   row: {
     flexDirection: 'row',
@@ -115,7 +120,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingVertical: 10,
+    paddingVertical: 11,
     marginTop: 14,
+    borderRadius: 999,
   },
 });

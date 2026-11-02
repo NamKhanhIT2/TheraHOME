@@ -12,7 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
 import { useAppStore } from '@/store/useAppStore';
@@ -78,9 +78,9 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={() => dismiss(muteChecked)}>
-      <View style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]}>
-        <View style={[styles.sheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
-          <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
+      <View style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]}>
+        <View style={[styles.sheet, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg }]}>
+          <View style={[styles.header, { backgroundColor: homeGlassColors.accent }]}>
             <Icon name="crown" size={20} color={theme.colors.textOnPrimary} />
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textOnPrimary, flexShrink: 1 }]} numberOfLines={1}>
               {t('upgradePromptTitle', { plan: plan.name })}
@@ -89,7 +89,7 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
 
           <View style={styles.body}>
             {plan.tagline ? (
-              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 14, lineHeight: 18 }]}>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted, textAlign: 'center', marginBottom: 14, lineHeight: 18 }]}>
                 {plan.tagline}
               </Text>
             ) : null}
@@ -99,10 +99,10 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
               <View style={{ gap: 12 }}>
                 {plan.features.map((feature, index) => (
                   <View key={`${feature.text}-${index}`} style={styles.row}>
-                    <View style={[styles.icon, { backgroundColor: theme.colors.primaryTint10 }]}>
-                      <Icon name={feature.icon || 'check'} size={13} color={theme.colors.primary} />
+                    <View style={[styles.icon, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+                      <Icon name={feature.icon || 'check'} size={13} color={homeGlassColors.accent} />
                     </View>
-                    <Text style={[theme.type.captionSm, { color: theme.colors.textPrimary, flex: 1, lineHeight: 19 }]}>
+                    <Text style={[theme.type.captionSm, { color: homeGlassColors.text, flex: 1, lineHeight: 19 }]}>
                       {feature.text}
                     </Text>
                   </View>
@@ -115,19 +115,19 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
                 style={[
                   styles.checkbox,
                   {
-                    borderColor: muteChecked ? theme.colors.primary : theme.colors.borderInput,
-                    backgroundColor: muteChecked ? theme.colors.primary : 'transparent',
+                    borderColor: muteChecked ? homeGlassColors.accent : homeGlassColors.hairline,
+                    backgroundColor: muteChecked ? homeGlassColors.accent : 'transparent',
                     borderRadius: theme.radius.sm,
                   },
                 ]}
               >
                 {muteChecked ? <Icon name="check" size={12} color={theme.colors.textOnPrimary} /> : null}
               </View>
-              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>{t('upgradePromptMute')}</Text>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted }]}>{t('upgradePromptMute')}</Text>
             </Pressable>
 
             <Pressable
-              style={[styles.cta, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md }]}
+              style={[styles.cta, { backgroundColor: homeGlassColors.accent, borderRadius: theme.radius.md }]}
               onPress={() => {
                 dismiss(muteChecked);
                 router.push('/subscription');
@@ -137,7 +137,7 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
               <Text style={[theme.type.bodyStrong, { color: theme.colors.textOnPrimary }]}>{t('upgradePromptNow')}</Text>
             </Pressable>
             <Pressable style={styles.later} onPress={() => dismiss(muteChecked)} hitSlop={6}>
-              <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('later')}</Text>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>{t('later')}</Text>
             </Pressable>
           </View>
         </View>

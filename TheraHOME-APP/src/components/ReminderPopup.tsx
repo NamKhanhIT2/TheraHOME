@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useUpdateProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { registerForPushNotifications, scheduleDailyReminder, scheduleEveningReminder } from '@/lib/pushNotifications';
@@ -34,18 +34,18 @@ function ToggleRow({
   const theme = useTheme();
   return (
     <View style={styles.row}>
-      <View style={[styles.rowIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-        <Icon name={icon} size={18} color={theme.colors.primary} />
+      <View style={[styles.rowIcon, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+        <Icon name={icon} size={18} color={homeGlassColors.accent} />
       </View>
-      <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{label}</Text>
+      <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flex: 1 }]}>{label}</Text>
       <Pressable
         onPress={onPressTime}
         disabled={!value}
-        style={[styles.timePill, { backgroundColor: theme.colors.bgCardAlt, opacity: value ? 1 : 0.4 }]}
+        style={[styles.timePill, { backgroundColor: homeGlassColors.surfaceRaised, opacity: value ? 1 : 0.4 }]}
       >
-        <Text style={[theme.type.caption, { color: theme.colors.primaryDark, fontFamily: theme.fontFamily.semiBold }]}>{time}</Text>
+        <Text style={[theme.type.caption, { color: homeGlassColors.accent, fontFamily: theme.fontFamily.semiBold }]}>{time}</Text>
       </Pressable>
-      <Pressable onPress={() => onChange(!value)} style={[styles.toggleTrack, { backgroundColor: value ? theme.colors.primary : theme.colors.borderInput }]}>
+      <Pressable onPress={() => onChange(!value)} style={[styles.toggleTrack, { backgroundColor: value ? homeGlassColors.accent : homeGlassColors.hairline }]}>
         <View style={[styles.toggleThumb, { left: value ? 21 : 3 }]} />
       </Pressable>
     </View>
@@ -107,20 +107,20 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
 
   return (
     <Modal visible transparent animationType="fade">
-      <View style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]}>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}>
-          <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('reminderPopupTitle')}</Text>
+      <View style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]}>
+        <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
+          <Text style={[theme.type.h2, { color: homeGlassColors.text, textAlign: 'center' }]}>{t('reminderPopupTitle')}</Text>
           <View style={styles.rows}>
             <ToggleRow icon="sun" label={t('morning')} time={morningTime} value={morningOn} onChange={setMorningOn} onPressTime={() => setPickingTimeFor('morning')} />
             <ToggleRow icon="moon" label={t('evening')} time={eveningTime} value={eveningOn} onChange={setEveningOn} onPressTime={() => setPickingTimeFor('evening')} />
           </View>
-          <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 14 }]}>
+          <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 14 }]}>
             {t('reminderPopupHint')}
           </Text>
           <Pressable
             onPress={() => void confirm()}
             disabled={submitting}
-            style={[styles.confirmBtn, { backgroundColor: theme.colors.primary, opacity: submitting ? 0.6 : 1 }]}
+            style={[styles.confirmBtn, { backgroundColor: homeGlassColors.accent, opacity: submitting ? 0.6 : 1 }]}
           >
             <Text style={[theme.type.button, { color: '#fff' }]}>{t('turnOnNotifications')}</Text>
           </Pressable>
@@ -128,8 +128,8 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
       </View>
 
       <Modal visible={!!pickingTimeFor} transparent animationType="fade" onRequestClose={() => setPickingTimeFor(null)}>
-        <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={() => setPickingTimeFor(null)}>
-          <View style={[styles.timeSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}>
+        <Pressable style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]} onPress={() => setPickingTimeFor(null)}>
+          <View style={[styles.timeSheet, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
             <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.timeOptions}>
               {TIME_OPTIONS.map((time) => {
                 const current = pickingTimeFor === 'morning' ? morningTime : eveningTime;
@@ -141,9 +141,9 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
                       else if (pickingTimeFor === 'evening') setEveningTime(time);
                       setPickingTimeFor(null);
                     }}
-                    style={[styles.timeOption, { backgroundColor: time === current ? theme.colors.bgCardAlt : 'transparent' }]}
+                    style={[styles.timeOption, { backgroundColor: time === current ? homeGlassColors.surfaceRaised : 'transparent' }]}
                   >
-                    <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{time}</Text>
+                    <Text style={[theme.type.body, { color: homeGlassColors.text }]}>{time}</Text>
                   </Pressable>
                 );
               })}
