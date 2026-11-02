@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Animated, {
   cancelAnimation,
@@ -18,7 +18,6 @@ import { useTheme } from '@/theme';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
-const CYAN = '#00D9FF';
 const WHITE_BLUE = '#BDEEFF';
 
 // The spiralling particle field (owner-supplied canvas source, animated-loading

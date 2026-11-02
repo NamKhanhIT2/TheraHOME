@@ -20,6 +20,7 @@ function fixture(response) {
     },
     '@/lib/supabase': { supabase: { rpc: async () => ({ data: await response() }),
       functions: { invoke: async (name) => { effects.push(name); return {}; } } } },
+    '@/lib/invokeFunction': { invokeFunction: async (name) => { effects.push(name); return {}; } },
     '@/hooks/useRealtimeSync': { useRealtimeSync() {} },
     '@/lib/callkeep': {
       dismissCall: (id) => { effects.push('dismiss'); dismissed.add(id); },

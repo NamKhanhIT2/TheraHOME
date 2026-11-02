@@ -83,7 +83,7 @@ export function ProductActivateCard({ productId }: { productId: string }) {
   }
 
   return (
-    <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
+    <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
       <View style={[styles.lockedIcon, { backgroundColor: homeGlassColors.surfaceRaised }]}>
         <Icon name="lock" size={22} color={homeGlassColors.accentStrong} />
       </View>

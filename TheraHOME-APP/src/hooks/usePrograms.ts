@@ -358,8 +358,8 @@ interface RawPainLog {
   program_days: { day_number: number } | null;
 }
 
-/** Pain scores for a program, oldest-first — feeds `PainChart`'s `data` prop
- * the same way the mock's `painLevels` array did. */
+/** Pain scores for a program, oldest-first — feeds `GlassPainCard`'s `data`
+ * prop the same way the mock's `painLevels` array did. */
 /** One logged check-in, tied to its ACTUAL program day — the chart labels
  * points by `day`, so a user who first answers on day 2 sees "N2", not a
  * point renumbered to N1 (which is what the old plain-scores array did). */

@@ -817,6 +817,9 @@ export function usePostComments(postId: string | undefined, limit: number = DEFA
     return () => {
       supabase.removeChannel(channel);
     };
+    // Not `key`: it is a fresh array every render, and resubscribing to
+    // Realtime on every render is the opposite of what this effect is for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId, queryClient]);
 
   return useQuery({

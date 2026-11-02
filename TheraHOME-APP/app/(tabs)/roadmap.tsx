@@ -89,7 +89,9 @@ export default function RoadmapScreen() {
   const productsQuery = useProducts();
   const programsQuery = useActivatedPrograms(userId);
   const defaultProductQuery = useDefaultProductId(userId);
-  const activatedPrograms = programsQuery.data ?? [];
+  // Memoized for the same reason as `catalogProducts`: a fresh `?? []`
+  // every render gave the memos below a new dependency each time.
+  const activatedPrograms = useMemo(() => programsQuery.data ?? [], [programsQuery.data]);
   // Memoized (not a fresh `?? []` per render) — feeds the dropdownProducts
   // memo below.
   const catalogProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);

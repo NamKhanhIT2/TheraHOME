@@ -1,7 +1,5 @@
 export { BrandMark } from './BrandMark';
 export { AvatarImg } from './AvatarImg';
-export { PainChart } from './PainChart';
-export { WaterCard } from './WaterCard';
 export { PathNode } from './PathNode';
 export { ProductDropdown } from './ProductDropdown';
 export { AssistantBubble, OnlineIndicator } from './AssistantBubble';

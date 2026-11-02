@@ -6,7 +6,7 @@ import { useI18n } from '@/lib/i18n';
 /** Truncates long post content to a fixed number of lines with a trailing
  * "Xem thêm" that expands the text inline — the card itself never navigates
  * from tapping it, matching the familiar social-feed pattern (Facebook/
- * Instagram) rather than the curated `ArticleCard`'s "navigate to detail"
+ * Instagram) rather than a curated article card's "navigate to detail"
  * CTA. Short content that already fits within `collapsedLines` renders as
  * plain text with no affordance at all.
  *

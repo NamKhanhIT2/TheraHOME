@@ -1,8 +1,9 @@
 /** Catmull-Rom-ish smoothing: one cubic segment per gap, control points
- * derived from each point's neighbours. Shared by the two pain charts
- * (`components/PainChart.tsx` and `components/home/GlassPainCard.tsx`) so the
- * curve through a given set of readings is identical on both surfaces — it is
- * the same data, and a different curve would read as different data.
+ * derived from each point's neighbours. Drawn by `components/home/
+ * GlassPainCard.tsx`, and kept out of it so a second surface that plots the
+ * same readings gets the same curve — it is the same data, and a different
+ * curve would read as different data. (There used to be two: the light
+ * `PainChart` was deleted with the glass redesign.)
  *
  * Returns '' for fewer than two points: a single reading has no line, and the
  * callers draw a dropline to the axis for that case instead. */

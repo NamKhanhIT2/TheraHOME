@@ -69,7 +69,7 @@ export default function CommunityProfileScreen() {
 
   const name = official ? 'TheraHOME' : profile!.fullName;
   const avatarUrl = official ? null : profile!.avatarUrl;
-  const tabs: Array<[ProfileTab, string]> = official
+  const tabs: [ProfileTab, string][] = official
     ? [['posts', t('posts')], ['journey', t('knowledge')]]
     : ownProfile
       ? [['posts', t('posts')], ['saved', t('saved')], ['achievements', t('achievements')], ['journey', t('journey')]]
@@ -96,7 +96,7 @@ export default function CommunityProfileScreen() {
           />
         }
       >
-        <View style={[styles.profileCard, theme.shadows.card, { backgroundColor: official ? homeGlassColors.surfaceRaised : homeGlassColors.surface, borderColor: official ? homeGlassColors.purpleStrong : homeGlassColors.hairline }]}> 
+        <View style={[styles.profileCard, { backgroundColor: official ? homeGlassColors.surfaceRaised : homeGlassColors.surface, borderColor: official ? homeGlassColors.purpleStrong : homeGlassColors.hairline }]}> 
           <CommunityAvatar name={name} authorId={official ? null : userId} avatarUrl={avatarUrl} size={76} isOfficial={official} />
           <View style={styles.nameRow}>
             <Text style={[theme.type.h2, { color: homeGlassColors.text }]}>{name}</Text>

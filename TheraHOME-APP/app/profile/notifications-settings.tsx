@@ -67,7 +67,7 @@ function TimeRow({ icon, title, sub, value, onChange, isLast }: { icon: string; 
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={[styles.backdrop, { backgroundColor: homeGlassColors.toast }]} onPress={() => setOpen(false)}>
-          <View style={[styles.timeSheet, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.sky[3], borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
+          <View style={[styles.timeSheet, { backgroundColor: homeGlassColors.sky[3], borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
             <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.timeOptions}>
               {TIME_OPTIONS.map((t) => (
                 <Pressable
@@ -121,6 +121,11 @@ export default function NotificationsSettingsScreen() {
     setRemindTimeState(profileQuery.data.dailyReminderTime);
     setRemindEveningState(profileQuery.data.eveningReminderEnabled);
     setRemindEveningTimeState(profileQuery.data.eveningReminderTime);
+    // Seeds the four switches from the four fields, and only when one of
+    // them actually changes — depending on `profileQuery.data` itself
+    // would overwrite what the user is in the middle of picking every
+    // time the profile refetched in the background.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileQuery.data?.dailyReminderEnabled, profileQuery.data?.dailyReminderTime, profileQuery.data?.eveningReminderEnabled, profileQuery.data?.eveningReminderTime]);
 
   async function setRemind(v: boolean) {
@@ -200,7 +205,7 @@ export default function NotificationsSettingsScreen() {
         >
           {t('notifications')}
         </Text>
-        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
           <ToggleRow icon="sun" title={t('morning')} sub={t('reminderSubtitle')} value={remind} onChange={setRemind} isLast={!remind} />
           {remind ? <TimeRow icon="clock" title={t('reminderTime')} value={remindTime} onChange={setRemindTime} isLast={false} /> : null}
           {/* "Nhắc tập theo thói quen của riêng bạn" — the server returns a
@@ -230,7 +235,7 @@ export default function NotificationsSettingsScreen() {
         >
           {t('notifCommunitySection')}
         </Text>
-        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
           <ToggleRow
             icon="bell"
             title={t('notifCommunitySection')}

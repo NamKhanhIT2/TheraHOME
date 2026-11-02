@@ -11,12 +11,12 @@ import { heroFont } from './glass';
 const LOGO = require('../../../assets/brandmark-blue.png');
 
 /**
- * Home v3's "Gợi ý cho bạn" card — the same curated post `ArticleCard`
- * renders on Community's pinned slot, re-skinned for the glass surface.
+ * Home v3's "Gợi ý cho bạn" card — a curated post, on the glass surface.
  *
- * Kept as its own component rather than a variant of `ArticleCard`: the two
- * share a shape but not a single colour, and threading a theme switch through
- * that one would have left neither easy to read.
+ * Written as its own component rather than a variant of the light
+ * `ArticleCard` it replaced: the two shared a shape but not a single colour,
+ * and threading a theme switch through that one would have left neither easy
+ * to read. The light one has since been deleted, unused.
  */
 export function GlassArticleCard({
   title,

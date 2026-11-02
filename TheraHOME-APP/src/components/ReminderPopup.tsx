@@ -108,7 +108,7 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
   return (
     <Modal visible transparent animationType="fade">
       <View style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]}>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
+        <View style={[styles.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
           <Text style={[theme.type.h2, { color: homeGlassColors.text, textAlign: 'center' }]}>{t('reminderPopupTitle')}</Text>
           <View style={styles.rows}>
             <ToggleRow icon="sun" label={t('morning')} time={morningTime} value={morningOn} onChange={setMorningOn} onPressTime={() => setPickingTimeFor('morning')} />
@@ -129,7 +129,7 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
 
       <Modal visible={!!pickingTimeFor} transparent animationType="fade" onRequestClose={() => setPickingTimeFor(null)}>
         <Pressable style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]} onPress={() => setPickingTimeFor(null)}>
-          <View style={[styles.timeSheet, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
+          <View style={[styles.timeSheet, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
             <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.timeOptions}>
               {TIME_OPTIONS.map((time) => {
                 const current = pickingTimeFor === 'morning' ? morningTime : eveningTime;

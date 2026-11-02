@@ -61,7 +61,7 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
   return (
     <View style={{ gap: 14 }}>
       {hasUnlock ? (
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, borderColor: homeGlassColors.accentStrong }]}>
+        <View style={[styles.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, borderColor: homeGlassColors.accentStrong }]}>
           <View style={styles.content}>
             <View style={styles.titleRow}>
               <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flexShrink: 1 }]} numberOfLines={2}>
@@ -99,7 +99,7 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
       ) : null}
 
       {hasCrossSell ? (
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, borderColor: homeGlassColors.accentStrong }]}>
+        <View style={[styles.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, borderColor: homeGlassColors.accentStrong }]}>
           <View style={styles.content}>
             <View style={styles.titleRow}>
               <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flexShrink: 1 }]} numberOfLines={2}>

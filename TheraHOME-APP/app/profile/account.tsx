@@ -74,7 +74,7 @@ export default function AccountSettingsScreen() {
     <ScreenContainer tone="glass">
       <BackBar tone="glass" onBack={() => router.back()} title={t('accountSettings')} />
       <ScrollView contentContainerStyle={styles.body}>
-        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 20 }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 20 }]}>
           {/* Was a hardcoded "Quản lý tài khoản Google" label, written when
               Google was the only way in. The app now also signs in with email
               + password and with Apple, so that row told most users something
@@ -167,7 +167,7 @@ export default function AccountSettingsScreen() {
         <Text style={[theme.type.captionSm, { color: homeGlassColors.tick, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }]}>
           {t('legal')}
         </Text>
-        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
           {LEGAL_ROWS.map((row, i) => (
             <Pressable
               key={row.key}

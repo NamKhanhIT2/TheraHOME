@@ -283,6 +283,116 @@ export type Database = {
         }
         Relationships: []
       }
+      app_orders: {
+        Row: {
+          address: string
+          created_at: string
+          customer_name: string
+          discount_percent: number
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          list_price: number
+          market: string
+          message_id: string | null
+          note: string | null
+          phone: string
+          phone_digits: string
+          product_name: string
+          quantity: number
+          reference: string
+          staff_note: string | null
+          status: string
+          store_item_id: string | null
+          thread_id: string | null
+          total_amount: number
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          customer_name: string
+          discount_percent?: number
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          list_price: number
+          market: string
+          message_id?: string | null
+          note?: string | null
+          phone: string
+          phone_digits: string
+          product_name: string
+          quantity: number
+          reference: string
+          staff_note?: string | null
+          status?: string
+          store_item_id?: string | null
+          thread_id?: string | null
+          total_amount: number
+          unit_price: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          customer_name?: string
+          discount_percent?: number
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          list_price?: number
+          market?: string
+          message_id?: string | null
+          note?: string | null
+          phone?: string
+          phone_digits?: string
+          product_name?: string
+          quantity?: number
+          reference?: string
+          staff_note?: string | null
+          status?: string
+          store_item_id?: string | null
+          thread_id?: string | null
+          total_amount?: number
+          unit_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_orders_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_orders_store_item_id_fkey"
+            columns: ["store_item_id"]
+            isOneToOne: false
+            referencedRelation: "store_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_orders_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_thread_overview"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_orders_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       articles: {
         Row: {
           body: string | null
@@ -3164,6 +3274,7 @@ export type Database = {
         Args: {
           p_actor_name: string
           p_group_count: number
+          p_language: string
           p_preview: string
           p_second_actor_name: string
           p_type: string

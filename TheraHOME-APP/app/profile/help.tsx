@@ -43,7 +43,7 @@ export default function HelpSupportScreen() {
       <BackBar tone="glass" onBack={() => router.back()} title={t('helpSupport')} />
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={[theme.type.h2, { color: homeGlassColors.text, marginBottom: 10 }]}>{t('faq')}</Text>
-        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 24 }]}> 
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 24 }]}> 
           {faqs.map((f, i) => (
             <FaqItem key={i} q={f.q} a={f.a} />
           ))}
@@ -52,7 +52,7 @@ export default function HelpSupportScreen() {
         {/* Easy-to-find source citation for the app's training guidance —
             App Review asked for health-adjacent content to cite a source. */}
         <Text style={[theme.type.h2, { color: homeGlassColors.text, marginBottom: 10 }]}>{t('sourcesTitle')}</Text>
-        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 24, padding: 14 }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 24, padding: 14 }]}>
           <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, lineHeight: 19 }]}>{t('sourcesBody')}</Text>
           <Pressable onPress={() => Linking.openURL('https://www.who.int/news-room/fact-sheets/detail/physical-activity')} hitSlop={6}>
             <Text style={[theme.type.caption, { color: homeGlassColors.tick, marginTop: 8, fontFamily: theme.fontFamily.semiBold }]}>
@@ -65,7 +65,7 @@ export default function HelpSupportScreen() {
         <View style={{ gap: 10 }}>
           <Pressable
             onPress={() => router.push('/chat/ai')}
-            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
+            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
           >
             <Image source={AI_ASSISTANT_IMAGE} style={styles.iconCircle} resizeMode="cover" />
             <View style={{ flex: 1 }}>
@@ -77,7 +77,7 @@ export default function HelpSupportScreen() {
 
           <Pressable
             onPress={() => router.push('/chat/human')}
-            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
+            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
           >
             <Image source={SPECIALIST_IMAGE} style={styles.iconCircle} resizeMode="cover" />
             <View style={{ flex: 1 }}>
@@ -93,7 +93,7 @@ export default function HelpSupportScreen() {
           {hotline ? (
             <Pressable
               onPress={() => Linking.openURL(`tel:${hotline}`)}
-              style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
+              style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
             >
               <Icon name="external-link" size={20} color={homeGlassColors.tick} />
               <View style={{ flex: 1 }}>
@@ -107,7 +107,7 @@ export default function HelpSupportScreen() {
 
           <Pressable
             onPress={() => Linking.openURL(`mailto:${appConfig.get('support_email')}`)}
-            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
+            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
           >
             <Icon name="external-link" size={20} color={homeGlassColors.tick} />
             <View style={{ flex: 1 }}>

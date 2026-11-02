@@ -305,6 +305,10 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
       .catch((error: unknown) => {
         if (__DEV__) console.warn('Reminder inbox backfill skipped while offline:', error);
       });
+    // The deps below are the reminder FIELDS, deliberately, not `profile`:
+    // the object gets a new identity on every background refetch, and
+    // rescheduling the device's notifications that often is not free.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     inApp,
     userId,

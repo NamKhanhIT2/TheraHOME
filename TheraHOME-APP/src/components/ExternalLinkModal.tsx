@@ -61,7 +61,7 @@ export function ExternalLinkModal({ url, onClose }: ExternalLinkModalProps) {
           <Reanimated.View entering={FadeIn.duration(220).delay(40).easing(Easing.out(Easing.quad))}>
           <Pressable
             onPress={(e) => e.stopPropagation()}
-            style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline, padding: theme.space[5] }]}
+            style={[styles.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline, padding: theme.space[5] }]}
           >
             <View style={[styles.iconCircle, { backgroundColor: homeGlassColors.surfaceRaised }]}>
               <Icon name="external-link" size={20} color={homeGlassColors.textMuted} />

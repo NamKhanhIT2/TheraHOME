@@ -65,11 +65,15 @@ export default function PostDetailScreen() {
   const updatePost = useUpdatePost(userId);
   const hidePost = useHideCommunityPost(userId);
   const blockUser = useBlockCommunityUser(userId);
-  const hiddenCommentIds = useHiddenCommunityComments(userId).data ?? new Set<string>();
+  const hiddenCommentsData = useHiddenCommunityComments(userId).data;
+  // `?? new Set()` inline gave the comment tree below a new dependency
+  // identity on every render, so it rebuilt the whole thread each time.
+  const hiddenCommentIds = useMemo(() => hiddenCommentsData ?? new Set<string>(), [hiddenCommentsData]);
   // Blocking used to hide a person's POSTS from the feed but leave every
   // comment and reply they wrote fully visible here, avatar and profile link
   // included — which defeats the point of blocking them.
-  const blockedUserIds = useBlockedCommunityUsers(userId).data ?? new Set<string>();
+  const blockedUsersData = useBlockedCommunityUsers(userId).data;
+  const blockedUserIds = useMemo(() => blockedUsersData ?? new Set<string>(), [blockedUsersData]);
   const hideComment = useHideCommunityComment(userId);
   const reportContent = useReportContent(userId);
   const scrollRef = useRef<ScrollView>(null);
@@ -156,7 +160,7 @@ export default function PostDetailScreen() {
       setText(''); setImageUri(null); setImageMimeType(null); setReplyTo(null); setEditing(null); setShowEmoji(false);
     } catch (cause) { setError(friendlyCommunityError(cause)); }
   }
-  function toggleThread(id: string) { setExpandedThreads((old) => { const next = new Set(old); next.has(id) ? next.delete(id) : next.add(id); return next; }); }
+  function toggleThread(id: string) { setExpandedThreads((old) => { const next = new Set(old); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
   async function copy(comment: CommentRow) { await Clipboard.setStringAsync(comment.text); closeCommentMenu(); }
   function remove(comment: CommentRow) {
     closeCommentMenu();

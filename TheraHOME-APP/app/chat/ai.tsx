@@ -102,7 +102,7 @@ export default function AIChatScreen() {
 
         {!aiConsentAccepted ? (
           <View style={styles.consentBox}>
-            <View style={[styles.consentCard, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
+            <View style={[styles.consentCard, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
               <View style={[styles.consentIcon, { backgroundColor: homeGlassColors.hairline }]}>
                 <Icon name="shield-check" size={24} color={homeGlassColors.tick} />
               </View>

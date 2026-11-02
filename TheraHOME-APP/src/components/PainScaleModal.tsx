@@ -113,7 +113,7 @@ export function PainScaleModal({ dayId, onCancel, onConfirm, submitting }: PainS
       <Pressable style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]} onPress={submitting ? undefined : onCancel}>
         <Pressable
           onPress={(e) => e.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline, padding: theme.space[5] }]}
+          style={[styles.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline, padding: theme.space[5] }]}
         >
           <Text style={[theme.type.h2, { color: homeGlassColors.text }]}>
             {t('day')} {dayId} · {t('discomfortToday')}

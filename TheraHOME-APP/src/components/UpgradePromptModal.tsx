@@ -79,7 +79,7 @@ export function UpgradePromptModal({ userId, daysDone }: { userId: string | unde
   return (
     <Modal transparent animationType="fade" visible onRequestClose={() => dismiss(muteChecked)}>
       <View style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]}>
-        <View style={[styles.sheet, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg }]}>
+        <View style={[styles.sheet, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg }]}>
           <View style={[styles.header, { backgroundColor: homeGlassColors.accent }]}>
             <Icon name="crown" size={20} color={theme.colors.textOnPrimary} />
             <Text style={[theme.type.bodyStrong, { color: theme.colors.textOnPrimary, flexShrink: 1 }]} numberOfLines={1}>

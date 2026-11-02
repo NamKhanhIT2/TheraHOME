@@ -120,7 +120,7 @@ function ChallengeBanner({ userId, onShareCompletion, onDismiss }: { userId: str
   const eligibleToComplete = activatedPrograms.some((p) => p.streak >= challenge.targetStreakDays);
 
   return (
-    <View style={[styles.challengeBanner, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
+    <View style={[styles.challengeBanner, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Text style={{ fontSize: 20 }}>{challenge.icon}</Text>
         <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flex: 1 }]}>{challenge.title}</Text>

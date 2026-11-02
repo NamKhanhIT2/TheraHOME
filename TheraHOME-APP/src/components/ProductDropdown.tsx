@@ -101,7 +101,9 @@ export function ProductDropdown({ product, products, onSelect, appearance = 'lig
             <View
               style={[
                 styles.menu,
-                theme.shadows.card,
+                // Only on the light ground: a drop shadow over the dark one is
+                // invisible, and the glass branch below draws its own rim.
+                glass ? null : theme.shadows.card,
                 glass
                   ? { backgroundColor: homeGlassColors.toast, borderRadius: 16, borderWidth: 1, borderColor: homeGlassColors.hairline }
                   : { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.borderInput },

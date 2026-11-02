@@ -269,7 +269,9 @@ export default function HomeScreen() {
   const productsQuery = useProducts();
   const programsQuery = useActivatedPrograms(userId);
   const defaultProductQuery = useDefaultProductId(userId);
-  const activatedPrograms = programsQuery.data ?? [];
+  // Memoized for the same reason as `catalogProducts`: a fresh `?? []`
+  // every render gave the memos below a new dependency each time.
+  const activatedPrograms = useMemo(() => programsQuery.data ?? [], [programsQuery.data]);
   // Prefer the product the user actually ordered over just "first activated
   // program" — only kicks in when they haven't explicitly picked one via
   // the dropdown yet (`selectedProductId` always wins once set).

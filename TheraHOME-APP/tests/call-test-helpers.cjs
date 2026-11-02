@@ -18,7 +18,7 @@ function loadModule(file, mocks, globals = {}) {
       if (id in mocks) return mocks[id];
       throw new Error(`Unmocked import ${id} in ${file}`);
     },
-    console: { warn() {} }, AbortController, setTimeout, clearTimeout, setInterval, clearInterval,
+    console: { warn() {}, error() {}, log() {}, info() {} }, AbortController, setTimeout, clearTimeout, setInterval, clearInterval,
     ...globals,
   }, { filename: file });
   return module.exports;

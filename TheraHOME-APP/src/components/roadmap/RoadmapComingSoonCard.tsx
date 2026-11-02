@@ -14,7 +14,7 @@ export function RoadmapComingSoonCard({ productName }: { productName: string }) 
   const theme = useTheme();
   const { t } = useI18n();
   return (
-    <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
+    <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
       <View style={[styles.iconWrap, { backgroundColor: homeGlassColors.surfaceRaised }]}>
         <Icon name="clock" size={24} color={homeGlassColors.accentStrong} />
       </View>

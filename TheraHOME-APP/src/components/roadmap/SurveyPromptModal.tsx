@@ -28,7 +28,7 @@ export function SurveyPromptModal({ phaseName, onTake, onLater }: SurveyPromptMo
       <Pressable style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]} onPress={onLater}>
         <Pressable
           onPress={(event) => event.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}
+          style={[styles.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}
         >
           <View style={[styles.icon, { backgroundColor: homeGlassColors.surfaceRaised }]}>
             <Icon name="clipboard-check" size={26} color={homeGlassColors.accent} />
