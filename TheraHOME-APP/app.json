@@ -26,7 +26,7 @@
     },
     "android": {
       "package": "ai.therahome",
-      "versionCode": 25,
+      "versionCode": 27,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0169ED",
@@ -79,6 +79,9 @@
       "expo-image",
       "./plugins/withAndroidUploadSigning",
       "./plugins/withPlayAssetsBundleCopy",
+      "./plugins/withAndroidPictureInPicture",
+      "./plugins/withAndroidR8",
+      "./plugins/withAndroidOptionalHardware",
       [
         "expo-navigation-bar",
         {
@@ -104,7 +107,18 @@
       ],
       "./plugins/withCallkeepLabel",
       "@config-plugins/react-native-callkeep",
-      "./plugins/withVoipPushKit"
+      "./plugins/withVoipPushKit",
+      "./plugins/withIosNoDebugDylib",
+      "./plugins/withIosPrebuiltDebugArtifacts",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "TheraHOME đọc số bước và vòng vận động hôm nay từ ứng dụng Sức khoẻ để hiển thị trên trang chủ. Dữ liệu chỉ nằm trên máy bạn.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ],
+      "./plugins/withIosDevelopmentTeam"
     ],
     "extra": {
       "router": {},
