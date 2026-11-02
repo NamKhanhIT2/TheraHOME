@@ -8411,3 +8411,26 @@ Hai màn cuối mà khách thật sự bấm trúng từ một màn đã tối.
 Tài khoản thử đã trả lời cả hai khảo sát có câu hỏi (`user_quiz_attempts` có
 1 dòng cho mỗi giai đoạn), mà giai đoạn 3 thì không có câu hỏi nào — nên
 nhánh đó không mở được nếu không xoá dữ liệu thật, và việc đó thì không làm.
+
+## 2026-11-02 — `place-app-order` lên bản có ghi đơn
+
+Bản đang chạy trước đó là bản cũ: nó viết đơn vào thread CSKH, gắn nhãn cho
+alert, gửi push — nhưng **không ghi dòng nào vào `app_orders`**. Nên trang Đơn
+hàng của console (vừa deploy cùng ngày) chỉ có đúng dòng `TEST0001` chèn tay
+hôm 01/11.
+
+Đã deploy **version 5** = đúng file trong `supabase/functions/place-app-order/`
+(đối chiếu từng dòng với bản trên server sau khi deploy, khớp cả chuỗi tiếng
+Việt và 16 cột của câu `insert`). Trước khi deploy có soi lại
+`information_schema.columns` của `app_orders`: tên và kiểu của cả 16 cột đều
+khớp, nên lần đặt đơn thật đầu tiên không chết ở bước ghi.
+
+Kiểm chứng mà không ghi gì: POST với publishable key →
+`{"error":"unauthorized"}` 401. Đó là **đúng cái JSON hàm tự trả về**
+(`json({ error: 'unauthorized' }, 401)`), không phải lỗi của gateway — tức là
+code mới đã chạy tới chỗ kiểm tra người gọi.
+
+**Vẫn chưa thử được từ đầu đến cuối**, và không phải vì server: phần client gọi
+hàm này (giỏ hàng + form đặt đơn trong tab Cửa hàng) nằm trong JS chưa được
+build. Bản app đang cài trên máy không có đường nào gọi tới nó. Đặt một đơn
+thật là việc làm được ngay sau khi có build mới.
