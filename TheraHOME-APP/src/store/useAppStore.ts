@@ -32,10 +32,25 @@ interface AppState {
   setLanguage: (language: AppLanguage, opts?: { auto?: boolean }) => void;
   market: AppMarket | null;
   setMarket: (market: AppMarket) => void;
+  /** Drops everything in here that belonged to the account that just signed
+   * out. See the implementation for what counts and what deliberately does
+   * not. */
+  clearAccountPreferences: () => void;
+  /** Has this DEVICE ever had a session? False only until the first sign-in
+   * or sign-up, which is how the auth stack knows to open on "Tạo tài
+   * khoản" rather than on "Đăng nhập" (owner, 2026-10-28). Survives signing
+   * out on purpose — a returning person wants the login screen. */
+  everSignedIn: boolean;
+  markSignedInOnce: () => void;
 
   // Onboarding
   onboardingAnswers: Record<string, AnswerValue>;
   onboardingQuestionIndex: number;
+  /** Who those answers belong to. The questionnaire runs AFTER sign-up, so
+   * there is always an account to attribute them to — and a different one
+   * must never inherit them (QA pass, 2026-10-30). */
+  onboardingOwnerId: string | null;
+  claimOnboardingFor: (userId: string) => void;
   setAnswer: (key: string, value: AnswerValue) => void;
   setOnboardingQuestionIndex: (index: number) => void;
   resetOnboardingAnswers: () => void;
@@ -52,6 +67,8 @@ interface AppState {
   // profiles.country_confirmed — see app/(onboarding)/country.tsx.)
   hasSeenReminderPrompt: boolean;
   setHasSeenReminderPrompt: (v: boolean) => void;
+  waterRemindersOn: boolean;
+  setWaterRemindersOn: (v: boolean) => void;
 
   // One-time consent for the AI assistant (App Review requirement: the
   // user must be told chat content goes to a third-party AI service and
@@ -61,6 +78,12 @@ interface AppState {
   /** The customer ticked "Không hiển thị lại" on the upgrade prompt. */
   upgradePromptMuted: boolean;
   muteUpgradePrompt: () => void;
+  /** The app version this customer said "Để sau" to, so the optional update
+   * nudge asks once per release rather than once per launch. Holds the
+   * version that was INSTALLED when they dismissed it; the next release
+   * makes it stale and the nudge returns on its own. */
+  updateNagDismissedAt: string | null;
+  dismissUpdateNag: (version: string) => void;
   // True from confirming a password-reset code until the new password is
   // saved. verifyOtp('recovery') creates a live session, which would
   // otherwise drop the user straight into the app — this keeps the
@@ -103,19 +126,55 @@ export const useAppStore = create<AppState>()(
       setLanguage: (language, opts) => set({ language, languageAutoDetected: opts?.auto ?? false }),
       market: null,
       setMarket: (market) => set({ market }),
+      everSignedIn: false,
+      markSignedInOnce: () => set({ everSignedIn: true }),
+      // This store is persisted per DEVICE, but some of what it holds was
+      // chosen by one ACCOUNT. Picking Malaysia in onboarding sets the
+      // language explicitly; signing out used to leave the phone in Malay —
+      // login screen included — and hand that language to whoever signed in
+      // next, until their own profile overrode it (owner, 2026-10-26).
+      //
+      // The language goes back to following the device, and the market goes
+      // back to unknown so `useMarket()` falls through to the next account's
+      // own country instead of the last one's.
+      //
+      // Onboarding answers deliberately stay: "Tài khoản của bạn đã được
+      // tạo. Bạn có thể đăng nhập lại để tiếp tục bất cứ lúc nào" is a
+      // promise that a half-finished questionnaire survives a sign-out.
+      clearAccountPreferences: () =>
+        set({
+          language: detectDeviceLanguage(),
+          languageAutoDetected: true,
+          market: null,
+          selectedProductId: null,
+        }),
 
       onboardingAnswers: {},
       onboardingQuestionIndex: 0,
+      onboardingOwnerId: null,
+      claimOnboardingFor: (userId) =>
+        set((s) =>
+          s.onboardingOwnerId === userId
+            ? {}
+            : // Someone else's half-finished questionnaire: drop it rather
+              // than write their treatment area and goal onto this profile.
+              { onboardingOwnerId: userId, onboardingAnswers: {}, onboardingQuestionIndex: 0 },
+        ),
       setAnswer: (key, value) =>
         set((s) => ({ onboardingAnswers: { ...s.onboardingAnswers, [key]: value } })),
       setOnboardingQuestionIndex: (index) => set({ onboardingQuestionIndex: index }),
-      resetOnboardingAnswers: () => set({ onboardingAnswers: {}, onboardingQuestionIndex: 0 }),
+      resetOnboardingAnswers: () => set({ onboardingAnswers: {}, onboardingQuestionIndex: 0, onboardingOwnerId: null }),
 
       selectedProductId: null,
       selectProduct: (id) => set({ selectedProductId: id }),
 
       hasSeenReminderPrompt: false,
       setHasSeenReminderPrompt: (v) => set({ hasSeenReminderPrompt: v }),
+
+      // The water switch on Home. Device-local, like the reminders it
+      // schedules — there is no server state to keep in step.
+      waterRemindersOn: false,
+      setWaterRemindersOn: (v) => set({ waterRemindersOn: v }),
 
       aiConsentAccepted: false,
       acceptAiConsent: () => set({ aiConsentAccepted: true }),
@@ -125,6 +184,9 @@ export const useAppStore = create<AppState>()(
       // not asked again on the next launch.
       upgradePromptMuted: false,
       muteUpgradePrompt: () => set({ upgradePromptMuted: true }),
+
+      updateNagDismissedAt: null,
+      dismissUpdateNag: (version) => set({ updateNagDismissedAt: version }),
       recoveringPassword: false,
       setRecoveringPassword: (value) => set({ recoveringPassword: value }),
     }),
@@ -133,15 +195,19 @@ export const useAppStore = create<AppState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         darkMode: s.darkMode,
+        everSignedIn: s.everSignedIn,
         language: s.language,
         languageAutoDetected: s.languageAutoDetected,
         market: s.market,
         onboardingAnswers: s.onboardingAnswers,
         onboardingQuestionIndex: s.onboardingQuestionIndex,
+        onboardingOwnerId: s.onboardingOwnerId,
         selectedProductId: s.selectedProductId,
         hasSeenReminderPrompt: s.hasSeenReminderPrompt,
+        waterRemindersOn: s.waterRemindersOn,
         aiConsentAccepted: s.aiConsentAccepted,
         upgradePromptMuted: s.upgradePromptMuted,
+        updateNagDismissedAt: s.updateNagDismissedAt,
       }),
       // Re-checks the device locale against the *persisted* state once
       // rehydration actually completes (not at module-load time, before
