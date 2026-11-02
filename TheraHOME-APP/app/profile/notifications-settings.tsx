@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { homeGlassColors, useTheme } from '@/theme';
@@ -6,7 +6,7 @@ import { useSession } from '@/hooks/useSession';
 import { useProfile, useUpdateProfile, useSuggestedReminderHour } from '@/hooks/useProfile';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
-import { registerForPushNotifications, scheduleDailyReminder, scheduleEveningReminder } from '@/lib/pushNotifications';
+import { claimTodayReminderBackfill, registerForPushNotifications, scheduleDailyReminder, scheduleEveningReminder } from '@/lib/pushNotifications';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
@@ -52,6 +52,11 @@ function ToggleRow({
 function TimeRow({ icon, title, sub, value, onChange, isLast }: { icon: string; title: string; sub?: string; value: string; onChange: (v: string) => void; isLast?: boolean }) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
+  // 48 half-hours in a list 360pt tall: opened at the top, someone set to
+  // 07:00 saw midnight and had to scroll fourteen rows to find their own
+  // setting. Modal mounts its children only while visible, so the selected
+  // row's onLayout is the one moment we know where it sits.
+  const listRef = useRef<ScrollView>(null);
   return (
     <View style={[styles.row, !isLast ? { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline } : null]}>
       <Icon name={icon} size={20} color={homeGlassColors.tick} />
@@ -68,10 +73,18 @@ function TimeRow({ icon, title, sub, value, onChange, isLast }: { icon: string; 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={[styles.backdrop, { backgroundColor: homeGlassColors.toast }]} onPress={() => setOpen(false)}>
           <View style={[styles.timeSheet, { backgroundColor: homeGlassColors.sky[3], borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
-            <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.timeOptions}>
+            <ScrollView ref={listRef} showsVerticalScrollIndicator contentContainerStyle={styles.timeOptions}>
               {TIME_OPTIONS.map((t) => (
                 <Pressable
                   key={t}
+                  onLayout={
+                    t === value
+                      ? (e) => {
+                          const y = e.nativeEvent.layout.y;
+                          listRef.current?.scrollTo({ y: Math.max(y - 120, 0), animated: false });
+                        }
+                      : undefined
+                  }
                   onPress={() => {
                     onChange(t);
                     setOpen(false);
@@ -141,6 +154,9 @@ export default function NotificationsSettingsScreen() {
       }
     }
     setRemindState(v);
+    // Switching on after today's hour has passed must not look like this
+    // morning's reminder came and went — see claimTodayReminderBackfill.
+    if (v) await claimTodayReminderBackfill(userId, 'daily');
     updateProfile.mutate(
       { daily_reminder_enabled: v },
       { onError: () => setRemindState(!v) },
@@ -152,7 +168,10 @@ export default function NotificationsSettingsScreen() {
     const previous = remindTime;
     setRemindTimeState(v);
     updateProfile.mutate({ daily_reminder_time: v }, { onError: () => setRemindTimeState(previous) });
-    if (remind) void scheduleDailyReminder(true, v, language, currentDay).catch(() => Alert.alert(t('notificationError')));
+    if (remind) {
+      void claimTodayReminderBackfill(userId, 'daily');
+      void scheduleDailyReminder(true, v, language, currentDay).catch(() => Alert.alert(t('notificationError')));
+    }
   }
 
   async function setRemindEvening(v: boolean) {
@@ -168,6 +187,7 @@ export default function NotificationsSettingsScreen() {
       }
     }
     setRemindEveningState(v);
+    if (v) await claimTodayReminderBackfill(userId, 'evening');
     updateProfile.mutate(
       { evening_reminder_enabled: v },
       { onError: () => setRemindEveningState(!v) },
@@ -179,7 +199,10 @@ export default function NotificationsSettingsScreen() {
     const previous = remindEveningTime;
     setRemindEveningTimeState(v);
     updateProfile.mutate({ evening_reminder_time: v }, { onError: () => setRemindEveningTimeState(previous) });
-    if (remindEvening) void scheduleEveningReminder(true, v, language).catch(() => Alert.alert(t('notificationError')));
+    if (remindEvening) {
+      void claimTodayReminderBackfill(userId, 'evening');
+      void scheduleEveningReminder(true, v, language).catch(() => Alert.alert(t('notificationError')));
+    }
   }
 
   if (profileQuery.isPending) {

@@ -35,6 +35,19 @@ const LANGUAGE_RULE: Record<Lang, string> = {
   ms: "PERATURAN BAHASA (mengatasi sebarang arahan bahasa di atas): pengguna menggunakan aplikasi dalam Bahasa Melayu — sentiasa balas dalam Bahasa Melayu. Jika pengguna menulis dalam bahasa lain, balas dalam bahasa yang mereka gunakan.",
 };
 
+// The chat bubble is a plain <Text> — it draws whatever comes back
+// literally. Groq answers in Markdown unless told otherwise, so a reply
+// about the roadmap reached the customer as "mở tab **Lộ trình**", asterisks
+// and all (seen on device 2026-11-02). The bubble now renders **bold**, but
+// the rest of Markdown has no business in a chat message, and the cheapest
+// place to stop it is here. Appended after the admin-curated prompt for the
+// same reason LANGUAGE_RULE is.
+const PLAIN_TEXT_RULE: Record<Lang, string> = {
+  vi: "ĐỊNH DẠNG: viết văn xuôi thuần như một tin nhắn. Không dùng Markdown — không ##, không ```, không gạch đầu dòng bằng * hoặc -. Nếu cần nhấn mạnh, dùng **chữ** (dạng duy nhất ứng dụng hiển thị được).",
+  en: "FORMATTING: write plain prose, like a chat message. No Markdown — no ##, no ```, no * or - bullets. If you must emphasise something, use **bold**, the only form the app can render.",
+  ms: "FORMAT: tulis prosa biasa seperti mesej sembang. Jangan guna Markdown — tiada ##, tiada ```, tiada senarai * atau -. Jika perlu penegasan, guna **tebal**, satu-satunya bentuk yang boleh dipaparkan aplikasi.",
+};
+
 // Sent INSTEAD of a Groq reply once the day's allowance is spent. It is
 // inserted as a normal assistant message rather than returned as an error on
 // purpose: the user's own message is already in the thread by the time this
@@ -166,7 +179,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const systemPrompt = await getSystemPrompt(adminClient);
-  const replyText = await getGroqReply(`${systemPrompt.trim()}\n\n${LANGUAGE_RULE[lang]}`, history as HistoryRow[], lang);
+  const replyText = await getGroqReply(`${systemPrompt.trim()}\n\n${LANGUAGE_RULE[lang]}\n\n${PLAIN_TEXT_RULE[lang]}`, history as HistoryRow[], lang);
 
   const { error: insertError } = await adminClient
     .from("chat_messages")

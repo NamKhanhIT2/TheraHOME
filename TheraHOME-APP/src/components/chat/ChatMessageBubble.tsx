@@ -19,6 +19,33 @@ import type { ChatMessageRow } from '@/hooks/useChat';
  * no reactions and no reply quotes, and nothing here draws them if they are
  * absent.
  */
+/**
+ * Renders `**bold**` and drops the asterisks.
+ *
+ * The AI assistant answers in Markdown by default, so replies reached the
+ * customer as literal "mở tab **Lộ trình**" (seen on device 2026-11-02).
+ * `chat-ai-reply` now tells the model to write plain prose, but every reply
+ * already stored in `chat_messages` still has the asterisks in it, and a
+ * model instruction is a request, not a guarantee. Bold is the only mark
+ * handled on purpose — anything else Markdown can express has no meaning in
+ * a chat bubble, and silently eating `*` in a customer's own message would
+ * be worse than showing it.
+ */
+function renderInlineBold(body: string, boldFamily: string): React.ReactNode {
+  if (!body.includes('**')) return body;
+  const parts = body.split(/\*\*(.+?)\*\*/gs);
+  // split() with one capture group alternates plain, captured, plain, …
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
+      <Text key={index} style={{ fontFamily: boldFamily }}>
+        {part}
+      </Text>
+    ) : (
+      part
+    ),
+  );
+}
+
 export function ChatMessageBubble({
   message,
   own,
@@ -122,7 +149,9 @@ export function ChatMessageBubble({
                 </View>
               ) : null}
               {message.body ? (
-                <Text style={[theme.type.body, { color: own ? '#fff' : ink }]}>{message.body}</Text>
+                <Text style={[theme.type.body, { color: own ? '#fff' : ink }]}>
+                  {renderInlineBold(message.body, theme.fontFamily.bold)}
+                </Text>
               ) : null}
             </>
           )}

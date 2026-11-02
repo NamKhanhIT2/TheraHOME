@@ -341,6 +341,27 @@ const REMINDER_BACKFILL_KEY_PREFIX = 'thera_reminder_backfilled_';
  * and covers any caller added later. */
 const backfillInFlight = new Set<string>();
 
+/**
+ * Claims today's backfill slot WITHOUT writing an inbox row.
+ *
+ * `backfillTodayReminderIfDue` exists for a reminder that fired while the
+ * app was closed. Turning the switch on at 20:32 for a 07:00 reminder is
+ * not that: nothing fired this morning, because nothing was scheduled. The
+ * backfill could not tell the two apart and posted "Đã đến giờ tập luyện"
+ * the moment the switch moved (QA on device, 2026-11-02) — a notification
+ * for an event that never happened, with a day number the customer never
+ * worked through.
+ *
+ * Settings calls this whenever it turns a reminder on, or moves one to an
+ * hour that has already passed today, so the first real occurrence is
+ * tomorrow's.
+ */
+export async function claimTodayReminderBackfill(userId: string | undefined, kind: ReminderKind): Promise<void> {
+  if (!userId) return;
+  const storageKey = `${REMINDER_BACKFILL_KEY_PREFIX}${userId}_${kind}_${localDateString(new Date())}`;
+  await AsyncStorage.setItem(storageKey, '1').catch(() => {});
+}
+
 async function backfillTodayReminderIfDue(userId: string, kind: ReminderKind, enabled: boolean, time: string, title: string, body: string, destination: string): Promise<void> {
   if (!enabled) return;
   const [hour, minute] = time.split(':').map(Number);
