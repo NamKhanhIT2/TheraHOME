@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Picture-in-picture needs no permission. The manifest exists because an
+       Expo Android module must have one; the attribute that actually turns
+       PiP on lives on MainActivity and is set by
+       plugins/withAndroidPictureInPicture.js. -->
+</manifest>

@@ -19,7 +19,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useIsStaff } from '@/hooks/useWebRoles';
@@ -29,6 +29,7 @@ import { hapticConfirm } from '@/lib/haptics';
 import { CallVideo, useCallVideoTracks } from '@/components/call/CallVideo';
 import { CallPip } from '@/components/call/CallPip';
 import { setCallScreenAwake } from '@/lib/callScreen';
+import { useI18n } from '@/lib/i18n';
 import {
   flipSessionCamera,
   openCallSession,
@@ -54,6 +55,7 @@ const CLOSE_DELAY_MS = 1600;
 
 export default function CallScreen() {
   const theme = useTheme();
+  const { t } = useI18n();
   const { callId } = useLocalSearchParams<{ callId: string }>();
   const userId = useSession().session?.user.id;
   const isStaff = useIsStaff(userId);
@@ -245,37 +247,37 @@ export default function CallScreen() {
   // ----------------------------------------------------------------- copy
   const peerName = peerIsSupport
     ? 'TheraHOME CSKH'
-    : (peerProfile.data?.fullName ?? (isStaff ? 'Khách hàng' : 'TheraHOME CSKH'));
+    : (peerProfile.data?.fullName ?? (isStaff ? t('callCustomer') : 'TheraHOME CSKH'));
 
   const statusLine = useMemo(() => {
-    if (media === 'ending') return session?.failureReason ? 'Không thể duy trì kết nối' : 'Đã kết thúc';
-    if (!call) return callQuery.isError ? 'Không thể tải cuộc gọi' : callQuery.isPending ? 'Đang kết nối…' : 'Không tìm thấy cuộc gọi';
+    if (media === 'ending') return session?.failureReason ? t('callKeepFailed') : t('callEnded');
+    if (!call) return callQuery.isError ? t('callLoadFailed') : callQuery.isPending ? t('callConnecting') : t('callNotFound');
     switch (call.status) {
       case 'ringing':
-        return isCaller ? 'Đang gọi…' : (isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi đến');
+        return isCaller ? t('callRinging') : (isVideo ? t('callIncomingVideo') : t('callIncoming'));
       case 'accepted':
-        if (media === 'unsupported') return 'Bản cài đặt này chưa hỗ trợ gọi';
-        if (media === 'failed') return 'Mất kết nối';
-        if (media === 'reconnecting') return 'Đang kết nối lại…';
-        if (media !== 'live') return 'Đang kết nối…';
-        return remoteJoined ? formatCallDuration(seconds) : 'Đang chờ đầu kia vào…';
+        if (media === 'unsupported') return t('callUnsupportedBuild');
+        if (media === 'failed') return t('callConnectionLost');
+        if (media === 'reconnecting') return t('callReconnecting');
+        if (media !== 'live') return t('callConnecting');
+        return remoteJoined ? formatCallDuration(seconds) : t('callWaitingPeer');
       case 'busy':
-        return peerIsSupport ? 'Tổng đài đang có cuộc gọi khác' : 'Người nhận đang bận';
+        return peerIsSupport ? t('callLineBusy') : t('callPeerBusy');
       case 'declined':
-        return isCaller ? 'Cuộc gọi bị từ chối' : 'Đã từ chối';
+        return isCaller ? t('callDeclined') : t('callDeclinedShort');
       case 'missed':
-        return isCaller ? (call.endReason === 'cancelled' ? 'Đã hủy cuộc gọi' : 'Không có người nghe máy') : 'Cuộc gọi nhỡ';
+        return isCaller ? (call.endReason === 'cancelled' ? t('callCancelled') : t('callNoAnswer')) : t('callMissed');
       case 'ended':
-        if (call.endReason === 'unsupported') return 'Bản cài đặt này chưa hỗ trợ gọi';
-        if (['connection_failed', 'connection_timeout', 'peer_timeout'].includes(call.endReason ?? '')) return 'Cuộc gọi kết thúc do mất kết nối';
-        return call.durationSeconds ? `Đã kết thúc · ${formatCallDuration(call.durationSeconds)}` : 'Đã kết thúc';
+        if (call.endReason === 'unsupported') return t('callUnsupportedBuild');
+        if (['connection_failed', 'connection_timeout', 'peer_timeout'].includes(call.endReason ?? '')) return t('callEndedDisconnect');
+        return call.durationSeconds ? `${t('callEnded')} · ${formatCallDuration(call.durationSeconds)}` : t('callEnded');
     }
-  }, [call, callQuery.isPending, callQuery.isError, isCaller, isVideo, media, remoteJoined, seconds, peerIsSupport, session?.failureReason]);
+  }, [t, call, callQuery.isPending, callQuery.isError, isCaller, isVideo, media, remoteJoined, seconds, peerIsSupport, session?.failureReason]);
 
   const hint =
-    call?.status === 'busy' ? 'Bạn có thể nhắn tin, CSKH sẽ gọi lại ngay khi xong cuộc hiện tại.'
-    : media === 'unsupported' ? 'Cần cập nhật ứng dụng lên bản mới nhất để dùng tính năng gọi.'
-    : call?.status === 'ringing' && isCaller ? 'Giữ máy trong khoảng 45 giây nhé.'
+    call?.status === 'busy' ? t('callBusyHint')
+    : media === 'unsupported' ? t('callUpdateHint')
+    : call?.status === 'ringing' && isCaller ? t('callHoldHint')
     : null;
 
   return (
@@ -322,7 +324,7 @@ export default function CallScreen() {
               it, and every control is drawn after this. */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={controlsVisible ? 'Ẩn các nút điều khiển' : 'Hiện các nút điều khiển'}
+            accessibilityLabel={controlsVisible ? t('callHideControls') : t('callShowControls')}
             style={styles.fill}
             onPress={() => {
               setControlsVisible((visible) => !visible);
@@ -332,9 +334,19 @@ export default function CallScreen() {
         </>
       ) : null}
 
+      {/* This route is a fullScreenModal, where the safe-area context
+          reports insets.top === 0 — the same trap `community/create` hit on
+          2026-10-26. `SafeAreaView` alone leaves the caller's name under the
+          notch, so the top padding is taken from the window metrics read at
+          launch, which know how tall this phone's status bar is (QA pass,
+          2026-10-30). */}
       <SafeAreaView
         pointerEvents="box-none"
-        style={[styles.content, { justifyContent: videoStage ? 'flex-end' : 'space-between' }]}
+        style={[
+          styles.content,
+          { paddingTop: Math.max(32, (initialWindowMetrics?.insets.top ?? 0) + 12) },
+          { justifyContent: videoStage ? 'flex-end' : 'space-between' },
+        ]}
       >
       {videoStage ? (
         showControls ? (
@@ -394,7 +406,7 @@ export default function CallScreen() {
         <View style={[styles.quality, { backgroundColor: quality === 'lost' ? theme.colors.error : theme.colors.warning }]}>
           <Icon name="wifi-off" size={14} color="#fff" />
           <Text style={[theme.type.captionSm, styles.qualityText]}>
-            {quality === 'lost' ? 'Mất kết nối mạng' : 'Mạng yếu, cuộc gọi có thể bị ngắt quãng'}
+            {quality === 'lost' ? t('callNetworkLost') : t('callNetworkWeak')}
           </Text>
         </View>
       ) : null}
@@ -409,9 +421,9 @@ export default function CallScreen() {
           // opens on speaker but the user must be able to put it back to the
           // earpiece, which the video-only layout had made impossible.
           <View style={styles.toggleRow}>
-            <ToggleButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? 'Tắt tiếng' : 'Đã tắt tiếng'}
+            <ToggleButton icon={micOn ? 'mic' : 'mic-off'} label={micOn ? t('callMute') : t('callMuted')}
               active={!micOn} onPress={() => { keepControls(); toggleSessionMic(); }} disabled={!controlsLive || session?.micPending} onDark={videoStage} />
-            <ToggleButton icon={cameraOn ? 'video' : 'video-off'} label={cameraOn ? 'Tắt camera' : 'Bật camera'}
+            <ToggleButton icon={cameraOn ? 'video' : 'video-off'} label={cameraOn ? t('callCameraOff') : t('callCameraOn')}
               active={!cameraOn} onPress={() => { keepControls(); toggleSessionCamera(); }} disabled={!controlsLive || session?.cameraPending} onDark={videoStage} />
             {cameraOn ? (
               <ToggleButton icon="switch-camera" label="Đổi camera" active={false}
@@ -437,11 +449,11 @@ export default function CallScreen() {
               onPress={() => { hapticConfirm(); void terminate('declined', 'declined'); }} />
             <RoundButton color={theme.colors.success} icon={isVideo ? 'video' : 'phone'} label="Trả lời"
               disabled={answerCall.isPending}
-              onPress={() => { hapticConfirm(); if (callId) answerCall.mutate(callId, { onError: () => Alert.alert('Không thể trả lời', 'Cuộc gọi có thể đã kết thúc. Vui lòng thử lại.') }); }} />
+              onPress={() => { hapticConfirm(); if (callId) answerCall.mutate(callId, { onError: () => Alert.alert(t('callAnswerFailed'), t('callAnswerRetryBody')) }); }} />
           </View>
         ) : isOver || unreadable ? null : (
           <RoundButton color={theme.colors.error} icon="phone-off"
-            label={call?.status === 'ringing' && isCaller ? 'Huỷ' : 'Kết thúc'}
+            label={call?.status === 'ringing' && isCaller ? t('cancel') : t('callEnd')}
             onPress={() => { hapticConfirm(); void terminate('ended', 'hangup'); }} />
         )}
       </View>
@@ -534,7 +546,7 @@ const styles = StyleSheet.create({
   // Their side of the call when they have no camera: the big frame still
   // belongs to them.
   peerStage: { alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#111' },
-  videoTopBar: { position: 'absolute', top: 4, left: 52, right: 120, gap: 2 },
+  videoTopBar: { position: 'absolute', top: Math.max(4, (initialWindowMetrics?.insets.top ?? 0) - 16), left: 52, right: 120, gap: 2 },
   videoText: { color: '#fff', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
   videoTextDim: { color: 'rgba(255,255,255,0.65)' },
 });

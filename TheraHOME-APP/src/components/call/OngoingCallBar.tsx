@@ -7,12 +7,19 @@
 // caller that lets you navigate away shows one of these, and for the same
 // reason: a call you cannot see is a call you forget to end.
 //
+// It is also what keeps the call visible AFTER the app is left, not just
+// after the call screen is: this component arms Android's picture-in-picture
+// window (src/lib/callWindow.ts) for as long as a call exists, and draws the
+// small view the system puts in it. The bar and that window are the same
+// idea one step apart — a call you cannot see is a call you forget to end,
+// whether you left the screen or the whole app.
+//
 // It is also the LAST of the three things that close a LiveKit room (see
 // src/lib/callSession.ts). The other two react to this device acting — the
 // red button, the room failing. This one watches the `calls` row over
 // Realtime, so a call ended by the OTHER side while minimised is noticed
 // here and nowhere else.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,8 +29,17 @@ import { hapticConfirm } from '@/lib/haptics';
 import { closeCallSession, openCallSession, useCallSession, type CallSession } from '@/lib/callSession';
 import { dismissCall, syncCallMuted } from '@/lib/callkeep';
 import { setProximityBlanking } from '@/lib/callScreen';
+import {
+  CALL_WINDOW_VIDEO_RATIO,
+  CALL_WINDOW_VOICE_RATIO,
+  armCallWindow,
+  exitCallWindow,
+  useCallWindowActive,
+} from '@/lib/callWindow';
 import { useRingtone } from '@/hooks/useRingtone';
 import { useCallVideoTracks } from '@/components/call/CallVideo';
+import { CallWindowView } from '@/components/call/CallWindowView';
+import { useI18n } from '@/lib/i18n';
 import {
   CALL_IS_OVER,
   RING_TIMEOUT_MS,
@@ -84,12 +100,16 @@ function ActiveCall({ callId, userId, session, hidden }: {
   hidden: boolean;
 }) {
   const theme = useTheme();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const { data: callData, refetch: refetchCall } = useCall(callId);
   const call = callData ?? null;
   const terminate = useCallTerminator(callId);
   const seconds = useCallDuration(call?.answeredAt);
   const [ringExpired, setRingExpired] = useState(false);
+  // True while Android is drawing this app as a floating window over
+  // whatever the user went off to do.
+  const inWindow = useCallWindowActive();
 
   const isCaller = !!call && call.callerId === userId;
   const peerIsSupport = !!call && isCaller && call.calleeId === null;
@@ -174,14 +194,75 @@ function ActiveCall({ callId, userId, session, hidden }: {
     }
   }, [over, callId]);
 
+  // ----------------------------------------------- the call outside the app
+  //
+  // Armed for as long as a call exists, disarmed the moment it does not.
+  // Armed means "a Home press puts this app in a small floating window
+  // instead of hiding it" — true of a call, and of nothing else in this
+  // app, which is why the flag is held here rather than set once at
+  // startup. The shape follows the call: a picture if there is one, a bar
+  // if it is only a name and a timer.
+  const windowRatio = tracks.remote || tracks.local
+    ? CALL_WINDOW_VIDEO_RATIO
+    : CALL_WINDOW_VOICE_RATIO;
+  useEffect(() => {
+    if (over) {
+      // A call that ends while the user is in another app would otherwise
+      // leave a window floating over their screen showing a conversation
+      // that is finished, dismissable only by finding its X.
+      armCallWindow(false);
+      exitCallWindow();
+      return;
+    }
+    armCallWindow(true, windowRatio);
+  }, [over, windowRatio]);
+  // Separate from the effect above, and with no dependencies, because this
+  // one has to run on EVERY way out — a sign-out, a reload, the session
+  // closing underneath. An app left armed shrinks itself every time the
+  // user presses Home, forever.
+  useEffect(() => () => {
+    armCallWindow(false);
+    exitCallWindow();
+  }, []);
+
+  // Tapping the floating window is how Android expands an app back to full
+  // screen, and the thing the user tapped was a call — so that is where
+  // they land, not on whatever screen happened to be underneath it when
+  // they pressed Home.
+  const wasInWindow = useRef(false);
+  useEffect(() => {
+    if (inWindow) {
+      wasInWindow.current = true;
+      return;
+    }
+    if (!wasInWindow.current) return;
+    wasInWindow.current = false;
+    if (over || ending) return;
+    router.navigate({ pathname: '/call/[callId]', params: { callId } });
+  }, [inWindow, over, ending, callId]);
+
+  const name = peerIsSupport
+    ? 'TheraHOME CSKH'
+    : (peer.data?.fullName ?? t('callLabel'));
+  const status = ending ? t('callEnding')
+    : call?.status === 'ringing' ? t('callRinging')
+    : session.state === 'reconnecting' ? t('callReconnecting')
+    : !session.remoteJoined ? t('callConnecting')
+    : formatCallDuration(seconds);
+
+  // The app IS the window — picture-in-picture shrinks this view tree, it
+  // does not get its own — so while the window is up the call replaces
+  // everything, including the call screen underneath it. Checked before
+  // `hidden`, which only means "the full call screen is in front of me" and
+  // is irrelevant at an inch tall.
+  if (inWindow && !over) {
+    return <CallWindowView name={name} status={status} track={tracks.remote} muted={!session.micOn} />;
+  }
+
   // Rendered-but-hidden rather than unmounted while the call screen is up:
   // unmounting would drop the Realtime subscription above, which is the
   // very thing that has to keep watching.
   if (hidden || over) return null;
-
-  const name = peerIsSupport
-    ? 'TheraHOME CSKH'
-    : (peer.data?.fullName ?? 'Cuộc gọi');
 
   return (
     <View style={[styles.wrap, { top: insets.top + 6 }]} pointerEvents="box-none">
@@ -197,11 +278,7 @@ function ActiveCall({ callId, userId, session, hidden }: {
         <Icon name={session.micOn ? 'phone' : 'mic-off'} size={18} color="#fff" />
         <View style={styles.text}>
           <Text numberOfLines={1} style={[theme.type.captionSm, styles.label]}>{name}</Text>
-          <Text style={[theme.type.captionSm, styles.label]}>
-            {ending ? 'Đang kết thúc…' : call?.status === 'ringing' ? 'Đang gọi…'
-              : session.state === 'reconnecting' ? 'Đang kết nối lại…'
-              : !session.remoteJoined ? 'Đang kết nối…' : formatCallDuration(seconds)}
-          </Text>
+          <Text style={[theme.type.captionSm, styles.label]}>{status}</Text>
         </View>
         <Pressable
           accessibilityRole="button"

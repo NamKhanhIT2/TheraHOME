@@ -16,13 +16,14 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { AvatarImg } from '@/components/AvatarImg';
 import { Icon } from '@/components/icons/Icon';
 import { hapticConfirm } from '@/lib/haptics';
 import { useRingtone } from '@/hooks/useRingtone';
 import { dismissCall, isCallDismissed, isSystemRinging, subscribeSystemRinging, wasAnsweredHere } from '@/lib/callkeep';
 import { useAnswerCall, useCallTerminator, useCallerProfile, useIncomingCall } from '@/hooks/useCalls';
+import { useI18n } from '@/lib/i18n';
 
 export function IncomingCallSheet({ enabled, userId, isStaff }: {
   enabled: boolean;
@@ -30,6 +31,7 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
   isStaff: boolean;
 }) {
   const theme = useTheme();
+  const { t } = useI18n();
   const incoming = useIncomingCall({ enabled, userId, isStaff });
   const call = incoming.data ?? null;
   // Staff are being called by a customer, so look the caller up. A customer
@@ -82,32 +84,32 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
   // there should only ever be one of them.
   if (systemHasIt || pathname === `/call/${call.id}` || wasAnsweredHere(call.id) || isCallDismissed(call.id)) return null;
 
-  const name = isStaff ? (caller.data?.fullName ?? 'Khách hàng') : 'TheraHOME CSKH';
+  const name = isStaff ? (caller.data?.fullName ?? t('callCustomer')) : 'TheraHOME CSKH';
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => { /* answer or decline */ }}>
-      <View style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]}>
-        <View style={[styles.card, { backgroundColor: theme.colors.bgCard }]}>
-          <Text style={[theme.type.captionSm, { color: theme.colors.primary, letterSpacing: 0.4 }]}>
-            {isVideo ? 'CUỘC GỌI VIDEO ĐẾN' : 'CUỘC GỌI ĐẾN'}
+      <View style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]}>
+        <View style={[styles.card, { backgroundColor: homeGlassColors.menu }]}>
+          <Text style={[theme.type.captionSm, { color: homeGlassColors.accent, letterSpacing: 0.4 }]}>
+            {isVideo ? t('callIncomingVideoCaps') : t('callIncomingCaps')}
           </Text>
 
           {isStaff ? (
             <AvatarImg size={76} uri={caller.data?.avatarUrl} />
           ) : (
-            <View style={[styles.brandAvatar, { backgroundColor: theme.colors.primaryTint10 }]}>
-              <Icon name="headphones" size={34} color={theme.colors.primary} />
+            <View style={[styles.brandAvatar, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+              <Icon name="headphones" size={34} color={homeGlassColors.accent} />
             </View>
           )}
 
-          <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{name}</Text>
+          <Text style={[theme.type.h2, { color: homeGlassColors.text, textAlign: 'center' }]}>{name}</Text>
           {isStaff && caller.data?.phone ? (
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{caller.data.phone}</Text>
+            <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}>{caller.data.phone}</Text>
           ) : null}
 
           <View style={styles.actions}>
             <Action
-              color={theme.colors.error}
+              color={homeGlassColors.dotMissed}
               icon="phone-off"
               label="Từ chối"
               disabled={answerCall.isPending || declining === call.id}
@@ -118,7 +120,7 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
               }}
             />
             <Action
-              color={theme.colors.success}
+              color={homeGlassColors.tick}
               icon={isVideo ? 'video' : 'phone'}
               label="Trả lời"
               disabled={answerCall.isPending || declining === call.id}
@@ -133,14 +135,14 @@ export function IncomingCallSheet({ enabled, userId, isStaff }: {
                       router.navigate({ pathname: '/call/[callId]', params: { callId: call.id } });
                     }
                   },
-                  onError: () => Alert.alert('Không thể trả lời', 'Cuộc gọi có thể đã kết thúc hoặc được trả lời trên máy khác.'),
+                  onError: () => Alert.alert(t('callAnswerFailed'), t('callAnswerFailedBody')),
                 });
               }}
             />
           </View>
 
-          <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, textAlign: 'center' }]}>
-            {isStaff ? 'Khách đang chờ trên ứng dụng TheraHOME' : 'Nhân viên hỗ trợ đang gọi cho bạn'}
+          <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint, textAlign: 'center' }]}>
+            {isStaff ? t('callCustomerWaiting') : t('callSupportCalling')}
           </Text>
         </View>
       </View>
@@ -163,7 +165,7 @@ function Action({ color, icon, label, onPress, disabled }: {
       >
         <Icon name={icon} size={27} color="#fff" />
       </Pressable>
-      <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>{label}</Text>
+      <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted }]}>{label}</Text>
     </View>
   );
 }
