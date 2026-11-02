@@ -82,7 +82,12 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const granted = await registerForPushNotifications(userId);
+      // Only ask the OS when the person actually asked for a reminder. Both
+      // toggles off and we asked anyway, which spends the single permission
+      // prompt iOS ever gives us on the exact thing they just declined —
+      // and reads as not listening (QA on simulator, 2026-11-02).
+      const wantsReminders = morningOn || eveningOn;
+      const granted = wantsReminders ? await registerForPushNotifications(userId) : false;
       if (granted) {
         await Promise.all([
           scheduleDailyReminder(morningOn, morningTime, language, currentDay),
@@ -122,7 +127,12 @@ export function ReminderPopup({ userId, onDone }: ReminderPopupProps) {
             disabled={submitting}
             style={[styles.confirmBtn, { backgroundColor: homeGlassColors.accent, opacity: submitting ? 0.6 : 1 }]}
           >
-            <Text style={[theme.type.button, { color: '#fff' }]}>{t('turnOnNotifications')}</Text>
+            {/* With both toggles off this button used to still read "Bật
+                thông báo", so the only way out of the popup was a button
+                that said the opposite of what the person had just chosen. */}
+            <Text style={[theme.type.button, { color: '#fff' }]}>
+              {morningOn || eveningOn ? t('turnOnNotifications') : t('later')}
+            </Text>
           </Pressable>
         </View>
       </View>
