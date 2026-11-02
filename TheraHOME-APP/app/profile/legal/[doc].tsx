@@ -19,8 +19,8 @@ export default function LegalScreen() {
   const legalDoc = useLegalDoc(docKey);
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={legalDoc.title} />
+    <ScreenContainer tone="glass">
+      <BackBar tone="glass" onBack={() => router.back()} title={legalDoc.title} />
       <ScrollView contentContainerStyle={styles.body}>
         <LegalDocBody docKey={docKey} />
       </ScrollView>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { questions } from '@/lib/mockData';
 import { useOnboardingContent } from '@/hooks/useOnboardingContent';
 import { useSession } from '@/hooks/useSession';
@@ -43,13 +43,13 @@ function FieldRow({ label, value, onChangeText }: { label: string; value: string
   const theme = useTheme();
   return (
     <View style={styles.field}>
-      <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginBottom: 6 }]}>{label}</Text>
+      <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted, marginBottom: 6 }]}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
         style={[
           styles.input,
-          { borderColor: theme.colors.borderInput, borderRadius: theme.radius.md, color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCard },
+          { borderColor: homeGlassColors.hairline, borderRadius: theme.radius.md, color: homeGlassColors.text, backgroundColor: homeGlassColors.surface },
         ]}
       />
     </View>
@@ -60,7 +60,7 @@ function SelectRow({ label, value, options, onChange }: { label: string; value: 
   const theme = useTheme();
   return (
     <View style={styles.field}>
-      <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginBottom: 6 }]}>{label}</Text>
+      <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted, marginBottom: 6 }]}>{label}</Text>
       <View style={styles.chipsWrap}>
         {options.map((opt) => (
           <OptionChip key={opt} label={opt} active={value === opt} onPress={() => onChange(opt)} />
@@ -71,7 +71,6 @@ function SelectRow({ label, value, options, onChange }: { label: string; value: 
 }
 
 export default function EditProfileScreen() {
-  const theme = useTheme();
   const { t, language } = useI18n();
   const { session } = useSession();
   const userId = session?.user.id;
@@ -135,28 +134,28 @@ export default function EditProfileScreen() {
 
   if (profileQuery.isPending) {
     return (
-      <ScreenContainer>
-        <BackBar onBack={() => router.back()} title={t('editProfile')} />
+      <ScreenContainer tone="glass">
+        <BackBar tone="glass" onBack={() => router.back()} title={t('editProfile')} />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={homeGlassColors.tick} />
         </View>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={t('editProfile')} />
+    <ScreenContainer tone="glass">
+      <BackBar tone="glass" onBack={() => router.back()} title={t('editProfile')} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.avatarRow}>
           <AvatarImg size={84} editable uri={avatarUri ?? profileQuery.data?.avatarUrl} onPress={pickAvatar} />
-          {uploadingAvatar ? <ActivityIndicator style={{ marginTop: 8 }} color={theme.colors.primary} /> : null}
+          {uploadingAvatar ? <ActivityIndicator style={{ marginTop: 8 }} color={homeGlassColors.tick} /> : null}
         </View>
         <FieldRow label={t('name')} value={name} onChangeText={setName} />
         <FieldRow label={t('phoneNumber')} value={phone} onChangeText={setPhone} />
         <SelectRow label={t('trainingArea')} value={localizeSavedAnswer('priority_zone', area, language, optionsFor)} options={zoneOptions} onChange={setArea} />
         <SelectRow label={t('trainingGoal')} value={localizeSavedAnswer('goal_main', goal, language, optionsFor)} options={goalOptions} onChange={setGoal} />
-        <Button style={{ width: '100%', marginTop: 8 }} loading={updateProfile.isPending} onPress={handleSave}>
+        <Button tone="glass" style={{ width: '100%', marginTop: 8 }} loading={updateProfile.isPending} onPress={handleSave}>
           {t('saveChanges')}
         </Button>
       </ScrollView>

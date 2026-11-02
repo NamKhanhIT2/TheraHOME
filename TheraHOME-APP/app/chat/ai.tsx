@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useChatThread, useChatMessages, useAISuggestedReplies, type ChatMessageRow } from '@/hooks/useChat';
 import { useChatOutbox } from '@/hooks/useChatOutbox';
@@ -63,6 +63,7 @@ export default function AIChatScreen() {
     const olderMessage = index < items.length - 1 ? items[index + 1] : null;
     return (
       <ChatMessageBubble
+        tone="glass"
         message={message}
         own={message.senderType === 'user'}
         showStatus={message.id === latestOwnId}
@@ -74,24 +75,24 @@ export default function AIChatScreen() {
   }
 
   const greeting = (
-    <View style={[styles.greeting, { backgroundColor: theme.colors.bgCardAlt }]}>
-      <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{t('aiGreeting')}</Text>
+    <View style={[styles.greeting, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+      <Text style={[theme.type.body, { color: homeGlassColors.text }]}>{t('aiGreeting')}</Text>
     </View>
   );
 
   return (
-    <ScreenContainer>
+    <ScreenContainer tone="glass">
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-        <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}>
+        <View style={[styles.header, { borderBottomColor: homeGlassColors.hairline }]}>
           <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Icon name="chevron-left" size={22} color={theme.colors.textPrimary} />
+            <Icon name="chevron-left" size={22} color={homeGlassColors.text} />
           </Pressable>
           <Image source={AI_ASSISTANT_IMAGE} style={styles.avatar} resizeMode="cover" />
           <View>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold }]}>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, fontFamily: theme.fontFamily.bold }]}>
               {t('aiAssistant')}
             </Text>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>
+            <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>
               {outbox.aiReplying ? t('aiTyping') : t('aiInstantNoDoctor')}
             </Text>
           </View>
@@ -101,27 +102,27 @@ export default function AIChatScreen() {
 
         {!aiConsentAccepted ? (
           <View style={styles.consentBox}>
-            <View style={[styles.consentCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
-              <View style={[styles.consentIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-                <Icon name="shield-check" size={24} color={theme.colors.primary} />
+            <View style={[styles.consentCard, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
+              <View style={[styles.consentIcon, { backgroundColor: homeGlassColors.hairline }]}>
+                <Icon name="shield-check" size={24} color={homeGlassColors.tick} />
               </View>
-              <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('aiConsentTitle')}</Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary, lineHeight: 20, marginTop: 8 }]}>
+              <Text style={[theme.type.h2, { color: homeGlassColors.text, textAlign: 'center' }]}>{t('aiConsentTitle')}</Text>
+              <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, lineHeight: 20, marginTop: 8 }]}>
                 {t('aiConsentBody')}
               </Text>
               <Pressable onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'privacy' } })} hitSlop={6}>
-                <Text style={[theme.type.caption, { color: theme.colors.primary, marginTop: 10, fontFamily: theme.fontFamily.semiBold }]}>
+                <Text style={[theme.type.caption, { color: homeGlassColors.tick, marginTop: 10, fontFamily: theme.fontFamily.semiBold }]}>
                   {t('viewPrivacy')}
                 </Text>
               </Pressable>
-              <Button style={{ width: '100%', marginTop: 16 }} onPress={acceptAiConsent}>
+              <Button tone="glass" style={{ width: '100%', marginTop: 16 }} onPress={acceptAiConsent}>
                 {t('aiConsentAgree')}
               </Button>
             </View>
           </View>
         ) : loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color={theme.colors.primary} />
+            <ActivityIndicator color={homeGlassColors.tick} />
           </View>
         ) : (
           <FlatList
@@ -142,23 +143,23 @@ export default function AIChatScreen() {
             onEndReachedThreshold={0.2}
             ListHeaderComponent={
               outbox.aiReplying ? (
-                <View style={[styles.typing, { backgroundColor: theme.colors.bgCardAlt }]}>
+                <View style={[styles.typing, { backgroundColor: homeGlassColors.surfaceRaised }]}>
                   {[0, 1, 2].map((i) => (
-                    <View key={i} style={[styles.typingDot, { backgroundColor: theme.colors.textMuted }]} />
+                    <View key={i} style={[styles.typingDot, { backgroundColor: homeGlassColors.textFaint }]} />
                   ))}
-                  <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('aiTyping')}</Text>
+                  <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>{t('aiTyping')}</Text>
                 </View>
               ) : outbox.aiFailed ? (
-                <Pressable onPress={() => void outbox.retryAIReply()} style={[styles.typing, { backgroundColor: theme.colors.errorTint }]}>
-                  <Text style={[theme.type.captionSm, { color: theme.colors.error }]}>{t('aiReplyFailed')}</Text>
-                  <Icon name="refresh-cw" size={12} color={theme.colors.error} />
-                  <Text style={[theme.type.captionSm, { color: theme.colors.error, fontFamily: theme.fontFamily.semiBold }]}>{t('retry')}</Text>
+                <Pressable onPress={() => void outbox.retryAIReply()} style={[styles.typing, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+                  <Text style={[theme.type.captionSm, { color: homeGlassColors.dotMissed }]}>{t('aiReplyFailed')}</Text>
+                  <Icon name="refresh-cw" size={12} color={homeGlassColors.dotMissed} />
+                  <Text style={[theme.type.captionSm, { color: homeGlassColors.dotMissed, fontFamily: theme.fontFamily.semiBold }]}>{t('retry')}</Text>
                 </Pressable>
               ) : null
             }
             ListFooterComponent={
               messagesQuery.isFetchingNextPage ? (
-                <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 8 }} />
+                <ActivityIndicator color={homeGlassColors.tick} style={{ marginVertical: 8 }} />
               ) : !messagesQuery.hasNextPage && items.length > 0 ? (
                 greeting
               ) : null
@@ -171,9 +172,9 @@ export default function AIChatScreen() {
                     <Pressable
                       key={s.id}
                       onPress={() => send(s.text)}
-                      style={[styles.suggestionChip, { borderColor: theme.colors.borderInput, backgroundColor: theme.colors.bgCard }]}
+                      style={[styles.suggestionChip, { borderColor: homeGlassColors.hairline, backgroundColor: homeGlassColors.surface }]}
                     >
-                      <Text style={[theme.type.captionSm, { color: theme.colors.primary }]}>{s.text}</Text>
+                      <Text style={[theme.type.captionSm, { color: homeGlassColors.tick }]}>{s.text}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -185,11 +186,12 @@ export default function AIChatScreen() {
         {aiConsentAccepted ? (
           <>
             <Pressable onPress={() => router.push('/chat/human')} style={styles.escalateBtn}>
-              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, textDecorationLine: 'underline' }]}>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted, textDecorationLine: 'underline' }]}>
                 {t('aiNeedHuman')}
               </Text>
             </Pressable>
             <ChatComposer
+              tone="glass"
               ref={composerRef}
               value={text}
               onChangeValue={setText}

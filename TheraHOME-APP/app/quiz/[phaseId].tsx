@@ -3,7 +3,7 @@ import { Alert, ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Tex
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Reanimated from 'react-native-reanimated';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
 import { usePhaseQuiz, useQuizAttempt, useSubmitQuizAttempt } from '@/hooks/useQuiz';
@@ -109,20 +109,20 @@ export default function QuizScreen() {
   }
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={phaseName ? `${t('quizTitle')} · ${phaseName}` : t('quizTitle')} />
+    <ScreenContainer tone="glass">
+      <BackBar tone="glass" onBack={() => router.back()} title={phaseName ? `${t('quizTitle')} · ${phaseName}` : t('quizTitle')} />
       {isLoading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={homeGlassColors.tick} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
           {questions.map((q, index) => (
-            <Card key={q.id} style={{ width: '100%', marginBottom: 14 }}>
-              <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>
+            <Card key={q.id} tone="glass" style={{ width: '100%', marginBottom: 14 }}>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.tick, fontFamily: theme.fontFamily.semiBold }]}>
                 {t('quizQuestionOf', { current: index + 1, total: questions.length })}
               </Text>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginTop: 4, marginBottom: 12 }]}>
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, marginTop: 4, marginBottom: 12 }]}>
                 {q.question}
               </Text>
               <View style={{ gap: 8 }}>
@@ -136,10 +136,10 @@ export default function QuizScreen() {
                           styles.option,
                           theme.type.body,
                           {
-                            borderColor: selected ? theme.colors.primary : theme.colors.borderInput,
-                            backgroundColor: selected ? theme.colors.primaryTint05 : theme.colors.bgCard,
+                            borderColor: selected ? homeGlassColors.tick : homeGlassColors.hairline,
+                            backgroundColor: selected ? homeGlassColors.surfaceRaised : 'transparent',
                             borderRadius: theme.radius.md,
-                            color: selected ? theme.colors.primary : theme.colors.textPrimary,
+                            color: selected ? homeGlassColors.tick : homeGlassColors.text,
                           },
                         ]}
                       >
@@ -152,11 +152,11 @@ export default function QuizScreen() {
             </Card>
           ))}
           {!allAnswered ? (
-            <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, textAlign: 'center', marginBottom: 8 }]}>
+            <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint, textAlign: 'center', marginBottom: 8 }]}>
               {t('quizAnswerAllHint')}
             </Text>
           ) : null}
-          <Button style={{ width: '100%' }} disabled={!allAnswered} loading={submitAttempt.isPending} onPress={handleSubmit}>
+          <Button tone="glass" style={{ width: '100%' }} disabled={!allAnswered} loading={submitAttempt.isPending} onPress={handleSubmit}>
             {t('quizSubmit')}
           </Button>
         </ScrollView>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useAppStore';
 import { useSession } from '@/hooks/useSession';
@@ -20,9 +20,6 @@ const MENU: { icon: string; labelKey: TranslationKey; route: string }[] = [
   // it is the only entrance to it, and a free user is meant to be able to
   // read what the paid tiers contain.
   { icon: 'crown', labelKey: 'plansUpgrade', route: '/subscription' },
-  // Directly under the plans, because the xu programme is a benefit OF a
-  // plan — a row floating lower down would read as a separate product.
-  { icon: 'star', labelKey: 'coinsNavLabel', route: '/coins' },
   { icon: 'pencil', labelKey: 'editProfile', route: '/profile/edit' },
   { icon: 'bell', labelKey: 'workoutReminders', route: '/profile/notifications-settings' },
   { icon: 'grid', labelKey: 'accountSettings', route: '/profile/account' },
@@ -32,9 +29,6 @@ const MENU: { icon: string; labelKey: TranslationKey; route: string }[] = [
 export default function ProfileScreen() {
   const theme = useTheme();
   const { t } = useI18n();
-  const darkMode = useAppStore((s) => s.darkMode);
-  const toggleDarkMode = useAppStore((s) => s.toggleDarkMode);
-  const selectProduct = useAppStore((s) => s.selectProduct);
   const selectedProductId = useAppStore((s) => s.selectedProductId);
   const { session } = useSession();
   const userId = session?.user.id;
@@ -57,54 +51,56 @@ export default function ProfileScreen() {
     // waited for, so `selectProduct(null)` ran against a session that might
     // still be live.
     await supabase.auth.signOut().catch((e: unknown) => { if (__DEV__) console.warn('signOut failed:', e); });
-    selectProduct(null);
+    // Belt and braces: the root layout clears these off the SIGNED_OUT
+    // event, but that event is Supabase's to emit and this is the path a
+    // person actually takes.
+    useAppStore.getState().clearAccountPreferences();
   }
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={t('profile')} />
+    <ScreenContainer tone="glass">
+      <BackBar tone="glass" onBack={() => router.back()} title={t('profile')} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.profileHead}>
           <AvatarImg size={84} editable uri={profile?.avatarUrl} onPress={() => router.push('/profile/edit')} />
-          <Text style={[theme.type.h1, { color: theme.colors.textPrimary }]}>{profile?.fullName ?? t('you')}</Text>
+          {/* An account created with just an email carries no name until its
+              owner sets one (owner, 2026-10-28). "Bạn" is how the app
+              addresses them, not what they are called. */}
+          <Text style={[theme.type.h1, { color: homeGlassColors.text }]}>{profile?.fullName ?? t('defaultUserName')}</Text>
           {program ? (
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>
+            <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}>
               {t('day')} {progress.day}/{progress.totalDays} · {program.streak} {t('streakDays')}
             </Text>
           ) : null}
         </View>
 
         <View style={styles.statsRow}>
-          <View style={[styles.statBox, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md }]}>
-            <Text style={[theme.type.h1, { color: theme.colors.textPrimary }]}>{sessionsDone}</Text>
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('sessionsDone')}</Text>
+          <View style={[styles.statBox, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md }]}>
+            <Text style={[theme.type.h1, { color: homeGlassColors.text }]}>{sessionsDone}</Text>
+            <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{t('sessionsDone')}</Text>
           </View>
-          <View style={[styles.statBox, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md }]}>
-            <Text style={[theme.type.h1, { color: theme.colors.textPrimary }]}>{program?.adherencePct ?? 0}%</Text>
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{t('adherence')}</Text>
+          <View style={[styles.statBox, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md }]}>
+            <Text style={[theme.type.h1, { color: homeGlassColors.text }]}>{program?.adherencePct ?? 0}%</Text>
+            <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{t('adherence')}</Text>
           </View>
         </View>
 
-        <View style={[styles.menuCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
-          <Pressable onPress={toggleDarkMode} style={[styles.menuRow, { borderBottomColor: theme.colors.divider, borderBottomWidth: 1 }]}>
-            <Icon name="moon" size={20} color={theme.colors.primary} />
-            {/* Fixed label + on/off track — the old flipping label ("Chế độ
-                sáng" while dark) read like light mode was the thing enabled. */}
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>
-              {t('darkMode')}
-            </Text>
-            <View style={[styles.toggleTrack, { backgroundColor: darkMode ? theme.colors.primary : theme.colors.borderInput }]}>
-              <View style={[styles.toggleThumb, { left: darkMode ? 21 : 3 }]} />
-            </View>
-          </Pressable>
+        {/* A rim rather than `theme.shadows.card`: a drop shadow is invisible
+            on this ground, so the card had no edge at all. */}
+        <View style={[styles.menuCard, { backgroundColor: homeGlassColors.surface, borderColor: homeGlassColors.hairline, borderRadius: theme.radius.lg }]}>
+          {/* The dark-mode row is gone (owner, 2026-10-26). The app is
+              being redesigned dark throughout, so a switch that flips the
+              remaining light screens is a setting with nothing left to
+              mean. `useAppStore.darkMode` still exists and still drives
+              ThemeProvider — only the control was removed. */}
           {MENU.map((item, i) => (
             <Pressable
               key={item.route}
               onPress={() => router.push(item.route as never)}
-              style={[styles.menuRow, i < MENU.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.divider } : null]}
+              style={({ pressed }) => [styles.menuRow, i < MENU.length - 1 ? { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline } : null, pressed ? { backgroundColor: homeGlassColors.surfaceRaised } : null]}
             >
-              <Icon name={item.icon} size={20} color={theme.colors.textSecondary} />
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>
+              <Icon name={item.icon} size={20} color={homeGlassColors.textMuted} />
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flex: 1 }]}>
                 {/* "Nâng cấp gói" is the wrong word once somebody has one:
                     they are not upgrading, they are looking at what they
                     bought. The screen behind it already says "Gói hiện tại
@@ -112,26 +108,29 @@ export default function ProfileScreen() {
                     still calling it an upgrade. */}
                 {item.labelKey === 'plansUpgrade' && activePlan ? t('plansYourPlan') : t(item.labelKey)}
               </Text>
-              <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
+              <Icon name="chevron-right" size={16} color={homeGlassColors.textFaint} />
             </Pressable>
           ))}
         </View>
 
         <Pressable
           onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'privacy' } })}
-          style={[styles.linkCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+          style={({ pressed }) => [styles.linkCard, { backgroundColor: pressed ? homeGlassColors.surfaceRaised : homeGlassColors.surface, borderColor: homeGlassColors.hairline, borderRadius: theme.radius.lg }]}
         >
-          <Icon name="lock" size={20} color={theme.colors.textSecondary} />
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{t('privacy')}</Text>
-          <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
+          <Icon name="lock" size={20} color={homeGlassColors.textMuted} />
+          <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flex: 1 }]}>{t('privacy')}</Text>
+          <Icon name="chevron-right" size={16} color={homeGlassColors.textFaint} />
         </Pressable>
 
-        <Pressable onPress={handleSignOut} style={[styles.signOutBtn, { backgroundColor: theme.colors.errorTint, borderRadius: theme.radius.md }]}>
-          <Icon name="log-out" size={18} color={theme.colors.error} />
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.error }]}>{t('signOut')}</Text>
+        {/* `errorTint` is a pale pink wash made for a white page; on this one
+            it glowed. A raised surface with the palette's own red on it says
+            the same thing without shouting. */}
+        <Pressable onPress={handleSignOut} style={({ pressed }) => [styles.signOutBtn, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md }, pressed ? { opacity: 0.7 } : null]}>
+          <Icon name="log-out" size={18} color={homeGlassColors.dotMissed} />
+          <Text style={[theme.type.bodyStrong, { color: homeGlassColors.dotMissed }]}>{t('signOut')}</Text>
         </Pressable>
         <Pressable onPress={() => router.push('/profile/delete-account')} style={styles.deleteBtn}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textMuted }]}>{t('deleteAccount')}</Text>
+          <Text style={[theme.type.bodyStrong, { color: homeGlassColors.textFaint }]}>{t('deleteAccount')}</Text>
         </Pressable>
       </ScrollView>
     </ScreenContainer>
@@ -163,6 +162,7 @@ const styles = StyleSheet.create({
   menuCard: {
     overflow: 'hidden',
     marginBottom: 20,
+    borderWidth: 1,
   },
   menuRow: {
     flexDirection: 'row',
@@ -171,25 +171,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  toggleTrack: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    position: 'absolute',
-    top: 3,
-  },
   linkCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
   },
   signOutBtn: {
     flexDirection: 'row',

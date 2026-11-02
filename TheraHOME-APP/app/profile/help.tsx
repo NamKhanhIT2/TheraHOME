@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSpecialistPresence } from '@/hooks/useChat';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
@@ -18,12 +18,12 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   return (
-    <View style={[styles.faqItem, { borderBottomColor: theme.colors.divider }]}>
+    <View style={[styles.faqItem, { borderBottomColor: homeGlassColors.hairline }]}>
       <Pressable onPress={() => setOpen((o) => !o)} style={styles.faqHeader}>
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{q}</Text>
-        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} color={theme.colors.textMuted} />
+        <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flex: 1 }]}>{q}</Text>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} color={homeGlassColors.textFaint} />
       </Pressable>
-      {open ? <Text style={[theme.type.body, { color: theme.colors.textSecondary, paddingHorizontal: 16, paddingBottom: 14 }]}>{a}</Text> : null}
+      {open ? <Text style={[theme.type.body, { color: homeGlassColors.textMuted, paddingHorizontal: 16, paddingBottom: 14 }]}>{a}</Text> : null}
     </View>
   );
 }
@@ -39,11 +39,11 @@ export default function HelpSupportScreen() {
   const faqs = useFaqItems();
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={t('helpSupport')} />
+    <ScreenContainer tone="glass">
+      <BackBar tone="glass" onBack={() => router.back()} title={t('helpSupport')} />
       <ScrollView contentContainerStyle={styles.body}>
-        <Text style={[theme.type.h2, { color: theme.colors.textPrimary, marginBottom: 10 }]}>{t('faq')}</Text>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, marginBottom: 24 }]}> 
+        <Text style={[theme.type.h2, { color: homeGlassColors.text, marginBottom: 10 }]}>{t('faq')}</Text>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 24 }]}> 
           {faqs.map((f, i) => (
             <FaqItem key={i} q={f.q} a={f.a} />
           ))}
@@ -51,40 +51,40 @@ export default function HelpSupportScreen() {
 
         {/* Easy-to-find source citation for the app's training guidance —
             App Review asked for health-adjacent content to cite a source. */}
-        <Text style={[theme.type.h2, { color: theme.colors.textPrimary, marginBottom: 10 }]}>{t('sourcesTitle')}</Text>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, marginBottom: 24, padding: 14 }]}>
-          <Text style={[theme.type.caption, { color: theme.colors.textSecondary, lineHeight: 19 }]}>{t('sourcesBody')}</Text>
+        <Text style={[theme.type.h2, { color: homeGlassColors.text, marginBottom: 10 }]}>{t('sourcesTitle')}</Text>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 24, padding: 14 }]}>
+          <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, lineHeight: 19 }]}>{t('sourcesBody')}</Text>
           <Pressable onPress={() => Linking.openURL('https://www.who.int/news-room/fact-sheets/detail/physical-activity')} hitSlop={6}>
-            <Text style={[theme.type.caption, { color: theme.colors.primary, marginTop: 8, fontFamily: theme.fontFamily.semiBold }]}>
+            <Text style={[theme.type.caption, { color: homeGlassColors.tick, marginTop: 8, fontFamily: theme.fontFamily.semiBold }]}>
               {t('sourcesLink')}
             </Text>
           </Pressable>
         </View>
 
-        <Text style={[theme.type.h2, { color: theme.colors.textPrimary, marginBottom: 10 }]}>{t('supportContact')}</Text>
+        <Text style={[theme.type.h2, { color: homeGlassColors.text, marginBottom: 10 }]}>{t('supportContact')}</Text>
         <View style={{ gap: 10 }}>
           <Pressable
             onPress={() => router.push('/chat/ai')}
-            style={[styles.contactRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
           >
             <Image source={AI_ASSISTANT_IMAGE} style={styles.iconCircle} resizeMode="cover" />
             <View style={{ flex: 1 }}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('aiAssistant')}</Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{t('instantReplies')}</Text>
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t('aiAssistant')}</Text>
+              <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}>{t('instantReplies')}</Text>
             </View>
-            <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
+            <Icon name="chevron-right" size={16} color={homeGlassColors.textFaint} />
           </Pressable>
 
           <Pressable
             onPress={() => router.push('/chat/human')}
-            style={[styles.contactRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
           >
             <Image source={SPECIALIST_IMAGE} style={styles.iconCircle} resizeMode="cover" />
             <View style={{ flex: 1 }}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('specialist')}</Text>
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t('specialist')}</Text>
               <OnlineIndicator online={specialistOnline} />
             </View>
-            <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
+            <Icon name="chevron-right" size={16} color={homeGlassColors.textFaint} />
           </Pressable>
 
           {/* Hotline row only exists once admin fills a number in WEB Admin
@@ -93,13 +93,13 @@ export default function HelpSupportScreen() {
           {hotline ? (
             <Pressable
               onPress={() => Linking.openURL(`tel:${hotline}`)}
-              style={[styles.contactRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+              style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
             >
-              <Icon name="external-link" size={20} color={theme.colors.primary} />
+              <Icon name="external-link" size={20} color={homeGlassColors.tick} />
               <View style={{ flex: 1 }}>
-                <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportHotline')}</Text>
+                <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t('supportHotline')}</Text>
                 {appConfig.get('support_hotline_label') ? (
-                  <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{appConfig.get('support_hotline_label')}</Text>
+                  <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}>{appConfig.get('support_hotline_label')}</Text>
                 ) : null}
               </View>
             </Pressable>
@@ -107,12 +107,12 @@ export default function HelpSupportScreen() {
 
           <Pressable
             onPress={() => Linking.openURL(`mailto:${appConfig.get('support_email')}`)}
-            style={[styles.contactRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}
+            style={[styles.contactRow, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}
           >
-            <Icon name="external-link" size={20} color={theme.colors.primary} />
+            <Icon name="external-link" size={20} color={homeGlassColors.tick} />
             <View style={{ flex: 1 }}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportEmail')}</Text>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{appConfig.get('support_email')}</Text>
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t('supportEmail')}</Text>
+              <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}>{appConfig.get('support_email')}</Text>
             </View>
           </Pressable>
         </View>

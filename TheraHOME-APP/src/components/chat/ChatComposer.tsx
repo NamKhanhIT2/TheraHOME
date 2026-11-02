@@ -1,6 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { Image, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { Icon } from '@/components/icons/Icon';
 import type { ChatMessageRow } from '@/hooks/useChat';
@@ -52,6 +52,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
   replyingTo?: ChatMessageRow | null;
   onCancelReply?: () => void;
   enableEmojis?: boolean;
+  /** 'glass' for the customer's threads. The staff console stays light. */
+  tone?: 'app' | 'glass';
 }>(function ChatComposer(
   {
     value,
@@ -65,10 +67,22 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
     replyingTo,
     onCancelReply,
     enableEmojis = true,
+    tone = 'app',
   },
   ref,
 ) {
   const theme = useTheme();
+  const glass = tone === 'glass';
+  // The bar sits ON the thread, so it takes the screen's own ground rather
+  // than `bgApp` — which on a dark thread was a white strip across the foot
+  // of the screen.
+  const ground = glass ? homeGlassColors.sky[4] : theme.colors.bgApp;
+  const raised = glass ? homeGlassColors.surfaceRaised : theme.colors.bgCardAlt;
+  const rule = glass ? homeGlassColors.hairline : theme.colors.divider;
+  const ink = glass ? homeGlassColors.text : theme.colors.textPrimary;
+  const inkMuted = glass ? homeGlassColors.textMuted : theme.colors.textSecondary;
+  const inkFaint = glass ? homeGlassColors.textFaint : theme.colors.textMuted;
+  const accent = glass ? homeGlassColors.tick : theme.colors.primary;
   const { t } = useI18n();
   const inputRef = useRef<TextInput>(null);
   const [showEmojis, setShowEmojis] = useState(false);
@@ -93,19 +107,19 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
   return (
     <>
       {replyingTo ? (
-        <View style={[styles.context, { backgroundColor: theme.colors.bgCardAlt, borderLeftColor: theme.colors.primary }]}>
+        <View style={[styles.context, { backgroundColor: raised, borderLeftColor: accent }]}>
           <View style={styles.flex}>
-            <Text style={[styles.contextTitle, { color: theme.colors.primary }]}>{t('chatReplying')}</Text>
-            <Text numberOfLines={1} style={{ color: theme.colors.textSecondary }}>{replyingTo.body || t('image')}</Text>
+            <Text style={[styles.contextTitle, { color: accent }]}>{t('chatReplying')}</Text>
+            <Text numberOfLines={1} style={{ color: inkMuted }}>{replyingTo.body || t('image')}</Text>
           </View>
           <Pressable onPress={onCancelReply} hitSlop={8}>
-            <Icon name="x" size={18} color={theme.colors.textMuted} />
+            <Icon name="x" size={18} color={inkFaint} />
           </Pressable>
         </View>
       ) : null}
 
       {showEmojis ? (
-        <View style={[styles.emojiBar, { borderTopColor: theme.colors.divider }]}>
+        <View style={[styles.emojiBar, { borderTopColor: rule }]}>
           {COMPOSER_EMOJIS.map((emoji) => (
             <Pressable key={emoji} onPress={() => onChangeValue(value + emoji)}>
               <Text style={styles.composerEmoji}>{emoji}</Text>
@@ -115,7 +129,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
       ) : null}
 
       {attachment ? (
-        <View style={[styles.attachmentTray, { borderTopColor: theme.colors.divider }]}>
+        <View style={[styles.attachmentTray, { borderTopColor: rule }]}>
           <View>
             {attachment.kind === 'video' ? (
               <View style={[styles.preview, styles.videoPreview]}>
@@ -124,14 +138,14 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
             ) : (
               <Image source={{ uri: attachment.uri }} style={styles.preview} />
             )}
-            <Pressable onPress={onRemoveAttachment} style={[styles.remove, { borderColor: theme.colors.bgApp }]} hitSlop={6}>
+            <Pressable onPress={onRemoveAttachment} style={[styles.remove, { borderColor: ground }]} hitSlop={6}>
               <Icon name="x" size={12} color="#fff" />
             </Pressable>
           </View>
         </View>
       ) : null}
 
-      <View style={[styles.inputRow, { borderTopColor: theme.colors.divider, backgroundColor: theme.colors.bgApp }]}>
+      <View style={[styles.inputRow, { borderTopColor: rule, backgroundColor: ground }]}>
         {onPickMedia ? (
           <Pressable
             accessibilityRole="button"
@@ -140,7 +154,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
             onPress={onPickMedia}
             style={styles.tool}
           >
-            <Icon name="image" size={23} color={theme.colors.primary} />
+            <Icon name="image" size={23} color={accent} />
           </Pressable>
         ) : null}
 
@@ -152,7 +166,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
             onPress={toggleEmojis}
             style={styles.tool}
           >
-            <Icon name="smile" size={23} color={showEmojis ? theme.colors.primary : theme.colors.textMuted} />
+            <Icon name="smile" size={23} color={showEmojis ? accent : inkFaint} />
           </Pressable>
         ) : null}
 
@@ -165,8 +179,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
           maxLength={2000}
           placeholder={placeholder}
           accessibilityLabel={t('a11yMessageInput')}
-          placeholderTextColor={theme.colors.textMuted}
-          style={[styles.input, { borderColor: theme.colors.borderInput, color: theme.colors.textPrimary, backgroundColor: theme.colors.bgCardAlt }]}
+          placeholderTextColor={inkFaint}
+          style={[styles.input, { borderColor: glass ? homeGlassColors.hairline : theme.colors.borderInput, color: ink, backgroundColor: raised }]}
         />
 
         <Pressable
@@ -177,13 +191,13 @@ export const ChatComposer = forwardRef<ChatComposerHandle, {
           onPress={() => (hasContent ? onSend() : emptyAction.kind === 'like' ? emptyAction.onPress() : undefined)}
           style={[
             styles.send,
-            { backgroundColor: hasContent ? theme.colors.primary : theme.colors.bgCardAlt },
+            { backgroundColor: hasContent ? accent : raised },
           ]}
         >
           <Icon
             name={hasContent ? 'send' : emptyAction.kind === 'like' ? 'thumbs-up' : 'send'}
             size={18}
-            color={hasContent ? '#fff' : theme.colors.textMuted}
+            color={hasContent ? '#fff' : inkFaint}
           />
         </Pressable>
       </View>

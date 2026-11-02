@@ -7,20 +7,25 @@
 //
 // It hides itself rather than disappointing anyone: no native module in
 // this binary, no published reference for this day, or the feature switched
-// off centrally, and there is simply no card. What it does NOT hide from is
-// someone without a plan — that is exactly who it is for.
-import React from 'react';
+// off centrally, and there is simply no card.
+//
+// It is FREE as of 2026-10-27 (owner). It used to open the plan gate for
+// anyone without a subscription; the lock is gone here AND in the two
+// policies that actually enforced it — `exercise_references` and the
+// `exercise-reference` storage bucket — because removing only this one
+// would have handed people a screen with no clip to copy.
+import React, { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import * as Haptics from 'expo-haptics';
+import { homeGlassColors, useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
-import { usePaidAccess } from '@/hooks/useSubscription';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useDaysWithReference } from '@/hooks/useExerciseReference';
-import { usePlanGate } from '@/hooks/usePlanGate';
 import { isPoseSupported } from '@/lib/pose';
 import { MOTION_TRACKING_ENABLED } from '@/lib/features';
+import { useEdgeGlowTransition } from '@/store/useEdgeGlowTransition';
 
 export interface LiveFormCardProps {
   userId: string | undefined;
@@ -34,49 +39,75 @@ export interface LiveFormCardProps {
 export function LiveFormCard({ userId, productId, dayNumber, programDayId }: LiveFormCardProps) {
   const theme = useTheme();
   const { t } = useI18n();
-  const askForPlan = usePlanGate();
-  const paid = usePaidAccess(userId).data === true;
   // The remote kill switch. Checked here rather than inside the training
   // screen so a flipped switch removes the entrance, not just the room.
   const { get } = useAppConfig();
   const days = useDaysWithReference(userId).data;
+  const igniteGlow = useEdgeGlowTransition((state) => state.ignite);
+  const launchingRef = useRef(false);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(
+    () => () => {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    },
+    [],
+  );
+
+  function openLiveTraining() {
+    if (launchingRef.current) return;
+    launchingRef.current = true;
+    igniteGlow();
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Give the light enough time to reach the corners before the native push
+    // begins. The root-level glow stays mounted above both screens.
+    timersRef.current.push(
+      setTimeout(() => {
+        router.push({
+          pathname: '/train/[dayId]',
+          params: {
+            dayId: String(dayNumber),
+            productId: productId ?? '',
+            edgeGlow: '1',
+          },
+        });
+      }, 300),
+      setTimeout(() => {
+        launchingRef.current = false;
+      }, 1_200),
+    );
+  }
 
   if (!MOTION_TRACKING_ENABLED || !isPoseSupported()) return null;
   if (get('motion_tracking_enabled').trim().toLowerCase() === 'off') return null;
   if (!programDayId || !days?.has(programDayId)) return null;
 
-  // Paid ACCESS, not a purchased plan: App Review buys nothing and must
-  // still be able to open this.
-  const locked = !paid;
-
   return (
     <Pressable
-      onPress={() => {
-        if (locked) {
-          askForPlan('featureMotionTracking');
-          return;
-        }
-        router.push({ pathname: '/train/[dayId]', params: { dayId: String(dayNumber), productId: productId ?? '' } });
-      }}
-      style={[
+      onPress={openLiveTraining}
+      style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: theme.colors.bgCardAlt,
-          borderColor: theme.colors.borderLight,
+          backgroundColor: homeGlassColors.surface,
+          borderColor: homeGlassColors.hairline,
           borderRadius: theme.radius.lg,
+          opacity: pressed ? 0.88 : 1,
+          transform: [{ scale: pressed ? 0.988 : 1 }],
         },
       ]}
     >
-      <View style={[styles.badge, { backgroundColor: theme.colors.primaryTint10 }]}>
-        <Icon name={locked ? 'crown' : 'activity'} size={19} color={theme.colors.primary} />
+      <View style={[styles.badge, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+        <Icon name="activity" size={19} color={homeGlassColors.tick} />
       </View>
       <View style={styles.text}>
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('dayLiveFormTitle')}</Text>
-        <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>
-          {locked ? t('dayLiveFormLocked') : t('dayLiveFormBody')}
+        <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t('dayLiveFormTitle')}</Text>
+        <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}>
+          {t('dayLiveFormBody')}
         </Text>
       </View>
-      <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+      <Icon name="chevron-right" size={18} color={homeGlassColors.textFaint} />
     </Pressable>
   );
 }

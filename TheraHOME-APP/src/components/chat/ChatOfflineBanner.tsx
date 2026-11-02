@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { Icon } from '@/components/icons/Icon';
 import { useChatConnected } from '@/lib/chatConnection';
@@ -15,14 +15,13 @@ import { useChatConnected } from '@/lib/chatConnection';
  * reconnect, which is what the wording promises.
  */
 export function ChatOfflineBanner() {
-  const theme = useTheme();
   const { t } = useI18n();
   const connected = useChatConnected();
   if (connected) return null;
   return (
-    <View style={[styles.bar, { backgroundColor: theme.colors.warningTint }]}>
-      <Icon name="wifi-off" size={14} color={theme.colors.warning} />
-      <Text style={[styles.text, { color: theme.colors.warning }]}>{t('chatOffline')}</Text>
+    <View style={[styles.bar, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+      <Icon name="wifi-off" size={14} color={homeGlassColors.badge} />
+      <Text style={[styles.text, { color: homeGlassColors.badge }]}>{t('chatOffline')}</Text>
     </View>
   );
 }

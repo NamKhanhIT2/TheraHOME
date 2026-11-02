@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Dimensions, FlatList, Image, KeyboardAvoiding
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { markSpecialistMessagesRead, toggleChatReaction, useChatMessages, useChatThread, useSpecialistPresence, type ChatMessageRow } from '@/hooks/useChat';
 import { useChatOutbox } from '@/hooks/useChatOutbox';
@@ -17,6 +17,7 @@ import { ReactionAsset } from '@/components/ReactionAsset';
 import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
 import { ChatComposer, type ChatComposerHandle } from '@/components/chat/ChatComposer';
 import { ChatOfflineBanner } from '@/components/chat/ChatOfflineBanner';
+import { CUSTOMER_CALLS_ENABLED } from '@/lib/features';
 import { CallButton } from '@/components/chat/CallButton';
 import { resetChatChannelStatus } from '@/lib/chatConnection';
 import { hapticConfirm, hapticPressHold } from '@/lib/haptics';
@@ -197,6 +198,7 @@ export default function HumanChatScreen() {
     return (
       <View style={styles.messageRow}>
         <ChatMessageBubble
+          tone="glass"
           message={message}
           own={own}
           quoted={quoted}
@@ -217,7 +219,7 @@ export default function HumanChatScreen() {
           onOpenMedia={(uri, kind) => setViewer({ uri, kind })}
           onRetry={outbox.retry}
         />
-        {isSessionEnd ? <Text style={[styles.messageTime, { color: theme.colors.textMuted }]}>{timeOf(message.createdAt)}</Text> : null}
+        {isSessionEnd ? <Text style={[styles.messageTime, { color: homeGlassColors.textFaint }]}>{timeOf(message.createdAt)}</Text> : null}
       </View>
     );
   }
@@ -228,12 +230,13 @@ export default function HumanChatScreen() {
     ? displayedReactions(actionMessage).find((item) => item.userId === userId)?.emoji
     : null;
   return (
-    <ScreenContainer>
+    <ScreenContainer tone="glass">
       <KeyboardAvoidingView style={styles.flex} behavior="padding">
-        <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}><Pressable onPress={() => router.back()}><Icon name="chevron-left" size={22} color={theme.colors.textPrimary} /></Pressable><Image source={SPECIALIST_IMAGE} style={styles.avatar} resizeMode="cover" /><View style={styles.flex}><Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('supportTeamName')}</Text><OnlineIndicator online={specialistOnline} /></View><CallButton threadId={threadId} /></View>
+        <View style={[styles.header, { borderBottomColor: homeGlassColors.hairline }]}><Pressable onPress={() => router.back()}><Icon name="chevron-left" size={22} color={homeGlassColors.text} /></Pressable><Image source={SPECIALIST_IMAGE} style={styles.avatar} resizeMode="cover" /><View style={styles.flex}><Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t('supportTeamName')}</Text><OnlineIndicator online={specialistOnline} /></View>{CUSTOMER_CALLS_ENABLED ? <CallButton threadId={threadId} /> : null}</View>
         <ChatOfflineBanner />
-        {threadQuery.isPending || messagesQuery.isPending ? <View style={styles.loading}><ActivityIndicator color={theme.colors.primary} /></View> : <FlatList ref={listRef} inverted data={items} keyExtractor={(item) => item.id} renderItem={renderMessage} contentContainerStyle={styles.body} keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" maintainVisibleContentPosition={CHAT_FOLLOW_NEW_MESSAGES} onTouchStart={() => composerRef.current?.closeEmojis()} onScrollBeginDrag={() => composerRef.current?.closeEmojis()} onEndReached={() => { if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) void messagesQuery.fetchNextPage(); }} onEndReachedThreshold={0.2} ListHeaderComponent={<View style={styles.listBottomSpacer} />} ListFooterComponent={messagesQuery.isFetchingNextPage ? <ActivityIndicator color={theme.colors.primary} /> : null} ListEmptyComponent={<Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>{t('chatEmptyHint')}</Text>} />}
+        {threadQuery.isPending || messagesQuery.isPending ? <View style={styles.loading}><ActivityIndicator color={homeGlassColors.tick} /></View> : <FlatList ref={listRef} inverted data={items} keyExtractor={(item) => item.id} renderItem={renderMessage} contentContainerStyle={styles.body} keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled" maintainVisibleContentPosition={CHAT_FOLLOW_NEW_MESSAGES} onTouchStart={() => composerRef.current?.closeEmojis()} onScrollBeginDrag={() => composerRef.current?.closeEmojis()} onEndReached={() => { if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) void messagesQuery.fetchNextPage(); }} onEndReachedThreshold={0.2} ListHeaderComponent={<View style={styles.listBottomSpacer} />} ListFooterComponent={messagesQuery.isFetchingNextPage ? <ActivityIndicator color={homeGlassColors.tick} /> : null} ListEmptyComponent={<Text style={{ color: homeGlassColors.textFaint, textAlign: 'center' }}>{t('chatEmptyHint')}</Text>} />}
         <ChatComposer
+          tone="glass"
           ref={composerRef}
           value={text}
           onChangeValue={setText}
@@ -247,18 +250,18 @@ export default function HumanChatScreen() {
           onCancelReply={() => setReplyingTo(null)}
         />
         {viewer ? <ChatMediaViewer uri={viewer.uri} kind={viewer.kind} onClose={() => setViewer(null)} /> : null}
-        <Modal visible={!!actionMessage} transparent animationType="none" onRequestClose={() => { setActionMessage(null); setActionOrigin(null); }}><Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={() => { setActionMessage(null); setActionOrigin(null); }}><View style={[styles.actionContent, { top: actionTop, ...(actionOwn ? { right: 16 } : { left: 16 }) }]}><View style={[styles.reactionBar, { backgroundColor: theme.colors.bgCard, borderWidth: 1, borderColor: theme.colors.divider }]}>{REACTIONS.map((emoji) => <Pressable key={emoji} style={[styles.reactionChoice, selectedActionEmoji === emoji ? { backgroundColor: theme.colors.bgCardAlt } : undefined]} onPress={() => actionMessage && void react(actionMessage, emoji)}><ReactionAsset emoji={emoji} size={29} /></Pressable>)}</View><View style={[styles.sheet, { backgroundColor: theme.colors.bgCard, borderWidth: 1, borderColor: theme.colors.divider }]}><ActionRow icon="message-circle" text={t('reply')} onPress={() => void action('reply')} /><ActionRow icon="copy" text={t('copyText')} onPress={() => void action('copy')} /></View></View></Pressable></Modal>
+        <Modal visible={!!actionMessage} transparent animationType="none" onRequestClose={() => { setActionMessage(null); setActionOrigin(null); }}><Pressable style={[styles.backdrop, { backgroundColor: homeGlassColors.toast }]} onPress={() => { setActionMessage(null); setActionOrigin(null); }}><View style={[styles.actionContent, { top: actionTop, ...(actionOwn ? { right: 16 } : { left: 16 }) }]}><View style={[styles.reactionBar, { backgroundColor: homeGlassColors.surface, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>{REACTIONS.map((emoji) => <Pressable key={emoji} style={[styles.reactionChoice, selectedActionEmoji === emoji ? { backgroundColor: homeGlassColors.surfaceRaised } : undefined]} onPress={() => actionMessage && void react(actionMessage, emoji)}><ReactionAsset emoji={emoji} size={29} /></Pressable>)}</View><View style={[styles.sheet, { backgroundColor: homeGlassColors.surface, borderWidth: 1, borderColor: homeGlassColors.hairline }]}><ActionRow icon="message-circle" text={t('reply')} onPress={() => void action('reply')} /><ActionRow icon="copy" text={t('copyText')} onPress={() => void action('copy')} /></View></View></Pressable></Modal>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
 
-function ActionRow({ icon, text, onPress }: { icon: string; text: string; onPress: () => void }) { const theme = useTheme(); return <Pressable style={[styles.actionRow, { borderBottomColor: theme.colors.divider }]} onPress={onPress}><Icon name={icon} size={19} color={theme.colors.textPrimary} /><Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{text}</Text></Pressable>; }
+function ActionRow({ icon, text, onPress }: { icon: string; text: string; onPress: () => void }) { const theme = useTheme(); return <Pressable style={[styles.actionRow, { borderBottomColor: homeGlassColors.hairline }]} onPress={onPress}><Icon name={icon} size={19} color={homeGlassColors.text} /><Text style={[theme.type.body, { color: homeGlassColors.text }]}>{text}</Text></Pressable>; }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 10, paddingTop: 4, borderBottomWidth: StyleSheet.hairlineWidth },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#14161F', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: homeGlassColors.surfaceRaised, alignItems: 'center', justifyContent: 'center' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   // justifyContent on an INVERTED list reads upside down: 'flex-end' is the
   // visual TOP. Without it a short thread sat pinned to the bottom of the

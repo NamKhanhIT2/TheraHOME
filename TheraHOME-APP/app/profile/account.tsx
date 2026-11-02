@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -23,12 +23,12 @@ function ToggleRow({ icon, title, sub, value, onChange }: { icon: string; title:
   const theme = useTheme();
   return (
     <View style={styles.row}>
-      <Icon name={icon} size={20} color={theme.colors.primary} />
+      <Icon name={icon} size={20} color={homeGlassColors.tick} />
       <View style={{ flex: 1 }}>
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{title}</Text>
-        {sub ? <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{sub}</Text> : null}
+        <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{title}</Text>
+        {sub ? <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{sub}</Text> : null}
       </View>
-      <Pressable onPress={() => onChange(!value)} style={[styles.toggleTrack, { backgroundColor: value ? theme.colors.primary : theme.colors.borderInput }]}>
+      <Pressable onPress={() => onChange(!value)} style={[styles.toggleTrack, { backgroundColor: value ? homeGlassColors.tick : homeGlassColors.hairline }]}>
         <View style={[styles.toggleThumb, { left: value ? 21 : 3 }]} />
       </Pressable>
     </View>
@@ -71,23 +71,23 @@ export default function AccountSettingsScreen() {
   }
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={t('accountSettings')} />
+    <ScreenContainer tone="glass">
+      <BackBar tone="glass" onBack={() => router.back()} title={t('accountSettings')} />
       <ScrollView contentContainerStyle={styles.body}>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, marginBottom: 20 }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, marginBottom: 20 }]}>
           {/* Was a hardcoded "Quản lý tài khoản Google" label, written when
               Google was the only way in. The app now also signs in with email
               + password and with Apple, so that row told most users something
               untrue and left password accounts with no way to change their
               password anywhere in the app. */}
-          <View style={[styles.row, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}>
-            <Icon name={signInProvider === 'google' ? 'user' : signInProvider === 'apple' ? 'user' : 'mail'} size={20} color={theme.colors.primary} />
+          <View style={[styles.row, { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline }]}>
+            <Icon name={signInProvider === 'google' ? 'user' : signInProvider === 'apple' ? 'user' : 'mail'} size={20} color={homeGlassColors.tick} />
             <View style={{ flex: 1 }}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>
                 {signInProvider === 'google' ? t('signInWithGoogle') : signInProvider === 'apple' ? t('signInWithApple') : t('authEmail')}
               </Text>
               {accountEmail ? (
-                <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{accountEmail}</Text>
+                <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{accountEmail}</Text>
               ) : null}
             </View>
           </View>
@@ -95,19 +95,19 @@ export default function AccountSettingsScreen() {
             <Pressable
               onPress={changePassword}
               disabled={sendingReset}
-              style={[styles.row, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}
+              style={[styles.row, { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline }]}
               accessibilityRole="button"
             >
-              <Icon name="lock" size={20} color={theme.colors.primary} />
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{t('authNewPasswordTitle')}</Text>
-              <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+              <Icon name="lock" size={20} color={homeGlassColors.tick} />
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flex: 1 }]}>{t('authNewPasswordTitle')}</Text>
+              <Icon name="chevron-right" size={18} color={homeGlassColors.textFaint} />
             </Pressable>
           ) : null}
 
-          <View style={[styles.langBlock, { borderBottomWidth: 1, borderBottomColor: theme.colors.divider }]}>
+          <View style={[styles.langBlock, { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline }]}>
             <View style={styles.langHeader}>
-              <Icon name="book" size={20} color={theme.colors.primary} />
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('language')}</Text>
+              <Icon name="book" size={20} color={homeGlassColors.tick} />
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t('language')}</Text>
             </View>
             <View style={styles.langOptions}>
               {/* Labels follow the CURRENT UI language (per explicit request
@@ -135,13 +135,13 @@ export default function AccountSettingsScreen() {
                     styles.langBtn,
                     {
                       borderWidth: language === code ? 2 : 1,
-                      borderColor: language === code ? theme.colors.primary : theme.colors.borderInput,
-                      backgroundColor: language === code ? theme.colors.primaryTint10 : theme.colors.bgCard,
+                      borderColor: language === code ? homeGlassColors.tick : homeGlassColors.hairline,
+                      backgroundColor: language === code ? homeGlassColors.hairline : homeGlassColors.surface,
                       borderRadius: theme.radius.md,
                     },
                   ]}
                 >
-                  <Text style={[theme.type.body, { color: language === code ? theme.colors.primary : theme.colors.textPrimary, fontFamily: theme.fontFamily.semiBold }]}> 
+                  <Text style={[theme.type.body, { color: language === code ? homeGlassColors.tick : homeGlassColors.text, fontFamily: theme.fontFamily.semiBold }]}> 
                     {label}
                   </Text>
                 </Pressable>
@@ -164,19 +164,19 @@ export default function AccountSettingsScreen() {
           />
         </View>
 
-        <Text style={[theme.type.captionSm, { color: theme.colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }]}>
+        <Text style={[theme.type.captionSm, { color: homeGlassColors.tick, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }]}>
           {t('legal')}
         </Text>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
           {LEGAL_ROWS.map((row, i) => (
             <Pressable
               key={row.key}
               onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: row.key } })}
-              style={[styles.row, i < LEGAL_ROWS.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.divider } : null]}
+              style={[styles.row, i < LEGAL_ROWS.length - 1 ? { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline } : null]}
             >
-              <Icon name={row.icon} size={20} color={theme.colors.primary} />
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{t(row.labelKey)}</Text>
-              <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
+              <Icon name={row.icon} size={20} color={homeGlassColors.tick} />
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flex: 1 }]}>{t(row.labelKey)}</Text>
+              <Icon name="chevron-right" size={16} color={homeGlassColors.textFaint} />
             </Pressable>
           ))}
         </View>
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#fff',
+    backgroundColor: homeGlassColors.text,
     position: 'absolute',
     top: 3,
   },

@@ -13,12 +13,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { useTheme, poseColors } from '@/theme';
+import { useVideoPlayer, VideoView, type VideoThumbnail } from 'expo-video';
+import * as VideoThumbnails from 'expo-video-thumbnails';
+import { Image } from 'expo-image';
+import { homeGlassColors, useTheme, poseColors } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useCatalogProgramDays } from '@/hooks/usePrograms';
-import { useExerciseReference } from '@/hooks/useExerciseReference';
+import { useExerciseReference, type ExerciseReference } from '@/hooks/useExerciseReference';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
@@ -28,19 +30,23 @@ import { PoseCamera, isPoseCameraAvailable } from '@/components/pose/PoseCamera'
 import {
   getCameraPermissionStatus,
   isPoseSupported,
+  POSE_EDGES,
+  POSE_HIDDEN,
   requestCameraPermission,
   type PoseFrame,
   type PosePoint,
   type PoseStatus,
 } from '@/lib/pose';
 import { createComparator, edgesFor, type Comparator, type Verdict } from '@/lib/poseCompare';
-import { sampleAt } from '@/lib/poseTrack';
+import { sampleAt, type TrackSample } from '@/lib/poseTrack';
 import { hintFor, partOf } from '@/lib/poseHints';
+import { useEdgeGlowTransition } from '@/store/useEdgeGlowTransition';
 
 /** The reference skeleton is redrawn at the track's own rate. Faster would
  * draw the same sample twice; slower would make the specialist stutter next
  * to a customer moving smoothly. */
 const REFERENCE_HZ = 15;
+const PREVIEW_TIME_MS = 100;
 
 /** Seconds of "get into position" before anything is scored. Long enough to
  * step back and put the phone down, short enough not to be a wait. */
@@ -51,7 +57,8 @@ type Phase = 'intro' | 'countdown' | 'running' | 'done';
 export default function TrainScreen() {
   const theme = useTheme();
   const { t } = useI18n();
-  const { dayId, productId } = useLocalSearchParams<{ dayId: string; productId?: string }>();
+  const { dayId, productId, edgeGlow } = useLocalSearchParams<{ dayId: string; productId?: string; edgeGlow?: string }>();
+  const settleEdgeGlow = useEdgeGlowTransition((state) => state.settle);
   const { session } = useSession();
   const userId = session?.user.id;
 
@@ -59,8 +66,19 @@ export default function TrainScreen() {
   const program = (programsQuery.data ?? []).find((p) => p.productId === productId);
   const daysQuery = useCatalogProgramDays(productId, program?.userProgramId, program?.activatedAt);
   const day = (daysQuery.data ?? []).find((x) => x.id === Number(dayId));
-  const referenceQuery = useExerciseReference(day?.programDayId);
+  const referenceQuery = useExerciseReference(day?.programDayId, userId);
   const reference = referenceQuery.data ?? null;
+  const compareConfig = useMemo(
+    () => (reference ? { ...reference.config, view: reference.track.view } : null),
+    [reference],
+  );
+  const drawnEdges = useMemo(() => (compareConfig ? edgesFor(compareConfig) : undefined), [compareConfig]);
+  const previewSample = useMemo(
+    () => selectPreviewSample(reference?.track ?? null, drawnEdges),
+    [reference, drawnEdges],
+  );
+  const previewTimeMs = previewSample?.t ?? PREVIEW_TIME_MS;
+  const previewPoints = useMemo(() => pointsFromSample(previewSample), [previewSample]);
 
   const [phase, setPhase] = useState<Phase>('intro');
   const [counter, setCounter] = useState(COUNTDOWN);
@@ -72,6 +90,34 @@ export default function TrainScreen() {
   const [pane, setPane] = useState({ w: 0, h: 0 });
   const [summary, setSummary] = useState<ReturnType<Comparator['summary']> | null>(null);
 
+  // The entrance light belongs to the way in and nothing else: it lingers a
+  // moment on arrival, then goes out. The owner asked for exactly that on
+  // 2026-10-31 — during the session it was one more thing moving while the
+  // customer is trying to hold a pose.
+  useEffect(() => {
+    if (edgeGlow !== '1' || phase !== 'intro') return;
+    const timer = setTimeout(settleEdgeGlow, 2_800);
+    return () => clearTimeout(timer);
+  }, [edgeGlow, phase, settleEdgeGlow]);
+
+  // Starting early cuts the lingering light short rather than leaving it to
+  // time out behind the countdown.
+  useEffect(() => {
+    if (phase !== 'intro') settleEdgeGlow();
+  }, [phase, settleEdgeGlow]);
+
+  useEffect(() => () => settleEdgeGlow(), [settleEdgeGlow]);
+
+  // Whether the specialist's clip has a frame to show. Until it does the
+  // pane is a black rectangle, which is what the owner was looking at
+  // (2026-10-25) — the player only decodes once something asks it to.
+  const [clipReady, setClipReady] = useState(false);
+  // A still of the specialist, held over the player until the session
+  // starts. `posterDone` is "we have finished trying", which is not the
+  // same as having one: the spinner waits for the attempt, not the result,
+  // or a clip neither generator can grab a still from would spin for ever.
+  const [poster, setPoster] = useState<VideoThumbnail | string | null>(null);
+  const [posterDone, setPosterDone] = useState(false);
   const player = useVideoPlayer(reference?.clipUrl ?? null, (instance) => {
     // A demonstration loops: it has no end to reach, and the customer's
     // attention belongs on the two bodies rather than on a progress bar.
@@ -84,14 +130,101 @@ export default function TrainScreen() {
     // iOS still honours the silent switch, so a phone on silent shows the
     // movement and says nothing — which is the right way round: this screen
     // must work without sound, never only with it.
-    instance.muted = false;
+    // Muted until the session starts, so the frame that is nudged onto the
+    // screen below arrives silently. Unmuted again in the countdown.
+    instance.muted = true;
   });
+
+  // The still, fetched once the clip is loaded enough to have one.
+  //
+  // This exists because the nudge below is not enough on its own. On
+  // Android the player draws its own first frame and always did; on iPhone
+  // the layer stayed black through every variation of play/pause/seek
+  // (owner, 2026-10-30), so the pane no longer depends on the player having
+  // drawn anything at all — it shows a picture it fetched itself, and gets
+  // out of the way when the clip actually starts moving.
+  //
+  // Two generators, tried in order, because they fail for different
+  // reasons: expo-video asks THIS player for the still (no second download,
+  // and it works on a signed URL that is already open), while
+  // expo-video-thumbnails opens the URL again with its own decoder.
+  const clipUrl = reference?.clipUrl ?? null;
+  useEffect(() => {
+    if (!clipReady || !clipUrl) return;
+    let alive = true;
+    const generate = async () => {
+      try {
+        const [thumb] = await player.generateThumbnailsAsync([previewTimeMs / 1000], { maxWidth: 720 });
+        if (thumb) {
+          if (alive) setPoster(thumb);
+          return;
+        }
+      } catch {
+        // Falls through to the second generator.
+      }
+      try {
+        const { uri } = await VideoThumbnails.getThumbnailAsync(clipUrl, { time: previewTimeMs });
+        if (alive) setPoster(uri);
+      } catch {
+        // No still to be had. The player is all there is, which is where
+        // this screen stood before.
+      }
+    };
+    void generate().finally(() => {
+      if (alive) setPosterDone(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [clipReady, clipUrl, player, previewTimeMs]);
 
   // Read by the camera callback, which must not re-subscribe every frame.
   const clipTimeRef = useRef(0);
   const phaseRef = useRef<Phase>('intro');
   const comparatorRef = useRef<Comparator | null>(null);
   phaseRef.current = phase;
+
+  // The first frame of the clip, and why it takes a nudge HERE rather than
+  // in the setup callback above — which is where it used to be, and did
+  // nothing. `setup` runs the instant the player is created, before the
+  // clip has loaded anything to decode, so a play/pause there moves no
+  // picture. Android's ExoPlayer draws frame 0 by itself once the item is
+  // prepared, which is why only iPhone was affected: iOS's AVPlayer leaves
+  // the layer blank until something asks it to move, so the spinner
+  // finished and handed over to a black rectangle (owner, 2026-10-30).
+  //
+  // The seek is past 0 rather than at 0 on purpose: the player is already at
+  // 0, and a seek to where it already is can be dropped as a no-op — which
+  // would leave exactly the blank layer this is here to fix. It matches the
+  // thumbnail and its pose sample, so the overlay does not jump on load.
+  //
+  // Once per player, and only while nobody has pressed Bắt đầu yet. This
+  // event fires again every time the clip recovers from buffering, and
+  // muting and pausing a session that is already running would be a worse
+  // bug than the black pane.
+  const firstFrameRef = useRef(false);
+  useEffect(() => {
+    firstFrameRef.current = false;
+    setClipReady(false);
+    setPoster(null);
+    setPosterDone(false);
+    const showFirstFrame = () => {
+      setClipReady(true);
+      if (firstFrameRef.current || phaseRef.current !== 'intro') return;
+      firstFrameRef.current = true;
+      player.muted = true;
+      player.play();
+      player.pause();
+      player.currentTime = previewTimeMs / 1000;
+    };
+    const subscription = player.addListener('statusChange', ({ status }) => {
+      if (status === 'readyToPlay') showFirstFrame();
+    });
+    // A cached clip can be ready before this effect runs, and the event for
+    // that has already been and gone.
+    if (player.status === 'readyToPlay') showFirstFrame();
+    return () => subscription.remove();
+  }, [player, previewTimeMs]);
 
   const paneAspect = pane.h > 0 ? pane.w / pane.h : 1;
   const paneAspectRef = useRef(1);
@@ -100,11 +233,9 @@ export default function TrainScreen() {
   // One config, used for both the comparison and for deciding which bones
   // are worth drawing — so the skeleton shows exactly the part of the body
   // the exercise is scored on, and nothing the colour could not explain.
-  const compareConfig = useMemo(
-    () => (reference ? { ...reference.config, view: reference.track.view } : null),
-    [reference],
-  );
-  const drawnEdges = useMemo(() => (compareConfig ? edgesFor(compareConfig) : undefined), [compareConfig]);
+  const displayedReferencePoints = phase === 'intro' || phase === 'countdown'
+    ? previewPoints
+    : referencePoints;
 
   useEffect(() => {
     comparatorRef.current = reference && compareConfig ? createComparator(reference.track, compareConfig) : null;
@@ -121,17 +252,7 @@ export default function TrainScreen() {
       clipTimeRef.current = ms;
       const sample = sampleAt(reference.track, ms);
       if (!sample) return;
-      setReferencePoints(
-        Object.entries(sample.p).map(([key, value]) => ({
-          k: key as PosePoint['k'],
-          // The track is normalized against the CLIP's frame and drawn into
-          // a pane of the same shape (the video is letterboxed to its own
-          // aspect), so these go straight through.
-          x: value![0],
-          y: value![1],
-          c: value![2],
-        })),
-      );
+      setReferencePoints(pointsFromSample(sample));
     }, 1000 / REFERENCE_HZ);
     return () => clearInterval(timer);
   }, [phase, player, reference]);
@@ -159,6 +280,7 @@ export default function TrainScreen() {
     if (counter <= 0) {
       comparatorRef.current?.reset();
       player.currentTime = 0;
+      player.muted = false;
       player.play();
       setPhase('running');
       return;
@@ -224,13 +346,13 @@ export default function TrainScreen() {
   // day and its reference both exist.
   if (body !== 'ready' || !reference || !reference.clipUrl) {
     return (
-      <ScreenContainer>
-        <BackBar onBack={() => router.back()} title={t('trainTitle')} />
+      <ScreenContainer tone="glass">
+        <BackBar tone="glass" onBack={() => router.back()} title={t('trainTitle')} />
         <View style={styles.center}>
           {body === 'loading' ? (
-            <ActivityIndicator color={theme.colors.primary} />
+            <ActivityIndicator color={homeGlassColors.tick} />
           ) : (
-            <Text style={[theme.type.body, styles.message, { color: theme.colors.textSecondary }]}>
+            <Text style={[theme.type.body, styles.message, { color: homeGlassColors.textMuted }]}>
               {body === 'unsupported' ? t('trainUnavailable') : t('trainNoReference')}
             </Text>
           )}
@@ -244,8 +366,8 @@ export default function TrainScreen() {
     // Android's navigation bar. Seen on a Galaxy A12, 2026-10-19 — the
     // gesture bar was drawn across "Dừng lại", which is the one control
     // somebody mid-exercise needs to be able to hit.
-    <ScreenContainer edges={['top', 'bottom']}>
-      <BackBar onBack={() => router.back()} title={t('trainTitle')} />
+    <ScreenContainer tone="glass" edges={['top', 'bottom']}>
+      <BackBar tone="glass" onBack={() => router.back()} title={t('trainTitle')} />
 
       {/* The specialist. Letterboxed to the clip's own shape so the
           precomputed keypoints land exactly on the body — `contentFit`
@@ -258,15 +380,32 @@ export default function TrainScreen() {
           nativeControls={false}
           contentFit="contain"
         />
-        <ReferenceOverlay points={referencePoints} only={drawnEdges} />
-        <View style={[styles.tag, { backgroundColor: theme.colors.bgCard }]}>
-          <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{t('trainSpecialist')}</Text>
+        {/* The still, over the player and under the skeleton. It goes away
+            when the clip starts moving — by then the player has frames of
+            its own, and at `done` it is paused on the last one. Same
+            `contain` as the VideoView, so the two line up exactly. */}
+        {poster && (phase === 'intro' || phase === 'countdown') ? (
+          <Image source={poster} style={StyleSheet.absoluteFill} contentFit="contain" transition={150} />
+        ) : null}
+        <ReferenceOverlay points={displayedReferencePoints} only={drawnEdges} />
+        {!clipReady || !posterDone ? (
+          // Something to look at while the clip loads, rather than a black
+          // rectangle with a label floating on it.
+          <View style={[styles.cover, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+            <ActivityIndicator color={homeGlassColors.tick} />
+            <Text style={[theme.type.caption, styles.message, { color: homeGlassColors.textMuted }]}>
+              {t('loading')}
+            </Text>
+          </View>
+        ) : null}
+        <View style={[styles.tag, { backgroundColor: homeGlassColors.surface }]}>
+          <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}>{t('trainSpecialist')}</Text>
         </View>
       </View>
 
       {/* You. */}
       <View
-        style={[styles.cameraPane, { backgroundColor: theme.colors.bgCardAlt }]}
+        style={[styles.cameraPane, { backgroundColor: homeGlassColors.surfaceRaised }]}
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           setPane({ w: width, h: height });
@@ -290,12 +429,12 @@ export default function TrainScreen() {
         />
 
         {phase === 'intro' ? (
-          <View style={[styles.cover, { backgroundColor: theme.colors.bgApp }]}>
-            <Icon name="user" size={28} color={theme.colors.primary} />
-            <Text style={[theme.type.bodyStrong, styles.message, { color: theme.colors.textPrimary }]}>
+          <View style={[styles.cover, { backgroundColor: homeGlassColors.sky[4] }]}>
+            <Icon name="user" size={28} color={homeGlassColors.tick} />
+            <Text style={[theme.type.bodyStrong, styles.message, { color: homeGlassColors.text }]}>
               {reference.track.view === 'side' ? t('trainSetupSide') : t('trainSetupFront')}
             </Text>
-            <Text style={[theme.type.caption, styles.message, { color: theme.colors.textSecondary }]}>
+            <Text style={[theme.type.caption, styles.message, { color: homeGlassColors.textMuted }]}>
               {t('trainPrivacy')}
             </Text>
           </View>
@@ -303,8 +442,8 @@ export default function TrainScreen() {
 
         {phase === 'countdown' ? (
           <View style={styles.cover}>
-            <Text style={[theme.type.h1, { color: theme.colors.primary }]}>{counter}</Text>
-            <Text style={[theme.type.caption, styles.message, { color: theme.colors.textSecondary }]}>
+            <Text style={[theme.type.h1, { color: homeGlassColors.tick }]}>{counter}</Text>
+            <Text style={[theme.type.caption, styles.message, { color: homeGlassColors.textMuted }]}>
               {t('trainGetReady')}
             </Text>
           </View>
@@ -317,8 +456,8 @@ export default function TrainScreen() {
             device, 2026-10-19). One message, one place. */}
 
         {cameraState === 'denied' ? (
-          <View style={[styles.cover, { backgroundColor: theme.colors.bgApp }]}>
-            <Text style={[theme.type.body, styles.message, { color: theme.colors.textSecondary }]}>
+          <View style={[styles.cover, { backgroundColor: homeGlassColors.sky[4] }]}>
+            <Text style={[theme.type.body, styles.message, { color: homeGlassColors.textMuted }]}>
               {t('trainCameraDenied')}
             </Text>
           </View>
@@ -334,16 +473,16 @@ export default function TrainScreen() {
                   "điểm" tells somebody who simply stepped out of frame that
                   they scored nothing — a verdict on a measurement that was
                   never taken. */}
-              <Text style={[theme.type.h2, { color: lost ? theme.colors.textMuted : scoreColour(verdict?.score) }]}>
+              <Text style={[theme.type.h2, { color: lost ? homeGlassColors.textFaint : scoreColour(verdict?.score) }]}>
                 {lost || verdict === null ? '—' : verdict.score}
               </Text>
               {lost ? null : (
-                <Text style={[theme.type.caption, { color: theme.colors.textMuted }]}>
+                <Text style={[theme.type.caption, { color: homeGlassColors.textFaint }]}>
                   {t('trainScoreUnit')}
                 </Text>
               )}
             </View>
-            <Text style={[theme.type.bodyStrong, styles.hint, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+            <Text style={[theme.type.bodyStrong, styles.hint, { color: homeGlassColors.text }]} numberOfLines={2}>
               {lost
                 ? t('trainLost')
                 : partial
@@ -359,11 +498,11 @@ export default function TrainScreen() {
 
         {phase === 'done' && summary ? (
           <View style={styles.readout}>
-            <Text style={[theme.type.h2, { color: theme.colors.textPrimary }]}>
+            <Text style={[theme.type.h2, { color: homeGlassColors.text }]}>
               {t('trainSummaryGood', { percent: Math.round(summary.goodRatio * 100) })}
             </Text>
             {summary.worst ? (
-              <Text style={[theme.type.caption, styles.hint, { color: theme.colors.textSecondary }]}>
+              <Text style={[theme.type.caption, styles.hint, { color: homeGlassColors.textMuted }]}>
                 {t('trainSummaryWorst', { part: t(partOf(summary.worst)) })}
               </Text>
             ) : null}
@@ -372,10 +511,10 @@ export default function TrainScreen() {
 
         <Pressable
           onPress={phase === 'running' ? stop : begin}
-          style={[styles.action, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md }]}
+          style={[styles.action, { backgroundColor: homeGlassColors.tick, borderRadius: theme.radius.md }]}
         >
           <Icon name={phase === 'running' ? 'square' : 'play'} size={18} color="#fff" />
-          <Text style={[theme.type.button, { color: '#fff' }]}>
+          <Text style={[theme.type.button, { color: homeGlassColors.text }]}>
             {phase === 'running' ? t('trainStop') : phase === 'done' ? t('trainAgain') : t('trainStart')}
           </Text>
         </Pressable>
@@ -401,6 +540,38 @@ function ReferenceOverlay({ points, only }: { points: PosePoint[]; only?: Set<st
       <PoseSkeleton points={points} width={size.w} height={size.h} only={only} level="reference" />
     </View>
   );
+}
+
+function pointsFromSample(sample: TrackSample | null): PosePoint[] {
+  if (!sample) return [];
+  const points: PosePoint[] = [];
+  for (const [key, value] of Object.entries(sample.p)) {
+    if (!value) continue;
+    // Track coordinates are normalized against the clip frame; the video,
+    // thumbnail and overlay all use that same aspect ratio.
+    points.push({ k: key as PosePoint['k'], x: value[0], y: value[1], c: value[2] });
+  }
+  return points;
+}
+
+function selectPreviewSample(track: ExerciseReference['track'] | null, only?: Set<string>): TrackSample | null {
+  if (!track) return null;
+  // The first video frame can have no detected joints. Choose the closest
+  // early frame that actually draws a scored bone, then request its matching
+  // thumbnail. This keeps preview image and keypoints in sync.
+  let nearest: TrackSample | null = null;
+  for (const sample of track.samples) {
+    if (sample.t > 3_000) break;
+    if (!POSE_EDGES.some(([from, to]) =>
+      (!only || only.has(`${from}-${to}`)) &&
+      (sample.p[from]?.[2] ?? 0) >= POSE_HIDDEN &&
+      (sample.p[to]?.[2] ?? 0) >= POSE_HIDDEN,
+    )) continue;
+    if (!nearest || Math.abs(sample.t - PREVIEW_TIME_MS) < Math.abs(nearest.t - PREVIEW_TIME_MS)) {
+      nearest = sample;
+    }
+  }
+  return nearest ?? sampleAt(track, PREVIEW_TIME_MS);
 }
 
 function scoreColour(score: number | undefined): string {

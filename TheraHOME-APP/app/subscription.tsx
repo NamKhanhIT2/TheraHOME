@@ -28,7 +28,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Button } from '@/components/ui/Button';
@@ -113,8 +113,9 @@ export default function SubscriptionScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer tone="glass">
       <BackBar
+        tone="glass"
         onBack={() => router.back()}
         title={t('plansTitle')}
         right={
@@ -124,7 +125,7 @@ export default function SubscriptionScreen() {
           // exist. It answers "không tìm thấy giao dịch nào" when there is
           // nothing to find, which is a real answer.
           <Pressable onPress={store.restore} disabled={store.restoring || store.verifying} hitSlop={8}>
-            <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>
+            <Text style={[theme.type.captionSm, { color: homeGlassColors.tick, fontFamily: theme.fontFamily.semiBold }]}>
               {store.restoring ? '…' : t('restorePurchase')}
             </Text>
           </Pressable>
@@ -132,26 +133,26 @@ export default function SubscriptionScreen() {
       />
       {query.isPending ? (
         <View style={styles.centered}>
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={homeGlassColors.tick} />
         </View>
       ) : query.isError ? (
         <View style={styles.centered}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, textAlign: 'center' }]}>
+          <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, textAlign: 'center' }]}>
             {t('plansLoadErrorTitle')}
           </Text>
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }]}>
+          <Text style={[theme.type.body, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 6 }]}>
             {t('checkNetworkRetry')}
           </Text>
-          <Button variant="secondary" style={{ marginTop: 18 }} onPress={() => void query.refetch()}>
+          <Button tone="glass" variant="secondary" style={{ marginTop: 18 }} onPress={() => void query.refetch()}>
             {t('retry')}
           </Button>
         </View>
       ) : plans.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, textAlign: 'center' }]}>
+          <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, textAlign: 'center' }]}>
             {t('plansEmptyTitle')}
           </Text>
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }]}>
+          <Text style={[theme.type.body, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 6 }]}>
             {t('plansEmptyBody')}
           </Text>
         </View>
@@ -193,8 +194,8 @@ export default function SubscriptionScreen() {
                   style={[
                     styles.dot,
                     index === active
-                      ? { width: 22, backgroundColor: theme.colors.primary }
-                      : { backgroundColor: theme.colors.borderInput },
+                      ? { width: 22, backgroundColor: homeGlassColors.tick }
+                      : { backgroundColor: homeGlassColors.hairline },
                   ]}
                 />
               ))}
@@ -205,11 +206,11 @@ export default function SubscriptionScreen() {
               actual failure — three different things in three tones, in one
               place under the carousel. */}
           {store.paymentPending ? (
-            <Text style={[theme.type.captionSm, styles.notice, { color: theme.colors.warning }]} numberOfLines={3}>
+            <Text style={[theme.type.captionSm, styles.notice, { color: homeGlassColors.badge }]} numberOfLines={3}>
               {t('purchasePending')}
             </Text>
           ) : store.purchaseError ? (
-            <Text style={[theme.type.captionSm, styles.notice, { color: theme.colors.error }]} numberOfLines={3}>
+            <Text style={[theme.type.captionSm, styles.notice, { color: homeGlassColors.dotMissed }]} numberOfLines={3}>
               {store.purchaseError === 'restore_not_found'
                 ? t('restoreNotFound')
                 : store.purchaseError === 'purchase_revoked'
@@ -224,19 +225,19 @@ export default function SubscriptionScreen() {
 
           <View style={styles.footerRow}>
             <Pressable style={styles.footerItem} hitSlop={6} onPress={openTerms}>
-              <Icon name="file-text" size={13} color={theme.colors.textMuted} />
-              <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]} numberOfLines={1}>
+              <Icon name="file-text" size={13} color={homeGlassColors.textFaint} />
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]} numberOfLines={1}>
                 {t('terms')}
               </Text>
             </Pressable>
-            <View style={[styles.footerDivider, { backgroundColor: theme.colors.borderInput }]} />
+            <View style={[styles.footerDivider, { backgroundColor: homeGlassColors.hairline }]} />
             <Pressable
               style={styles.footerItem}
               hitSlop={6}
               onPress={() => router.push({ pathname: '/profile/legal/[doc]', params: { doc: 'privacy' } })}
             >
-              <Icon name="shield-check" size={13} color={theme.colors.textMuted} />
-              <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]} numberOfLines={1}>
+              <Icon name="shield-check" size={13} color={homeGlassColors.textFaint} />
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]} numberOfLines={1}>
                 {t('paywallSecurity')}
               </Text>
             </Pressable>
@@ -295,30 +296,30 @@ function PlanCard({
       <View
         style={[
           styles.card,
-          theme.shadows.card,
+          { borderWidth: 1, borderColor: homeGlassColors.hairline },
           {
             marginTop: plan.badge ? 13 : 0,
-            backgroundColor: theme.colors.bgCard,
+            backgroundColor: homeGlassColors.surface,
             borderRadius: theme.radius.lg,
-            borderColor: isActive ? theme.colors.primary : theme.colors.divider,
+            borderColor: isActive ? homeGlassColors.tick : homeGlassColors.hairline,
             borderWidth: isActive ? 2 : 1,
           },
         ]}
       >
-        <Text style={[theme.type.h1, { color: theme.colors.textPrimary, textAlign: 'center' }]} numberOfLines={2}>
+        <Text style={[theme.type.h1, { color: homeGlassColors.text, textAlign: 'center' }]} numberOfLines={2}>
           {plan.name}
         </Text>
         {plan.tagline ? (
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6, lineHeight: 21 }]} numberOfLines={2}>
+          <Text style={[theme.type.body, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 6, lineHeight: 21 }]} numberOfLines={2}>
             {plan.tagline}
           </Text>
         ) : null}
 
         {priceLabel ? (
           <View style={styles.priceRow}>
-            <Text style={[theme.type.h1, { color: theme.colors.primary, fontSize: 30, lineHeight: 36 }]}>{priceLabel}</Text>
+            <Text style={[theme.type.h1, { color: homeGlassColors.tick, fontSize: 30, lineHeight: 36 }]}>{priceLabel}</Text>
             {plan.periodLabel ? (
-              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>/{plan.periodLabel}</Text>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted }]}>/{plan.periodLabel}</Text>
             ) : null}
           </View>
         ) : null}
@@ -346,10 +347,10 @@ function PlanCard({
             <View style={{ gap: 12, paddingBottom: 4 }}>
               {plan.features.map((feature, index) => (
                 <View key={`${feature.text}-${index}`} style={styles.featureRow}>
-                  <View style={[styles.featureIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-                    <Icon name={feature.icon || 'check'} size={13} color={theme.colors.primary} />
+                  <View style={[styles.featureIcon, { backgroundColor: homeGlassColors.hairline }]}>
+                    <Icon name={feature.icon || 'check'} size={13} color={homeGlassColors.tick} />
                   </View>
-                  <Text style={[theme.type.body, { color: theme.colors.textPrimary, flex: 1, lineHeight: 21 }]}>{feature.text}</Text>
+                  <Text style={[theme.type.body, { color: homeGlassColors.text, flex: 1, lineHeight: 21 }]}>{feature.text}</Text>
                 </View>
               ))}
             </View>
@@ -357,14 +358,15 @@ function PlanCard({
           {/* Says there is more, and gets out of the way once you reach it.
               A list that is cut off with no sign of it reads as a bug. */}
           {overflow && !atBottom ? (
-            <View style={[styles.scrollHint, { backgroundColor: theme.colors.bgCard }]} pointerEvents="none">
-              <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{t('plansScrollMore')}</Text>
-              <Icon name="chevron-down" size={12} color={theme.colors.textMuted} />
+            <View style={[styles.scrollHint, { backgroundColor: homeGlassColors.surface }]} pointerEvents="none">
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>{t('plansScrollMore')}</Text>
+              <Icon name="chevron-down" size={12} color={homeGlassColors.textFaint} />
             </View>
           ) : null}
         </View>
 
         <Button
+          tone="glass"
           variant={canBuy ? 'primary' : 'secondary'}
           disabled={!canBuy}
           loading={busy}
@@ -377,11 +379,11 @@ function PlanCard({
         {/* The discount this tier includes, shown ONLY to whoever holds it —
             a code everybody can read is a public discount, not a benefit. */}
         {isCurrent && plan.perkDiscountCode ? (
-          <View style={[styles.perk, { borderColor: theme.colors.primary, borderRadius: theme.radius.md }]}>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary }]}>
+          <View style={[styles.perk, { borderColor: homeGlassColors.tick, borderRadius: theme.radius.md }]}>
+            <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted }]}>
               {t('plansPerkDiscount', { percent: String(plan.perkDiscountPercent ?? '') })}
             </Text>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.primary, letterSpacing: 1 }]} selectable>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.tick, letterSpacing: 1 }]} selectable>
               {plan.perkDiscountCode}
             </Text>
           </View>
@@ -394,10 +396,10 @@ function PlanCard({
       {isCurrent || plan.badge ? (
         <View style={styles.badgeRow} pointerEvents="none">
           <View style={[styles.badge, {
-            backgroundColor: isCurrent ? theme.colors.success : theme.colors.primary,
+            backgroundColor: isCurrent ? homeGlassColors.dotDone : homeGlassColors.tick,
             borderRadius: theme.radius.sm,
           }]}>
-            <Text style={[theme.type.captionSm, { color: theme.colors.textOnPrimary, fontFamily: theme.fontFamily.bold }]} numberOfLines={1}>
+            <Text style={[theme.type.captionSm, { color: homeGlassColors.text, fontFamily: theme.fontFamily.bold }]} numberOfLines={1}>
               {isCurrent ? t('plansInUse') : plan.badge}
             </Text>
           </View>

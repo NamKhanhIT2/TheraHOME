@@ -56,9 +56,12 @@ export function useDaysWithReference(userId: string | undefined) {
   });
 }
 
-export function useExerciseReference(programDayId: string | undefined) {
+export function useExerciseReference(programDayId: string | undefined, userId?: string) {
   return useQuery({
-    queryKey: ['exercise_reference', programDayId],
+    // Keyed by viewer too: the value is a signed URL into a private bucket,
+    // and a key without a user id hands it to whoever signs in next on this
+    // phone while it is still fresh (QA pass, 2026-10-30).
+    queryKey: ['exercise_reference', programDayId, userId ?? 'anon'],
     enabled: !!programDayId,
     // Catalogue content, not per-user state: it changes when the team
     // publishes a new track, which is not something to poll for.

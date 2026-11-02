@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile, useUpdateProfile, useSuggestedReminderHour } from '@/hooks/useProfile';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
@@ -36,13 +36,13 @@ function ToggleRow({
 }) {
   const theme = useTheme();
   return (
-    <View style={[styles.row, !isLast ? { borderBottomWidth: 1, borderBottomColor: theme.colors.divider } : null]}>
-      <Icon name={icon} size={20} color={theme.colors.primary} />
+    <View style={[styles.row, !isLast ? { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline } : null]}>
+      <Icon name={icon} size={20} color={homeGlassColors.tick} />
       <View style={{ flex: 1 }}>
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{title}</Text>
-        {sub ? <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{sub}</Text> : null}
+        <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{title}</Text>
+        {sub ? <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{sub}</Text> : null}
       </View>
-      <Pressable onPress={() => onChange(!value)} style={[styles.toggleTrack, { backgroundColor: value ? theme.colors.primary : theme.colors.borderInput }]}>
+      <Pressable onPress={() => onChange(!value)} style={[styles.toggleTrack, { backgroundColor: value ? homeGlassColors.tick : homeGlassColors.hairline }]}>
         <View style={[styles.toggleThumb, { left: value ? 21 : 3 }]} />
       </Pressable>
     </View>
@@ -53,21 +53,21 @@ function TimeRow({ icon, title, sub, value, onChange, isLast }: { icon: string; 
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   return (
-    <View style={[styles.row, !isLast ? { borderBottomWidth: 1, borderBottomColor: theme.colors.divider } : null]}>
-      <Icon name={icon} size={20} color={theme.colors.primary} />
+    <View style={[styles.row, !isLast ? { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline } : null]}>
+      <Icon name={icon} size={20} color={homeGlassColors.tick} />
       <View style={{ flex: 1 }}>
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{title}</Text>
-        {sub ? <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>{sub}</Text> : null}
+        <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{title}</Text>
+        {sub ? <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2 }]}>{sub}</Text> : null}
       </View>
       <Pressable
         onPress={() => setOpen(true)}
-        style={[styles.timePill, { backgroundColor: theme.colors.primaryTint10, borderRadius: theme.radius.md }]}
+        style={[styles.timePill, { backgroundColor: homeGlassColors.hairline, borderRadius: theme.radius.md }]}
       >
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.primaryDark, fontFamily: theme.fontFamily.bold }]}>{value}</Text>
+        <Text style={[theme.type.bodyStrong, { color: homeGlassColors.tick, fontFamily: theme.fontFamily.bold }]}>{value}</Text>
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={() => setOpen(false)}>
-          <View style={[styles.timeSheet, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}>
+        <Pressable style={[styles.backdrop, { backgroundColor: homeGlassColors.toast }]} onPress={() => setOpen(false)}>
+          <View style={[styles.timeSheet, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.sky[3], borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}>
             <ScrollView showsVerticalScrollIndicator contentContainerStyle={styles.timeOptions}>
               {TIME_OPTIONS.map((t) => (
                 <Pressable
@@ -76,9 +76,9 @@ function TimeRow({ icon, title, sub, value, onChange, isLast }: { icon: string; 
                     onChange(t);
                     setOpen(false);
                   }}
-                  style={[styles.timeOption, { backgroundColor: t === value ? theme.colors.bgCardAlt : 'transparent' }]}
+                  style={[styles.timeOption, { backgroundColor: t === value ? homeGlassColors.surfaceRaised : 'transparent' }]}
                 >
-                  <Text style={[theme.type.body, { color: theme.colors.textPrimary }]}>{t}</Text>
+                  <Text style={[theme.type.body, { color: homeGlassColors.text }]}>{t}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -179,28 +179,28 @@ export default function NotificationsSettingsScreen() {
 
   if (profileQuery.isPending) {
     return (
-      <ScreenContainer>
-        <BackBar onBack={() => router.back()} title={t('notifications')} />
+      <ScreenContainer tone="glass">
+        <BackBar tone="glass" onBack={() => router.back()} title={t('notifications')} />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={homeGlassColors.tick} />
         </View>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={t('notifications')} />
+    <ScreenContainer tone="glass">
+      <BackBar tone="glass" onBack={() => router.back()} title={t('notifications')} />
       <ScrollView contentContainerStyle={styles.body}>
         <Text
           style={[
             theme.type.captionSm,
-            { color: theme.colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.4, marginVertical: 8, marginTop: 10 },
+            { color: homeGlassColors.tick, textTransform: 'uppercase', letterSpacing: 0.4, marginVertical: 8, marginTop: 10 },
           ]}
         >
           {t('notifications')}
         </Text>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
           <ToggleRow icon="sun" title={t('morning')} sub={t('reminderSubtitle')} value={remind} onChange={setRemind} isLast={!remind} />
           {remind ? <TimeRow icon="clock" title={t('reminderTime')} value={remindTime} onChange={setRemindTime} isLast={false} /> : null}
           {/* "Nhắc tập theo thói quen của riêng bạn" — the server returns a
@@ -208,12 +208,12 @@ export default function NotificationsSettingsScreen() {
               finished sessions for the word "habit" to mean anything. Hidden
               when it already matches, so it is an offer and never a nag. */}
           {remind && suggestedHour !== null && suggestedTime !== remindTime ? (
-            <Pressable onPress={() => setRemindTime(suggestedTime)} style={[styles.suggestRow, { borderTopColor: theme.colors.divider }]}>
-              <Icon name="sparkles" size={16} color={theme.colors.primary} />
-              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, flex: 1 }]}>
+            <Pressable onPress={() => setRemindTime(suggestedTime)} style={[styles.suggestRow, { borderTopColor: homeGlassColors.hairline }]}>
+              <Icon name="sparkles" size={16} color={homeGlassColors.tick} />
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted, flex: 1 }]}>
                 {t('reminderHabitSuggest', { time: suggestedTime })}
               </Text>
-              <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.tick, fontFamily: theme.fontFamily.semiBold }]}>
                 {t('reminderHabitApply', { time: suggestedTime })}
               </Text>
             </Pressable>
@@ -225,12 +225,12 @@ export default function NotificationsSettingsScreen() {
         <Text
           style={[
             theme.type.captionSm,
-            { color: theme.colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.4, marginVertical: 8, marginTop: 22 },
+            { color: homeGlassColors.tick, textTransform: 'uppercase', letterSpacing: 0.4, marginVertical: 8, marginTop: 22 },
           ]}
         >
           {t('notifCommunitySection')}
         </Text>
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+        <View style={[styles.card, { borderWidth: 1, borderColor: homeGlassColors.hairline }, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg }]}>
           <ToggleRow
             icon="bell"
             title={t('notifCommunitySection')}
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#fff',
+    backgroundColor: homeGlassColors.text,
     position: 'absolute',
     top: 3,
   },

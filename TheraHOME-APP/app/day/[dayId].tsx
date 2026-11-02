@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useActivatedPrograms, useCatalogProgramDays, useMarkDayWatched } from '@/hooks/usePrograms';
 import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
@@ -13,9 +13,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { PainScaleModal } from '@/components/PainScaleModal';
-import { FormReviewCard } from '@/components/day/FormReviewCard';
 import { LiveFormCard } from '@/components/day/LiveFormCard';
-import { DayCoinCard, StreakCoinBanner } from '@/components/day/DayCoinCard';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { BackBar } from '@/components/ui/BackBar';
 import { Icon } from '@/components/icons/Icon';
@@ -73,7 +71,7 @@ export default function DayDetailScreen() {
   // refuse a day whose phase needs a purchase the user hasn't made (audit
   // 2026-09-05). Review accounts are exempt, as everywhere else.
   const phaseIds = useMemo(() => Array.from(new Set((daysQuery.data ?? []).map((x) => x.phaseId))), [daysQuery.data]);
-  const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
+  const lockRequirementsQuery = usePhaseLockRequirements();
   const purchasesQuery = usePhasePurchases(userId);
   const isReviewAccount = useProfile(userId).data?.accountType === 'review';
   const lockDataReady = !d || phaseIds.length === 0 || (lockRequirementsQuery.isFetched && (!userId || purchasesQuery.isFetched));
@@ -175,10 +173,10 @@ export default function DayDetailScreen() {
 
   if (programsQuery.isPending || daysQuery.isPending) {
     return (
-      <ScreenContainer>
-        <BackBar onBack={() => router.back()} title={`${t('day')} ${dayId}`} />
+      <ScreenContainer tone="glass">
+        <BackBar tone="glass" onBack={() => router.back()} title={`${t('day')} ${dayId}`} />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={homeGlassColors.tick} />
         </View>
       </ScreenContainer>
     );
@@ -189,13 +187,13 @@ export default function DayDetailScreen() {
   if (!d) {
     const loadFailed = programsQuery.isError || daysQuery.isError;
     return (
-      <ScreenContainer>
-        <BackBar onBack={() => router.back()} title={`${t('day')} ${dayId}`} />
+      <ScreenContainer tone="glass">
+        <BackBar tone="glass" onBack={() => router.back()} title={`${t('day')} ${dayId}`} />
         <View style={styles.loadingBox}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, textAlign: 'center' }]}>
+          <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, textAlign: 'center' }]}>
             {loadFailed ? t('homeLoadErrorTitle') : t('noToolsTitle')}
           </Text>
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
+          <Text style={[theme.type.body, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 8 }]}>
             {loadFailed ? t('checkNetworkRetry') : t('roadmapComingSoonBody')}
           </Text>
           {loadFailed ? (
@@ -204,7 +202,7 @@ export default function DayDetailScreen() {
               style={{ marginTop: 16 }}
               accessibilityRole="button"
             >
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('retry')}</Text>
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.tick }]}>{t('retry')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -213,9 +211,9 @@ export default function DayDetailScreen() {
   }
   if (!lockDataReady || phaseLocked || productUnpublished) {
     return (
-      <ScreenContainer>
+      <ScreenContainer tone="glass">
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.colors.primary} />
+          <ActivityIndicator color={homeGlassColors.tick} />
         </View>
       </ScreenContainer>
     );
@@ -282,7 +280,7 @@ export default function DayDetailScreen() {
           recordWatch();
           void WebBrowser.openBrowserAsync(videoUrl, {
             presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-            controlsColor: theme.colors.primary,
+            controlsColor: homeGlassColors.tick,
           });
         },
       },
@@ -290,16 +288,16 @@ export default function DayDetailScreen() {
   }
 
   return (
-    <ScreenContainer>
-      <BackBar onBack={() => router.back()} title={`${t('day')} ${d.id}`} />
+    <ScreenContainer tone="glass">
+      <BackBar tone="glass" onBack={() => router.back()} title={`${t('day')} ${d.id}`} />
       <ScrollView contentContainerStyle={styles.body}>
-        <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginBottom: 16 }]}>{d.phase}</Text>
+        <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginBottom: 16 }]}>{d.phase}</Text>
 
         <View
           onLayout={(event) => setVideoWidth(event.nativeEvent.layout.width)}
           style={[
             styles.videoBox,
-            { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight, borderRadius: theme.radius.lg },
+            { backgroundColor: homeGlassColors.surfaceRaised, borderColor: homeGlassColors.hairline, borderRadius: theme.radius.lg },
           ]}
         >
           {videoId && !videoError && videoWidth > 0 && transitionDone ? (
@@ -322,29 +320,29 @@ export default function DayDetailScreen() {
               }}
             />
             {!videoReady ? (
-              <View style={[styles.videoLoadingOverlay, { backgroundColor: theme.colors.bgCardAlt }]}>
-                <ActivityIndicator color={theme.colors.primary} />
-                <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}>{t('loadingVideo')}</Text>
+              <View style={[styles.videoLoadingOverlay, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+                <ActivityIndicator color={homeGlassColors.tick} />
+                <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}>{t('loadingVideo')}</Text>
               </View>
             ) : null}
             </>
           ) : videoError ? (
             <View style={styles.videoFallback}>
-              <Icon name="film" size={28} color={theme.colors.textMuted} />
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center' }]}>{t('inlineVideoError')}</Text>
+              <Icon name="film" size={28} color={homeGlassColors.textFaint} />
+              <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, textAlign: 'center' }]}>{t('inlineVideoError')}</Text>
               <Pressable
                 onPress={() => {
                   recordWatch();
                   void WebBrowser.openBrowserAsync(d.video);
                 }}
               >
-                <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('openYoutube')}</Text>
+                <Text style={[theme.type.bodyStrong, { color: homeGlassColors.tick }]}>{t('openYoutube')}</Text>
               </Pressable>
             </View>
           ) : (
             <View style={styles.videoFallback}>
-              {videoUrl ? <ActivityIndicator color={theme.colors.primary} /> : <Icon name="film" size={28} color={theme.colors.textMuted} />}
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center' }]}> 
+              {videoUrl ? <ActivityIndicator color={homeGlassColors.tick} /> : <Icon name="film" size={28} color={homeGlassColors.textFaint} />}
+              <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, textAlign: 'center' }]}> 
                 {videoUrl ? t('loadingVideo') : t('videoUnavailableMessage')}
               </Text>
             </View>
@@ -356,9 +354,9 @@ export default function DayDetailScreen() {
             directly above the button, on a screen that had already recorded
             you pressing it. */}
         {d.status !== 'done' ? (
-          <View style={[styles.videoTip, { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight }]}> 
-            <Icon name="sparkles" size={17} color={theme.colors.primary} />
-            <Text style={[theme.type.caption, styles.videoTipText, { color: theme.colors.textSecondary }]}>{t('videoTip')}</Text>
+          <View style={[styles.videoTip, { backgroundColor: homeGlassColors.surfaceRaised, borderColor: homeGlassColors.hairline }]}> 
+            <Icon name="sparkles" size={17} color={homeGlassColors.tick} />
+            <Text style={[theme.type.caption, styles.videoTipText, { color: homeGlassColors.textMuted }]}>{t('videoTip')}</Text>
           </View>
         ) : null}
 
@@ -367,25 +365,25 @@ export default function DayDetailScreen() {
             onPress={openVideoBrowser}
             style={[
               styles.actionBtn,
-              { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md },
+              { backgroundColor: homeGlassColors.tick, borderRadius: theme.radius.md },
             ]}
           >
-            <Icon name="play" size={18} color="#fff" />
-            <Text style={[theme.type.button, { color: '#fff' }]}>{t('watchVideo')}</Text>
+            <Icon name="play" size={18} color={homeGlassColors.text} />
+            <Text style={[theme.type.button, { color: homeGlassColors.text }]}>{t('watchVideo')}</Text>
           </Pressable>
           {progressLocked ? (
-            <View style={[styles.previewHint, { backgroundColor: theme.colors.bgCardAlt, borderColor: theme.colors.borderLight }]}> 
-              <Icon name="lock" size={17} color={theme.colors.textSecondary} />
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary, flex: 1 }]}>{t('lockedPreviewHint')}</Text>
+            <View style={[styles.previewHint, { backgroundColor: homeGlassColors.surfaceRaised, borderColor: homeGlassColors.hairline }]}> 
+              <Icon name="lock" size={17} color={homeGlassColors.textMuted} />
+              <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, flex: 1 }]}>{t('lockedPreviewHint')}</Text>
             </View>
           ) : null}
           {canRecordWatch && d.status !== 'done' ? (
-            <View style={[styles.completionHint, { backgroundColor: theme.colors.primaryTint05, borderColor: theme.colors.primaryTint10 }]}> 
+            <View style={[styles.completionHint, { backgroundColor: homeGlassColors.surfaceRaised, borderColor: homeGlassColors.hairline }]}> 
               <View style={styles.completionHintTitle}>
-                <Icon name="play" size={19} color={theme.colors.primary} />
-                <Text style={[theme.type.bodyStrong, { color: theme.colors.primaryDark }]}>{t('watchToCompleteTitle')}</Text>
+                <Icon name="play" size={19} color={homeGlassColors.tick} />
+                <Text style={[theme.type.bodyStrong, { color: homeGlassColors.tick }]}>{t('watchToCompleteTitle')}</Text>
               </View>
-              <Text style={[theme.type.caption, { color: theme.colors.textSecondary }]}> 
+              <Text style={[theme.type.caption, { color: homeGlassColors.textMuted }]}> 
                 {t('watchToCompleteHint')}
               </Text>
             </View>
@@ -396,8 +394,8 @@ export default function DayDetailScreen() {
             // press, and sat directly above a second confirmation line about
             // the xu — two announcements of one event.
             <View style={styles.completedRow}>
-              <Icon name="check" size={16} color={theme.colors.success} />
-              <Text style={[theme.type.caption, { color: theme.colors.success }]}>{t('completed')}</Text>
+              <Icon name="check" size={16} color={homeGlassColors.dotDone} />
+              <Text style={[theme.type.caption, { color: homeGlassColors.dotDone }]}>{t('completed')}</Text>
             </View>
           ) : null}
           {/* Support-tools link is optional: when Admin leaves the day's
@@ -410,47 +408,28 @@ export default function DayDetailScreen() {
               style={[
                 styles.actionBtn,
                 {
-                  backgroundColor: theme.colors.bgCard,
+                  backgroundColor: homeGlassColors.surface,
                   borderWidth: 1,
-                  borderColor: theme.colors.borderInput,
+                  borderColor: homeGlassColors.hairline,
                   borderRadius: theme.radius.md,
                 },
               ]}
             >
-              <Icon name="external-link" size={18} color={theme.colors.primary} />
-              <Text numberOfLines={1} style={[theme.type.button, { color: theme.colors.primary }]}>{supportToolsLabel}</Text>
+              <Icon name="external-link" size={18} color={homeGlassColors.tick} />
+              <Text numberOfLines={1} style={[theme.type.button, { color: homeGlassColors.tick }]}>{supportToolsLabel}</Text>
             </Pressable>
           ) : null}
-          {/* "Tôi tập thế này đúng chưa?" — a clip of this exercise, sent to
-              a specialist. Only on a day the customer can actually do: there
-              is nothing to film on a locked one. */}
-          {/* The xu for finishing this day. Above the form-check card because
-              it belongs to the day just completed, while that one is a
-              request about it. */}
-          {!progressLocked ? (
-            <DayCoinCard userProgramId={userProgramId} programDayId={programDayId} dayDone={d.status === 'done'} />
-          ) : null}
-          {!progressLocked ? <StreakCoinBanner userProgramId={userProgramId} programDayId={programDayId} /> : null}
-          {/* The two ways to ask "tôi tập thế này đúng chưa", in the order
-              they answer: the live one first because it answers while you
-              are still on the mat, the specialist one under it because it
-              answers better. Both hide themselves when they have nothing
-              to offer. */}
+          {/* The xu cards and the send-a-clip-to-a-specialist card were
+              taken off this screen (owner, 2026-10-25). What is left is the
+              live posture check, which answers "tôi tập thế này đúng chưa"
+              while you are still on the mat; it hides itself when it has
+              nothing to offer. */}
           {!progressLocked ? (
             <LiveFormCard
               userId={userId}
               productId={productId}
               dayNumber={d.id}
               programDayId={programDayId}
-            />
-          ) : null}
-          {!progressLocked ? (
-            <FormReviewCard
-              userId={userId}
-              userProgramId={userProgramId}
-              programDayId={programDayId}
-              dayNumber={d.id}
-              dayLabel={d.phase}
             />
           ) : null}
         </View>

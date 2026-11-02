@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { router, useLocalSearchParams } from 'expo-router';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
-import { useDeleteNotification, useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, type NotificationRow, type NotificationType } from '@/hooks/useNotifications';
+import { isCommunityNotification, useDeleteNotification, useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, type NotificationRow, type NotificationType } from '@/hooks/useNotifications';
 import { POST_REACTIONS } from '@/hooks/useCommunity';
 import { timeAgo } from '@/lib/timeAgo';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -17,7 +17,11 @@ import type { AppLanguage } from '@/store/useAppStore';
 import { RemoteImage } from '@/components/ui/RemoteImage';
 
 type TimeGroup = 'new' | 'today' | 'earlier';
-type NotificationStyle = { icon: string; color: string; bg: string };
+/** Only the icon's own colour: on the dark palette the initial-avatar
+ * circle is a plain raised surface for every type, so the one coloured thing
+ * in the row is the little badge — which is enough to tell a heart from a
+ * calendar at a glance. */
+type NotificationStyle = { icon: string; color: string };
 const THERAHOME_AVATAR = require('../assets/icon.png');
 const SPECIALIST_AVATAR = require('../assets/therahome-specialist.png');
 
@@ -71,26 +75,44 @@ export default function NotificationInboxScreen() {
   const userId = session?.user.id;
   const notificationsQuery = useNotifications(userId);
   const showSkeleton = useSteadyLoading(notificationsQuery.isPending);
-  const notifications = notificationsQuery.data ?? [];
+  // Opened from Cộng đồng's own bell: that bell answers for community
+  // things only, so the list it opens must not show water reminders either
+  // (owner, 2026-10-26).
+  const { scope } = useLocalSearchParams<{ scope?: string }>();
+  // Rule 31: each surface keeps its own ground. Reached from Cộng đồng's bell
+  // this inbox is that tab's violet; from Home's bell it is the blue sky.
+  const violet = scope === 'community';
+  const tone = violet ? 'violet' : 'glass';
+  const accent = violet ? homeGlassColors.purple : homeGlassColors.tick;
+  // What the round badge's rim is drawn against — opaque, because `surface`
+  // is translucent and a rim in it would show the avatar through.
+  const ground = violet ? homeGlassColors.purpleSky[2] : homeGlassColors.sky[4];
+  const notifications = useMemo(() => {
+    const all = notificationsQuery.data ?? [];
+    return scope === 'community' ? all.filter((item) => isCommunityNotification(item.type)) : all;
+  }, [notificationsQuery.data, scope]);
   const markRead = useMarkNotificationRead(userId);
   const markAllRead = useMarkAllNotificationsRead(userId);
   const deleteNotification = useDeleteNotification(userId);
   const [visibleEarlier, setVisibleEarlier] = useState(2);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
 
+  // Amber and the old light-mode blues went muddy on a near-black row, so
+  // these are drawn from the glass palette instead of the hex literals this
+  // screen used to carry.
   const stylesByType: Record<NotificationType, NotificationStyle> = {
-    schedule: { icon: 'calendar', color: theme.colors.primary, bg: theme.colors.primaryTint10 },
-    inactivity: { icon: 'activity', color: '#B9860B', bg: 'rgba(185,134,11,0.12)' },
-    ad: { icon: 'megaphone', color: '#D98200', bg: 'rgba(217,130,0,0.12)' },
-    blog: { icon: 'book', color: '#2BB673', bg: 'rgba(43,182,115,0.12)' },
-    chat: { icon: 'message-circle', color: '#7C4DFF', bg: 'rgba(124,77,255,0.12)' },
-    post_comment: { icon: 'message-circle', color: '#3478F6', bg: 'rgba(52,120,246,0.12)' },
-    comment_reply: { icon: 'message-circle', color: '#3478F6', bg: 'rgba(52,120,246,0.12)' },
-    post_reaction: { icon: 'heart', color: theme.colors.error, bg: 'rgba(220,60,60,0.10)' },
-    comment_reaction: { icon: 'heart', color: theme.colors.error, bg: 'rgba(220,60,60,0.10)' },
-    streak_milestone: { icon: 'trending-up', color: '#D98200', bg: 'rgba(217,130,0,0.12)' },
-    post_moderation: { icon: 'shield-check', color: '#2BB673', bg: 'rgba(43,182,115,0.12)' },
-    roadmap_ready: { icon: 'calendar', color: theme.colors.primary, bg: theme.colors.primaryTint10 },
+    schedule: { icon: 'calendar', color: homeGlassColors.tick },
+    inactivity: { icon: 'activity', color: homeGlassColors.badge },
+    ad: { icon: 'megaphone', color: homeGlassColors.accent },
+    blog: { icon: 'book', color: homeGlassColors.dotDone },
+    chat: { icon: 'message-circle', color: homeGlassColors.link },
+    post_comment: { icon: 'message-circle', color: homeGlassColors.accent },
+    comment_reply: { icon: 'message-circle', color: homeGlassColors.accent },
+    post_reaction: { icon: 'heart', color: homeGlassColors.focus },
+    comment_reaction: { icon: 'heart', color: homeGlassColors.focus },
+    streak_milestone: { icon: 'trending-up', color: homeGlassColors.purple },
+    post_moderation: { icon: 'shield-check', color: homeGlassColors.dotDone },
+    roadmap_ready: { icon: 'calendar', color: homeGlassColors.tick },
   };
 
   const sections = useMemo(() => {
@@ -105,13 +127,7 @@ export default function NotificationInboxScreen() {
 
   function openNotification(notification: NotificationRow) {
     if (!notification.read) markRead.mutate(notification.id);
-    // Checked before `type`, not inside it: the xu notifications ride on an
-    // existing type on purpose (a brand-new one renders as a blank row in
-    // every build already in the wild), so the destination is the only thing
-    // that identifies them.
-    if (notification.destination === 'coins') {
-      router.push('/coins');
-    } else if (notification.type === 'chat' && notification.relatedChatThreadId) {
+    if (notification.type === 'chat' && notification.relatedChatThreadId) {
       router.push('/chat/human');
     } else if (notification.type === 'blog' && notification.relatedArticleId) {
       router.push({ pathname: '/community/article/[articleId]', params: { articleId: notification.relatedArticleId } });
@@ -168,13 +184,14 @@ export default function NotificationInboxScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer tone={tone}>
       <BackBar
+        tone={tone}
         onBack={() => router.back()}
         title={t('notifications')}
         right={notifications.some((item) => !item.read) ? (
           <Pressable onPress={() => markAllRead.mutate()} disabled={markAllRead.isPending} hitSlop={8} style={styles.markAll}>
-            <Text style={[theme.type.caption, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>{t('markAllRead')}</Text>
+            <Text style={[theme.type.caption, { color: accent, fontFamily: theme.fontFamily.semiBold }]}>{t('markAllRead')}</Text>
           </Pressable>
         ) : null}
       />
@@ -182,7 +199,7 @@ export default function NotificationInboxScreen() {
         // The inbox is a uniform list of icon + two lines, which is the shape
         // a skeleton stands in for most convincingly.
         <View style={styles.skeletonBody}>
-          {[0, 1, 2, 3, 4].map((row) => <SkeletonRow key={row} />)}
+          {[0, 1, 2, 3, 4].map((row) => <SkeletonRow key={row} tone="glass" />)}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
@@ -190,15 +207,15 @@ export default function NotificationInboxScreen() {
               notifications" empty state, so a network error was indis-
               tinguishable from a genuinely empty inbox. */}
           {notificationsQuery.isError ? <View style={styles.emptyState}>
-            <View style={[styles.emptyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="bell" size={25} color={theme.colors.primary} /></View>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginTop: 12, textAlign: 'center' }]}>{t('homeLoadErrorTitle')}</Text>
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 6, textAlign: 'center' }]}>{t('checkNetworkRetry')}</Text>
+            <View style={[styles.emptyIcon, { backgroundColor: homeGlassColors.surfaceRaised }]}><Icon name="bell" size={25} color={accent} /></View>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, marginTop: 12, textAlign: 'center' }]}>{t('homeLoadErrorTitle')}</Text>
+            <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 6, textAlign: 'center' }]}>{t('checkNetworkRetry')}</Text>
             <Pressable onPress={() => { void notificationsQuery.refetch(); }} style={{ marginTop: 14 }} accessibilityRole="button">
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.primary }]}>{t('retry')}</Text>
+              <Text style={[theme.type.bodyStrong, { color: accent }]}>{t('retry')}</Text>
             </Pressable>
           </View> : sections.length === 0 ? <View style={styles.emptyState}>
-            <View style={[styles.emptyIcon, { backgroundColor: theme.colors.primaryTint10 }]}><Icon name="bell" size={25} color={theme.colors.primary} /></View>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, marginTop: 12 }]}>{t('noNotifications')}</Text>
+            <View style={[styles.emptyIcon, { backgroundColor: homeGlassColors.surfaceRaised }]}><Icon name="bell" size={25} color={accent} /></View>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, marginTop: 12 }]}>{t('noNotifications')}</Text>
           </View> : null}
 
           {sections.map((section, sectionIndex) => {
@@ -206,10 +223,12 @@ export default function NotificationInboxScreen() {
             const hasMoreEarlier = section.id === 'earlier' && section.items.length > displayedItems.length;
             return <View key={section.id} style={[styles.section, sectionIndex === 0 ? styles.firstSection : null]}>
             <View style={styles.sectionHeader}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t(section.labelKey)}</Text>
-              {section.id === 'new' ? <View style={[styles.countBadge, { backgroundColor: theme.colors.primary }]}><Text style={styles.countText}>{section.items.length}</Text></View> : null}
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t(section.labelKey)}</Text>
+              {section.id === 'new' ? <View style={[styles.countBadge, { backgroundColor: accent }]}><Text style={[styles.countText, { color: homeGlassColors.text }]}>{section.items.length}</Text></View> : null}
             </View>
-            <View style={[styles.groupCard, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg }]}>
+            {/* A rim, not a drop shadow: on a near-black ground a shadow is
+                invisible and the card loses its edge entirely. */}
+            <View style={[styles.groupCard, { backgroundColor: homeGlassColors.surface, borderColor: homeGlassColors.hairline, borderRadius: theme.radius.lg }]}>
               {displayedItems.map((notification, index) => {
                 const notificationStyle = stylesByType[notification.type] ?? stylesByType.schedule;
                 const actorName = fallbackActorName(notification, language);
@@ -218,39 +237,39 @@ export default function NotificationInboxScreen() {
                 const isReaction = notification.type === 'post_reaction' || notification.type === 'comment_reaction';
                 const reactionEmoji = isReaction ? POST_REACTIONS.find((item) => item.key === notification.reactionType)?.emoji : null;
                 const bodyText = notification.type === 'schedule' && notification.relatedDayNumber != null ? t('dayUnlockedBody') : notification.body;
-                return <Pressable key={notification.id} onPress={() => openNotification(notification)} style={[styles.row, index < displayedItems.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.colors.divider } : null, { backgroundColor: notification.read ? 'transparent' : theme.colors.primaryTint05 }]}>
+                return <Pressable key={notification.id} onPress={() => openNotification(notification)} style={[styles.row, index < displayedItems.length - 1 ? { borderBottomWidth: 1, borderBottomColor: homeGlassColors.hairline } : null, { backgroundColor: notification.read ? 'transparent' : homeGlassColors.surfaceRaised }]}>
                   <View style={styles.avatarWrap}>
-                    {notification.actorAvatarUrl ? <RemoteImage uri={notification.actorAvatarUrl} contentFit="cover" style={[styles.avatarImage, { backgroundColor: theme.colors.bgCardAlt }]} /> : useBrandAvatar ? <Image source={THERAHOME_AVATAR} style={[styles.avatarImage, { backgroundColor: theme.colors.bgCardAlt }]} /> : useSpecialistAvatar ? <Image source={SPECIALIST_AVATAR} style={[styles.avatarImage, { backgroundColor: theme.colors.bgCardAlt }]} /> : <View style={[styles.initialAvatar, { backgroundColor: notificationStyle.bg }]}><Text style={[styles.initials, { color: notificationStyle.color }]}>{initials(actorName)}</Text></View>}
+                    {notification.actorAvatarUrl ? <RemoteImage uri={notification.actorAvatarUrl} contentFit="cover" style={[styles.avatarImage, { backgroundColor: homeGlassColors.surfaceRaised }]} /> : useBrandAvatar ? <Image source={THERAHOME_AVATAR} style={[styles.avatarImage, { backgroundColor: homeGlassColors.surfaceRaised }]} /> : useSpecialistAvatar ? <Image source={SPECIALIST_AVATAR} style={[styles.avatarImage, { backgroundColor: homeGlassColors.surfaceRaised }]} /> : <View style={[styles.initialAvatar, { backgroundColor: homeGlassColors.surfaceRaised }]}><Text style={[styles.initials, { color: notificationStyle.color }]}>{initials(actorName)}</Text></View>}
                     {reactionEmoji ? (
-                      <View style={[styles.actionBadge, { borderColor: theme.colors.bgCard, backgroundColor: theme.colors.bgCard }]}><Text style={styles.reactionBadgeEmoji}>{reactionEmoji}</Text></View>
+                      <View style={[styles.actionBadge, { borderColor: ground, backgroundColor: ground }]}><Text style={styles.reactionBadgeEmoji}>{reactionEmoji}</Text></View>
                     ) : (
-                      <View style={[styles.actionBadge, { borderColor: theme.colors.bgCard, backgroundColor: notificationStyle.color }]}><Icon name={notificationStyle.icon} size={14} color="#fff" strokeWidth={2.4} /></View>
+                      <View style={[styles.actionBadge, { borderColor: ground, backgroundColor: notificationStyle.color }]}><Icon name={notificationStyle.icon} size={14} color={ground} strokeWidth={2.4} /></View>
                     )}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={styles.titleRow}>
-                      <Text numberOfLines={1} style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flexShrink: 1 }]}>{notification.type === 'schedule' && notification.relatedDayNumber != null ? t('dayUnlocked', { day: notification.relatedDayNumber }) : socialTitle(notification, t) ?? notification.title}</Text>
-                      {!notification.read ? <View style={[styles.unreadDot, { backgroundColor: theme.colors.primary }]} /> : null}
+                      <Text numberOfLines={1} style={[theme.type.bodyStrong, { color: homeGlassColors.text, flexShrink: 1 }]}>{notification.type === 'schedule' && notification.relatedDayNumber != null ? t('dayUnlocked', { day: notification.relatedDayNumber }) : socialTitle(notification, t) ?? notification.title}</Text>
+                      {!notification.read ? <View style={[styles.unreadDot, { backgroundColor: accent }]} /> : null}
                     </View>
-                    {bodyText ? <Text numberOfLines={2} style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2, lineHeight: 18 }]}>{bodyText}</Text> : null}
+                    {bodyText ? <Text numberOfLines={2} style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 2, lineHeight: 18 }]}>{bodyText}</Text> : null}
                     <View style={styles.metaRow}>
-                      <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>{timeAgo(notification.createdAt, t)}</Text>
+                      <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>{timeAgo(notification.createdAt, t)}</Text>
                     </View>
                   </View>
-                  {notification.postImageUrl ? <RemoteImage uri={notification.postImageUrl} contentFit="cover" style={[styles.thumbnail, { backgroundColor: theme.colors.bgCardAlt }]} /> : null}
-                  <Pressable onPress={(event) => { event.stopPropagation(); confirmDelete(notification); }} hitSlop={10} accessibilityLabel={t('deleteNotification')} style={styles.deleteButton}><Icon name="trash-2" size={17} color={theme.colors.textMuted} /></Pressable>
+                  {notification.postImageUrl ? <RemoteImage uri={notification.postImageUrl} contentFit="cover" style={[styles.thumbnail, { backgroundColor: homeGlassColors.surfaceRaised }]} /> : null}
+                  <Pressable onPress={(event) => { event.stopPropagation(); confirmDelete(notification); }} hitSlop={10} accessibilityLabel={t('deleteNotification')} style={styles.deleteButton}><Icon name="trash-2" size={17} color={homeGlassColors.textFaint} /></Pressable>
                 </Pressable>;
               })}
               {loadingEarlier ? [0, 1].map((skeleton) => <View key={`older-skeleton-${skeleton}`} style={[styles.row, styles.skeletonRow]}>
-                <View style={[styles.skeletonAvatar, { backgroundColor: theme.colors.bgCardAlt }]} />
+                <View style={[styles.skeletonAvatar, { backgroundColor: homeGlassColors.surfaceRaised }]} />
                 <View style={{ flex: 1, gap: 8 }}>
-                  <View style={[styles.skeletonTitle, { backgroundColor: theme.colors.bgCardAlt }]} />
-                  <View style={[styles.skeletonText, { backgroundColor: theme.colors.bgCardAlt }]} />
+                  <View style={[styles.skeletonTitle, { backgroundColor: homeGlassColors.surfaceRaised }]} />
+                  <View style={[styles.skeletonText, { backgroundColor: homeGlassColors.surfaceRaised }]} />
                 </View>
               </View>) : null}
             </View>
-            {hasMoreEarlier ? <Pressable onPress={loadEarlierNotifications} disabled={loadingEarlier} style={[styles.loadEarlierButton, { borderColor: theme.colors.primaryTint10 }]}> 
-              <Text style={[theme.type.caption, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>{t('viewEarlierNotifications')}</Text>
+            {hasMoreEarlier ? <Pressable onPress={loadEarlierNotifications} disabled={loadingEarlier} style={[styles.loadEarlierButton, { borderColor: homeGlassColors.hairline }]}> 
+              <Text style={[theme.type.caption, { color: accent, fontFamily: theme.fontFamily.semiBold }]}>{t('viewEarlierNotifications')}</Text>
             </Pressable> : null}
           </View>;
           })}
@@ -275,8 +294,8 @@ const styles = StyleSheet.create({
   firstSection: { marginTop: 6 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8, paddingHorizontal: 2 },
   countBadge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  countText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  groupCard: { overflow: 'hidden' },
+  countText: { fontSize: 11, fontWeight: '800' },
+  groupCard: { overflow: 'hidden', borderWidth: 1 },
   row: { flexDirection: 'row', gap: 9, alignItems: 'flex-start', paddingVertical: 8, paddingLeft: 12, paddingRight: 8 },
   avatarWrap: { width: 42, height: 42, flexShrink: 0, position: 'relative' },
   avatarImage: { width: 42, height: 42, borderRadius: 21 },

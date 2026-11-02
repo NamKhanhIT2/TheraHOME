@@ -29,8 +29,8 @@ export function ChatMediaViewer({ uri, kind, onClose }: ChatMediaViewerProps) {
       <StatusBar style="light" />
       <View style={styles.backdrop}>
         {kind === 'video' ? <VideoViewer uri={uri} /> : <RemoteImage uri={uri} cacheKey={uri.split('?')[0]} contentFit="contain" priority="high" style={styles.media} />}
-        <Pressable onPress={onClose} style={styles.close} hitSlop={10}>
-          <Icon name="x" size={24} color="#fff" />
+        <Pressable accessibilityRole="button" onPress={onClose} style={({ pressed }) => [styles.close, pressed ? { opacity: 0.6 } : null]} hitSlop={14}>
+          <Icon name="x" size={26} color="#fff" strokeWidth={2.2} />
         </Pressable>
       </View>
     </Modal>
@@ -40,5 +40,5 @@ export function ChatMediaViewer({ uri, kind, onClose }: ChatMediaViewerProps) {
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   media: { width: '100%', height: '82%' },
-  close: { position: 'absolute', top: 58, right: 22, width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  close: { position: 'absolute', top: 58, right: 22, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
 });

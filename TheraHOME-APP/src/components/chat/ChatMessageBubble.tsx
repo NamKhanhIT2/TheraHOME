@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { Icon } from '@/components/icons/Icon';
 import { ChatMedia } from '@/components/chat/ChatMedia';
@@ -32,6 +32,7 @@ export function ChatMessageBubble({
   onPressReactions,
   onOpenMedia,
   onRetry,
+  tone = 'app',
 }: {
   message: ChatMessageRow;
   own: boolean;
@@ -41,6 +42,9 @@ export function ChatMessageBubble({
   showStatus?: boolean;
   joinsNewer?: boolean;
   joinsOlder?: boolean;
+  /** 'glass' for the customer's threads, which are on the dark palette.
+   * The staff console shares this component and stays light. */
+  tone?: 'app' | 'glass';
   onPress?: () => void;
   onLongPress?: (event: GestureResponderEvent) => void;
   onPressReactions?: (event: GestureResponderEvent) => void;
@@ -48,6 +52,14 @@ export function ChatMessageBubble({
   onRetry?: (outboxId: string) => void;
 }) {
   const theme = useTheme();
+  // One place to answer "what colour is this on this thread's ground", so the
+  // bubble body, the quote rule and the retry link cannot drift apart.
+  const glass = tone === 'glass';
+  const ink = glass ? homeGlassColors.text : theme.colors.textPrimary;
+  const inkMuted = glass ? homeGlassColors.textMuted : theme.colors.textSecondary;
+  const inkFaint = glass ? homeGlassColors.textFaint : theme.colors.textMuted;
+  const accent = glass ? homeGlassColors.tick : theme.colors.primary;
+  const danger = glass ? homeGlassColors.dotMissed : theme.colors.error;
   const { t } = useI18n();
   const connected = useChatConnected();
 
@@ -78,24 +90,24 @@ export function ChatMessageBubble({
             mediaOnly
               ? styles.mediaOnly
               : {
-                  backgroundColor: own ? theme.colors.primary : theme.colors.bgCardAlt,
+                  backgroundColor: own ? accent : glass ? homeGlassColors.surfaceRaised : theme.colors.bgCardAlt,
                   borderRadius: 18,
                 },
-            failed ? { borderWidth: 1, borderColor: theme.colors.error } : null,
+            failed ? { borderWidth: 1, borderColor: danger } : null,
             joinsNewer && !mediaOnly ? (own ? styles.joinOwnTop : styles.joinOtherTop) : null,
             joinsOlder && !mediaOnly ? (own ? styles.joinOwnBottom : styles.joinOtherBottom) : null,
           ]}
         >
           {message.replyToMessageId ? (
-            <View style={[styles.quote, { borderLeftColor: own ? '#ffffffaa' : theme.colors.primary }]}>
-              <Text numberOfLines={2} style={[styles.quoteText, { color: own ? '#ffffffbb' : theme.colors.textSecondary }]}>
+            <View style={[styles.quote, { borderLeftColor: own ? '#ffffffaa' : accent }]}>
+              <Text numberOfLines={2} style={[styles.quoteText, { color: own ? '#ffffffbb' : inkMuted }]}>
                 {quoted?.deletedAt ? t('msgDeletedShort') : quoted?.body || (quoted?.imageUrl ? t('image') : t('msgRepliedFallback'))}
               </Text>
             </View>
           ) : null}
 
           {message.deletedAt ? (
-            <Text style={{ color: own ? '#ffffffaa' : theme.colors.textMuted, fontStyle: 'italic' }}>{t('msgDeleted')}</Text>
+            <Text style={{ color: own ? '#ffffffaa' : inkFaint, fontStyle: 'italic' }}>{t('msgDeleted')}</Text>
           ) : (
             <>
               {message.imageUrl ? (
@@ -110,7 +122,7 @@ export function ChatMessageBubble({
                 </View>
               ) : null}
               {message.body ? (
-                <Text style={[theme.type.body, { color: own ? '#fff' : theme.colors.textPrimary }]}>{message.body}</Text>
+                <Text style={[theme.type.body, { color: own ? '#fff' : ink }]}>{message.body}</Text>
               ) : null}
             </>
           )}
@@ -122,7 +134,7 @@ export function ChatMessageBubble({
             style={[
               styles.reactions,
               own ? styles.reactionsOwn : styles.reactionsOther,
-              { backgroundColor: theme.colors.bgCard, borderColor: theme.colors.divider },
+              { backgroundColor: glass ? homeGlassColors.surface : theme.colors.bgCard, borderColor: glass ? homeGlassColors.hairline : theme.colors.divider },
             ]}
           >
             <Text style={styles.reactionText}>{emojis!.join(' ')}</Text>
@@ -132,7 +144,7 @@ export function ChatMessageBubble({
 
       {own && (showStatus || sending || failed) ? (
         <View style={styles.statusRow}>
-          <Text style={[styles.status, { color: failed ? theme.colors.error : theme.colors.textMuted }]}>
+          <Text style={[styles.status, { color: failed ? danger : inkFaint }]}>
             {statusText}
             {message.editedAt && !failed && !sending ? ` · ${t('edited')}` : ''}
           </Text>
@@ -144,8 +156,8 @@ export function ChatMessageBubble({
               onPress={() => onRetry(message.outboxId!)}
               style={styles.retry}
             >
-              <Icon name="refresh-cw" size={11} color={theme.colors.primary} />
-              <Text style={[styles.status, { color: theme.colors.primary }]}>{t('retry')}</Text>
+              <Icon name="refresh-cw" size={11} color={accent} />
+              <Text style={[styles.status, { color: accent }]}>{t('retry')}</Text>
             </Pressable>
           ) : null}
         </View>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { type LegalDocKey } from '@/lib/legalContent';
 import { useLegalDoc } from '@/hooks/useLegalDoc';
 
@@ -40,21 +40,21 @@ export function LegalDocBody({ docKey }: LegalDocBodyProps) {
 
         if (i === 0) {
           return (
-            <Text key={i} style={[theme.type.h1, { color: theme.colors.textPrimary, marginBottom: 4 }]}>
+            <Text key={i} style={[theme.type.h1, { color: homeGlassColors.text, marginBottom: 4 }]}>
               {line}
             </Text>
           );
         }
         if (i === 1) {
           return (
-            <Text key={i} style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+            <Text key={i} style={[styles.subtitle, { color: homeGlassColors.textMuted }]}>
               {line}
             </Text>
           );
         }
         if (i === 2) {
           return (
-            <Text key={i} style={[styles.smallMuted, { color: theme.colors.textMuted }]}>
+            <Text key={i} style={[styles.smallMuted, { color: homeGlassColors.textFaint }]}>
               {line}
             </Text>
           );
@@ -67,9 +67,9 @@ export function LegalDocBody({ docKey }: LegalDocBodyProps) {
           return (
             <View
               key={i}
-              style={[styles.disclaimerBox, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md }]}
+              style={[styles.disclaimerBox, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md }]}
             >
-              <Text style={[styles.disclaimerText, { color: theme.colors.textSecondary }]}>{line}</Text>
+              <Text style={[styles.disclaimerText, { color: homeGlassColors.textMuted }]}>{line}</Text>
             </View>
           );
         }
@@ -79,7 +79,7 @@ export function LegalDocBody({ docKey }: LegalDocBodyProps) {
               key={i}
               style={[
                 heading[2] ? styles.subSectionHeader : styles.sectionHeader,
-                { color: theme.colors.textPrimary, fontFamily: theme.fontFamily.bold },
+                { color: homeGlassColors.text, fontFamily: theme.fontFamily.bold },
               ]}
             >
               {line}
@@ -89,13 +89,13 @@ export function LegalDocBody({ docKey }: LegalDocBodyProps) {
         if (raw.startsWith('\t') || line.startsWith('•')) {
           return (
             <View key={i} style={styles.bulletRow}>
-              <Text style={[styles.bulletDot, { color: theme.colors.textSecondary }]}>•</Text>
-              <Text style={[styles.bulletText, { color: theme.colors.textSecondary }]}>{line.replace(/^•\s*/, '')}</Text>
+              <Text style={[styles.bulletDot, { color: homeGlassColors.textMuted }]}>•</Text>
+              <Text style={[styles.bulletText, { color: homeGlassColors.textMuted }]}>{line.replace(/^•\s*/, '')}</Text>
             </View>
           );
         }
         return (
-          <Text key={i} style={[styles.paragraph, { color: theme.colors.textSecondary }]}>
+          <Text key={i} style={[styles.paragraph, { color: homeGlassColors.textMuted }]}>
             {line}
           </Text>
         );

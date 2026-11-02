@@ -18,6 +18,23 @@ export type NotificationType =
   | 'post_moderation'
   | 'roadmap_ready';
 
+/** The types Cộng đồng's own bell answers for. Everything else — water,
+ * "đến giờ tập", the roadmap, support chat — belongs to Home's bell
+ * (owner, 2026-10-26). `blog` is here because an official article IS
+ * community content. */
+const COMMUNITY_NOTIFICATION_TYPES: NotificationType[] = [
+  'post_reaction',
+  'post_comment',
+  'comment_reply',
+  'comment_reaction',
+  'post_moderation',
+  'blog',
+];
+
+export function isCommunityNotification(type: NotificationType): boolean {
+  return COMMUNITY_NOTIFICATION_TYPES.includes(type);
+}
+
 export interface NotificationRow {
   id: string;
   type: NotificationType;

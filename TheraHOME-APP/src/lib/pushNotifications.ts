@@ -215,6 +215,64 @@ export async function scheduleEveningReminder(enabled: boolean, time: string, la
   await scheduleReminder(EVENING_REMINDER_ID, enabled, time, copy.title, copy.body, 'evening');
 }
 
+/**
+ * The water reminders: five a day, device-local, nothing server-side.
+ *
+ * Deliberately NOT routed through `scheduleReminder` above — that one tags
+ * its notifications with a `reminderKind`, which is how the inbox listener
+ * recognises the two reminders that need a `notifications` row written for
+ * them. A nudge to drink a glass is not something anybody needs to find
+ * again in a notification centre a week later.
+ *
+ * Returns whether reminders are on afterwards: asking for notification
+ * permission can be refused, and a switch that stays on after a refusal is
+ * a lie.
+ */
+const WATER_TIMES = ['09:00', '11:00', '14:00', '16:30', '20:00'];
+const waterReminderId = (index: number) => `water-reminder-${index}`;
+
+export async function scheduleWaterReminders(
+  enabled: boolean,
+  language: AppLanguage = 'vi',
+): Promise<boolean> {
+  await Promise.all(
+    WATER_TIMES.map((_time, index) =>
+      Notifications.cancelScheduledNotificationAsync(waterReminderId(index)).catch(() => undefined),
+    ),
+  );
+  if (!enabled) return false;
+
+  await ensureAndroidChannel();
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let status = existing;
+  if (status !== 'granted') ({ status } = await Notifications.requestPermissionsAsync());
+  if (status !== 'granted') return false;
+
+  const title = translate(language, 'waterReminderTitle');
+  const body = translate(language, 'waterReminderBody');
+  await Promise.all(
+    WATER_TIMES.map((time, index) => {
+      const [hour, minute] = time.split(':').map(Number);
+      return Notifications.scheduleNotificationAsync({
+        identifier: waterReminderId(index),
+        content: {
+          title,
+          body,
+          sound: 'ting.wav',
+          data: { type: 'water', destination: 'home' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour,
+          minute,
+          ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+        },
+      }).catch(() => undefined);
+    }),
+  );
+  return true;
+}
+
 /** Writes an inbox row (`record_local_reminder_notification` RPC) the
  * moment a local daily/evening reminder is actually delivered — these are
  * the only two notifications in the app that are purely device-scheduled
