@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useI18n } from '@/lib/i18n';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
@@ -25,24 +25,24 @@ export function SurveyPromptModal({ phaseName, onTake, onLater }: SurveyPromptMo
   const { t } = useI18n();
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onLater}>
-      <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={onLater}>
+      <Pressable style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]} onPress={onLater}>
         <Pressable
           onPress={(event) => event.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider }]}
+          style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline }]}
         >
-          <View style={[styles.icon, { backgroundColor: theme.colors.primaryTint10 }]}>
-            <Icon name="clipboard-check" size={26} color={theme.colors.primary} />
+          <View style={[styles.icon, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+            <Icon name="clipboard-check" size={26} color={homeGlassColors.accent} />
           </View>
-          <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('surveyPromptTitle')}</Text>
-          <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 }]}>
+          <Text style={[theme.type.h2, { color: homeGlassColors.text, textAlign: 'center' }]}>{t('surveyPromptTitle')}</Text>
+          <Text style={[theme.type.body, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 8, lineHeight: 22 }]}>
             {t('surveyPromptBody')}
           </Text>
-          <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, textAlign: 'center', marginTop: 6 }]}>{phaseName}</Text>
+          <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint, textAlign: 'center', marginTop: 6 }]}>{phaseName}</Text>
           <Button style={{ width: '100%', marginTop: 20 }} onPress={onTake}>
             {t('surveyPromptCta')}
           </Button>
           <Pressable onPress={onLater} hitSlop={8} style={styles.laterBtn}>
-            <Text style={[theme.type.body, { color: theme.colors.textMuted }]}>{t('later')}</Text>
+            <Text style={[theme.type.body, { color: homeGlassColors.textFaint }]}>{t('later')}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

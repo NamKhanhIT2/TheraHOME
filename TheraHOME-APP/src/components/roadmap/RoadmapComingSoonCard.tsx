@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
 
@@ -14,14 +14,14 @@ export function RoadmapComingSoonCard({ productName }: { productName: string }) 
   const theme = useTheme();
   const { t } = useI18n();
   return (
-    <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
-      <View style={[styles.iconWrap, { backgroundColor: theme.colors.primaryTint10 }]}>
-        <Icon name="clock" size={24} color={theme.colors.primary} />
+    <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
+      <View style={[styles.iconWrap, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+        <Icon name="clock" size={24} color={homeGlassColors.accentStrong} />
       </View>
-      <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center', marginTop: 12 }]}>
+      <Text style={[theme.type.h2, { color: homeGlassColors.text, textAlign: 'center', marginTop: 12 }]}>
         {t('roadmapComingSoonTitle', { product: productName })}
       </Text>
-      <Text style={[theme.type.body, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
+      <Text style={[theme.type.body, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 8 }]}>
         {t('roadmapComingSoonBody')}
       </Text>
     </View>

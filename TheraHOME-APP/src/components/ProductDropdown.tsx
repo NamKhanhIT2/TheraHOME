@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
+import { heroFont } from '@/components/home/glass';
 import { Icon } from '@/components/icons/Icon';
 import type { ProductInfo } from '@/hooks/usePrograms';
 
@@ -9,12 +10,16 @@ export interface ProductDropdownProps {
   product: ProductInfo;
   products: ProductInfo[];
   onSelect: (id: string) => void;
+  /** 'glass' is the dark roadmap's pill — a compact chip rather than a
+   * full-width field. The light variant is what every other surface uses. */
+  appearance?: 'light' | 'glass';
 }
 
 /** Mirrors the reference `ProductDropdown` — dropdown of a user's activated
  * products for the Home/Roadmap switcher. Uses a `Modal` instead of an
  * absolutely-positioned web overlay. */
-export function ProductDropdown({ product, products, onSelect }: ProductDropdownProps) {
+export function ProductDropdown({ product, products, onSelect, appearance = 'light' }: ProductDropdownProps) {
+  const glass = appearance === 'glass';
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   // With a single roadmap there is nothing to switch to: render the trigger
@@ -32,7 +37,10 @@ export function ProductDropdown({ product, products, onSelect }: ProductDropdown
   function openMenu() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     triggerRef.current?.measureInWindow((x, y, width, height) => {
-      setMenuFrame({ left: x, top: y + height + 10, width });
+      // The glass chip is narrow; its menu needs more room than the chip
+      // itself, and must stay on screen when the chip sits at the right edge.
+      const menuWidth = Math.max(width, 190);
+      setMenuFrame({ left: Math.max(14, x + width - menuWidth), top: y + height + 10, width: menuWidth });
       setOpen(true);
       menuAnim.setValue(0);
       Animated.spring(menuAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start();
@@ -50,14 +58,28 @@ export function ProductDropdown({ product, products, onSelect }: ProductDropdown
         disabled={single}
         style={[
           styles.trigger,
-          { backgroundColor: theme.colors.bgCard, borderColor: theme.colors.borderInput, borderRadius: theme.radius.md },
+          glass
+            ? { backgroundColor: homeGlassColors.surfaceRaised, borderColor: homeGlassColors.hairline, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 14 }
+            : { backgroundColor: theme.colors.bgCard, borderColor: theme.colors.borderInput, borderRadius: theme.radius.md },
         ]}
       >
-        <View style={[styles.dot, { backgroundColor: theme.colors[product.accent] }]} />
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flex: 1 }]}>{product.name}</Text>
+        <View style={[styles.dot, { backgroundColor: glass ? homeGlassColors.accent : theme.colors[product.accent] }]} />
+        {/* Clamped and shrinkable: the trigger sits beside a screen title
+         * in a space-between row, so an unclamped product name pushes the
+         * title off a narrow phone instead of truncating itself. */}
+        <Text
+          numberOfLines={1}
+          style={[
+            glass ? [styles.glassLabel, heroFont('600')] : theme.type.bodyStrong,
+            { color: glass ? homeGlassColors.text : theme.colors.textPrimary },
+            glass ? styles.glassLabelShrink : { flex: 1 },
+          ]}
+        >
+          {product.name}
+        </Text>
         {single ? null : (
           <Animated.View style={{ transform: [{ rotate: chevronAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
-            <Icon name="chevron-down" size={18} color={theme.colors.textSecondary} />
+            <Icon name="chevron-down" size={glass ? 15 : 18} color={glass ? homeGlassColors.textMuted : theme.colors.textSecondary} />
           </Animated.View>
         )}
       </Pressable>
@@ -80,7 +102,9 @@ export function ProductDropdown({ product, products, onSelect }: ProductDropdown
               style={[
                 styles.menu,
                 theme.shadows.card,
-                { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.borderInput },
+                glass
+                  ? { backgroundColor: homeGlassColors.toast, borderRadius: 16, borderWidth: 1, borderColor: homeGlassColors.hairline }
+                  : { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.borderInput },
               ]}
             >
               {products.map((p) => (
@@ -92,12 +116,23 @@ export function ProductDropdown({ product, products, onSelect }: ProductDropdown
                   }}
                   style={[
                     styles.menuItem,
-                    { backgroundColor: p.id === product.id ? theme.colors.bgCardAlt : 'transparent' },
+                    {
+                      backgroundColor:
+                        p.id === product.id
+                          ? glass
+                            ? homeGlassColors.surfaceRaised
+                            : theme.colors.bgCardAlt
+                          : 'transparent',
+                    },
                   ]}
                 >
-                  <View style={[styles.dot, { backgroundColor: theme.colors[p.accent] }]} />
-                  <Text style={[theme.type.body, { color: theme.colors.textPrimary, flex: 1 }]}>{p.name}</Text>
-                  {p.id === product.id ? <Icon name="check" size={16} color={theme.colors[p.accent]} /> : null}
+                  <View style={[styles.dot, { backgroundColor: glass ? homeGlassColors.accent : theme.colors[p.accent] }]} />
+                  <Text style={[theme.type.body, { color: glass ? homeGlassColors.text : theme.colors.textPrimary, flex: 1 }]}>
+                    {p.name}
+                  </Text>
+                  {p.id === product.id ? (
+                    <Icon name="check" size={16} color={glass ? homeGlassColors.accent : theme.colors[p.accent]} />
+                  ) : null}
                 </Pressable>
               ))}
             </View>
@@ -109,6 +144,10 @@ export function ProductDropdown({ product, products, onSelect }: ProductDropdown
 }
 
 const styles = StyleSheet.create({
+  glassLabelShrink: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -116,6 +155,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 10,
     paddingHorizontal: 14,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  glassLabel: {
+    fontSize: 15,
+    lineHeight: 20,
+    letterSpacing: -0.2,
   },
   dot: {
     width: 8,

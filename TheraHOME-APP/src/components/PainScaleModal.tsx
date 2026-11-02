@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Animated, Modal, PanResponder, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { painColor } from '@/theme/colors';
 import { MoodFace } from '@/components/MoodFace';
 import { Button } from '@/components/ui/Button';
@@ -88,13 +88,13 @@ function PainSlider({ value, onChange, color }: { value: number; onChange: (v: n
         {...panResponder.panHandlers}
         style={styles.sliderHitArea}
       >
-        <View style={[styles.sliderTrack, { backgroundColor: theme.colors.borderLight }]} />
+        <View style={[styles.sliderTrack, { backgroundColor: homeGlassColors.hairline }]} />
         <Animated.View style={[styles.sliderFill, { width: pctPercent, backgroundColor: color }]} />
         <Animated.View style={[styles.sliderThumb, { left: pctPercent, backgroundColor: color, borderColor: '#fff' }]} />
       </View>
       <View style={styles.sliderLabels}>
-        <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>0 · {t('noDiscomfort')}</Text>
-        <Text style={[theme.type.captionSm, { color: theme.colors.textMuted }]}>10 · {t('veryUncomfortable')}</Text>
+        <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>0 · {t('noDiscomfort')}</Text>
+        <Text style={[theme.type.captionSm, { color: homeGlassColors.textFaint }]}>10 · {t('veryUncomfortable')}</Text>
       </View>
     </View>
   );
@@ -110,21 +110,21 @@ export function PainScaleModal({ dayId, onCancel, onConfirm, submitting }: PainS
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={submitting ? undefined : onCancel}>
+      <Pressable style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]} onPress={submitting ? undefined : onCancel}>
         <Pressable
           onPress={(e) => e.stopPropagation()}
-          style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider, padding: theme.space[5] }]}
+          style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline, padding: theme.space[5] }]}
         >
-          <Text style={[theme.type.h2, { color: theme.colors.textPrimary }]}>
+          <Text style={[theme.type.h2, { color: homeGlassColors.text }]}>
             {t('day')} {dayId} · {t('discomfortToday')}
           </Text>
-          <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 4, marginBottom: 18 }]}>
+          <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, marginTop: 4, marginBottom: 18 }]}>
             {t('swipePain')}
           </Text>
           <View style={styles.faceCol}>
             <MoodFace value={value} />
             <Text style={[theme.type.h1, { color, marginTop: 6 }]}>{value}</Text>
-            <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t(moodLabelKey(value))}</Text>
+            <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t(moodLabelKey(value))}</Text>
           </View>
           <View style={{ marginTop: 20 }}>
             <PainSlider value={value} onChange={setValue} color={color} />

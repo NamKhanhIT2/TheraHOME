@@ -1,8 +1,10 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
+import { heroFont } from '@/components/home/glass';
 import { Icon } from '@/components/icons/Icon';
+import { RoadmapKnob } from '@/components/roadmap/RoadmapKnob';
 import { usePhaseQuiz, useQuizAttempt } from '@/hooks/useQuiz';
 import { useI18n } from '@/lib/i18n';
 
@@ -51,16 +53,19 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, enabled, lo
   if (!enabled) {
     if (!hasQuiz || collapsed) return null;
     return (
-      <View style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding, opacity: 0.62 }]}>
-        <View style={[styles.quizIcon, { backgroundColor: theme.colors.bgCardAlt }]}>
-          <Icon name="lock" size={18} color={theme.colors.textMuted} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textSecondary }]}>{t('quizTitle')}</Text>
-          <Text style={[theme.type.captionSm, { color: theme.colors.textMuted, marginTop: 2 }]}>
+      <View style={styles.quizRow}>
+        <RoadmapKnob size={44}>
+          <Icon name="lock" size={17} color={homeGlassColors.textFaint} />
+        </RoadmapKnob>
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text style={[styles.quizTitle, heroFont('600'), { color: homeGlassColors.textMuted }]}>{t('quizTitle')}</Text>
+          <Text style={[theme.type.caption, heroFont('400'), { color: homeGlassColors.textFaint }]}>
             {t('quizLockedHint', { day: lockedDayNumber })}
           </Text>
         </View>
+        <RoadmapKnob size={38}>
+          <Icon name="lock" size={16} color={homeGlassColors.roadmapKnobIcon} strokeWidth={2.2} />
+        </RoadmapKnob>
       </View>
     );
   }
@@ -74,14 +79,21 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, enabled, lo
     return (
       <Pressable
         onPress={() => router.push({ pathname: '/quiz/[phaseId]', params: { phaseId, productId, phaseName } })}
-        style={[styles.quizRow, theme.shadows.card, { backgroundColor: theme.colors.primaryTint05, borderRadius: theme.radius.lg, padding: theme.cardPadding, borderWidth: 1.5, borderColor: theme.colors.primary }]}
+        style={({ pressed }) => [
+          styles.quizRow,
+          { backgroundColor: homeGlassColors.surfaceRaised, borderColor: 'rgba(95,184,245,0.38)', borderWidth: 1, borderRadius: 18 },
+          pressed ? { opacity: 0.65 } : null,
+        ]}
       >
-        <View style={[styles.quizIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-          <Icon name="clipboard-check" size={19} color={theme.colors.primary} />
-        </View>
+        <RoadmapKnob size={44}>
+          <Icon name="clipboard-check" size={18} color={homeGlassColors.accent} />
+        </RoadmapKnob>
         <View style={{ flex: 1 }}>
-          <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('quizTitle')}</Text>
+          <Text style={[styles.quizTitle, heroFont('600'), { color: homeGlassColors.text }]}>{t('quizTitle')}</Text>
         </View>
+        <RoadmapKnob size={38}>
+          <Icon name="chevron-right" size={16} color={homeGlassColors.accent} strokeWidth={2.2} />
+        </RoadmapKnob>
       </Pressable>
     );
   }
@@ -95,41 +107,34 @@ export function PhaseFooter({ userId, productId, phaseId, phaseName, enabled, lo
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/quiz/[phaseId]', params: { phaseId, productId, phaseName } })}
-      style={[
-        styles.quizRow,
-        theme.shadows.card,
-        {
-          backgroundColor: theme.colors.successTint,
-          borderRadius: theme.radius.lg,
-          padding: theme.cardPadding,
-          marginBottom: 0,
-          // Bright border marks the survey as done (per request).
-          borderWidth: 1.5,
-          borderColor: theme.colors.success,
-        },
-      ]}
+      style={({ pressed }) => [styles.quizRow, pressed ? { opacity: 0.65 } : null]}
     >
-      <View style={[styles.quizIcon, { backgroundColor: theme.colors.successTint }]}>
-        <Icon name="check" size={19} color={theme.colors.success} />
-      </View>
+      <RoadmapKnob size={44}>
+        <Icon name="check" size={19} color={homeGlassColors.tick} strokeWidth={2.6} />
+      </RoadmapKnob>
       <View style={{ flex: 1 }}>
-        <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('quizTitle')}</Text>
+        <Text style={[styles.quizTitle, heroFont('600'), { color: homeGlassColors.text }]}>{t('quizTitle')}</Text>
       </View>
+      <RoadmapKnob size={38}>
+        <Icon name="chevron-right" size={16} color={homeGlassColors.roadmapKnobIcon} strokeWidth={2.2} />
+      </RoadmapKnob>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  // Deliberately the same geometry as a day row (see PathNode): the survey
+  // is the last stop of a phase, not a card bolted under it.
   quizRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
   },
-  quizIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+  quizTitle: {
+    fontSize: 17.5,
+    lineHeight: 23,
+    letterSpacing: -0.2,
   },
 });

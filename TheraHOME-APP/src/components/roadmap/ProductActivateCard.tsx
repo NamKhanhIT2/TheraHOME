@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 import { useMarket } from '@/hooks/useMarket';
@@ -83,27 +83,27 @@ export function ProductActivateCard({ productId }: { productId: string }) {
   }
 
   return (
-    <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
-      <View style={[styles.lockedIcon, { backgroundColor: theme.colors.primaryTint10 }]}>
-        <Icon name="lock" size={22} color={theme.colors.primary} />
+    <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, padding: theme.cardPadding }]}>
+      <View style={[styles.lockedIcon, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+        <Icon name="lock" size={22} color={homeGlassColors.accentStrong} />
       </View>
-      <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center', marginTop: 4 }]}>
+      <Text style={[theme.type.h2, { color: homeGlassColors.text, textAlign: 'center', marginTop: 4 }]}>
         {t('productLockedTitle')}
       </Text>
-      <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, lineHeight: 19 }]}>
+      <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 4, lineHeight: 19 }]}>
         {t('productLockedHint')}
       </Text>
       <View
         style={[
           styles.inputWrap,
           {
-            borderColor: error ? theme.colors.error : theme.colors.borderInput,
+            borderColor: error ? homeGlassColors.dotMissed : homeGlassColors.hairline,
             borderRadius: theme.radius.md,
-            backgroundColor: theme.colors.bgCardAlt,
+            backgroundColor: homeGlassColors.surfaceRaised,
           },
         ]}
       >
-        <Icon name={isEmail ? 'mail' : 'smartphone'} size={19} color={theme.colors.textMuted} />
+        <Icon name={isEmail ? 'mail' : 'smartphone'} size={19} color={homeGlassColors.textFaint} />
         <TextInput
           value={contact}
           onChangeText={(value) => {
@@ -111,17 +111,17 @@ export function ProductActivateCard({ productId }: { productId: string }) {
             if (error) setError('');
           }}
           placeholder={t('contactInputPlaceholder')}
-          placeholderTextColor={theme.colors.textMuted}
+          placeholderTextColor={homeGlassColors.textFaint}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType={isEmail ? 'email-address' : 'default'}
           returnKeyType="done"
           onSubmitEditing={() => void submit()}
-          style={[styles.input, { color: theme.colors.textPrimary }]}
+          style={[styles.input, { color: homeGlassColors.text }]}
         />
       </View>
       {error ? (
-        <Text style={[theme.type.caption, { color: theme.colors.error, marginTop: 8, alignSelf: 'stretch' }]}>{error}</Text>
+        <Text style={[theme.type.caption, { color: homeGlassColors.dotMissed, marginTop: 8, alignSelf: 'stretch' }]}>{error}</Text>
       ) : null}
       <Button
         style={{ width: '100%', marginTop: 14 }}

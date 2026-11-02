@@ -28,22 +28,27 @@ export interface PhaseLockRequirement {
   salesEnabled: boolean;
 }
 
-/** Which of the given phases require an (unpurchased) IAP unlock on THIS
- * platform — a phase appears in the map only when admin configured this
- * platform's product id for it. Used by the roadmap to force-lock a
- * phase's days even if the normal day-by-day sequential unlock would
- * otherwise mark them reachable. */
-export function usePhaseLockRequirements(phaseIds: string[]) {
-  const key = phaseIds.slice().sort().join(',');
+/** Which phases require an (unpurchased) IAP unlock on THIS platform — a
+ * phase appears in the map only when admin configured this platform's product
+ * id for it. Used by the roadmap to force-lock a phase's days even if the
+ * normal day-by-day sequential unlock would otherwise mark them reachable.
+ *
+ * Takes no phase ids on purpose. It used to filter by the ids of the days
+ * that had loaded, which made it the LAST link in a serial chain —
+ * catalogue → activated programmes → days → these locks — and Home cannot
+ * finish loading until it resolves. `phase_promos` holds one row per
+ * purchasable phase across the whole catalogue (two of them, checked against
+ * production 2026-10-24), so fetching the lot costs nothing and lets this run
+ * in parallel with everything else from the first frame. Callers look up by
+ * phase id, so extra rows for other products are simply never asked about. */
+export function usePhaseLockRequirements() {
   return useQuery({
-    queryKey: ['phase_promos_lock', key],
+    queryKey: ['phase_promos_lock'],
     queryFn: async (): Promise<Map<string, PhaseLockRequirement>> => {
-      if (phaseIds.length === 0) return new Map();
       try {
         const { data, error } = await supabase
           .from('phase_promos')
           .select(`phase_id, sales_enabled, ${PLATFORM_PRODUCT_COLUMN}`)
-          .in('phase_id', phaseIds)
           .not(PLATFORM_PRODUCT_COLUMN, 'is', null);
         if (error) throw error;
         const map = new Map(
@@ -60,10 +65,7 @@ export function usePhaseLockRequirements(phaseIds: string[]) {
         const cached = await AsyncStorage.getItem(LOCK_CACHE_KEY).catch(() => null);
         if (cached) {
           try {
-            const entries = JSON.parse(cached) as [string, PhaseLockRequirement][];
-            // Only the phases this screen asked about — the cache can outlive
-            // a phase that has since been deleted.
-            return new Map(entries.filter(([id]) => phaseIds.includes(id)));
+            return new Map(JSON.parse(cached) as [string, PhaseLockRequirement][]);
           } catch {
             // Corrupt entry: fall through and report the real failure.
           }
@@ -71,7 +73,6 @@ export function usePhaseLockRequirements(phaseIds: string[]) {
         throw e;
       }
     },
-    enabled: phaseIds.length > 0,
   });
 }
 

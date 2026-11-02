@@ -3,7 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useTheme } from '@/theme';
+import { useTheme, homeGlassColors } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { ExternalLinkModal } from '@/components/ExternalLinkModal';
 import { usePhasePromo } from '@/hooks/usePhasePromo';
@@ -61,22 +61,22 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
   return (
     <View style={{ gap: 14 }}>
       {hasUnlock ? (
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderColor: theme.colors.primary }]}>
+        <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, borderColor: homeGlassColors.accentStrong }]}>
           <View style={styles.content}>
             <View style={styles.titleRow}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flexShrink: 1 }]} numberOfLines={2}>
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flexShrink: 1 }]} numberOfLines={2}>
                 {t('unlockGiaiDoan', { phase: phaseName })}
               </Text>
-              <Icon name="lock" size={15} color={theme.colors.textMuted} />
+              <Icon name="lock" size={15} color={homeGlassColors.textFaint} />
             </View>
             {promo.unlockDescription ? (
-              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginTop: 4 }]} numberOfLines={3}>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted, marginTop: 4 }]} numberOfLines={3}>
                 {promo.unlockDescription}
               </Text>
             ) : null}
             <View style={{ marginTop: 10, gap: 6 }}>
               <Pressable
-                style={[styles.btnFilled, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.sm }]}
+                style={[styles.btnFilled, { backgroundColor: homeGlassColors.accentStrong, borderRadius: theme.radius.sm }]}
                 onPress={() => router.push({ pathname: '/paywall/[phaseId]', params: { phaseId, phaseName } })}
               >
                 <Text style={[theme.type.captionSm, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]} numberOfLines={1}>
@@ -86,11 +86,11 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
               </Pressable>
               {promo.unlockVideoUrl ? (
                 <Pressable
-                  style={[styles.btnOutline, { borderColor: theme.colors.borderInput, borderRadius: theme.radius.sm }]}
+                  style={[styles.btnOutline, { borderColor: homeGlassColors.hairline, borderRadius: theme.radius.sm }]}
                   onPress={() => void WebBrowser.openBrowserAsync(promo.unlockVideoUrl!)}
                 >
-                  <Icon name="play" size={12} color={theme.colors.primary} />
-                  <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>{t('watchIntroVideo')}</Text>
+                  <Icon name="play" size={12} color={homeGlassColors.accentStrong} />
+                  <Text style={[theme.type.captionSm, { color: homeGlassColors.accentStrong, fontFamily: theme.fontFamily.semiBold }]}>{t('watchIntroVideo')}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -99,27 +99,27 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
       ) : null}
 
       {hasCrossSell ? (
-        <View style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderColor: theme.colors.primary }]}>
+        <View style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.surface, borderRadius: theme.radius.lg, borderColor: homeGlassColors.accentStrong }]}>
           <View style={styles.content}>
             <View style={styles.titleRow}>
-              <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary, flexShrink: 1 }]} numberOfLines={2}>
+              <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text, flexShrink: 1 }]} numberOfLines={2}>
                 {promo.crossSellTitle}
               </Text>
               {promo.crossSellBadge ? (
-                <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
+                <View style={[styles.badge, { backgroundColor: homeGlassColors.accentStrong }]}>
                   <Text style={[theme.type.captionSm, { color: '#fff', fontFamily: theme.fontFamily.bold }]}>{promo.crossSellBadge}</Text>
                 </View>
               ) : null}
             </View>
             {promo.crossSellDescription ? (
-              <Text style={[theme.type.captionSm, { color: theme.colors.textSecondary, marginTop: 4 }]} numberOfLines={3}>
+              <Text style={[theme.type.captionSm, { color: homeGlassColors.textMuted, marginTop: 4 }]} numberOfLines={3}>
                 {promo.crossSellDescription}
               </Text>
             ) : null}
             <View style={{ marginTop: 10, gap: 6 }}>
               {promo.crossSellCtaUrl ? (
                 <Pressable
-                  style={[styles.btnFilled, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.sm }]}
+                  style={[styles.btnFilled, { backgroundColor: homeGlassColors.accentStrong, borderRadius: theme.radius.sm }]}
                   onPress={() => setPendingUrl(promo.crossSellCtaUrl)}
                 >
                   <Text style={[theme.type.captionSm, { color: '#fff', fontFamily: theme.fontFamily.semiBold }]}>{t('learnMore')}</Text>
@@ -128,11 +128,11 @@ export function PhaseUnlockPromo({ phaseId, phaseName, unlocked }: PhaseUnlockPr
               ) : null}
               {promo.crossSellVideoUrl ? (
                 <Pressable
-                  style={[styles.btnOutline, { borderColor: theme.colors.borderInput, borderRadius: theme.radius.sm }]}
+                  style={[styles.btnOutline, { borderColor: homeGlassColors.hairline, borderRadius: theme.radius.sm }]}
                   onPress={() => void WebBrowser.openBrowserAsync(promo.crossSellVideoUrl!)}
                 >
-                  <Icon name="play" size={12} color={theme.colors.primary} />
-                  <Text style={[theme.type.captionSm, { color: theme.colors.primary, fontFamily: theme.fontFamily.semiBold }]}>{t('watchIntroVideo')}</Text>
+                  <Icon name="play" size={12} color={homeGlassColors.accentStrong} />
+                  <Text style={[theme.type.captionSm, { color: homeGlassColors.accentStrong, fontFamily: theme.fontFamily.semiBold }]}>{t('watchIntroVideo')}</Text>
                 </Pressable>
               ) : null}
             </View>

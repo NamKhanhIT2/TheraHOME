@@ -29,8 +29,7 @@ export function useAccessibleProgress(
 ): AccessibleProgress {
   const daysQuery = useProgramDays(program?.userProgramId, program?.productId, program?.activatedAt);
   const days = useMemo(() => daysQuery.data ?? [], [daysQuery.data]);
-  const phaseIds = useMemo(() => Array.from(new Set(days.map((d) => d.phaseId))), [days]);
-  const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
+  const lockRequirementsQuery = usePhaseLockRequirements();
   const purchasesQuery = usePhasePurchases(userId);
   // App Review accounts aren't calendar-gated, so their "Ngày N" follows
   // actual activity instead of days-since-activation — see below.
@@ -45,9 +44,9 @@ export function useAccessibleProgress(
     // old `days.length > 0` test then left this false forever: Home's hero
     // span an ActivityIndicator that never resolved, and _layout.tsx's
     // reminder scheduling — which waits on isReady — silently never ran for
-    // that account. `usePhaseLockRequirements` is itself disabled when there
-    // are no phase ids, so it can never report isFetched in that case.
-    const lockSettled = phaseIds.length === 0 || lockRequirementsQuery.isFetched;
+    // that account. `usePhaseLockRequirements` now runs unconditionally, so
+    // this is simply "has it answered yet".
+    const lockSettled = lockRequirementsQuery.isFetched;
     const isReady =
       !program || (daysQuery.isFetched && lockSettled && (!userId || purchasesQuery.isFetched));
     const accessible =
@@ -66,5 +65,5 @@ export function useAccessibleProgress(
       day = Math.min(totalDays, Math.max(day, activity + 1));
     }
     return { day, totalDays, isReady };
-  }, [days, phaseIds.length, daysQuery.isFetched, lockRequirementsQuery.data, lockRequirementsQuery.isFetched, purchasesQuery.data, purchasesQuery.isFetched, program, isReviewAccount, painLogsQuery.data, userId]);
+  }, [days, daysQuery.isFetched, lockRequirementsQuery.data, lockRequirementsQuery.isFetched, purchasesQuery.data, purchasesQuery.isFetched, program, isReviewAccount, painLogsQuery.data, userId]);
 }

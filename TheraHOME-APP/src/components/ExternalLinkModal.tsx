@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import Reanimated, { Easing, FadeIn } from 'react-native-reanimated';
-import { useTheme } from '@/theme';
+import { homeGlassColors, useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n } from '@/lib/i18n';
 
@@ -57,26 +57,26 @@ export function ExternalLinkModal({ url, onClose }: ExternalLinkModalProps) {
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
       {submitting ? null : (
         <Reanimated.View entering={FadeIn.duration(180)} style={styles.backdropFill}>
-        <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlayScrim }]} onPress={onClose}>
+        <Pressable style={[styles.backdrop, { backgroundColor: 'rgba(8,10,16,0.62)' }]} onPress={onClose}>
           <Reanimated.View entering={FadeIn.duration(220).delay(40).easing(Easing.out(Easing.quad))}>
           <Pressable
             onPress={(e) => e.stopPropagation()}
-            style={[styles.card, theme.shadows.card, { backgroundColor: theme.colors.bgCard, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.divider, padding: theme.space[5] }]}
+            style={[styles.card, theme.shadows.card, { backgroundColor: homeGlassColors.menu, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: homeGlassColors.hairline, padding: theme.space[5] }]}
           >
-            <View style={[styles.iconCircle, { backgroundColor: theme.colors.bgCardAlt }]}>
-              <Icon name="external-link" size={20} color={theme.colors.textSecondary} />
+            <View style={[styles.iconCircle, { backgroundColor: homeGlassColors.surfaceRaised }]}>
+              <Icon name="external-link" size={20} color={homeGlassColors.textMuted} />
             </View>
-            <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>
+            <Text style={[theme.type.h2, { color: homeGlassColors.text, textAlign: 'center' }]}>
               {t('leaveApp')}
             </Text>
-            <Text style={[theme.type.caption, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }]}>
+            <Text style={[theme.type.caption, { color: homeGlassColors.textMuted, textAlign: 'center', marginTop: 6 }]}>
               {t('externalLinkMessage', { host: hostOf(url) })}
             </Text>
             <View style={styles.row}>
-              <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: theme.colors.bgCardAlt, borderRadius: theme.radius.md }]}>
-                <Text style={[theme.type.bodyStrong, { color: theme.colors.textPrimary }]}>{t('cancel')}</Text>
+              <Pressable onPress={onClose} style={[styles.btn, { backgroundColor: homeGlassColors.surfaceRaised, borderRadius: theme.radius.md }]}>
+                <Text style={[theme.type.bodyStrong, { color: homeGlassColors.text }]}>{t('cancel')}</Text>
               </Pressable>
-              <Pressable onPress={() => void handleContinue()} style={[styles.btn, { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md }]}>
+              <Pressable onPress={() => void handleContinue()} style={[styles.btn, { backgroundColor: homeGlassColors.accent, borderRadius: theme.radius.md }]}>
                 <Text style={[theme.type.bodyStrong, { color: '#fff' }]}>{t('continue')}</Text>
               </Pressable>
             </View>

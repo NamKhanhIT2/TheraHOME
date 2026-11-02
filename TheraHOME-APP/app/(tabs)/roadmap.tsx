@@ -1,8 +1,9 @@
 import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { router, useFocusEffect } from 'expo-router';
-import Reanimated from 'react-native-reanimated';
-import { useTheme } from '@/theme';
+import Reanimated, { FadeOut } from 'react-native-reanimated';
+import { homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useActivatedPrograms, useCatalogProgramDays, useDefaultProductId, useProducts, useRoadmapProducts, type DayRow } from '@/hooks/usePrograms';
@@ -12,7 +13,12 @@ import { useAccessibleProgress } from '@/hooks/useAccessibleProgress';
 import { usePhaseLockRequirements } from '@/hooks/usePhasePromo';
 import { usePhasePurchases, daysOpenAfterPurchase } from '@/hooks/usePhasePurchase';
 import { useQuizResolvedMap } from '@/hooks/useQuiz';
-import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { HomeGlassNav, navBottomOffset } from '@/components/home/HomeGlassNav';
+import { HomeMascot } from '@/components/home/HomeMascot';
+import { VerticalGradient } from '@/components/home/VerticalGradient';
+import { heroFont } from '@/components/home/glass';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { useSteadyLoading } from '@/hooks/useSteadyLoading';
 import { ProductDropdown } from '@/components/ProductDropdown';
@@ -21,6 +27,8 @@ import { ProductActivateCard } from '@/components/roadmap/ProductActivateCard';
 import { PhaseUnlockPromo } from '@/components/roadmap/PhaseUnlockPromo';
 import { PathNode } from '@/components/PathNode';
 import { PhaseFooter } from '@/components/roadmap/PhaseFooter';
+import { RoadmapCalendar } from '@/components/roadmap/RoadmapCalendar';
+import { TodayCard } from '@/components/roadmap/TodayCard';
 import { SurveyPromptModal } from '@/components/roadmap/SurveyPromptModal';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
@@ -30,9 +38,38 @@ import { useAppStore } from '@/store/useAppStore';
 import { useTabFocusFade } from '@/hooks/useTabFocusFade';
 import { fadeUpEntering, staggerDelay } from '@/lib/motion';
 
+/** A quieter version of Home's sky: no photograph here, so the screen is
+ * its own backdrop — a little lift at the top, near-black by the nav. */
+const ROADMAP_STOPS = [
+  { offset: homeGlassColors.roadmapSkyStops[0], color: homeGlassColors.roadmapSky[0] },
+  { offset: homeGlassColors.roadmapSkyStops[1], color: homeGlassColors.roadmapSky[1] },
+  { offset: homeGlassColors.roadmapSkyStops[2], color: homeGlassColors.roadmapSky[2] },
+];
+
+/** How long a day's session is told to take. The catalogue carries no
+ * per-day duration, and every published day is the same short session, so
+ * this is a constant rather than a column that would always hold 10. */
+const SESSION_MINUTES = 10;
+
 export default function RoadmapScreen() {
   const theme = useTheme();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  // Nothing may show through the floating bar — the same rule, and the same
+  // mechanism, as Home (docs/home-ui-rules.md).
+  const maskStops = useMemo(() => {
+    const height = windowHeight - insets.top;
+    const navTop = height - (navBottomOffset(insets.bottom) + 60);
+    const at = (y: number) => Math.min(1, Math.max(0, y / height));
+    const c = homeGlassColors.text;
+    return [
+      { offset: 0, color: c, opacity: 1 },
+      { offset: at(navTop - 44), color: c, opacity: 1 },
+      { offset: at(navTop + 14), color: c, opacity: 0 },
+      { offset: 1, color: c, opacity: 0 },
+    ];
+  }, [insets.bottom, insets.top, windowHeight]);
   const { session } = useSession();
   const userId = session?.user.id;
   // App Review accounts get NO day/survey gating (per explicit request
@@ -48,7 +85,6 @@ export default function RoadmapScreen() {
   // quiz" prompt isn't left dangling visible on its own). Only an explicit
   // tap overrides the computed default below; this map holds overrides,
   // not the effective state itself.
-  const [collapsedOverrides, setCollapsedOverrides] = useState<Record<string, boolean>>({});
 
   const productsQuery = useProducts();
   const programsQuery = useActivatedPrograms(userId);
@@ -96,9 +132,9 @@ export default function RoadmapScreen() {
     if (!selectedProductId && program) selectProduct(program.productId);
   }, [selectedProductId, program, selectProduct]);
 
-  // Manual expand/collapse taps stick for the session — but only for the
-  // device they were made on: switching devices resets them so every
-  // roadmap opens in its default layout (today's phase expanded).
+  // Manual expand/collapse taps stick for the session, and reset when the
+  // product changes so every roadmap opens in its default layout.
+  const [collapsedOverrides, setCollapsedOverrides] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setCollapsedOverrides({});
   }, [effectiveProductId]);
@@ -135,7 +171,7 @@ export default function RoadmapScreen() {
   // until a verified purchase exists. See PhaseFooter/PhaseUnlockPromo for
   // the unlock UI itself.
   const phaseIds = useMemo(() => Array.from(new Set(days.map((d) => d.phaseId))), [days]);
-  const lockRequirementsQuery = usePhaseLockRequirements(phaseIds);
+  const lockRequirementsQuery = usePhaseLockRequirements();
   const purchasesQuery = usePhasePurchases(userId);
   // Hold the skeleton until the paid-phase list has answered. Until it does,
   // `lockedPhaseIds` below is empty — nothing is paid — so a customer whose
@@ -171,7 +207,7 @@ export default function RoadmapScreen() {
     (day: { id: number; phaseId: string }) => day.id <= (boughtPhaseOpenThrough.get(day.phaseId) ?? -Infinity),
     [boughtPhaseOpenThrough],
   );
-  /** Bought, but still waiting for its 24 hours. */
+  /** Bought, but still waiting for its 49 hours. */
   const dayBoughtWaiting = useCallback(
     (day: { id: number; phaseId: string }) => boughtPhaseOpenThrough.has(day.phaseId) && !dayBoughtOpen(day),
     [boughtPhaseOpenThrough, dayBoughtOpen],
@@ -222,38 +258,6 @@ export default function RoadmapScreen() {
     }
     return map;
   }, [days]);
-  // The phase that opens by default: the one holding today. Owner rule
-  // (2026-09-07): opening the roadmap must always land on today's phase
-  // expanded, never on a wall of collapsed phases.
-  //
-  // It used to fold that phase back up once its days AND its survey were
-  // both finished ("nothing left to act on"), which is precisely the state a
-  // completed roadmap sits in — so the account that had finished all 14 days
-  // opened the tab with every phase shut. Other phases still collapse, so
-  // the two promo cards at the bottom keep the room around them they were
-  // given when survey 2 is submitted.
-  const currentPhaseId = useMemo(() => {
-    // Locked (unpurchased) phases can never be the default — their days are
-    // not shown at all, so filter first and let every lookup below inherit it.
-    const visibleDays = days.filter((d) => !lockedPhaseIds.has(d.phaseId));
-    // Today's day by the calendar. Once watched, its status flips to 'done'
-    // and nothing is 'current' any more, so fall back to the day number the
-    // program reports. That number can also run PAST the last day of a
-    // finished roadmap (current_day 15 of 14 today, for the same reason
-    // Admin's "Ngày N/X" had to be capped), which matched no day at all and
-    // was the other half of why nothing expanded — hence the final clamp to
-    // the last day that exists at or before it.
-    const todayDay =
-      visibleDays.find((d) => d.status === 'current') ??
-      (program ? visibleDays.find((d) => d.id === program.currentDay) : undefined) ??
-      (program ? visibleDays.filter((d) => d.id <= program.currentDay).pop() : undefined);
-    if (todayDay) return todayDay.phaseId;
-    // No program (a roadmap being previewed before activation): keep the old
-    // behaviour of opening the last phase whose survey is still outstanding.
-    const lastVisiblePhaseId = visibleDays[visibleDays.length - 1]?.phaseId ?? null;
-    if (lastVisiblePhaseId && quizResolvedQuery.data?.get(lastVisiblePhaseId) === false) return lastVisiblePhaseId;
-    return null;
-  }, [days, program, lockedPhaseIds, quizResolvedQuery.data]);
 
   // The promo pair for the bottom-of-list cards: the LAST reachable
   // (non-IAP-locked) phase must have all days run their course AND its
@@ -302,38 +306,93 @@ export default function RoadmapScreen() {
   // roadmap tab is focused while the survey is still due — reset the
   // per-focus dismissal on focus. It also stops on its own once the survey
   // is answered (dueSurveyPhase becomes null).
+  /** The day the whole screen is about: today's, or the last one that opened. */
+  const todayDay = useMemo(() => days.find((d) => d.id === todayMarkerDay) ?? null, [days, todayMarkerDay]);
+  /** Every day the user may actually see. A phase behind the paywall is not
+   * listed, and a phase whose `salesEnabled` is false is not even advertised
+   * — so its days must not surface anywhere else either. The calendar used to
+   * be handed the raw `days`, which plotted the unbought phase across the
+   * weeks after day 14 and, once those dates passed, drew them as "chưa hoàn
+   * thành" — blaming the customer for missing days they were never sold,
+   * right under a progress bar that says 12/14 (2026-11-01). */
+  const visibleDays = useMemo(
+    () => days.filter((d) => !lockedPhaseIds.has(d.phaseId)),
+    [days, lockedPhaseIds],
+  );
+  /** Which phase opens expanded: the one today sits in. A locked phase can
+   * never be it — its days are not listed at all. */
+  const currentPhaseId = useMemo(() => {
+    const current =
+      visibleDays.find((d) => d.status === 'current') ?? visibleDays.find((d) => d.id === todayMarkerDay);
+    return current?.phaseId ?? visibleDays[visibleDays.length - 1]?.phaseId ?? null;
+  }, [visibleDays, todayMarkerDay]);
+
   const [surveyPromptDismissed, setSurveyPromptDismissed] = useState(false);
   useFocusEffect(useCallback(() => { setSurveyPromptDismissed(false); }, []));
   // Only over the real day list — never on the skeleton, an error, a
   // coming-soon roadmap, or a not-yet-activated device.
+  /** The bottom of the "what do I do now" block, measured inside the
+   * scroll view, and what is left of the visible area under it. */
+  const [todayCardBottom, setTodayCardBottom] = useState(0);
+  const [contentTop, setContentTop] = useState(0);
+  const listSpacer = useMemo(() => {
+    if (!todayCardBottom) return 0;
+    // The scroll view's own visible height: the screen, less the status
+    // bar, less the floating bar and the gap it sits in.
+    const visible = windowHeight - insets.top - (navBottomOffset(insets.bottom) + 72);
+    return Math.max(0, visible - (contentTop + todayCardBottom));
+  }, [todayCardBottom, contentTop, windowHeight, insets.top, insets.bottom]);
+
+  /** Walks with the day list below, so a phase header is drawn once. Reset
+   * on every render, which is exactly the scope it is read in. */
+  let lastPhase: string | null = null;
+
   const showSurveyPrompt =
     !!dueSurveyPhase && !surveyPromptDismissed && !showSkeleton && !loadError && !!selectedProduct?.roadmapPublished;
 
-  let lastPhase: string | null = null;
 
   return (
-    <ScreenContainer edges={['top']}>
+    // The owner's dark design (2026-10-25). Same screen, same rules — the
+    // whole of the logic above is untouched; what changed is that the day
+    // list is drawn on Home's glass palette and carries Home's floating nav
+    // instead of the shared white strip.
+    <View style={[styles.root, { backgroundColor: homeGlassColors.roadmapSky[2] }]}> 
+      <StatusBar style="light" />
+      <VerticalGradient stops={ROADMAP_STOPS} />
+      <SafeAreaView edges={['top']} style={styles.root}>
+      <MaskedView
+        style={styles.root}
+        maskElement={
+          <View style={styles.root}>
+            <VerticalGradient stops={maskStops} />
+          </View>
+        }
+      >
       <Reanimated.View style={[{ flex: 1 }, focusFadeStyle]}>
       {/* Keeps the inline activation input above the keyboard (per
           explicit request); same pattern as the chat screens. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <ScrollView contentContainerStyle={styles.scrollBody} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scrollBody, { paddingBottom: navBottomOffset(insets.bottom) + 96 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Reanimated.View entering={fadeUpEntering(0)} style={styles.header}>
-          <Text style={[theme.type.display, { color: theme.colors.textPrimary }]}>{t('recoveryRoadmap')}</Text>
-          <Text style={[theme.type.caption, { color: theme.colors.textSecondary, marginTop: 2 }]}>
-            {t('chooseProduct')}
+          <Text numberOfLines={1} style={[styles.title, styles.titleShrink, heroFont('700'), { color: homeGlassColors.text }]}>
+            {t('roadmap')}
           </Text>
+          {!loadError && selectedProduct ? (
+            <View style={styles.headerAction}>
+              <ProductDropdown
+                appearance="glass"
+                product={selectedProduct}
+                products={dropdownProducts}
+                onSelect={selectProduct}
+              />
+            </View>
+          ) : null}
         </Reanimated.View>
 
-        {!loadError && selectedProduct ? (
-          <Reanimated.View entering={fadeUpEntering(70)} style={{ marginTop: 12 }}>
-            <ProductDropdown
-              product={selectedProduct}
-              products={dropdownProducts}
-              onSelect={selectProduct}
-            />
-          </Reanimated.View>
-        ) : null}
 
         {showSkeleton ? (
           /* Three dependent queries: measured around six seconds on a real
@@ -354,8 +413,10 @@ export default function RoadmapScreen() {
           </View>
         ) : loadError ? (
           <View style={styles.errorBox}>
-            <Text style={[theme.type.h2, { color: theme.colors.textPrimary, textAlign: 'center' }]}>{t('roadmapLoadErrorTitle')}</Text>
-            <Text style={[theme.type.caption, styles.errorText, { color: theme.colors.textSecondary }]}>
+            <Text style={[theme.type.h2, heroFont('600'), { color: homeGlassColors.text, textAlign: 'center' }]}>
+              {t('roadmapLoadErrorTitle')}
+            </Text>
+            <Text style={[theme.type.caption, styles.errorText, { color: homeGlassColors.textMuted }]}>
               {t('checkNetworkRetry')}
             </Text>
             <Button
@@ -392,113 +453,149 @@ export default function RoadmapScreen() {
             <RoadmapComingSoonCard productName={selectedProduct.name} />
           </Reanimated.View>
         ) : selectedProduct ? (
-          <View style={{ marginTop: 8 }}>
+          // Its own y inside the scroll content, because the card below
+          // reports a y relative to THIS view, not to the scroll view —
+          // measuring only the card would place the fold a header's height
+          // too low.
+          <View style={{ marginTop: 0 }} onLayout={(event) => setContentTop(event.nativeEvent.layout.y)}>
+            {/* The month, then today, then the phase's survey — the owner's
+                reference (2026-10-27). The fourteen-row day list it replaced
+                said the same thing at four times the height, and said it
+                about every day equally; this screen is for the one day that
+                is actually open. Any other day is still reachable: tapping
+                its square runs the same gate the list ran. */}
+            <Reanimated.View entering={fadeUpEntering(60)}>
+              <RoadmapCalendar
+                days={visibleDays}
+                activatedAt={program?.activatedAt}
+                doneCount={visibleDays.filter((d) => d.status === 'done').length}
+                totalDays={accessibleProgress.totalDays || days.length}
+                onSelectDay={(d) => {
+                  if (dayBlocked(d)) return;
+                  if (program) {
+                    void requestDayGate.requestDay(d, program.userProgramId, program.productId);
+                  } else {
+                    router.push({ pathname: '/day/[dayId]', params: { dayId: String(d.id), productId: selectedProduct.id } });
+                  }
+                }}
+              />
+            </Reanimated.View>
+
+            {todayDay && program ? (
+              <Reanimated.View entering={fadeUpEntering(110)} onLayout={(event) => setTodayCardBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height)}>
+                <TodayCard
+                  day={todayDay}
+                  date={new Date()}
+                  productName={selectedProduct.name}
+                  minutes={SESSION_MINUTES}
+                  language={language}
+                  onStart={() => {
+                    if (dayBlocked(todayDay)) return;
+                    void requestDayGate.requestDay(todayDay, program.userProgramId, program.productId);
+                  }}
+                />
+              </Reanimated.View>
+            ) : null}
+
+            {/* Measured, not guessed. The list has to START below the
+                fold on every phone, and a fixed margin cannot do that: it
+                leaves a strip of the next section showing on a tall screen
+                and a hole on a short one. The spacer is whatever is left of
+                the visible scroll area after the calendar and the card
+                (owner, 2026-10-28: "vẫn đang lộ 1 tí nội dung phần sau"). */}
+            <View style={{ height: listSpacer }} pointerEvents="none" />
+
+            {/* The day list, back under the fold (owner, 2026-10-28). The
+                calendar answers "where am I" and the card answers "what do
+                I do now"; this answers "what does the whole thing look
+                like", which is a question people only ask by scrolling.
+                A locked phase keeps its greyed, tappable header here — the
+                path into the paywall, and the path App Review uses to find
+                the IAP without playing through fourteen days. */}
             {days.map((d, index) => {
               const nextDay = days[index + 1];
               const isLastOfPhase = !nextDay || nextDay.phaseId !== d.phaseId;
               const showPhase = d.phase !== lastPhase;
               lastPhase = d.phase;
-              // A phase behind the IAP paywall keeps a VISIBLE header in a
-              // greyed/locked state (per explicit request 2026-09-02) while
-              // its days and footer stay hidden until purchased. Tapping it
-              // opens the paywall directly — this is also the discovery path
-              // Apple's reviewer uses to reach the IAP without playing
-              // through 14 days first.
+
               if (lockedPhaseIds.has(d.phaseId)) {
                 if (!showPhase) return null;
-                // Selling paused (free-agreement mode): the phase stays
-                // locked but is invisible — no greyed header, so no tap
-                // path into the paywall either (per explicit request
-                // 2026-09-04). Flips back on via WEB Admin's Upsell editor.
+                // Selling paused (free-agreement mode): locked AND invisible,
+                // so there is no tap path into a paywall nobody may buy from.
                 if (lockRequirementsQuery.data?.get(d.phaseId)?.salesEnabled === false) return null;
                 return (
-                  <Reanimated.View key={d.id} entering={fadeUpEntering(140 + staggerDelay(index, 20, 10))}>
+                  <Reanimated.View key={d.id} entering={fadeUpEntering(200 + staggerDelay(index, 20, 10))}>
                     <Pressable
                       onPress={() => router.push({ pathname: '/paywall/[phaseId]', params: { phaseId: d.phaseId, phaseName: d.phase } })}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 18, paddingBottom: 8, opacity: 0.5 }}
+                      style={[styles.phaseHeader, { opacity: 0.5 }]}
                     >
-                      <Text
-                        style={[
-                          theme.type.captionSm,
-                          // One step above captionSm (per explicit request
-                          // 2026-09-03: roadmap phase headers a touch bigger).
-                          { fontSize: 13, lineHeight: 18, color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
-                        ]}
-                      >
+                      <Text numberOfLines={1} style={[theme.type.captionSm, styles.phaseLabel, { fontSize: 13.5, lineHeight: 18, color: homeGlassColors.textFaint, textTransform: 'uppercase', letterSpacing: 0.8 }]}>
                         {d.phase}
                       </Text>
-                      <Icon name="lock" size={14} color={theme.colors.textMuted} />
+                      <View style={styles.phaseChevron}>
+                        <Icon name="lock" size={15} color={homeGlassColors.textFaint} />
+                      </View>
                     </Pressable>
                   </Reanimated.View>
                 );
               }
-              const itemDelay = 140 + staggerDelay(index, 20, 10);
+
+              // Stagger within the PHASE, not the whole list: expanding a
+              // phase halfway down should cascade from its own first row
+              // rather than wait out the delay of every row above it.
+              const phaseStart = days.findIndex((x) => x.phaseId === d.phaseId);
+              const itemDelay = 200 + staggerDelay(index - phaseStart, 26, 12);
               const collapsed = collapsedOverrides[d.phaseId] ?? d.phaseId !== currentPhaseId;
+
               return (
                 <Fragment key={d.id}>
                   {showPhase ? (
                     <Reanimated.View entering={fadeUpEntering(itemDelay)}>
                       <Pressable
                         onPress={() => setCollapsedOverrides((cur) => ({ ...cur, [d.phaseId]: !collapsed }))}
-                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 18, paddingBottom: 8 }}
+                        hitSlop={6}
+                        style={({ pressed }) => [styles.phaseHeader, pressed ? { opacity: 0.6 } : null]}
                       >
-                        <Text
-                          style={[
-                            theme.type.captionSm,
-                            // One step above captionSm (per explicit request
-                            // 2026-09-03: roadmap phase headers a touch bigger).
-                            { fontSize: 13, lineHeight: 18, color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
-                          ]}
-                        >
+                        <Text numberOfLines={1} style={[theme.type.captionSm, styles.phaseLabel, { fontSize: 13.5, lineHeight: 18, color: homeGlassColors.textFaint, textTransform: 'uppercase', letterSpacing: 0.8 }]}>
                           {d.phase}
                         </Text>
-                        <View style={{ transform: [{ rotate: collapsed ? '-90deg' : '0deg' }] }}>
-                          <Icon name="chevron-down" size={16} color={theme.colors.textMuted} />
+                        <View style={[styles.phaseChevron, { transform: [{ rotate: collapsed ? '-90deg' : '0deg' }] }]}>
+                          <Icon name="chevron-down" size={18} color={homeGlassColors.textFaint} strokeWidth={2.2} />
                         </View>
                       </Pressable>
                     </Reanimated.View>
                   ) : null}
                   {!collapsed ? (
-                    <Reanimated.View entering={fadeUpEntering(itemDelay)}>
+                    <Reanimated.View entering={fadeUpEntering(itemDelay)} exiting={FadeOut.duration(120)}>
                       <PathNode
                         day={d}
+                        isLast={isLastOfPhase}
                         isToday={program ? d.id === todayMarkerDay : false}
                         unrestricted={isReviewAccount || dayBoughtOpen(d)}
                         opensIn24h={dayBoughtWaiting(d)}
                         onPress={() => {
-                          // Blocked days don't open at all (see dayBlocked —
-                          // App Review accounts are exempt); openable days go
-                          // through the discomfort check-in gate (which
-                          // skips itself once the day is answered).
                           if (dayBlocked(d)) return;
                           if (program) {
                             void requestDayGate.requestDay(d, program.userProgramId, program.productId);
                           } else {
-                            router.push({
-                              pathname: '/day/[dayId]',
-                              params: { dayId: String(d.id), productId: selectedProduct.id },
-                            });
+                            router.push({ pathname: '/day/[dayId]', params: { dayId: String(d.id), productId: selectedProduct.id } });
                           }
                         }}
                       />
                     </Reanimated.View>
                   ) : null}
+                  {/* A phase's survey belongs after its last day — "đánh
+                      giá sau Ngày 7" means after day 7, not above it
+                      (owner, 2026-10-28). It used to be pinned under the
+                      start button, where it also cost the pre-scroll
+                      screen a row. */}
                   {isLastOfPhase ? (
-                    // Always rendered at a phase's end: enabled (quiz
-                    // prompt + promos) once every day has run its course,
-                    // otherwise a visibly disabled quiz row with a
-                    // "complete Day N to unlock" hint.
                     <Reanimated.View entering={fadeUpEntering(itemDelay + 20)} style={{ marginTop: 14, marginBottom: 6 }}>
                       <PhaseFooter
                         userId={userId}
                         productId={selectedProduct.id}
                         phaseId={d.phaseId}
                         phaseName={d.phase}
-                        // The survey opens as soon as the phase's LAST day
-                        // UNLOCKS on the calendar (e.g. day 7 for phase 1) —
-                        // not only once every day of the phase is watched/past
-                        // (per explicit request 2026-09-09). `d.id` here is the
-                        // phase's last day number (this branch is isLastOfPhase).
                         enabled={isReviewAccount || (program ? program.currentDay >= d.id : false)}
                         lockedDayNumber={d.id}
                         collapsed={collapsed}
@@ -508,12 +605,9 @@ export default function RoadmapScreen() {
                 </Fragment>
               );
             })}
-            {/* The two promo cards (cross-sell + unlock next phase) sit at
-                the BOTTOM of the list — below the locked phase-3 header —
-                and only once the last reachable phase's days AND survey are
-                both finished (per explicit request 2026-09-02). */}
+
             {bottomPromoPhase ? (
-              <Reanimated.View entering={fadeUpEntering(180)} style={{ marginTop: 14 }}>
+              <Reanimated.View entering={fadeUpEntering(220)} style={{ marginTop: 14 }}>
                 <PhaseUnlockPromo
                   phaseId={bottomPromoPhase.id}
                   phaseName={bottomPromoPhase.name}
@@ -526,6 +620,15 @@ export default function RoadmapScreen() {
       </ScrollView>
       </KeyboardAvoidingView>
       </Reanimated.View>
+      </MaskedView>
+      </SafeAreaView>
+
+      <HomeGlassNav
+        active="roadmap"
+        onNavigate={(route) => router.navigate(route as '/roadmap')}
+        trailing={<HomeMascot cue={null} mood="default" isStaff={false} />}
+      />
+
       {requestDayGate.pendingDay !== null ? (
         <PainScaleModal
           dayId={requestDayGate.pendingDay}
@@ -544,11 +647,54 @@ export default function RoadmapScreen() {
           onLater={() => setSurveyPromptDismissed(true)}
         />
       ) : null}
-    </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  lockedPhase: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 10,
+  },
+  lockedPhaseIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phaseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 18,
+    paddingBottom: 8,
+    paddingHorizontal: 10,
+  },
+  // Clamped so the phase name can never crowd the chevron out of its
+  // column, whatever the product calls its phases.
+  phaseLabel: {
+    flex: 1,
+    minWidth: 0,
+  },
+  phaseChevron: {
+    width: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 30,
+    lineHeight: 36,
+    letterSpacing: -0.6,
+  },
   skeletonBody: {
     gap: 22,
     paddingTop: 4,
@@ -562,12 +708,26 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   scrollBody: {
-    paddingHorizontal: 20,
-    paddingBottom: 140,
+    paddingHorizontal: 14,
+  },
+  // Both children shrink; neither may push the other off a narrow phone.
+  headerAction: {
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: '62%',
+  },
+  titleShrink: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   header: {
-    paddingTop: 12,
-    paddingBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+    paddingHorizontal: 6,
   },
   lockedCard: {
     alignItems: 'center',
