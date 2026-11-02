@@ -30,6 +30,10 @@ export type AuthErrorCode =
   | 'invalid_email'
   | 'otp_invalid'
   | 'rate_limited'
+  // The fetch itself never completed. Kept apart from 'unknown' because the
+  // two need opposite advice: one says check your network, the other must
+  // not, or a wrong password sends people to reboot their router.
+  | 'network'
   | 'unknown';
 
 export class AuthError extends Error {
@@ -170,7 +174,9 @@ export async function signInWithIdentifier({
     }
     if (payload?.error === 'email_not_confirmed') throw new AuthError('email_not_confirmed', payload.email);
     if (payload?.error === 'invalid_credentials') throw new AuthError('invalid_credentials');
-    throw new AuthError('unknown');
+    // No Response at all means the request never reached the function — that
+    // is the only case here that is actually about the network.
+    throw new AuthError(context ? 'unknown' : 'network');
   }
 
   const session = data as { access_token?: string; refresh_token?: string };
@@ -236,6 +242,11 @@ export function authErrorKey(code: AuthErrorCode): TranslationKey {
     case 'invalid_email': return 'errInvalidEmail';
     case 'otp_invalid': return 'errOtpInvalid';
     case 'rate_limited': return 'errRateLimited';
-    default: return 'connectionError';
+    case 'network': return 'connectionError';
+    // NOT connectionError. Every unmapped failure used to tell the customer
+    // to check their network, so a sign-in that failed for any other reason
+    // sent them looking at their wifi (QA, 2026-11-02 — it cost us twenty
+    // minutes on a simulator whose network was provably fine).
+    default: return 'errSignInFailed';
   }
 }
