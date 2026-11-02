@@ -58,6 +58,38 @@ const FIELD_META: Record<string, { label: string; help: string; localized: boole
     multiline: true,
     placeholder: "Mở khoá chấm dáng tập qua video, chat AI không giới hạn...",
   },
+  ios_min_version: {
+    label: "iOS — phiên bản tối thiểu (ĐỂ TRỐNG = tắt). Chặn app cũ hơn",
+    help:
+      "Ai đang dùng bản THẤP HƠN số này sẽ thấy màn 'Cần cập nhật ứng dụng' KHÔNG BẤM BỎ QUA ĐƯỢC, chỉ còn nút mở App Store. " +
+      "Dùng khi bản cũ thật sự hỏng — ví dụ server đã đổi và bản cũ gọi sai. Ghi dạng 1.0.2, đúng số hiện trên App Store. " +
+      "CẢNH BÁO: đừng điền số của bản ĐANG CHỜ APPLE DUYỆT — người của Apple cài bản cũ hơn sẽ bị chặn và từ chối app. " +
+      "Chỉ nâng sau khi bản mới đã lên store. Để trống là không chặn ai.",
+    localized: false,
+    placeholder: "Để trống nếu chưa cần chặn",
+  },
+  ios_latest_version: {
+    label: "iOS — phiên bản mới nhất (ĐỂ TRỐNG = tắt). Chỉ nhắc nhẹ",
+    help:
+      "Ai đang dùng bản thấp hơn số này sẽ thấy thẻ 'Đã có bản mới' có nút 'Để sau'. Hỏi MỘT LẦN cho mỗi bản — " +
+      "bấm Để sau thì thôi, tới bản sau mới hỏi lại. Đây là cái nên dùng hằng ngày; cái ở trên chỉ dùng khi buộc phải chặn.",
+    localized: false,
+    placeholder: "Ví dụ: 1.0.3",
+  },
+  android_min_version: {
+    label: "Android — phiên bản tối thiểu (ĐỂ TRỐNG = tắt). Chặn app cũ hơn",
+    help:
+      "Giống ô iOS phía trên, nhưng cho Android. Tách riêng vì hai store phát hành theo nhịp khác nhau: " +
+      "Apple duyệt trong khoảng một ngày, Play rải bản mới ra nhiều ngày. Nâng chung một lúc là chặn nhầm người Android chưa được mời cập nhật.",
+    localized: false,
+    placeholder: "Để trống nếu chưa cần chặn",
+  },
+  android_latest_version: {
+    label: "Android — phiên bản mới nhất (ĐỂ TRỐNG = tắt). Chỉ nhắc nhẹ",
+    help: "Giống ô iOS, nhưng cho Android. Chờ Play rải xong rồi hãy điền, không thì nhắc người chưa tải được.",
+    localized: false,
+    placeholder: "Ví dụ: 1.0.3",
+  },
   home_intro_video_url: {
     label: 'Link video nút "Hướng dẫn nhanh" (Trang chủ)',
     help: "Nút nằm cạnh 'Bắt đầu hôm nay' trên Trang chủ. Có thể đặt link riêng cho từng thị trường.",

@@ -4,6 +4,7 @@ import { AccessGate } from "@/components/AccessGate";
 import { AppShell } from "@/components/shell/AppShell";
 import { NAV_ADMIN } from "@/lib/adminMockData";
 import { DashboardView } from "@/components/views/DashboardView";
+import { OrdersView } from "@/components/views/OrdersView";
 import { UsersView } from "@/components/views/UsersView";
 import { RoutineView } from "@/components/views/RoutineView";
 import { ProductsView } from "@/components/views/ProductsView";
@@ -28,6 +29,7 @@ export default function AdminPage() {
         {(active, setActive) => (
           <>
             {active === "dashboard" && <DashboardView setActive={setActive} />}
+            {active === "orders" && <OrdersView />}
             {active === "users" && <UsersView role="admin" />}
             {active === "exercises" && <RoutineView />}
             {active === "products" && <ProductsView />}

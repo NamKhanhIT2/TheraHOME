@@ -516,7 +516,7 @@ export type AdminMarket = "VN" | "US" | "MALAY";
 export async function fetchStoreCategories(market: AdminMarket = "VN"): Promise<StoreCategory[]> {
   const [{ data: cats, error: cErr }, { data: items, error: iErr }] = await Promise.all([
     supabase.from("store_categories").select("id, title, has_trial, sort_order, market").eq("market", market).order("sort_order"),
-    supabase.from("store_items").select("id, category_id, product_id, name, description, price_text, accent_color_key, external_link, preview_url, image_url, market").eq("market", market).order("sort_order"),
+    supabase.from("store_items").select("id, category_id, product_id, name, description, price_text, discount_percent, accent_color_key, external_link, preview_url, image_url, market").eq("market", market).order("sort_order"),
   ]);
   if (cErr) throw cErr;
   if (iErr) throw iErr;
@@ -533,6 +533,7 @@ export async function fetchStoreCategories(market: AdminMarket = "VN"): Promise<
           name: it.name,
           desc: it.description ?? "",
           price: it.price_text,
+          discountPercent: it.discount_percent,
           accent: accentFromKey(it.accent_color_key),
           link: it.external_link ?? "",
           previewLink: it.preview_url ?? "",
@@ -560,11 +561,12 @@ export interface StoreItemMarketFields {
   name: string;
   desc: string;
   price: string;
+  discountPercent: number;
   link: string;
   previewLink: string;
   imageUrl: string;
 }
-const EMPTY_STORE_ITEM_MARKET_FIELDS: StoreItemMarketFields = { name: "", desc: "", price: "", link: "", previewLink: "", imageUrl: "" };
+const EMPTY_STORE_ITEM_MARKET_FIELDS: StoreItemMarketFields = { name: "", desc: "", price: "", discountPercent: 10, link: "", previewLink: "", imageUrl: "" };
 
 export interface StoreItemGroup {
   groupKey: string;
@@ -590,7 +592,7 @@ export interface StoreCategoryGroup {
 export async function fetchStoreCategoryGroups(): Promise<StoreCategoryGroup[]> {
   const [{ data: cats, error: cErr }, { data: items, error: iErr }] = await Promise.all([
     supabase.from("store_categories").select("id, title, has_trial, sort_order, market, group_key, is_primary").order("sort_order"),
-    supabase.from("store_items").select("id, category_id, name, description, price_text, accent_color_key, external_link, preview_url, image_url, market, group_key, product_id").order("sort_order"),
+    supabase.from("store_items").select("id, category_id, name, description, price_text, discount_percent, accent_color_key, external_link, preview_url, image_url, market, group_key, product_id").order("sort_order"),
   ]);
   if (cErr) throw cErr;
   if (iErr) throw iErr;
@@ -621,7 +623,7 @@ export async function fetchStoreCategoryGroups(): Promise<StoreCategoryGroup[]> 
           return [
             m,
             row
-              ? { itemId: row.id, name: row.name, desc: row.description ?? "", price: row.price_text, link: row.external_link ?? "", previewLink: row.preview_url ?? "", imageUrl: row.image_url ?? "" }
+              ? { itemId: row.id, name: row.name, desc: row.description ?? "", price: row.price_text, discountPercent: row.discount_percent, link: row.external_link ?? "", previewLink: row.preview_url ?? "", imageUrl: row.image_url ?? "" }
               : { itemId: null, ...EMPTY_STORE_ITEM_MARKET_FIELDS },
           ];
         })
@@ -737,6 +739,7 @@ export async function saveStoreItemGroup(
       name: fields.name,
       description: fields.desc,
       price_text: fields.price,
+      discount_percent: fields.discountPercent,
       external_link: fields.link || null,
       preview_url: fields.previewLink || null,
       image_url: fields.imageUrl || null,
@@ -3562,4 +3565,102 @@ export async function saveExerciseReference(
 export async function deleteExerciseReference(programDayId: string) {
   const { error } = await supabase.from("exercise_references").delete().eq("program_day_id", programDayId);
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Orders placed inside the app
+// ---------------------------------------------------------------------------
+//
+// `app_orders` (migration 202611011800) is the first place an in-app order is
+// stored AS an order. Before it, `place-app-order` only wrote the order into
+// the buyer's support thread as a paragraph of text, so the console could
+// show one but never list, search, count or close one.
+//
+// Not the `orders` table: that is the Shopify/activation feed, and a row in
+// it feeds the access gate. An in-app order grants nothing.
+
+export type AppOrderStatus = "new" | "confirmed" | "shipped" | "delivered" | "cancelled";
+
+export interface AppOrder {
+  id: string;
+  reference: string;
+  userId: string;
+  productName: string;
+  market: string;
+  quantity: number;
+  listPrice: number;
+  unitPrice: number;
+  discountPercent: number;
+  totalAmount: number;
+  customerName: string;
+  phone: string;
+  phoneDigits: string;
+  address: string;
+  note: string | null;
+  status: AppOrderStatus;
+  staffNote: string | null;
+  threadId: string | null;
+  handledAt: string | null;
+  createdAt: string;
+}
+
+function mapAppOrder(row: Record<string, unknown>): AppOrder {
+  return {
+    id: String(row.id ?? ""),
+    reference: String(row.reference ?? ""),
+    userId: String(row.user_id ?? ""),
+    productName: String(row.product_name ?? ""),
+    market: String(row.market ?? "VN"),
+    quantity: Number(row.quantity ?? 0),
+    listPrice: Number(row.list_price ?? 0),
+    unitPrice: Number(row.unit_price ?? 0),
+    discountPercent: Number(row.discount_percent ?? 0),
+    totalAmount: Number(row.total_amount ?? 0),
+    customerName: String(row.customer_name ?? ""),
+    phone: String(row.phone ?? ""),
+    phoneDigits: String(row.phone_digits ?? ""),
+    address: String(row.address ?? ""),
+    note: (row.note as string) ?? null,
+    status: (row.status as AppOrderStatus) ?? "new",
+    staffNote: (row.staff_note as string) ?? null,
+    threadId: (row.thread_id as string) ?? null,
+    handledAt: (row.handled_at as string) ?? null,
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+export async function fetchAppOrders(limit = 300): Promise<AppOrder[]> {
+  const { data, error } = await supabase
+    .from("app_orders")
+    .select(
+      "id, reference, user_id, product_name, market, quantity, list_price, unit_price, discount_percent, total_amount, customer_name, phone, phone_digits, address, note, status, staff_note, thread_id, handled_at, created_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(mapAppOrder);
+}
+
+/** Staff may move an order along and leave a note on it; nothing else about
+ * an order is editable here, because the rest is what the customer actually
+ * bought and what the app actually charged. */
+export async function updateAppOrder(
+  id: string,
+  patch: { status?: AppOrderStatus; staffNote?: string | null },
+): Promise<AppOrder> {
+  const payload: Record<string, unknown> = {};
+  if (patch.status !== undefined) payload.status = patch.status;
+  if (patch.staffNote !== undefined) payload.staff_note = patch.staffNote;
+  const { data, error } = await supabase
+    .from("app_orders")
+    .update(payload)
+    .eq("id", id)
+    .select(
+      "id, reference, user_id, product_name, market, quantity, list_price, unit_price, discount_percent, total_amount, customer_name, phone, phone_digits, address, note, status, staff_note, thread_id, handled_at, created_at",
+    );
+  if (error) throw error;
+  // PostgREST answers an RLS-filtered UPDATE with `error: null` and zero
+  // rows, exactly like the DELETE case at the top of this file.
+  if (!data || data.length === 0) throw new Error("blocked_or_already_deleted");
+  return mapAppOrder(data[0] as Record<string, unknown>);
 }

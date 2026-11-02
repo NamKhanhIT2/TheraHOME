@@ -14,6 +14,10 @@ export interface NavItem {
 
 export const NAV_ADMIN: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: "grid" },
+  // app_orders — đơn khách đặt trong cửa hàng của app. Không phải bảng
+  // `orders` (feed Shopify dùng cho kích hoạt): đơn trong app không cấp
+  // quyền truy cập cho ai.
+  { id: "orders", label: "Đơn hàng", icon: "shopping-bag" },
   { id: "exercises", label: "Lộ trình", icon: "route" },
   { id: "products", label: "Sản Phẩm", icon: "box" },
   // subscription_plans — nội dung các gói trả phí trên màn hình nâng cấp của
@@ -62,6 +66,10 @@ export const NAV_ADMIN: NavItem[] = [
 
 export const NAV_CARE: NavItem[] = [
   { id: "chat", label: "Chat", icon: "message-circle" },
+  // app_orders — đơn khách đặt trong cửa hàng của app. Không phải bảng
+  // `orders` (feed Shopify dùng cho kích hoạt): đơn trong app không cấp
+  // quyền truy cập cho ai.
+  { id: "orders", label: "Đơn hàng", icon: "shopping-bag" },
   { id: "activation", label: "Kích hoạt", icon: "shield" },
   // Full Community management — official posts, per-market pinning AND the
   // Thử thách editor. Moved out of NAV_ADMIN on 2026-09-05 at the owner's

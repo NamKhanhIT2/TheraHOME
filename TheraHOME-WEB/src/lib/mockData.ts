@@ -57,6 +57,7 @@ export interface StoreItem {
   name: string;
   desc: string;
   price: string;
+  discountPercent: number;
   accent: string;
   link: string;
   previewLink: string;

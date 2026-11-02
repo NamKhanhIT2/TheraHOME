@@ -41,7 +41,7 @@ import { fetchActivationProducts, type ActivationProduct } from "@/lib/db";
 
 const MARKET_TABS: Array<[AdminMarket, string]> = [["VN", "VN"], ["US", "UK"], ["MALAY", "ML"]];
 const MARKET_LABEL: Record<AdminMarket, string> = { VN: "VN", US: "UK", MALAY: "ML" };
-const EMPTY_ITEM_FIELDS: StoreItemMarketFields = { name: "", desc: "", price: "", link: "", previewLink: "", imageUrl: "" };
+const EMPTY_ITEM_FIELDS: StoreItemMarketFields = { name: "", desc: "", price: "", discountPercent: 10, link: "", previewLink: "", imageUrl: "" };
 
 /** "n/3 thị trường", plus which markets this is NOT sold in, so staff can
  * see the coverage at a glance (e.g. "1/3 thị trường · không bán: UK, ML"). */
@@ -259,7 +259,7 @@ export function ProductsView() {
     const fields = emptyItemFields();
     for (const [code] of MARKET_TABS) {
       const row = item.byMarket[code];
-      fields[code] = { name: row.name, desc: row.desc, price: row.price, link: row.link, previewLink: row.previewLink, imageUrl: row.imageUrl };
+      fields[code] = { name: row.name, desc: row.desc, price: row.price, discountPercent: row.discountPercent, link: row.link, previewLink: row.previewLink, imageUrl: row.imageUrl };
     }
     setItemFields(fields);
     setItemImageFiles({});
@@ -280,6 +280,12 @@ export function ProductsView() {
     }
     if (!MARKET_TABS.some(([code]) => filled(code))) {
       setItemError("Cần điền tên và giá cho ít nhất một thị trường.");
+      return;
+    }
+    const invalidDiscount = MARKET_TABS.find(([code]) => filled(code) && (!Number.isInteger(itemFields[code].discountPercent) || itemFields[code].discountPercent < 0 || itemFields[code].discountPercent > 100));
+    if (invalidDiscount) {
+      setItemTab(invalidDiscount[0]);
+      setItemError(`Mức giảm giá ở ${invalidDiscount[1]} phải là số nguyên từ 0 đến 100.`);
       return;
     }
     const currentItem = groups?.find((g) => g.groupKey === itemModal.categoryGroupKey)?.items.find((it) => it.groupKey === itemModal.groupKey);
@@ -423,7 +429,10 @@ export function ProductsView() {
                     )}
                     <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{marketCompleteness(item.byMarket)}</div>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text-primary)" }}>{row.price}</div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text-primary)" }}>{row.price}</div>
+                    {filled ? <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--success)", marginTop: 2 }}>Giảm {row.discountPercent}%</div> : null}
+                  </div>
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={() => openEditItem(group.groupKey, item)} style={{ border: "none", background: "none", cursor: "pointer", display: "flex" }}>
                       <Icon name="pencil" size={16} color="var(--color-primary)" />
@@ -580,6 +589,19 @@ export function ProductsView() {
             placeholder="Ví dụ: 1.490.000₫"
             style={{ ...inputStyle, marginBottom: 14 }}
           />
+          <FieldLabel>Giảm giá thành viên trong app (%)</FieldLabel>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={itemFields[itemTab].discountPercent}
+            onChange={(e) => setItemFields((f) => ({ ...f, [itemTab]: { ...f[itemTab], discountPercent: Number(e.target.value) } }))}
+            style={{ ...inputStyle, marginBottom: 6 }}
+          />
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+            App dùng đúng mức này để hiển thị giá và tạo đơn; có thể đặt riêng cho từng thị trường.
+          </div>
           <FieldLabel>Link trang sản phẩm</FieldLabel>
           <input
             value={itemFields[itemTab].link}

@@ -7,6 +7,7 @@ import { AccessGate } from "@/components/AccessGate";
 import { AppShell } from "@/components/shell/AppShell";
 import { NAV_CARE } from "@/lib/adminMockData";
 import { ChatView } from "@/components/views/ChatView";
+import { OrdersView } from "@/components/views/OrdersView";
 import { ActivationView } from "@/components/views/ActivationView";
 import { UsersView } from "@/components/views/UsersView";
 import { NotificationsAdminView } from "@/components/views/NotificationsAdminView";
@@ -23,6 +24,7 @@ export default function CarePage() {
         {(active) => (
           <>
             {active === "chat" && <ChatView />}
+            {active === "orders" && <OrdersView />}
             {active === "activation" && <ActivationView />}
             {active === "community" && <CommunityView />}
             {active === "reports" && <ReportsView />}

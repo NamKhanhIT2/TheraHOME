@@ -108,7 +108,13 @@ export function OverviewView() {
           label: p.label,
           note: p.code,
           value: p.units,
-          color: `var(--ac-seq-${i + 1})`,
+          // Clamped to the last step of the ramp. A product added later (TH04
+          // arrived on its own) would otherwise ask for a token that does not
+          // exist, and an undefined custom property drops the stroke entirely
+          // — the slice vanishes while its units keep counting toward the
+          // total. Two tail slices sharing the darkest step is the lesser
+          // harm, and each is named and numbered beside the ring anyway.
+          color: `var(--ac-seq-${Math.min(i + 1, 4)})`,
         }))}
       />
     </div>

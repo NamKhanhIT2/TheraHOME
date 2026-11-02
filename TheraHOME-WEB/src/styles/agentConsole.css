@@ -52,6 +52,7 @@
   --ac-seq-1: #cdbfff;
   --ac-seq-2: #9b6bf2;
   --ac-seq-3: #6534b8;
+  --ac-seq-4: #431e86;
 
   /* status — reserved, never reused as a series colour */
   --ac-good: #3fbf80;
@@ -114,7 +115,13 @@
   .ac-nav-item[aria-current="page"]::before { display: none; }
   .ac-side-foot { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; }
   .ac-main { overflow: visible; }
-  .ac-head { position: static; }
+  /* Not `static`: the header only needs to stop sticking here, and `static`
+     also throws away its stacking context, which the range menu hangs off.
+     Without one the menu paints under the cards below it — with three ranges
+     that cost the last option, with five it cost four of them. `relative`
+     leaves the header exactly where `static` put it and scrolling unchanged,
+     and gives the menu something to sit above. */
+  .ac-head { position: relative; z-index: 20; }
   .ac-head-inner { padding: 16px; }
   .ac-content { padding: 16px 16px 40px; }
 }
