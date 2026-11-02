@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Animated, Image, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { router } from 'expo-router';
@@ -45,6 +45,17 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
   const [showConfirm, setShowConfirm] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmFocused, setConfirmFocused] = useState(false);
+  // Enter moves to the next field and sends the form from the last one.
+  // Without it the keyboard was a dead end on a small screen: it covers the
+  // button, and iPhone SE has no room to lift the card clear of it, so the
+  // only way to submit was to dismiss the keyboard first and then reach for
+  // a button that had just moved (QA on an SE simulator, 2026-11-02).
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
+  const submit = () => {
+    if (!canContinue || busy) return;
+    onSubmit?.({ username: username.trim(), email: username.trim(), password });
+  };
   // Only once they have typed something: nobody wants to be told they got it
   // wrong before they have finished getting it right.
   const showMismatch = creating && confirm.length > 0 && confirm !== password;
@@ -73,16 +84,16 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
                     and popped the "suggested username" strip over the form
                     (owner report 2026-09-09). The keyboard stays
                     email-address; only the autofill semantic is dropped. */}
-                <AuthInput icon="mail" value={username} onChangeText={setUsername} placeholder={copy.email} keyboardType="email-address" textContentType={creating ? 'none' : 'emailAddress'} autoComplete={creating ? 'off' : 'email'} importantForAutofill="no" />
+                <AuthInput icon="mail" value={username} onChangeText={setUsername} placeholder={copy.email} keyboardType="email-address" returnKeyType="next" onSubmitEditing={() => passwordRef.current?.focus()} submitBehavior="submit" textContentType={creating ? 'none' : 'emailAddress'} autoComplete={creating ? 'off' : 'email'} importantForAutofill="no" />
                 <View style={[styles.inputRow, passwordFocused && styles.inputRowFocused]}>
                   <Icon name="lock" size={20} color="#6E84A2" />
-                  <TextInput value={password} onChangeText={setPassword} onFocus={() => setPasswordFocused(true)} onBlur={() => setPasswordFocused(false)} placeholder={copy.password} placeholderTextColor="#8292AA" secureTextEntry={!showPassword} textContentType={creating ? 'newPassword' : 'password'} autoCapitalize="none" style={styles.input} />
+                  <TextInput ref={passwordRef} returnKeyType={creating ? 'next' : 'go'} onSubmitEditing={() => (creating ? confirmRef.current?.focus() : submit())} submitBehavior={creating ? 'submit' : 'blurAndSubmit'} value={password} onChangeText={setPassword} onFocus={() => setPasswordFocused(true)} onBlur={() => setPasswordFocused(false)} placeholder={copy.password} placeholderTextColor="#8292AA" secureTextEntry={!showPassword} textContentType={creating ? 'newPassword' : 'password'} autoCapitalize="none" style={styles.input} />
                   <Pressable accessibilityRole="button" onPress={() => setShowPassword((value) => !value)} hitSlop={10}><Icon name={showPassword ? 'eye-off' : 'eye'} size={22} color="#627999" /></Pressable>
                 </View>
                 {creating ? (
                   <View style={[styles.inputRow, confirmFocused && styles.inputRowFocused]}>
                     <Icon name="lock" size={20} color="#6E84A2" />
-                    <TextInput value={confirm} onChangeText={setConfirm} onFocus={() => setConfirmFocused(true)} onBlur={() => setConfirmFocused(false)} placeholder={copy.confirmPassword} placeholderTextColor="#8292AA" secureTextEntry={!showConfirm} textContentType="newPassword" autoCapitalize="none" style={styles.input} />
+                    <TextInput ref={confirmRef} returnKeyType="go" onSubmitEditing={submit} value={confirm} onChangeText={setConfirm} onFocus={() => setConfirmFocused(true)} onBlur={() => setConfirmFocused(false)} placeholder={copy.confirmPassword} placeholderTextColor="#8292AA" secureTextEntry={!showConfirm} textContentType="newPassword" autoCapitalize="none" style={styles.input} />
                     {/* Its own eye, not the first field's: these are two
                         separate things to check, and people check the
                         second one precisely because they cannot see it. */}
@@ -105,7 +116,7 @@ export function AuthScreenShell({ mode, busy, error, showApple = true, onApple, 
                 disabled={!canContinue || !!busy}
                 busy={!!busy}
                 label={creating ? copy.create : copy.signIn}
-                onPress={() => onSubmit?.({ username: username.trim(), email: username.trim(), password })}
+                onPress={submit}
               />
               <View style={styles.divider}><View style={styles.line} /><Text style={styles.or}>{copy.or}</Text><View style={styles.line} /></View>
               <View style={styles.socialRow}>
