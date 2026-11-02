@@ -31,7 +31,18 @@ export type AppConfigKey =
   // camera: if it goes wrong on a handset nobody tested, the fix has to be
   // reachable in minutes, and a constant in the bundle is a fix that takes
   // a store release.
-  | 'motion_tracking_enabled';
+  | 'motion_tracking_enabled'
+  // How old an install is allowed to be, per platform. `*_min_version`
+  // blocks; `*_latest_version` nudges. Both empty = nothing is shown, which
+  // is the shipped state — see src/lib/appUpdate.ts for why every unknown
+  // resolves to "no update needed". Per platform because the two stores
+  // release on their own schedule: Apple approves in a day, Play rolls out
+  // over several, and a threshold raised for both at once would block the
+  // platform that has not finished shipping.
+  | 'ios_min_version'
+  | 'ios_latest_version'
+  | 'android_min_version'
+  | 'android_latest_version';
 
 const DEFAULTS: Record<AppConfigKey, string> = {
   // Empty on purpose: TheraHOME has no hotline yet (2026-09-04), and a
@@ -59,6 +70,13 @@ const DEFAULTS: Record<AppConfigKey, string> = {
   // ready goes out with MOTION_TRACKING_ENABLED false in features.ts
   // instead, so the code is genuinely inert rather than hidden.
   motion_tracking_enabled: 'on',
+  // Empty, and empty means off. A version gate that defaults to ON would
+  // decide, from a bundled constant, that every older install is finished —
+  // and a constant cannot be corrected without the release it just blocked.
+  ios_min_version: '',
+  ios_latest_version: '',
+  android_min_version: '',
+  android_latest_version: '',
 };
 
 interface ConfigRow {

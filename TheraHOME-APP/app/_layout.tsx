@@ -7,16 +7,18 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import {
   useFonts,
+  Inter_200ExtraLight,
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { ThemeProvider, useTheme } from '@/theme';
+import { ThemeProvider, homeGlassColors, useTheme } from '@/theme';
 import { useSession } from '@/hooks/useSession';
 import { useIsStaff } from '@/hooks/useWebRoles';
 import { IncomingCallSheet } from '@/components/call/IncomingCallSheet';
 import { OngoingCallBar } from '@/components/call/OngoingCallBar';
+import { UpdateGate } from '@/components/UpdateGate';
 import { useCallKeepBridge } from '@/hooks/useCallKeepBridge';
 import '@/lib/callBackgroundTask';
 import { useActivatedPrograms } from '@/hooks/usePrograms';
@@ -28,6 +30,9 @@ import { supabase } from '@/lib/supabase';
 import { scheduleDailyReminder, scheduleEveningReminder, registerLocalReminderInboxSync, backfillTodaysReminders } from '@/lib/pushNotifications';
 import { Button } from '@/components/ui/Button';
 import { AppSplashScreen } from '@/components/onboarding/AppSplashScreen';
+import { useHomeWarmup } from '@/hooks/useHomeWarmup';
+import { hydrateQueryCache, startQueryPersistence } from '@/lib/queryPersistence';
+import { SiriEdgeGlow } from '@/components/motion/SiriEdgeGlow';
 
 const LAST_LOGIN_TOUCH_MIN_INTERVAL_MS = 10 * 60 * 1000;
 
@@ -103,7 +108,35 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // session, that session's profile, and the branded minimum). The gate below
   // raises the splash only until this settles once; `initialSplashDone` then
   // stays latched so later profile-loads never re-raise it.
-  const bootLoading = !fontsReady || sessionLoading || profileLoading || !minimumSplashElapsed;
+  // Home's data is fetched from here, under the splash, and the splash waits
+  // for it — otherwise the splash drops onto the app shell's near-white
+  // background while Home builds itself, and then onto Home's own loading
+  // state. Only on a signed-in boot: an onboarding user is not going to Home,
+  // and the hook gives up after its own cap either way.
+  // Last launch's answers, read off disk before anything can render Home.
+  // The warm-up above can only start the network chain earlier; this one
+  // removes it from the critical path entirely from the second launch on.
+  const [cacheHydrated, setCacheHydrated] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void hydrateQueryCache(queryClient).finally(() => {
+      if (!cancelled) setCacheHydrated(true);
+    });
+    const stop = startQueryPersistence(queryClient);
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, []);
+
+  const homeWarm = useHomeWarmup(session?.user.id);
+  const bootLoading =
+    !fontsReady ||
+    !cacheHydrated ||
+    sessionLoading ||
+    profileLoading ||
+    !minimumSplashElapsed ||
+    (!!session && !homeWarm);
   useEffect(() => {
     if (!bootLoading) setInitialSplashDone(true);
   }, [bootLoading]);
@@ -287,6 +320,36 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // auth row) must never stay in the app. The ban already blocks re-login, so
   // this only fires for a session that outlived the ban; sign out so the gate
   // falls back to onboarding rather than showing a scrubbed, empty shell.
+  // Signing out hands the phone back to nobody in particular, so the
+  // preferences that belonged to that ACCOUNT go with it — otherwise a
+  // test account that picked Malaysia left the login screen, and the next
+  // person to use the phone, in Malay (owner, 2026-10-26).
+  //
+  // Hooked to the auth event rather than to `session == null`, which is
+  // also true for the whole of a cold start before the stored session is
+  // read — resetting there would wipe the language on every launch.
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== 'SIGNED_OUT') return;
+      useAppStore.getState().clearAccountPreferences();
+      // And the QUERY CACHE with it. It lives on the device while the data
+      // in it belongs to one account: a few of its keys carry no user id at
+      // all (a signed URL to a paid exercise clip), and every feed query
+      // returns the viewer's own unapproved posts. Without
+      // this, the next account to sign in on this phone reads them out of
+      // cache before anything refetches (QA pass, 2026-10-30).
+      queryClient.clear();
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  // Latched the first time this device ever holds a session, and never
+  // cleared: it is what makes the auth stack open on sign-up for someone
+  // who has just installed the app, and on sign-in for everybody else.
+  useEffect(() => {
+    if (session) useAppStore.getState().markSignedInOnce();
+  }, [session]);
+
   useEffect(() => {
     if (!profile?.deletedAt) return;
     void supabase.auth.signOut().catch((e: unknown) => { if (__DEV__) console.warn('signOut (deleted) failed:', e); });
@@ -437,7 +500,12 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.bgApp }}>
+    // This background is visible for exactly one handoff: the frames between
+    // the splash coming down and the first screen painting itself. For a
+    // signed-in boot that screen is Home, which is dark — and `bgApp` is
+    // near-white, which is the white flash in the owner's video (2026-10-24).
+    // Everywhere else a screen paints its own background over this one.
+    <View style={{ flex: 1, backgroundColor: inApp ? homeGlassColors.sky[4] : theme.colors.bgApp }}>
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
       <NavigationBar style={theme.dark ? 'light' : 'dark'} />
       {/* Android's native-stack default is a fade-and-scale, so tapping a
@@ -449,13 +517,13 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         {/* Stable cold-launch/deep-link entry. Kept outside every protected
             group so `/` always exists while auth/profile guards switch. */}
         <Stack.Screen name="index" />
+        {__DEV__ ? <Stack.Screen name="dev/edge-glow" /> : null}
         <Stack.Protected guard={inApp && !isStaffAccount && !recoveringPassword}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="activate" />
           <Stack.Screen name="day/[dayId]" />
           <Stack.Screen name="paywall/[phaseId]" />
           <Stack.Screen name="subscription" />
-          <Stack.Screen name="coins" />
           <Stack.Screen name="profile/index" />
           <Stack.Screen name="profile/edit" />
           <Stack.Screen name="profile/notifications-settings" />
@@ -465,7 +533,10 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="notifications" />
           <Stack.Screen name="community/profile/[userId]" />
           <Stack.Screen name="community/article/[articleId]" />
-          <Stack.Screen name="community/create" options={{ presentation: 'modal', animation: Platform.OS === 'android' ? 'slide_from_bottom' : 'default' }} />
+          {/* Full screen rather than a card: the composer is a whole screen's
+            worth of work, and the sheet left a strip of the feed showing
+            above it (owner, 2026-10-25). */}
+        <Stack.Screen name="community/create" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="chat/ai" />
           <Stack.Screen name="chat/human" />
           <Stack.Screen name="quiz/[phaseId]" />
@@ -528,12 +599,26 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           a user minimises a call in order to read. It renders nothing unless
           a call is actually running. */}
       <OngoingCallBar enabled={inApp} userId={userId} />
+      {/* A root-level transition layer: unlike a glow nested in the day card,
+          this survives the native push and can settle over the training
+          screen instead of being clipped by the ScrollView. */}
+      <SiriEdgeGlow />
+      {/* Last, so a REQUIRED update covers everything — the call bar and the
+          incoming-call sheet included. It renders nothing until somebody
+          sets a threshold in WEB Admin, and it deliberately does not wait
+          for a session: a binary too old to talk to the server is too old
+          on the onboarding screens too. */}
+      <UpdateGate />
     </View>
   );
 }
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
+    // Only Home v3's big day numeral uses this weight; it is an ordinary
+    // asset from the already-installed @expo-google-fonts/inter, so it costs
+    // a download, not a native build.
+    Inter_200ExtraLight,
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
