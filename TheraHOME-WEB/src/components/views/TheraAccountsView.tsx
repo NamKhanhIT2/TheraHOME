@@ -275,15 +275,18 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       </div>
 
       <FieldLabel>Tên hiển thị</FieldLabel>
-      <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ví dụ: App Review iOS" style={{ ...inputStyle, marginBottom: 14 }} />
+      <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ví dụ: App Review iOS" style={{ ...inputStyle, marginBottom: 6 }} />
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
+        Tên người này hiện ra trong app và ngoài cộng đồng — <b>có thể trùng</b> với tài khoản khác.
+      </div>
       <FieldLabel>Username</FieldLabel>
       <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 6 }} />
       <div style={{ fontSize: 12, color: username.trim() && !usernameValid ? "var(--error)" : "var(--text-muted)", marginBottom: 14 }}>
         {username.trim() && !usernameValid
           ? "Username chỉ được gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang — từ 3 đến 32 ký tự. Không dấu cách, không dấu tiếng Việt."
-          : <>Tên hiển thị trong app / cộng đồng — <b>có thể trùng</b> với tài khoản khác. Không dùng để đăng nhập.</>}
+          : <>Mã định danh nội bộ, không phải tên hiển thị. <b>Nếu bỏ trống ô Email bên dưới, đây chính là thứ tạo ra địa chỉ đăng nhập</b> — nên đặt khác với các tài khoản đã có.</>}
       </div>
-      <FieldLabel>Email (tùy chọn)</FieldLabel>
+      <FieldLabel>Email đăng nhập (tùy chọn)</FieldLabel>
       <input
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -298,13 +301,23 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
         <div style={{ fontSize: 12.5, color: "var(--error)", marginBottom: 14 }}>Email không hợp lệ.</div>
       ) : (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
-          Có email → đăng nhập bằng email đó. Bỏ trống → đăng nhập bằng <code>username@thera.local</code>.
-          Không cần email để đổi mật khẩu — Admin đặt lại trực tiếp ở tab này.
+          {/* App chi nhan EMAIL o o dau tien (AuthScreenShell.tsx: "Sign-in is
+              by email only (owner, 2026-09-10) — username login was retired").
+              Nen cho xem thang dia chi se dung, thay vi ta lai cong thuc. */}
+          App chỉ đăng nhập bằng <b>Email + mật khẩu</b> — không gõ username vào được.
+          {" "}
+          {email.trim()
+            ? <>Người này sẽ đăng nhập bằng <code>{email.trim()}</code>.</>
+            : usernameValid
+              ? <>Để trống thì địa chỉ đăng nhập tự sinh là <code>{username.trim()}@thera.local</code> — người dùng phải gõ đúng cả chuỗi đó vào ô Email trong app.</>
+              : <>Để trống thì địa chỉ đăng nhập tự sinh từ username, dạng <code>username@thera.local</code>.</>}
+          {" "}
+          Không cần email thật để đổi mật khẩu — Admin đặt lại trực tiếp ở tab này.
         </div>
       )}
-      <PasswordField label="Password" value={password} onChange={setPassword} placeholder="Tối thiểu 8 ký tự" style={{ marginBottom: 6 }} />
+      <PasswordField label="Mật khẩu" value={password} onChange={setPassword} placeholder="Tối thiểu 8 ký tự" style={{ marginBottom: 6 }} />
       <div style={{ fontSize: 12, color: password.length > 0 && !passwordStrong ? "var(--error)" : "var(--text-muted)", marginBottom: 14 }}>{PASSWORD_HINT}</div>
-      <PasswordField label="Nhập lại Password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Nhập lại để xác nhận" style={{ marginBottom: 14 }} />
+      <PasswordField label="Nhập lại mật khẩu" value={confirmPassword} onChange={setConfirmPassword} placeholder="Nhập lại để xác nhận" style={{ marginBottom: 14 }} />
       {confirmPassword && !passwordsMatch ? (
         <div style={{ fontSize: 12.5, color: "var(--error)", marginTop: -10, marginBottom: 14 }}>Mật khẩu nhập lại không khớp.</div>
       ) : null}
@@ -625,14 +638,17 @@ export function TheraAccountsView() {
 
   return (
     <TableShell
-      subtitle="Tài khoản đặc biệt do Admin cấp — App Review / QA toàn quyền không khoá, nhân viên (CSKH), tester. Khách hàng thường tự đăng ký trong app; tab này chỉ dành cho những quyền self-service không có. Đăng nhập bằng Email + mật khẩu — Email tùy chọn (Admin đặt lại mật khẩu trực tiếp, không cần email)."
+      subtitle="Tài khoản đặc biệt do Admin cấp — App Review / QA toàn quyền không khoá, nhân viên (CSKH), tester. Khách hàng thường tự đăng ký trong app; tab này chỉ dành cho những quyền self-service không có. Các tài khoản này đăng nhập trong app bằng Email + mật khẩu (app không nhận username). Ô Email khi tạo là tùy chọn — bỏ trống thì địa chỉ đăng nhập tự sinh là username@thera.local, và Admin vẫn đặt lại mật khẩu trực tiếp ở đây."
       action={
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <MarketSelect options={MARKET_FILTER_TABS} value={marketFilter} onChange={setMarketFilter} />
           <PrimaryBtn icon="plus" onClick={() => setCreating(true)}>Tạo tài khoản</PrimaryBtn>
         </div>
       }
-      columns={["Tài khoản", "Tên người dùng", "Loại tài khoản", "Quyền truy cập", "Thị trường", "Trạng thái", "Ngày hết hạn", "Onboarding", "Ngày tạo", "Lần đăng nhập cuối", ""]}
+      /* Cung bo tu voi form tao tai khoan: cot 1 la profiles.username, cot 2 la
+         profiles.full_name. Goi chung la "Tai khoan"/"Ten nguoi dung" khien hai
+         o trong form doc nhu mot. */
+      columns={["Username", "Tên hiển thị", "Loại tài khoản", "Quyền truy cập", "Thị trường", "Trạng thái", "Ngày hết hạn", "Onboarding", "Ngày tạo", "Lần đăng nhập cuối", ""]}
       modals={
         <Fragment>
           {creating ? <CreateAccountModal onClose={() => setCreating(false)} onCreate={handleCreate} /> : null}
