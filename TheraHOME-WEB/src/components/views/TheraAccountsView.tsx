@@ -23,6 +23,7 @@ import {
   updateTheraAccount,
   createTheraAccount,
   resetTheraAccountPassword,
+  theraLoginAddress,
   deleteTheraAccount,
   theraAccountDeleteMessage,
   type CreateTheraAccountInput,
@@ -94,13 +95,11 @@ function toDateInputValue(iso: string | null) {
   return iso.slice(0, 10);
 }
 
-// Every issued account has a username (login by username always works). A
-// real email is now optional: when omitted, the edge function derives a
-// synthetic `<username>@thera.local` under the hood (Supabase Auth needs an
-// email-shaped identifier); when given, the account also logs in and resets
-// its password by that real address. This regex validates the username enough
-// to stay a valid email local-part once the `.local` suffix is appended.
-const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
+// There is no username field here any more (owner, 2026-11-03). The app signs
+// in by email and nothing else — `AuthScreenShell.tsx` has said so since
+// 2026-09-10, "username login was retired" — so asking for one made the admin
+// invent a handle that nobody would ever type. The Edge Function still wants
+// one; `usernameFromEmail` in db.ts derives it from the address instead.
 
 // Password policy (owner, 2026-09-10) — kept in sync with the app
 // (authAccount.ts) and the admin-manage-account Edge Function: at least 8
@@ -142,7 +141,6 @@ function PasswordField({ label, value, onChange, placeholder, style }: { label: 
 
 function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCreate: (input: CreateTheraAccountInput) => Promise<void> }) {
   const [fullName, setFullName] = useState("");
-  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -175,25 +173,22 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
     }
   }
 
-  const usernameValid = USERNAME_RE.test(username.trim());
-  // Email is OPTIONAL (owner, 2026-09-10): admins reset passwords directly in
-  // this tab, so an issued account doesn't need a real inbox. When left blank
-  // the Edge Function derives <username>@thera.local, which is what the person
-  // types to sign in. When given, it must be a real, valid address.
-  const emailValid = email.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  // Email is REQUIRED (owner, 2026-11-03). It is the only thing the app will
+  // accept at sign-in, so an account issued without one cannot be handed to
+  // anybody.
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const passwordStrong = isPasswordStrongEnough(password);
   const passwordsMatch = password === confirmPassword;
-  const canSubmit = !!fullName.trim() && usernameValid && emailValid && passwordStrong && passwordsMatch && !submitting;
+  const canSubmit = !!fullName.trim() && emailValid && passwordStrong && passwordsMatch && !submitting;
 
   // Why the button is off. It used to just sit there greyed with nothing on
-  // screen explaining it — and the four ways a Vietnamese admin trips it are
-  // all invisible: a space in the username, Vietnamese accents in it, under
-  // three characters, or a mistyped confirmation. Measured on the real form
-  // 2026-10-12: every one of those disabled the button and printed nothing.
+  // screen explaining it, and every way of tripping it is invisible — a
+  // missing field, a malformed address, a weak password, a mistyped
+  // confirmation. Measured on the real form 2026-10-12: each one disabled the
+  // button and printed nothing.
   const missing: string[] = [];
   if (!fullName.trim()) missing.push("tên hiển thị");
-  if (!usernameValid) missing.push(username.trim() ? "username hợp lệ" : "username");
-  if (!emailValid) missing.push("email đúng định dạng");
+  if (!emailValid) missing.push(email.trim() ? "email đúng định dạng" : "email đăng nhập");
   if (!passwordStrong) missing.push("mật khẩu đủ mạnh");
   else if (!passwordsMatch) missing.push("hai ô mật khẩu khớp nhau");
 
@@ -202,8 +197,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
     setSubmitting(true);
     try {
       await onCreate({
-        username: username.trim(),
-        email: email.trim() || null,
+        email: email.trim(),
         password,
         full_name: fullName.trim(),
         account_type: accountType,
@@ -279,14 +273,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
         Tên người này hiện ra trong app và ngoài cộng đồng — <b>có thể trùng</b> với tài khoản khác.
       </div>
-      <FieldLabel>Username</FieldLabel>
-      <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ví dụ: cskh_lan" autoCapitalize="none" autoComplete="off" name="thera-new-account-username" style={{ ...inputStyle, marginBottom: 6 }} />
-      <div style={{ fontSize: 12, color: username.trim() && !usernameValid ? "var(--error)" : "var(--text-muted)", marginBottom: 14 }}>
-        {username.trim() && !usernameValid
-          ? "Username chỉ được gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang — từ 3 đến 32 ký tự. Không dấu cách, không dấu tiếng Việt."
-          : <>Mã định danh nội bộ, không phải tên hiển thị. <b>Nếu bỏ trống ô Email bên dưới, đây chính là thứ tạo ra địa chỉ đăng nhập</b> — nên đặt khác với các tài khoản đã có.</>}
-      </div>
-      <FieldLabel>Email đăng nhập (tùy chọn)</FieldLabel>
+      <FieldLabel>Email đăng nhập</FieldLabel>
       <input
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -301,18 +288,8 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
         <div style={{ fontSize: 12.5, color: "var(--error)", marginBottom: 14 }}>Email không hợp lệ.</div>
       ) : (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 14 }}>
-          {/* App chi nhan EMAIL o o dau tien (AuthScreenShell.tsx: "Sign-in is
-              by email only (owner, 2026-09-10) — username login was retired").
-              Nen cho xem thang dia chi se dung, thay vi ta lai cong thuc. */}
-          App chỉ đăng nhập bằng <b>Email + mật khẩu</b> — không gõ username vào được.
-          {" "}
-          {email.trim()
-            ? <>Người này sẽ đăng nhập bằng <code>{email.trim()}</code>.</>
-            : usernameValid
-              ? <>Để trống thì địa chỉ đăng nhập tự sinh là <code>{username.trim()}@thera.local</code> — người dùng phải gõ đúng cả chuỗi đó vào ô Email trong app.</>
-              : <>Để trống thì địa chỉ đăng nhập tự sinh từ username, dạng <code>username@thera.local</code>.</>}
-          {" "}
-          Không cần email thật để đổi mật khẩu — Admin đặt lại trực tiếp ở tab này.
+          Đây là thứ người dùng gõ vào app để đăng nhập — app chỉ nhận <b>Email + mật khẩu</b>.
+          {" "}Không cần là hòm thư có thật: Admin đặt lại mật khẩu trực tiếp ở tab này, không gửi mail đi đâu cả.
         </div>
       )}
       <PasswordField label="Mật khẩu" value={password} onChange={setPassword} placeholder="Tối thiểu 8 ký tự" style={{ marginBottom: 6 }} />
@@ -377,7 +354,7 @@ function CreateAccountModal({ onClose, onCreate }: { onClose: () => void; onCrea
       {/* Sits directly above the footer, so the greyed-out button always has
           its reason next to it. Only after something has been typed — an
           untouched form does not need telling off. */}
-      {missing.length && (fullName || username || password) ? (
+      {missing.length && (fullName || email || password) ? (
         <div style={{ marginTop: 14, padding: "9px 12px", borderRadius: 10, background: "rgba(185,134,11,0.10)", border: "1px solid rgba(185,134,11,0.35)", fontSize: 12.5, color: "var(--text-primary)", lineHeight: 1.5 }}>
           Chưa tạo được — còn thiếu: <b>{missing.join(", ")}</b>.
         </div>
@@ -416,7 +393,7 @@ function EditAccountModal({ account, onClose, onSave }: { account: TheraAccount;
 
   return (
     <Modal
-      title={"Chỉnh sửa · " + account.username}
+      title={"Chỉnh sửa · " + theraLoginAddress(account)}
       onClose={onClose}
       width={480}
       footer={
@@ -487,7 +464,7 @@ function ResetPasswordModal({ account, onClose, onReset }: { account: TheraAccou
 
   return (
     <Modal
-      title={"Đặt lại mật khẩu · " + account.username}
+      title={"Đặt lại mật khẩu · " + theraLoginAddress(account)}
       onClose={onClose}
       width={420}
       footer={
@@ -550,8 +527,11 @@ export function TheraAccountsView() {
     }
     const known: Record<string, string> = {
       // Only reachable when two NO-email accounts would share the synthetic
-      // <username>@thera.local auth email — the username itself may repeat.
-      username_already_registered: "Đã có tài khoản không-email dùng tên này (trùng địa chỉ username@thera.local). Thêm Email hoặc chọn tên khác.",
+      // Unreachable from this form since email became mandatory (2026-11-03):
+      // the function only builds a synthetic <username>@thera.local when no
+      // address was sent, and one always is now. Kept so an older client, or a
+      // future caller that omits the email, still gets Vietnamese.
+      username_already_registered: "Đã có tài khoản cũ dùng địa chỉ nội bộ này. Chọn email khác.",
       email_already_registered: "Email này đã được dùng cho một tài khoản khác.",
       invalid_email: "Email không hợp lệ.",
       password_too_weak: "Mật khẩu chưa đủ mạnh — cần tối thiểu 8 ký tự, gồm chữ, số và ký tự đặc biệt.",
@@ -564,7 +544,7 @@ export function TheraAccountsView() {
     try {
       await createTheraAccount(input);
       setCreating(false);
-      pushToast("Đã tạo tài khoản " + input.username);
+      pushToast("Đã tạo tài khoản " + input.email);
       reload();
     } catch (e) {
       handleAdminManageAccountError(e, "Không thể tạo tài khoản.");
@@ -595,7 +575,7 @@ export function TheraAccountsView() {
   async function toggleLocked(a: TheraAccount) {
     try {
       await updateTheraAccount(a.id, { locked: !a.locked });
-      pushToast(a.locked ? "Đã mở khóa " + a.username : "Đã khóa " + a.username);
+      pushToast(a.locked ? "Đã mở khóa " + theraLoginAddress(a) : "Đã khóa " + theraLoginAddress(a));
       reload();
     } catch {
       pushToast("Không thể cập nhật trạng thái");
@@ -611,7 +591,7 @@ export function TheraAccountsView() {
     setDeleteBusy(true);
     try {
       await deleteTheraAccount(deleting.id);
-      pushToast("Đã xoá tài khoản " + deleting.username);
+      pushToast("Đã xoá tài khoản " + theraLoginAddress(deleting));
       setDeleting(null);
       reload();
     } catch (e) {
@@ -638,17 +618,17 @@ export function TheraAccountsView() {
 
   return (
     <TableShell
-      subtitle="Tài khoản đặc biệt do Admin cấp — App Review / QA toàn quyền không khoá, nhân viên (CSKH), tester. Khách hàng thường tự đăng ký trong app; tab này chỉ dành cho những quyền self-service không có. Các tài khoản này đăng nhập trong app bằng Email + mật khẩu (app không nhận username). Ô Email khi tạo là tùy chọn — bỏ trống thì địa chỉ đăng nhập tự sinh là username@thera.local, và Admin vẫn đặt lại mật khẩu trực tiếp ở đây."
+      subtitle="Tài khoản đặc biệt do Admin cấp — App Review / QA toàn quyền không khoá, nhân viên (CSKH), tester. Khách hàng thường tự đăng ký trong app; tab này chỉ dành cho những quyền self-service không có. Các tài khoản này đăng nhập trong app bằng Email + mật khẩu — app không nhận username. Email là bắt buộc khi tạo, nhưng không cần là hòm thư có thật vì Admin đặt lại mật khẩu trực tiếp ở đây."
       action={
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <MarketSelect options={MARKET_FILTER_TABS} value={marketFilter} onChange={setMarketFilter} />
           <PrimaryBtn icon="plus" onClick={() => setCreating(true)}>Tạo tài khoản</PrimaryBtn>
         </div>
       }
-      /* Cung bo tu voi form tao tai khoan: cot 1 la profiles.username, cot 2 la
-         profiles.full_name. Goi chung la "Tai khoan"/"Ten nguoi dung" khien hai
-         o trong form doc nhu mot. */
-      columns={["Username", "Tên hiển thị", "Loại tài khoản", "Quyền truy cập", "Thị trường", "Trạng thái", "Ngày hết hạn", "Onboarding", "Ngày tạo", "Lần đăng nhập cuối", ""]}
+      /* Cot 1 la dia chi dang nhap that (profiles.email, hoac
+         <username>@thera.local cho cac dong cu khong co email) — thu admin
+         phai doc ra cho khach. Cot 2 la profiles.full_name. */
+      columns={["Email đăng nhập", "Tên hiển thị", "Loại tài khoản", "Quyền truy cập", "Thị trường", "Trạng thái", "Ngày hết hạn", "Onboarding", "Ngày tạo", "Lần đăng nhập cuối", ""]}
       modals={
         <Fragment>
           {creating ? <CreateAccountModal onClose={() => setCreating(false)} onCreate={handleCreate} /> : null}
@@ -658,7 +638,7 @@ export function TheraAccountsView() {
             <ConfirmModal
               title="Xoá tài khoản"
               message={
-                `Xoá vĩnh viễn tài khoản "${deleting.username}"? Tài khoản sẽ không đăng nhập được nữa và toàn bộ lộ trình, tiến độ, nhật ký đau/nước, hội thoại và thông báo của tài khoản này bị xoá theo. ` +
+                `Xoá vĩnh viễn tài khoản "${theraLoginAddress(deleting)}"? Tài khoản sẽ không đăng nhập được nữa và toàn bộ lộ trình, tiến độ, nhật ký đau/nước, hội thoại và thông báo của tài khoản này bị xoá theo. ` +
                 "Bài viết đã đăng trong Cộng đồng vẫn còn nhưng không còn tên tác giả. Không thể hoàn tác — nếu chỉ muốn tạm chặn đăng nhập, hãy dùng \"Khóa\"."
               }
               confirmLabel="Xoá vĩnh viễn"
@@ -681,7 +661,7 @@ export function TheraAccountsView() {
         const isSingletonAdmin = a.accountType === "admin";
         return (
         <tr key={a.id} style={{ borderTop: "1px solid var(--divider)" }}>
-          <td style={{ padding: "12px 20px", color: "var(--text-primary)", fontWeight: 600 }}>{a.username}</td>
+          <td style={{ padding: "12px 20px", color: "var(--text-primary)", fontWeight: 600 }}>{theraLoginAddress(a)}</td>
           <td style={{ padding: "12px 20px", color: "var(--text-secondary)" }}>{a.fullName || "—"}</td>
           <td style={{ padding: "12px 20px" }}>
             <Badge color="var(--color-primary)" bg="var(--color-primary-tint-10)">{ACCOUNT_TYPE_META[a.accountType]}</Badge>

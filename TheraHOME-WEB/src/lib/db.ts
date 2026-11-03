@@ -1551,13 +1551,14 @@ export async function deleteUserProgram(userProgramId: string) {
 export async function fetchTheraAccounts(): Promise<TheraAccount[]> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, full_name, account_type, access_level, country, locked, expires_at, onboarding_completed, created_at, last_login_at, notes")
+    .select("id, username, email, full_name, account_type, access_level, country, locked, expires_at, onboarding_completed, created_at, last_login_at, notes")
     .neq("account_type", "normal")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((r): TheraAccount => ({
     id: r.id,
     username: r.username ?? "",
+    email: r.email,
     fullName: r.full_name ?? "",
     accountType: r.account_type as TheraAccountType,
     accessLevel: r.access_level as TheraAccessLevel,
@@ -1593,11 +1594,12 @@ export async function updateTheraAccount(
  * fell back to guessing the market from the UI language (owner rule: country
  * decides content, language decides wording). Added 2026-09-05. */
 export interface CreateTheraAccountInput {
-  username: string;
-  // Optional real, deliverable email. When set, the account signs in and
-  // resets its password by this address; when empty the Edge Function falls
-  // back to a synthetic <username>@thera.local (username-only login).
-  email: string | null;
+  /** Required since 2026-11-03 (owner). The app signs in by email and nothing
+   * else — username login was retired on 2026-09-10 — so an account without a
+   * real address could only be reached through a synthetic string the admin
+   * had to assemble by hand. There is no username field any more; see
+   * `usernameFromEmail` for the handle the Edge Function still wants. */
+  email: string;
   password: string;
   full_name: string;
   account_type: TheraAccountType;
@@ -1632,9 +1634,39 @@ async function invokeAdminManageAccount(body: Record<string, unknown>): Promise<
   return data;
 }
 
+/** The admin-manage-account Edge Function still rejects a create with no
+ * `username` ("missing_required_field") and still validates it against its own
+ * `USERNAME_RE`. The admin no longer types one, so it is derived here from the
+ * address they did type — one place, next to the only call that needs it,
+ * rather than in the form.
+ *
+ * Collisions do not matter: `profiles.username` has no unique index (checked
+ * against production), and the only name clash the function reports is between
+ * two SYNTHETIC `<username>@thera.local` auth emails, which cannot happen now
+ * that every new account carries a real address. */
+export function usernameFromEmail(email: string): string {
+  const local = (email.split("@")[0] ?? "").toLowerCase().replace(/[^a-z0-9._-]/g, "");
+  // The regex demands 3–32 of those characters. A local part can be shorter
+  // than three once the invalid ones are dropped ("a+b@…"), so pad instead of
+  // sending something the function will refuse.
+  return (local.length >= 3 ? local : local + "acc").slice(0, 32);
+}
+
 export async function createTheraAccount(input: CreateTheraAccountInput): Promise<string> {
-  const data = await invokeAdminManageAccount({ action: "create", ...input });
+  const data = await invokeAdminManageAccount({
+    action: "create",
+    ...input,
+    username: usernameFromEmail(input.email),
+  });
   return data.user_id as string;
+}
+
+/** What this account actually types to sign in. A row created before the email
+ * became mandatory has none, and reaches the app through the synthetic address
+ * the Edge Function built from its username. */
+export function theraLoginAddress(account: { email: string | null; username: string }): string {
+  if (account.email) return account.email;
+  return account.username ? `${account.username}@thera.local` : "—";
 }
 
 export async function resetTheraAccountPassword(userId: string, newPassword: string) {

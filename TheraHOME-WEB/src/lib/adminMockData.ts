@@ -173,7 +173,14 @@ export const COUNTRY_OPTIONS: TheraAccountCountry[] = ["VN", "US", "MALAY"];
 
 export interface TheraAccount {
   id: string;
+  /** Legacy handle. No longer collected when creating an account (owner,
+   * 2026-11-03) — kept because existing rows have one, and because an old
+   * no-email account's login address is still <username>@thera.local. */
   username: string;
+  /** The real email the account signs in with. Null on accounts created
+   * before the email became mandatory; those sign in as the synthetic
+   * address instead. Use `theraLoginAddress()` rather than reading this. */
+  email: string | null;
   fullName: string;
   accountType: TheraAccountType;
   accessLevel: TheraAccessLevel;
