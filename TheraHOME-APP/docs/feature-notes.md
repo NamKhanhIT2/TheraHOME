@@ -8465,3 +8465,26 @@ hero vốn đã bám vào (`chartProduct.totalDays`, TheraNECK+ = 14). Bảng
 `products` có RLS "public read … using (true)" nên tài khoản chưa kích hoạt
 vẫn đọc được. Khi vẫn chưa biết số ngày, `ArcGauge` không vẽ nhãn nào cả thay
 vì vẽ "0" đối với hư không — theo quy tắc 10 trong `docs/home-ui-rules.md`.
+
+## 2026-11-03 — Nút "Bắt đầu hôm nay" chết sau khi cuộn một đoạn
+
+Chủ báo: ở Trang chủ, cuộn lên một chút là nút "Bắt đầu hôm nay" bấm không
+ăn nữa, dù nút vẫn hiện rõ. Tái hiện trên simulator: ở vị trí cuộn 0 nút mở
+thang đau bình thường; cuộn ~150pt thì mọi cú chạm rơi vào hư không.
+
+Không phải nút hỏng. Khối thẻ (`styles.cards`) mở đầu bằng `paddingTop: 140`
+— 140pt trong suốt, không vẽ gì, nhưng vẫn là một view nhận chạm. Khối thẻ
+cuộn đúng tốc độ ngón tay, còn hero trượt chậm lại theo `HERO_SHIFT_RATE =
+0.45`, nên mỗi 100pt cuộn, mép trên của khối thẻ bò lên đè thêm 45pt vào
+hero. Nút nằm ở đáy hero, nên chỉ cần hơn ~100pt là nó nằm trọn dưới tấm
+padding vô hình kia. Người dùng nhìn thấy nút vì nút vẫn được vẽ (khối thẻ
+trong suốt ở đoạn đó), nhưng `hitTest` trả về khối thẻ.
+
+Sửa: `FadeGroup` nhận thêm prop `pointerEvents`, và khối thẻ ở Trang chủ
+dùng `pointerEvents="box-none"` — bản thân nó không bao giờ là đích của cú
+chạm, các thẻ con vẫn nhận chạm như cũ. Đã kiểm hai chiều trên simulator:
+cuộn rồi chạm nút → thang đau mở ra; cuộn tiếp tới thẻ nước rồi bấm "+" →
+0/8 thành 1/8 cốc.
+
+Quy tắc rút ra, đã ghi vào `docs/home-ui-rules.md` (số 33): một nhóm có hộp
+lớn hơn phần nó vẽ thì phải đặt `box-none`.

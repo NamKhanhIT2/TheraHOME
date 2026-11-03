@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -96,11 +96,16 @@ export function FadeGroup({
   style,
   onMeasure,
   rasterize,
+  pointerEvents,
 }: {
   children: React.ReactNode;
   style?: StyleProp<AnimatedStyle<ViewStyle>>;
   onMeasure?: (absoluteTop: number) => void;
   rasterize?: boolean;
+  /** 'box-none' for a group whose own box is bigger than what it draws —
+   * otherwise its empty padding swallows the taps of whatever it slides
+   * over. See the card stack in Home. */
+  pointerEvents?: ViewProps['pointerEvents'];
 }) {
   const env = useContext(EnvContext);
   const { ref, measure } = useAbsoluteBox(env, (top) => onMeasure?.(top));
@@ -111,6 +116,7 @@ export function FadeGroup({
       ref={ref}
       style={style}
       onLayout={measure}
+      pointerEvents={pointerEvents}
       shouldRasterizeIOS={rasterize}
       renderToHardwareTextureAndroid={rasterize}
     >

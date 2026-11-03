@@ -850,7 +850,16 @@ export default function HomeScreen() {
             </View>
           </FadeGroup>
 
-          <FadeGroup style={styles.cards}>
+          {/* `box-none`, because this group's box is much taller than what
+              it draws: `styles.cards` opens with 140pt of empty padding, and
+              the stack scrolls at full speed while the hero above it lags at
+              HERO_SHIFT_RATE. Every 100pt of scroll therefore slides that
+              invisible padding 45pt further up over the hero — and the Start
+              button sits at the hero's bottom edge, so a little way into the
+              scroll the button was still on screen, still drawn, and every
+              tap on it landed on empty padding instead (owner, 2026-11-03).
+              The cards themselves still take their own taps. */}
+          <FadeGroup style={styles.cards} pointerEvents="box-none">
             {/* Each of these reveals its own rows — a card is too big a
                 unit for an edge effect, and the owner wants the pieces to
                 arrive in order rather than as one slab. */}

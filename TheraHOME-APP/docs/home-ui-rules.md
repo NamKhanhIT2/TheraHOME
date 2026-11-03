@@ -127,3 +127,12 @@ implementation is wrong.
     identical on all four.
 32. Accents are per surface, not global: blue for Home and the roadmap's
     completed days (`tick`), red for today, violet for Cộng đồng.
+
+33. Anything that scrolls at a different speed from its neighbours makes a
+    **touch** problem, not just a visual one. The hero lags behind the scroll
+    at `HERO_SHIFT_RATE`, so every 100pt of scroll slides the card stack's
+    own box 45pt further up over it — and `styles.cards` opens with 140pt of
+    empty padding, which is invisible but still takes taps. That is how the
+    Start button came to be fully drawn and completely dead a little way into
+    the scroll (owner, 2026-11-03). A group whose box is taller than what it
+    draws gets `pointerEvents="box-none"`.
