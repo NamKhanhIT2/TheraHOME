@@ -62,6 +62,7 @@ import { NeumorphicBox } from '@/components/home/NeumorphicBox';
 import { VerticalGradient } from '@/components/home/VerticalGradient';
 import { GLASS_CARD_GAP, glassRaised, heroFont, tabularNums } from '@/components/home/glass';
 import { useI18n } from '@/lib/i18n';
+import { hapticSelect } from '@/lib/haptics';
 
 const WATER_GOAL_CUPS = 8;
 const HERO_PHOTO = require('../../assets/home-hero.webp');
@@ -91,6 +92,36 @@ const HERO_FADE = 520;
 
 /** Space between "NGÀY" and the numeral. */
 const DAY_WORD_GAP = 4;
+
+/** The hero's fixed rows above the day block: a 64pt metric disc with its
+ * 8pt gap and 17pt label, and the gauge's own 80pt band. None of it shrinks
+ * with the screen, which is why the two GAPS between them have to be solved
+ * for rather than written down as constants. */
+const HERO_FIXED_H = 64 + 8 + 17 + 80;
+/** How those two gaps split what is left — 44 above the gauge, 172 above the
+ * day block, which is what the owner approved on his own phone. */
+const GAUGE_GAP_REF = 44;
+const COPY_GAP_REF = 172;
+const HERO_GAP_REF = GAUGE_GAP_REF + COPY_GAP_REF;
+
+/**
+ * Where the day numeral belongs on the PHOTOGRAPH — 499 of the 956pt photo
+ * box, read off the layout the owner approved on his iPhone 11 Pro Max.
+ *
+ * It has to be keyed to the photograph rather than written as a `marginTop`,
+ * because the thing the numeral must stay clear of is the figure (rule 11)
+ * and the photo is scaled to cover `windowHeight + 60`. A constant margin
+ * therefore only lands right on the one phone it was measured on: an iPhone
+ * 15 Pro is 44pt shorter AND carries 15pt more top inset, so the same 172
+ * put the numeral 38pt too low — the Start button reached into the bottom
+ * mask and was already dissolving at rest (owner, 2026-11-03).
+ */
+const DAY_BLOCK_RATIO = 499 / 956;
+
+/** The hero copy's own height below the gap: a 78pt numeral, a three-line
+ * tagline at 20 + 69, and the button at 22 + 48. Written down because the
+ * gap above it has to know where it ends — see `heroGap`. */
+const HERO_COPY_H = 237;
 
 /**
  * There used to be a live `expo-blur` BlurView here, fading in over the hero
@@ -475,6 +506,20 @@ export default function HomeScreen() {
   const navTopFromBottom = navBottomOffset(insets.bottom) + 60;
   const bottomClearance = navTopFromBottom + 24;
   const tabTop = windowHeight - navTopFromBottom;
+  // The hero's one elastic gap. Everything above the day block is a fixed
+  // size, so this is what absorbs both the screen's height and its top
+  // inset, and it is solved for twice over: what the photograph asks for,
+  // and what the screen can actually give. On a short phone the fixed rows
+  // alone nearly fill the band between the header and the nav, and the
+  // picture's own answer pushes the Start button into the bottom mask,
+  // where it sits half-dissolved before anyone has scrolled. The screen
+  // wins there — a button you cannot read is worse than a numeral sitting a
+  // little higher up the figure.
+  const heroGapWanted = Math.round(DAY_BLOCK_RATIO * photoBoxHeight - headerHeight - HERO_FIXED_H);
+  const heroGapRoom = tabTop - MASK_BOTTOM_RAMP - 8 - headerHeight - HERO_FIXED_H - HERO_COPY_H;
+  const heroGap = Math.max(48, Math.min(heroGapWanted, heroGapRoom));
+  const gaugeGap = Math.round((heroGap * GAUGE_GAP_REF) / HERO_GAP_REF);
+  const heroCopyTop = heroGap - gaugeGap;
   // Alpha, not colour: these are the mask's own transparency. The dissolve
   // sits just ABOVE the header's lower edge, so content is still at full
   // strength everywhere it has open space, and loses itself in the band the
@@ -536,10 +581,10 @@ export default function HomeScreen() {
             </View>
           ))}
         </View>
-        <View style={styles.skeletonArc}>
+        <View style={[styles.skeletonArc, { paddingTop: gaugeGap + 8 }]}>
           <SkeletonBlock width="86%" height={6} radius={3} />
         </View>
-        <View style={styles.skeletonHero}>
+        <View style={[styles.skeletonHero, { marginTop: heroCopyTop - 4 }]}>
           <SkeletonBlock width={196} height={64} radius={14} />
           <SkeletonBlock width="82%" height={14} radius={7} />
           <SkeletonBlock width="64%" height={14} radius={7} />
@@ -723,18 +768,25 @@ export default function HomeScreen() {
                 icon="droplet"
                 value={`${water}/${WATER_GOAL_CUPS}`}
                 label={t('water')}
-                onPress={() => setWaterMutation.mutate(Math.min(WATER_GOAL_CUPS, water + 1))}
+                // The hero's own way of adding a cup — the same tick as
+                // the knobs on the water card, and silent once the glass
+                // is full, where this press changes nothing.
+                onPress={() => {
+                  if (water >= WATER_GOAL_CUPS) return;
+                  hapticSelect();
+                  setWaterMutation.mutate(water + 1);
+                }}
               />
             </View>
 
             {/* Same, but only cached once the arc has finished filling —
                 rasterising something mid-animation invalidates the cache
                 every frame and costs more than it saves. */}
-            <View style={styles.gauge}>
+            <View style={[styles.gauge, { paddingTop: gaugeGap }]}>
               <ArcGauge value={heroDayNumber} max={gaugeTotalDays} ready={gaugeReady} />
             </View>
 
-            <View style={styles.heroCopy}>
+            <View style={[styles.heroCopy, { marginTop: heroCopyTop }]}>
               {program && !program.product.roadmapPublished ? (
                 // Owner of a device whose roadmap Admin hasn't published yet:
                 // no day counter, no Start — those would open an empty
@@ -863,7 +915,7 @@ export default function HomeScreen() {
             {/* Each of these reveals its own rows — a card is too big a
                 unit for an edge effect, and the owner wants the pieces to
                 arrive in order rather than as one slab. */}
-            <GlassPainCard data={chartData} previewHighScore />
+            <GlassPainCard data={chartData} />
 
             <FadeGroup
               onMeasure={(top) => {
@@ -1078,13 +1130,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
   },
   gauge: {
-    paddingTop: 44,
+    // `paddingTop` is computed per device with the hero's other gap — see
+    // DAY_BLOCK_RATIO. It is 44 on the phone the design was measured on.
     paddingHorizontal: 22,
   },
   heroCopy: {
-    // The prototype's 150 put the numeral over the figure's torso on a real
-    // phone — owner's note, 2026-10-24. A little further down clears her.
-    marginTop: 172,
+    // `marginTop` is computed per device — see DAY_BLOCK_RATIO. The value it
+    // reproduces on the owner's iPhone 11 Pro Max is 172: the prototype's 150
+    // put the numeral over the figure's torso on a real phone (owner's note,
+    // 2026-10-24) and a little further down clears her.
     alignItems: 'center',
     paddingHorizontal: 30,
   },
@@ -1161,11 +1215,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   skeletonArc: {
-    paddingTop: 52,
+    // The hero's gauge gap plus 8 — its placeholder bar is thinner than the
+    // arc it stands in for. Computed, so the two cannot drift apart.
     alignItems: 'center',
   },
   skeletonHero: {
-    marginTop: 168,
+    // Computed with the hero's own gap, 4pt higher — its placeholder rows are
+    // shorter than the real ones. Written as one offset so the two can only
+    // move together.
     alignItems: 'center',
     gap: 14,
   },

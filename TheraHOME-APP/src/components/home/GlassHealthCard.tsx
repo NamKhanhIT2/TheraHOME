@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -11,6 +11,7 @@ import Animated, {
 import Svg, { Circle, G } from 'react-native-svg';
 import { homeGlassColors, useTheme } from '@/theme';
 import { useI18n } from '@/lib/i18n';
+import { hapticConfirm, hapticSelect } from '@/lib/haptics';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { Icon } from '@/components/icons/Icon';
 import { useHealthActivity } from '@/hooks/useHealthActivity';
@@ -113,6 +114,22 @@ export function GlassHealthCard({ userId }: { userId: string | undefined }) {
   const reduceMotion = useReduceMotion();
   const { status, activity, connect } = useHealthActivity(userId);
   const grow = useSharedValue(0);
+  // Pressing "Kết nối" hands the screen to iOS's own sheet, so the tick on
+  // the press is only half the story — the part worth feeling is Health
+  // actually answering. Only a `ready` counts: a denial and an empty Health
+  // app both land on `empty`, and congratulating somebody for saying no is
+  // worse than saying nothing.
+  const asking = useRef(false);
+  const askToConnect = useCallback(() => {
+    hapticSelect();
+    asking.current = true;
+    void connect();
+  }, [connect]);
+  useEffect(() => {
+    if (!asking.current || status === 'loading') return;
+    if (status === 'ready') hapticConfirm();
+    asking.current = false;
+  }, [status]);
   // Cached as a bitmap for the scroll, but only once the rings have stopped
   // filling — caching something mid-animation re-draws it every frame.
   const [settled, setSettled] = useState(false);
@@ -194,7 +211,7 @@ export function GlassHealthCard({ userId }: { userId: string | undefined }) {
           </Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => void connect()}
+            onPress={askToConnect}
             style={({ pressed }) => [
               styles.connect,
               { backgroundColor: homeGlassColors.surfaceAction },
@@ -219,7 +236,7 @@ export function GlassHealthCard({ userId }: { userId: string | undefined }) {
               shows the sheet for types it has not already decided. */}
           <Pressable
             accessibilityRole="button"
-            onPress={() => void connect()}
+            onPress={askToConnect}
             style={({ pressed }) => [
               styles.connect,
               { backgroundColor: homeGlassColors.surfaceAction },

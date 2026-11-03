@@ -39,9 +39,6 @@ export interface GlassPainCardProps {
   /** Logged check-ins, oldest first, with the real programme day they belong
    * to — the label is `day`, so a first log on day 2 reads "N2". */
   data: { day: number; score: number }[];
-  /** Design-review only: raises one plotted day to 9 without writing it to
-   * the customer's health history. */
-  previewHighScore?: boolean;
 }
 
 /**
@@ -51,7 +48,7 @@ export interface GlassPainCardProps {
  * an empty state for somebody who has not logged anything yet, and a window
  * that follows real day numbers rather than counting back from 14.
  */
-export function GlassPainCard({ data, previewHighScore = false }: GlassPainCardProps) {
+export function GlassPainCard({ data }: GlassPainCardProps) {
   const theme = useTheme();
   const { t } = useI18n();
   const { width: windowWidth } = useWindowDimensions();
@@ -69,30 +66,24 @@ export function GlassPainCard({ data, previewHighScore = false }: GlassPainCardP
   const windowed = data.slice(data.length - windowSize);
   const isEmpty = windowed.length === 0;
   const scrollable = windowed.length > 7;
-  const plotted = useMemo(() => {
-    if (!previewHighScore || windowed.length === 0 || windowed.some((entry) => entry.score >= 8)) return windowed;
-    const dayEleven = windowed.findIndex((entry) => entry.day === 11);
-    const target = dayEleven >= 0 ? dayEleven : Math.floor(windowed.length / 2);
-    return windowed.map((entry, index) => (index === target ? { ...entry, score: 9 } : entry));
-  }, [previewHighScore, windowed]);
 
   // Preserve the old 14-day interaction: points stay 48pt apart and the
   // viewport scrolls horizontally instead of squeezing two weeks into the
   // width of the phone. Seven days retain the current centred layout.
   const viewportWidth = Math.max(40, width - AXIS_WIDTH);
   const contentWidth = scrollable
-    ? SIDE_PADDING * 2 + POINT_GAP * (plotted.length - 1)
+    ? SIDE_PADDING * 2 + POINT_GAP * (windowed.length - 1)
     : viewportWidth;
   const plotW = Math.max(40, contentWidth - SIDE_PADDING * 2);
   const points = useMemo<[number, number][]>(
     () =>
-      plotted.map((entry, index) => [
+      windowed.map((entry, index) => [
         scrollable
           ? SIDE_PADDING + index * POINT_GAP
-          : SIDE_PADDING + (plotW * (index + 0.5)) / plotted.length,
+          : SIDE_PADDING + (plotW * (index + 0.5)) / windowed.length,
         PAD_TOP + PLOT_H * (1 - entry.score / MAX_SCORE),
       ]),
-    [plotted, plotW, scrollable],
+    [windowed, plotW, scrollable],
   );
 
   const linePath = smoothPath(points);
@@ -280,7 +271,7 @@ export function GlassPainCard({ data, previewHighScore = false }: GlassPainCardP
                         x2={points[0][0]}
                         y1={points[0][1] + 10}
                         y2={baseline}
-                        stroke={painColor(plotted[0].score)}
+                        stroke={painColor(windowed[0].score)}
                         strokeWidth={1.5}
                         strokeDasharray="4 5"
                         strokeLinecap="round"
@@ -305,7 +296,7 @@ export function GlassPainCard({ data, previewHighScore = false }: GlassPainCardP
                           cy={y}
                           r={5.5}
                           fill={homeGlassColors.scrim}
-                          stroke={painColor(plotted[index].score)}
+                          stroke={painColor(windowed[index].score)}
                           strokeWidth={2.5}
                         />
                         <SvgText
@@ -316,7 +307,7 @@ export function GlassPainCard({ data, previewHighScore = false }: GlassPainCardP
                           fontWeight="700"
                           fill={homeGlassColors.text}
                         >
-                          {plotted[index].score}
+                          {windowed[index].score}
                         </SvgText>
                       </React.Fragment>
                     ))}
@@ -325,14 +316,14 @@ export function GlassPainCard({ data, previewHighScore = false }: GlassPainCardP
                 <Reveal style={styles.axisLabels} arrive={false}>
                   {points.map(([x], index) => (
                     <Text
-                      key={plotted[index].day}
+                      key={windowed[index].day}
                       style={[
                         styles.axisLabel,
                         heroFont('400'),
                         { left: x - 22, color: homeGlassColors.textSoft },
                       ]}
                     >
-                      {`${t('dayAbbrev')}${plotted[index].day}`}
+                      {`${t('dayAbbrev')}${windowed[index].day}`}
                     </Text>
                   ))}
                 </Reveal>

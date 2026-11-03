@@ -1,6 +1,8 @@
-// Named haptic presets for the reaction-picker interaction (community posts/
-// comments and the human-chat action sheet) — a single, consistent tactile
-// vocabulary instead of ad-hoc impactAsync calls scattered per call site.
+// Named haptic presets — a single, consistent tactile vocabulary instead of
+// ad-hoc impactAsync calls scattered per call site. Started with the
+// reaction picker (community posts/comments, the human-chat action sheet)
+// and now also covers the tab bar, the water knobs and Apple Health.
+import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 /** Opening the reaction tray/action sheet on long-press. A single impact
@@ -24,4 +26,27 @@ export function hapticHoverTick() {
  * multi-pulse confirmation rather than a single flat tap. */
 export function hapticConfirm() {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+}
+
+/**
+ * One short, light tick as a selection changes: moving to another tab, a cup
+ * of water in or out. Never fired for a press that changes nothing — tapping
+ * the tab you are already on, or `+` on a full glass, stays silent.
+ *
+ * **It is two different calls because only one of them obeys the phone.**
+ * `impactAsync`/`selectionAsync` reach Android's `Vibrator`, which buzzes
+ * whatever the owner has set under Sounds → Touch feedback;
+ * `performAndroidHapticsAsync` goes through `View.performHapticFeedback`,
+ * which the system silences when haptics are off (and needs no VIBRATE
+ * permission). On iOS `UISelectionFeedbackGenerator` already respects
+ * System Haptics, so there is nothing to add there.
+ */
+export function hapticSelect() {
+  if (Platform.OS === 'android') {
+    void Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Segment_Tick).catch(
+      () => undefined,
+    );
+    return;
+  }
+  void Haptics.selectionAsync().catch(() => undefined);
 }

@@ -10,7 +10,7 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useAppStore } from '@/store/useAppStore';
 import { scheduleWaterReminders } from '@/lib/pushNotifications';
 import { useWaterArrived } from './waterArrival';
-import { hapticHoverTick } from '@/lib/haptics';
+import { hapticSelect } from '@/lib/haptics';
 import { GLASS_CARD_PADDING, heroFont, tabularNums } from './glass';
 import { WaterGlassFace } from './WaterGlassFace';
 
@@ -172,7 +172,9 @@ export function WaterDial({ cups, goal, onSet }: WaterDialProps) {
   const step = (next: number) => {
     const clamped = Math.max(0, Math.min(goal, next));
     if (clamped === shown) return;
-    hapticHoverTick();
+    // After the guard above, so `−` on an empty glass and `+` on a full one
+    // stay silent.
+    hapticSelect();
     setShown(clamped);
     onSet(clamped);
   };

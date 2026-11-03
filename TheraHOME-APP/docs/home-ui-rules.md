@@ -136,3 +136,22 @@ implementation is wrong.
     Start button came to be fully drawn and completely dead a little way into
     the scroll (owner, 2026-11-03). A group whose box is taller than what it
     draws gets `pointerEvents="box-none"`.
+
+34. **The hero's vertical rhythm is keyed to the PHOTOGRAPH, not written as
+    points.** The picture is scaled to cover `windowHeight + 60`, so the
+    figure sits at a fixed fraction of the screen on every phone — while a
+    constant `marginTop` plus a constant top inset does not. The numeral
+    belongs 499/956 of the way down the photo box (`DAY_BLOCK_RATIO`, the
+    layout the owner approved on his iPhone 11 Pro Max); everything above it
+    is a fixed size, so one computed gap carries the difference and is split
+    between the gauge and the day block in the design's own 44:172.
+    An iPhone 15 Pro is 44pt shorter AND carries 15pt more top inset, so the
+    old constant put the numeral 38pt low and the Start button reached into
+    the bottom mask — fully drawn, already dissolving, before anyone had
+    scrolled (owner, 2026-11-03).
+35. **The screen overrules the photograph when they disagree.** On a 667pt
+    phone the fixed rows alone nearly fill the band between header and nav,
+    and the picture's own answer puts the button under the dissolve. The gap
+    is therefore capped at what leaves the button clear (`heroGapRoom`): a
+    button you cannot read is worse than a numeral sitting a little higher
+    up the figure.

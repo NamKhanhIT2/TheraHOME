@@ -8488,3 +8488,84 @@ cuộn rồi chạm nút → thang đau mở ra; cuộn tiếp tới thẻ nư�
 
 Quy tắc rút ra, đã ghi vào `docs/home-ui-rules.md` (số 33): một nhóm có hộp
 lớn hơn phần nó vẽ thì phải đặt `box-none`.
+
+## 2026-11-03 — Hero vừa vặn theo màn hình, và bỏ `previewHighScore`
+
+Hai việc trong cùng một lần, cả hai đều ở Trang chủ.
+
+**`previewHighScore` đã bị gỡ.** It was a design-review flag on
+`GlassPainCard`: when nothing in the visible window scored 8 or more, it
+redrew one point — day 11, or the middle one — as a 9, so the chart's red
+band had something to show on a demo account. It never wrote to `pain_logs`,
+but it meant a customer whose worst day was a 5 saw a 9 on their own health
+history. The prop, its `useMemo` and the `plotted` array are gone; the chart
+plots `windowed`, which is what the person actually logged.
+
+**The hero's vertical rhythm is now solved per device, not written down.**
+The symptom the owner reported was that the Start button still did not take
+taps on an iPhone 15 Pro after yesterday's `box-none` fix. It does — the
+simulator he was looking at had a JS bundle from the day before. But the
+screenshot showed a real second defect underneath: on that phone the button
+was *already dissolving at rest*.
+
+The arithmetic. Everything above the day block is a fixed size (a 64pt disc
++ 8 + 17, and the gauge's 80pt band), and the gap below it was the constant
+`marginTop: 172`, measured on the owner's iPhone 11 Pro Max. The photograph
+is not fixed: it covers `windowHeight + 60`, so the figure rides up and down
+with the screen. A 15 Pro is 44pt shorter and carries 15pt MORE top inset,
+so the same 172 lands the numeral 38pt lower against the picture — and put
+the button's bottom 14pt inside the bottom mask's 44pt dissolve band.
+
+Now: `DAY_BLOCK_RATIO = 499/956` is where the numeral belongs on the photo
+box (the approved 11 Pro Max layout, reproduced exactly on that phone), one
+`heroGap` absorbs the screen height and the inset, and it splits between the
+gauge gap and the day block in the design's 44:172. A second term caps it at
+what still leaves the button above the dissolve — needed on an iPhone SE,
+where the fixed rows plus the copy nearly fill the band between header and
+nav and the picture's own answer is 120pt the screen does not have.
+
+Measured, three simulators, all on the same bundle:
+
+| phone | gap before | gap now | button clear of the mask |
+|---|---|---|---|
+| 11 Pro Max (owner) | 216 | 216 | 45 → 45 |
+| 15 Pro | 216 | 178 | **−14** → 24 |
+| 17e | 216 | ~187 | 5 → 34 |
+| SE (3rd gen) | 216 | 48 | −142 → 3 |
+
+The SE pays for it: the numeral sits over the figure's thigh instead of
+below her. That is the deliberate trade in rule 35.
+
+Verified on the 15 Pro by scrolling ~75pt and tapping the button — the
+"Ngày 12 · Mức độ khó chịu hôm nay" gate opened, which is yesterday's
+`box-none` fix doing its job on a bundle that actually contains it.
+
+## 2026-11-03 — Phản hồi xúc giác khi chuyển tab, uống nước, nối Apple Health
+
+A fourth preset in `src/lib/haptics.ts`, `hapticSelect()`, and three call
+sites. One short tick per *change*: the tab you are already on, `−` on an
+empty glass and `+` on a full one all stay silent, because the press changed
+nothing and a buzz for a screen that does not move is noise.
+
+- **Tab bar** — in `HomeGlassNav`'s `NavTab`, guarded on `item.key !== active`.
+  All four tabs render the same bar, so this is one place, not four.
+- **Water** — the knobs on `WaterDial` already ticked (`hapticHoverTick`,
+  a `Light` impact); they now use `hapticSelect` for the reason below. The
+  hero's own "Uống nước" metric circle is a second `+1` control and had no
+  feedback at all; it does now, with the same silence at 8/8.
+- **Apple Health** — a tick on "Kết nối", and `hapticConfirm()` when Health
+  actually answers with data. Only a `ready` counts: a denial and an empty
+  Health app both land on `empty`, and congratulating somebody for saying no
+  is worse than saying nothing.
+
+**Why two different native calls.** The owner asked for the device's own
+haptic setting to be respected, and on Android `impactAsync` /
+`selectionAsync` do not: expo-haptics routes them to `Vibrator.vibrate`,
+which buzzes whatever is set under Sounds → Touch feedback (and wants the
+`VIBRATE` permission). `performAndroidHapticsAsync` goes through
+`View.performHapticFeedback`, which the system silences when haptics are
+off. On iOS `UISelectionFeedbackGenerator` already obeys System Haptics, so
+`hapticSelect()` branches on `Platform.OS` and nothing else does.
+
+Not verifiable here: the iOS Simulator has no Taptic Engine. Checked on the
+15 Pro that the paths run and nothing throws; the feel itself needs a phone.

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { homeGlassColors } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { useI18n, type TranslationKey } from '@/lib/i18n';
+import { hapticSelect } from '@/lib/haptics';
 import { NeumorphicBox } from './NeumorphicBox';
 import { glanceAt } from './glanceStore';
 import { VerticalGradient } from './VerticalGradient';
@@ -140,6 +141,10 @@ export function HomeGlassNav({ active, onNavigate, trailing }: HomeGlassNavProps
             label={t(item.key as TranslationKey)}
             isActive={item.key === active}
             onPress={(at) => {
+              // One tick per actual move. The tab you are already on is not
+              // a move — `router.navigate` makes it a no-op, and a buzz for
+              // a screen that does not change is noise.
+              if (item.key !== active) hapticSelect();
               // Every tab is to the mascot's left, so this reads as it
               // turning to watch what the customer just did. The glance
               // store already drives its head; this is one more source.
