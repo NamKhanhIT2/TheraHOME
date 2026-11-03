@@ -8434,3 +8434,34 @@ code mới đã chạy tới chỗ kiểm tra người gọi.
 hàm này (giỏ hàng + form đặt đơn trong tab Cửa hàng) nằm trong JS chưa được
 build. Bản app đang cài trên máy không có đường nào gọi tới nó. Đặt một đơn
 thật là việc làm được ngay sau khi có build mới.
+
+## 2026-11-03 — Câu hỏi onboarding nuốt cú chạm đầu tiên, và đuôi cung tròn ghi "1"
+
+Hai lỗi chủ tài khoản báo sau khi tạo tài khoản thử test11 trên bản 1.0.3 (48).
+
+**Chạm lần đầu vào đáp án không ăn.** `selectAnswer` trong
+`app/(onboarding)/questions.tsx` chặn trên `isTransitioning`, mà cờ đó chỉ
+được hạ trong callback `finished` của *toàn bộ* hoạt ảnh vào màn. Với các màn
+"cinematic" (gần như tất cả: mục tiêu, vùng ưu tiên, lý do tại nhà, mức căng,
+thời điểm căng, độ tuổi, hai câu lối sống) hoạt ảnh đó dài khoảng 1,5 giây —
+370ms chờ, rồi các đáp án lần lượt hiện cách nhau 96ms, rồi nút Tiếp tục. Suốt
+chừng đó thời gian màn hình trông đã xong nhưng mọi cú chạm đều rơi vào hư
+không, nên người dùng phải chạm lần thứ hai. Câu 1 không dính vì không có màn
+nào đi ra trước nó.
+
+Cờ `isTransitioning` sinh ra để chặn cú chạm rơi vào câu **đang đi ra**, và
+câu đó đã biến mất từ lâu trước khi hoạt ảnh vào kết thúc. Giờ cờ được hạ
+đúng lúc đáp án cuối cùng *bắt đầu* hiện (`optionsLiveAt()`, tính từ cùng bộ
+hằng số mà hoạt ảnh đọc, nên hai bên không lệch nhau được): khoảng 560ms cho
+màn 3 đáp án thay vì 1490ms. Kiểm trên simulator theo cả hai chiều — bấm Tiếp
+tục rồi chạm ngay đáp án cuối của câu 8, và bấm Quay lại rồi chạm ngay đáp án
+thứ ba của câu 7 — cả hai lần cú chạm đầu đều ăn.
+
+**Đuôi cung tròn ở Trang chủ ghi "1".** `ArcGauge` nhận `max={heroTotalDays || 1}`.
+Trước khi kích hoạt thì không có lộ trình nào để hỏi, `heroTotalDays` bằng 0,
+nên nhãn rơi về 1 — và vì nhãn xoay theo tiếp tuyến của cung, chữ "1" nghiêng
+gần 40° đọc ra thành "7". Nay lấy số ngày của sản phẩm mà phần còn lại của
+hero vốn đã bám vào (`chartProduct.totalDays`, TheraNECK+ = 14). Bảng
+`products` có RLS "public read … using (true)" nên tài khoản chưa kích hoạt
+vẫn đọc được. Khi vẫn chưa biết số ngày, `ArcGauge` không vẽ nhãn nào cả thay
+vì vẽ "0" đối với hư không — theo quy tắc 10 trong `docs/home-ui-rules.md`.

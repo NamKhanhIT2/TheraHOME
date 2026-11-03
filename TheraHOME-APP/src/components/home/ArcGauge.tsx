@@ -127,26 +127,33 @@ export function ArcGauge({ value, max, ready = true }: ArcGaugeProps) {
         {TICKS.map((tick, index) => (
           <Circle key={index} cx={tick.x} cy={tick.y} r={1.35} fill={homeGlassColors.text} opacity={0.64} />
         ))}
-        <SvgText
-          x={LABEL0_X}
-          y={LABEL0_Y}
-          fontSize={11}
-          fill={homeGlassColors.textSoft}
-          textAnchor="middle"
-          transform={`rotate(${A0 - 4.5 + 90} ${LABEL0_X} ${LABEL0_Y})`}
-        >
-          0
-        </SvgText>
-        <SvgText
-          x={LABEL1_X}
-          y={LABEL1_Y}
-          fontSize={11}
-          fill={homeGlassColors.textSoft}
-          textAnchor="middle"
-          transform={`rotate(${A1 + 4.5 + 90} ${LABEL1_X} ${LABEL1_Y})`}
-        >
-          {max}
-        </SvgText>
+        {/* A scale needs both ends to mean something. While the programme's
+            length is still unknown the gauge shows the track alone rather
+            than a "0" against nothing. */}
+        {max > 0 ? (
+          <>
+            <SvgText
+              x={LABEL0_X}
+              y={LABEL0_Y}
+              fontSize={11}
+              fill={homeGlassColors.textSoft}
+              textAnchor="middle"
+              transform={`rotate(${A0 - 4.5 + 90} ${LABEL0_X} ${LABEL0_Y})`}
+            >
+              0
+            </SvgText>
+            <SvgText
+              x={LABEL1_X}
+              y={LABEL1_Y}
+              fontSize={11}
+              fill={homeGlassColors.textSoft}
+              textAnchor="middle"
+              transform={`rotate(${A1 + 4.5 + 90} ${LABEL1_X} ${LABEL1_Y})`}
+            >
+              {max}
+            </SvgText>
+          </>
+        ) : null}
       </G>
     </Svg>
   );

@@ -590,6 +590,12 @@ export default function HomeScreen() {
        null)
     : null;
   const heroTotalDays = progress.totalDays;
+  // The gauge's end label is how long the programme is, and before
+  // activation there is no programme to ask: it fell back to 1, and rotated
+  // along the arc that "1" even read as a "7" (owner, 2026-11-03). The
+  // catalog product the rest of the hero already anchors on carries the
+  // real figure — 14 for TheraNECK+.
+  const gaugeTotalDays = heroTotalDays || chartProduct?.totalDays || 0;
   const heroDayNumber = rawToday && heroTotalDays ? Math.min(rawToday.id, heroTotalDays) : 0;
   // Once the calendar advances past the reachable days (phase 3 still
   // IAP-locked), the raw "today" row belongs to the locked phase — the hero
@@ -725,7 +731,7 @@ export default function HomeScreen() {
                 rasterising something mid-animation invalidates the cache
                 every frame and costs more than it saves. */}
             <View style={styles.gauge}>
-              <ArcGauge value={heroDayNumber} max={heroTotalDays || 1} ready={gaugeReady} />
+              <ArcGauge value={heroDayNumber} max={gaugeTotalDays} ready={gaugeReady} />
             </View>
 
             <View style={styles.heroCopy}>

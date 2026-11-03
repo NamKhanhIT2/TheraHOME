@@ -192,6 +192,20 @@ function SpriteCell({
   );
 }
 
+// The entrance stagger, in one place, because two things read it: the
+// animation itself and the moment the answers start accepting taps.
+const CINEMATIC_OPTION_DELAY = 370;
+const CINEMATIC_OPTION_STAGGER = 96;
+const PLAIN_OPTION_STAGGER = 42;
+
+/** When the last option of a question has begun to reveal itself. */
+function optionsLiveAt(cinematic: boolean, optionCount: number): number {
+  const gaps = Math.max(0, optionCount - 1);
+  return cinematic
+    ? CINEMATIC_OPTION_DELAY + CINEMATIC_OPTION_STAGGER * gaps
+    : PLAIN_OPTION_STAGGER * gaps;
+}
+
 function OptionReveal({
   progress,
   fill = true,
@@ -426,9 +440,9 @@ export default function QuestionsScreen() {
             useNativeDriver: true,
           }),
           Animated.sequence([
-            Animated.delay(370),
+            Animated.delay(CINEMATIC_OPTION_DELAY),
             Animated.stagger(
-              96,
+              CINEMATIC_OPTION_STAGGER,
               optionAnims.slice(0, q.options.length).map((animation) =>
                 Animated.timing(animation, {
                   toValue: 1,
@@ -453,7 +467,7 @@ export default function QuestionsScreen() {
             useNativeDriver: true,
           }),
           Animated.stagger(
-            42,
+            PLAIN_OPTION_STAGGER,
             optionAnims.slice(0, q.options.length).map((animation) =>
               Animated.spring(animation, {
                 toValue: 1,
@@ -466,9 +480,19 @@ export default function QuestionsScreen() {
           ),
         ]);
 
-    entrance.start(({ finished }) => {
-      if (finished) setIsTransitioning(false);
-    });
+    entrance.start();
+
+    // Answers go live when the last of them has STARTED to appear, not when
+    // the whole entrance has finished. The cinematic entrance runs for about
+    // a second and a half (the options alone, then the Continue button), and
+    // `selectAnswer` was gated on all of it — so on every question after the
+    // first the opening tap on an answer was swallowed and only the second
+    // one registered (owner report, 2026-11-03). The guard is there to stop
+    // a tap landing on the question that is LEAVING; that one is gone long
+    // before this.
+    const liveAt = optionsLiveAt(isCinematicQuestion, q.options.length);
+    const unlock = setTimeout(() => setIsTransitioning(false), liveAt);
+    return () => clearTimeout(unlock);
   }, [assetsReady, q.options.length, qIndex, contentAnim, goalCtaAnim, goalTitleAnim, isCinematicQuestion, optionAnims, progressAnim, questions.length, reduceMotion]);
 
   function selectAnswer(v: string) {
