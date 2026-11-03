@@ -267,26 +267,6 @@ export default function DayDetailScreen() {
     );
   }
 
-  function openVideoBrowser() {
-    if (!videoUrl) {
-      Alert.alert(t('videoUnavailableTitle'), t('videoUnavailableMessage'));
-      return;
-    }
-    Alert.alert(t('openVideoTitle'), t('openVideoMessage'), [
-      { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('openLink'),
-        onPress: () => {
-          recordWatch();
-          void WebBrowser.openBrowserAsync(videoUrl, {
-            presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-            controlsColor: homeGlassColors.tick,
-          });
-        },
-      },
-    ]);
-  }
-
   return (
     <ScreenContainer tone="glass">
       <BackBar tone="glass" onBack={() => router.back()} title={`${t('day')} ${d.id}`} />
@@ -360,17 +340,12 @@ export default function DayDetailScreen() {
           </View>
         ) : null}
 
+        {/* No "Xem trên Youtube" button here any more (owner, 2026-11-03).
+            The embed above already plays the lesson in the app; a primary
+            button that left for the browser was the one thing on this screen
+            that made watching feel like a trip to YouTube. The fallback for
+            an embed that genuinely cannot play still offers the link. */}
         <View style={{ gap: 12 }}>
-          <Pressable
-            onPress={openVideoBrowser}
-            style={[
-              styles.actionBtn,
-              { backgroundColor: homeGlassColors.tick, borderRadius: theme.radius.md },
-            ]}
-          >
-            <Icon name="play" size={18} color={homeGlassColors.text} />
-            <Text style={[theme.type.button, { color: homeGlassColors.text }]}>{t('watchVideo')}</Text>
-          </Pressable>
           {progressLocked ? (
             <View style={[styles.previewHint, { backgroundColor: homeGlassColors.surfaceRaised, borderColor: homeGlassColors.hairline }]}> 
               <Icon name="lock" size={17} color={homeGlassColors.textMuted} />

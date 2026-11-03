@@ -17,6 +17,15 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useI18n } from '@/lib/i18n';
 
 const MAX_MEDIA = 10;
+/**
+ * Videos are uploaded as they come off the phone — the three compressed
+ * renditions in `uploadCommunityImage` are for stills only, and compressing
+ * video on device needs a native module this app does not carry. One clip
+ * reached the community bucket at 23 MB on 2026-09-11, which is 59% of
+ * everything in it. A ceiling is not compression, but it is the part that
+ * can be shipped without a new dependency.
+ */
+const MAX_VIDEO_BYTES = 12 * 1024 * 1024;
 const VIDEO_EXTENSION = /\.(mp4|mov|m4v|webm)(?:$|\?)/i;
 const isVideoItem = (item: PostMediaItem) => !!item.mimeType?.startsWith('video/') || VIDEO_EXTENSION.test(item.uri);
 
@@ -106,7 +115,16 @@ export default function CreatePostScreen() {
       selectionLimit: remaining,
     });
     if (!result.canceled && result.assets.length) {
-      setMedia((prev) => [...prev, ...result.assets.map((asset) => ({ uri: asset.uri, mimeType: asset.mimeType ?? null, width: asset.width, height: asset.height }))]);
+      const tooBig = result.assets.filter(
+        (asset) => (asset.mimeType?.startsWith('video/') ?? false) && (asset.fileSize ?? 0) > MAX_VIDEO_BYTES,
+      );
+      const accepted = result.assets.filter((asset) => !tooBig.includes(asset));
+      if (tooBig.length) {
+        Alert.alert(t('videoTooLargeTitle'), t('videoTooLargeMessage', { mb: String(Math.round(MAX_VIDEO_BYTES / 1048576)) }));
+      }
+      if (accepted.length) {
+        setMedia((prev) => [...prev, ...accepted.map((asset) => ({ uri: asset.uri, mimeType: asset.mimeType ?? null, width: asset.width, height: asset.height }))]);
+      }
     }
   }
 

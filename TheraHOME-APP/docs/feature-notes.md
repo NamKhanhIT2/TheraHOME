@@ -8569,3 +8569,111 @@ off. On iOS `UISelectionFeedbackGenerator` already obeys System Haptics, so
 
 Not verifiable here: the iOS Simulator has no Taptic Engine. Checked on the
 15 Pro that the paths run and nothing throws; the feel itself needs a phone.
+
+## 2026-11-03 — Vòng lặp Realtime đốt 96% băng thông của dự án
+
+Supabase egress hit **4,96 / 5 GB with twelve days of the cycle left**, and
+the free plan restricts rather than bills. The cause was not images, video or
+storage — storage is 143 MB and barely read. It was **630.182 requests in 24
+hours**, of which four endpoints were 96%:
+
+| path | reqs/24h | devices |
+|---|---|---|
+| `/rest/v1/notifications` | 181.842 | 41 |
+| `/rest/v1/calls` | 181.205 | 40 |
+| `/rest/v1/chat_messages` | 120.867 | **2** |
+| `/rest/v1/chat_message_reactions` | 120.828 | **2** |
+
+Every response was 0–2 bytes — empty arrays. The bandwidth was the HTTP and
+TLS overhead of the requests themselves, roughly 1,5 KB each, flat around the
+clock including the middle of the night.
+
+**The loop, in `useRealtimeSync`.** `connect()` opened with `teardown()`,
+and `teardown()` calls `supabase.removeChannel(channel)` — which makes the
+channel being discarded report `CLOSED` to the callback registered for the
+PREVIOUS attempt. That callback then scheduled another `connect()`, which
+tore down again, which reported `CLOSED` again. It fed itself. And because
+`attempt = 0` ran on every successful join, the backoff never climbed off its
+1000 ms floor, so the cycle sat at exactly one refetch per second for ever —
+each one calling `onSync()`, which invalidates the query the channel feeds.
+
+Proof it could not be real data: the looping chat thread holds four messages
+that never changed, and the whole project's Realtime message count for the
+month is 5.412. Nothing was being delivered. The refetches came from the
+rejoins.
+
+**Measured on an idle iPhone 15 Pro simulator, signed in, sitting on Home:**
+
+| | requests/minute |
+|---|---|
+| before | **177** (`calls` 59 + `notifications` 118 — two mounts of the bell) |
+| after | **0** |
+
+A cold start still makes its ~135 real requests, and opening Lộ trình still
+fetches its 19 — the app asks for what a screen needs and nothing else.
+
+**Two changes:**
+
+1. `useRealtimeSync` tags each attempt with a generation and ignores the
+   status callbacks of superseded channels, so the ghost `CLOSED` can no
+   longer schedule anything. The backoff now resets only after the channel
+   has held for 30 seconds, so a channel that joins and immediately drops is
+   treated as the failure it is. `onSync()` fires on a REJOIN only — the
+   first join happens while the query is already fetching on mount.
+2. `useIncomingCall` lost its `refetchInterval: 5000`. It is mounted in the
+   root layout for every signed-in customer on every screen, so that was
+   17.280 requests a day per phone for a feature that is not released
+   (`CUSTOMER_CALLS_ENABLED` is false; only a specialist can start a call).
+   The `calls` Realtime channel still rings the phone.
+
+**Not verified:** an actual incoming call after removing the poll. The ring
+now rests on Realtime plus the VoIP push, both of which were already the
+primary path. And the fix reaches nobody until a new build ships — the phones
+in the field keep burning until then.
+
+## 2026-11-03 — Bỏ nút "Xem trên Youtube" ở màn ngày tập
+
+The embed stays exactly as it is — the owner asked only for the button to go
+(2026-11-03). It was the one thing on this screen that actually left the app:
+a full-width primary `Pressable` calling `WebBrowser.openBrowserAsync`, under
+a frame that already plays the lesson inline.
+
+Gone with it: `openVideoBrowser`, and the copy that pointed at it. The tip no
+longer tells people to watch on YouTube and cast to a TV, and
+`watchToCompleteHint` no longer names a button that does not exist. Four
+translation keys nothing reads any more were deleted in all three locales —
+`watchVideo`, `openVideoTitle`, `openVideoMessage`, `videoUnavailableTitle`.
+
+The fallback link for an embed that genuinely cannot play is untouched: it is
+the only way to watch when the player errors.
+
+Checked on the simulator: the frame plays in place (0:01 / 32:41, YouTube's
+own controls), and the day flipped to "Đã hoàn thành" **after one second of
+playback** — the completion rule is still `state === 'playing'`, unchanged
+and still worth revisiting.
+
+## 2026-11-03 — Ảnh cộng đồng: một đề xuất bị rút lại, một trần cho video
+
+Two image-bandwidth ideas were raised; measuring them killed the first.
+
+**Serving the 480px thumbnail in the feed — NOT done.** The feed draws a
+single image FULL WIDTH (`MediaGrid`, `uris.length === 1`), which is ~390pt,
+i.e. 1170 real pixels on a 3x phone. The 1280px `feed` rendition is the
+right size for that; 480px would be visibly soft. The 480px `thumbnail` is
+right for grid cells — and `app/community/profile/[userId].tsx` already uses
+it there. The main feed's grid path, meanwhile, is never reached: of 11
+posts, 4 carry one image and **none carry two or more**. The change would
+have blurred the feed and saved nothing.
+
+Worth recording because the measurements behind it are the useful part:
+community images are **99,7% cache HITs** (355 of 356 requests in 24h), and
+Supabase meters cached egress against its own separate 5 GB, which sits at
+41%. They barely touch the uncached meter that reached 99%.
+
+**A ceiling on video uploads — done.** `uploadCommunityImage` compresses
+stills into three renditions but uploads video exactly as it came off the
+phone; one clip landed at 23 MB on 2026-09-11 and is 59% of everything in
+`community-images`. Real compression needs a native module this app does not
+carry, and `videoQuality` in expo-image-picker is documented for RECORDED
+video, so it cannot be relied on for a clip picked from the library. Both
+community pickers now refuse a video over **12 MB** and say why.

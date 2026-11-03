@@ -144,8 +144,13 @@ export default function PostDetailScreen() {
     if (!permission.granted) return Alert.alert(t('photoPermissionTitle'), t('photoPermissionMessage'));
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'] as ImagePicker.MediaType[], quality: 0.75 });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setImageMimeType(result.assets[0].mimeType ?? null);
+      const asset = result.assets[0];
+      // Same ceiling as the composer — see MAX_VIDEO_BYTES there.
+      if ((asset.mimeType?.startsWith('video/') ?? false) && (asset.fileSize ?? 0) > 12 * 1024 * 1024) {
+        return Alert.alert(t('videoTooLargeTitle'), t('videoTooLargeMessage', { mb: '12' }));
+      }
+      setImageUri(asset.uri);
+      setImageMimeType(asset.mimeType ?? null);
     }
   }
   function closeCommentMenu() { setCommentMenu(null); }

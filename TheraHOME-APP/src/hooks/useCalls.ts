@@ -408,7 +408,14 @@ export function useIncomingCall({ enabled, userId, isStaff }: {
       return call && call.callerId !== userId ? call : null;
     },
     enabled: armed,
-    refetchInterval: armed ? 5000 : false,
+    // No polling. This hook is mounted in the root layout for every signed-in
+    // customer, on every screen, so a 5-second refetch was 17,280 requests a
+    // day per phone for a feature the owner has not released yet
+    // (CUSTOMER_CALLS_ENABLED is false; only a specialist can start a call).
+    // It was the second-largest source of traffic in the project, behind the
+    // realtime reconnect loop that fed it — see useRealtimeSync, fixed the
+    // same day. The `calls` channel above is what rings the phone, and with
+    // that loop gone it is reliable enough to stand alone (2026-11-03).
   });
 }
 

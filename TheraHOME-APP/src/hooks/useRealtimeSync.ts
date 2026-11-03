@@ -30,6 +30,10 @@ import { supabase } from '@/lib/supabase';
  * key on 2026-09-07 (a `chat_messages` channel reaches SUBSCRIBED), so this
  * is purely about the client side surviving a real phone's lifecycle.
  */
+/** How long a channel has to stay joined before its join counts as proof
+ * that the connection is healthy. See `attempt` below. */
+const STEADY_MS = 30000;
+
 export function useRealtimeSync({
   channelName,
   bind,
@@ -61,12 +65,21 @@ export function useRealtimeSync({
     let cancelled = false;
     let channel: RealtimeChannel | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let steadyTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
+    // Which connect() attempt owns the channel right now. A status callback
+    // belonging to an older one is a ghost and must not act — see connect().
+    let generation = 0;
+    let joinedOnce = false;
 
     function teardown() {
       if (retryTimer) {
         clearTimeout(retryTimer);
         retryTimer = null;
+      }
+      if (steadyTimer) {
+        clearTimeout(steadyTimer);
+        steadyTimer = null;
       }
       if (channel) {
         // Fire and forget: the channel is being discarded either way, and a
@@ -78,15 +91,35 @@ export function useRealtimeSync({
 
     function connect() {
       if (cancelled) return;
+      // Claimed BEFORE teardown, because teardown is what produces the ghost
+      // this guards against: `removeChannel` makes the channel being
+      // discarded report CLOSED, and that report arrives at the callback
+      // registered below for the PREVIOUS attempt. Untagged, that dead
+      // channel schedules a reconnect, which tears down again, which reports
+      // CLOSED again — a cycle that feeds itself and never stops.
+      //
+      // It ran at exactly one refetch per second on every screen that uses
+      // this hook, around the clock, because `attempt` was also reset on each
+      // successful join so the backoff never left its 1000ms floor. One idle
+      // phone was making ~180 requests a minute and the project reached 99%
+      // of its monthly egress in twenty days (measured 2026-11-03).
+      const mine = ++generation;
       teardown();
       channel = bindRef.current(supabase.channel(`${channelName}_${Math.random().toString(36).slice(2)}`));
       channel.subscribe((status) => {
-        if (cancelled) return;
+        if (cancelled || mine !== generation) return;
         if (status === 'SUBSCRIBED') {
-          attempt = 0;
           onConnectionChangeRef.current?.(true);
-          // Covers anything written while this channel was down.
-          onSyncRef.current();
+          // Only a REJOIN has a gap behind it. The first join happens while
+          // the query it feeds is already fetching on mount, so syncing there
+          // only asks for the same rows twice.
+          if (joinedOnce) onSyncRef.current();
+          joinedOnce = true;
+          // The backoff resets once the channel has PROVED it can hold, not
+          // the instant it joins: a channel that joins and immediately drops
+          // is exactly the case the backoff exists for.
+          if (steadyTimer) clearTimeout(steadyTimer);
+          steadyTimer = setTimeout(() => { attempt = 0; }, STEADY_MS);
           return;
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
