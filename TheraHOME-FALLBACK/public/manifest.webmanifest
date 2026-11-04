@@ -1,0 +1,17 @@
+{
+  "name": "TheraHOME · Lộ trình trị liệu",
+  "short_name": "TheraHOME",
+  "description": "Toàn bộ bài tập theo ngày của lộ trình TheraNECK+, xem được cả khi ứng dụng gặp sự cố.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF3FB",
+  "theme_color": "#007FD9",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -8,6 +8,28 @@ Workers + D1. Mục đích: **khi Supabase bị khoá vì vượt egress, khách
 - D1: `therahome-duphong` (vùng APAC)
 - Cron đồng bộ: worker `therahome-duphong-cron`, 02:00 giờ VN mỗi ngày
 
+## Cài như ứng dụng (PWA)
+
+Hầu như không ai mở trang này trên máy tính, nên nó được làm cho điện thoại
+trước: giao diện lấy nguyên token từ `TheraHOME-APP/src/theme` (xanh #007FD9,
+nền #EEF3FB, thẻ trắng bóng mềm KHÔNG viền cứng, font Inter), có dark mode
+theo máy, và cài được lên màn hình chính.
+
+- `public/manifest.webmanifest` — `display: standalone`, khoá dọc, icon lấy từ
+  `TheraHOME-APP/assets/icon.png`
+- `src/app/goi-y-cai-dat.tsx` — mời cài. Android/Chrome dùng
+  `beforeinstallprompt` gọi hộp thoại thật; iOS Safari không có API nào nên chỉ
+  hướng dẫn bấm Chia sẻ → Thêm vào MH chính. Đóng một lần thì nhớ, không hỏi lại.
+- `public/sw.js` — service worker, mạng trước / cache sau. Trang đã mở một lần
+  thì lần sau **mất mạng vẫn xem được chữ**. Next prefetch các link trong tầm
+  nhìn nên lướt qua danh sách là đã lưu sẵn kha khá ngày.
+- Font nạp bằng `next/font`, tự host lúc build — không gọi fonts.googleapis.com
+  lúc chạy, nên offline vẫn đúng chữ.
+
+**Video thì không cache được** (cross-origin, opaque, rất nặng). Mất mạng thì
+chữ còn, video không — trang nói thẳng điều đó dưới khung video thay vì để
+người dùng tự đoán.
+
 ## Vì sao nó độc lập được với Supabase
 
 Ba thứ đã tách hẳn:

@@ -1,22 +1,81 @@
 @import "tailwindcss";
 
-/* Màu lấy theo cảm giác của app: xanh teal trị liệu, nền sáng dịu. Trang này
-   người đau cổ mở trên điện thoại nên chữ to, tương phản cao, không hiệu ứng. */
+/* Màu lấy nguyên từ src/theme/colors.ts của app Expo (vốn port từ Claude
+   Design tokens), để bản web trông đúng là TheraHOME chứ không phải một
+   trang khác. Primary là xanh dương #007FD9, KHÔNG phải teal. (04/11/2026) */
 @theme {
-  --color-nen: #f6f8f8;
-  --color-muc: #10302f;
-  --color-muc-nhat: #5b7574;
-  --color-thuong: #0f766e;
-  --color-thuong-nhat: #ccfbf1;
-  --color-vien: #dde5e4;
+  --color-primary: #007fd9;
+  --color-primary-dark: #0066ad;
+  --color-primary-tint10: #e5f2fc;
+
+  --color-bg-app: #eef3fb;
+  --color-bg-card: #ffffff;
+  --color-bg-card-alt: #f6f8fc;
+
+  --color-text-primary: #16213a;
+  --color-text-secondary: #6b7480;
+  --color-text-muted: #a0a8b4;
+
+  --color-accent-orange: #ffb648;
+  --color-accent-orange-tint: #fff1dc;
+  --color-success: #34c759;
+
+  --color-border-light: #e7ecf3;
+  --color-divider: #eef1f6;
+
+  /* radius.ts: sm 8, md 14, lg 20, xl 28 */
+  --radius-card: 20px;
+  --radius-chip: 999px;
+
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* App có dark mode (darkColors trong cùng file). Theo máy của người dùng. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-primary: #3aa1ff;
+    --color-primary-dark: #1e86e8;
+    --color-primary-tint10: #17273a;
+    --color-bg-app: #10151f;
+    --color-bg-card: #1b2230;
+    --color-bg-card-alt: #232b3b;
+    --color-text-primary: #f3f5f8;
+    --color-text-secondary: #a6afbf;
+    --color-text-muted: #6c7686;
+    --color-accent-orange-tint: #332310;
+    --color-border-light: #2a3242;
+    --color-divider: #262e3d;
+  }
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--color-bg-app);
 }
 
 body {
-  background: var(--color-nen);
-  color: var(--color-muc);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--color-bg-app);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  /* Chạy ở chế độ standalone (đã cài lên màn hình chính) thì không có thanh
+     địa chỉ để kéo, nên chặn kéo-để-tải-lại cho giống app thật. */
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
 }
+
+/* shadows.card trong radius.ts: bóng mềm khuếch tán, KHÔNG viền cứng trên
+   thẻ cấp cao nhất — quy tắc ghi thẳng trong theme của app. */
+.the {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-card);
+  box-shadow: 0 4px 16px rgb(22 33 58 / 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .the {
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+  }
+}
+
+/* Vùng an toàn của iPhone khi chạy toàn màn hình. */
+.an-toan-tren { padding-top: env(safe-area-inset-top); }
+.an-toan-duoi { padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
