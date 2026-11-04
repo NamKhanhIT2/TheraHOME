@@ -75,8 +75,8 @@ export function GoiYCaiDat() {
   }
 
   return (
-    <div className="the mt-4 flex items-start gap-3 p-4">
-      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-tint10 text-primary">
+    <div className="kinh mt-5 flex items-start gap-3 p-4">
+      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-inset text-tick">
         <svg className="size-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <path
             d="M10 3v9m0 0 3.2-3.2M10 12 6.8 8.8M4 14v1.5A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5V14"
@@ -90,13 +90,12 @@ export function GoiYCaiDat() {
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold">Cài lên màn hình chính</p>
         {laIOS ? (
-          <p className="mt-1 text-[14px] leading-relaxed text-text-secondary">
-            Bấm nút Chia sẻ ở thanh dưới, chọn <strong>Thêm vào MH chính</strong>. Mở ra là
-            toàn màn hình như ứng dụng, xem lại được cả khi mất mạng.
+          <p className="mt-1 text-[14px] leading-relaxed text-muted">
+            Bấm nút Chia sẻ ở thanh dưới, chọn <strong>Thêm vào MH chính</strong>. Mở ra là toàn màn hình, xem lại được cả khi mất mạng.
           </p>
         ) : (
-          <p className="mt-1 text-[14px] leading-relaxed text-text-secondary">
-            Mở toàn màn hình như ứng dụng, xem lại được cả khi mất mạng.
+          <p className="mt-1 text-[14px] leading-relaxed text-muted">
+            Mở toàn màn hình, xem lại được cả khi mất mạng.
           </p>
         )}
         <div className="mt-3 flex gap-2">
@@ -107,7 +106,7 @@ export function GoiYCaiDat() {
                 void suKien.prompt();
                 setVuaDong(true);
               }}
-              className="rounded-chip bg-primary px-4 py-2 text-[14px] font-semibold text-white active:opacity-80"
+              className="rounded-full bg-tick px-4 py-2 text-[14px] font-semibold text-white active:opacity-80"
             >
               Cài đặt
             </button>
@@ -115,7 +114,7 @@ export function GoiYCaiDat() {
           <button
             type="button"
             onClick={dong}
-            className="rounded-chip px-3 py-2 text-[14px] font-medium text-text-secondary active:opacity-70"
+            className="rounded-full px-3 py-2 text-[14px] font-medium text-muted active:opacity-70"
           >
             Để sau
           </button>

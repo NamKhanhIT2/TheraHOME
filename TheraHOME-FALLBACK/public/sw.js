@@ -8,8 +8,10 @@
  * Video YouTube thì KHÔNG cache được (cross-origin, opaque, rất nặng) — mất
  * mạng thì chữ vẫn còn, video thì không. Nói thẳng điều đó trên giao diện.
  */
-const PHIEN_BAN = 'therahome-duphong-v1';
-const VO_APP = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
+// Đổi tên mỗi lần giao diện thay đổi hẳn: activate xoá mọi cache khác tên,
+// nên máy từng mở bản cũ không bị kẹt bản cũ khi offline. (04/11/2026)
+const PHIEN_BAN = 'therahome-duphong-v2';
+const VO_APP = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/hero.webp'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(PHIEN_BAN).then((c) => c.addAll(VO_APP)).then(() => self.skipWaiting()));

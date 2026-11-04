@@ -24,41 +24,52 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
   const ten = ngay.title?.replace(/^\s*Ngày\s*\d+\s*:?\s*/i, "").trim();
 
   return (
-    <div>
-      <Link
-        href="/"
-        className="-ml-1 mt-1 inline-flex items-center gap-1 py-2 text-[15px] font-medium text-primary active:opacity-70"
-      >
-        <svg className="size-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path
-            d="M12.5 4.5 7 10l5.5 5.5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        Lộ trình
-      </Link>
+    <div className="troi-lotrinh min-h-dvh">
+      <div className="mx-auto max-w-xl px-5">
+        {/* BackBar kiểu app: mũi tên + nhãn, trên nền kính. */}
+        <div className="an-toan-tren flex items-center gap-2 pt-3">
+          <Link
+            href="/"
+            aria-label="Quay lại lộ trình"
+            className="noi flex size-10 items-center justify-center rounded-full active:opacity-70"
+          >
+            <svg className="size-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M12.5 4.5 7 10l5.5 5.5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Link>
+          <span className="text-[17px] font-semibold">Ngày {ngay.day_number}</span>
+        </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <span className="rounded-chip bg-primary px-3 py-1.5 text-[12px] font-semibold text-white">
-          Ngày {ngay.day_number}
-        </span>
+        <h1 className="mt-5 text-[26px] font-bold leading-tight tracking-tight">
+          {ten || `Ngày ${ngay.day_number}`}
+        </h1>
+
         {gd && (
-          <span className="rounded-chip bg-accent-orange-tint px-3 py-1.5 text-[12px] font-semibold text-text-primary">
-            {gd.name.split("·")[0].trim()}
-          </span>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="noi rounded-full px-3 py-1.5 text-[13px] font-medium text-soft">
+              {gd.name.split("·")[0].trim()}
+            </span>
+            <span className="noi flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-soft">
+              <svg className="size-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M8 5.8v3l1.8 1.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              {/* App cũng in cứng 10 phút cho mọi ngày
+                  (SESSION_MINUTES trong app/(tabs)/roadmap.tsx) — CSDL không
+                  có cột thời lượng. Giữ đúng con số app đang hiện. */}
+              10 phút
+            </span>
+          </div>
         )}
-      </div>
 
-      <h1 className="mt-3 text-[24px] font-bold leading-tight tracking-tight">
-        {ten || `Ngày ${ngay.day_number}`}
-      </h1>
-
-      {ma ? (
-        <>
-          <div className="the mt-4 overflow-hidden bg-black p-0">
+        {ma ? (
+          <div className="noi mt-5 overflow-hidden rounded-[22px]">
             {/* Nhúng thẳng YouTube: video vốn đã ở YouTube chứ không phải
                 Supabase Storage, nên phần nặng nhất của buổi tập không phụ
                 thuộc vào thứ đang hỏng. */}
@@ -70,47 +81,44 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
               allowFullScreen
             />
           </div>
-          {/* Service worker lưu được chữ, không lưu được video (cross-origin,
-              opaque, rất nặng). Nói thẳng thay vì để người dùng tự đoán. */}
-          <p className="mt-2 text-[13px] text-text-muted">Video cần mạng để phát.</p>
-        </>
-      ) : (
-        <p className="the mt-4 p-4 text-[15px] leading-relaxed text-text-secondary">
-          Ngày này chưa có link video trong bản sao.
-        </p>
-      )}
-
-      {ngay.support_tools_url && (
-        <a
-          href={ngay.support_tools_url}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 block rounded-chip bg-primary px-5 py-3.5 text-center text-[16px] font-semibold text-white active:opacity-80"
-        >
-          {ngay.support_tools_label ?? "Nội dung thêm"}
-        </a>
-      )}
-
-      <nav className="mt-7 grid grid-cols-2 gap-3">
-        {truoc ? (
-          <Link href={`/ngay/${truoc.day_number}`} className="the p-4 active:opacity-70">
-            <span className="block text-[12px] font-medium text-text-muted">Trước</span>
-            <span className="mt-0.5 block truncate text-[15px] font-semibold">
-              Ngày {truoc.day_number}
-            </span>
-          </Link>
         ) : (
-          <span />
+          <p className="kinh mt-5 p-4 text-[15px] leading-relaxed text-muted">
+            Ngày này chưa có video.
+          </p>
         )}
-        {sau && (
-          <Link href={`/ngay/${sau.day_number}`} className="the p-4 text-right active:opacity-70">
-            <span className="block text-[12px] font-medium text-text-muted">Tiếp theo</span>
-            <span className="mt-0.5 block truncate text-[15px] font-semibold">
-              Ngày {sau.day_number}
-            </span>
-          </Link>
+
+        {ngay.support_tools_url && (
+          <a
+            href={ngay.support_tools_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 block rounded-full bg-focus px-5 py-4 text-center text-[16px] font-semibold text-white active:opacity-80"
+          >
+            {ngay.support_tools_label ?? "Nội dung thêm"}
+          </a>
         )}
-      </nav>
+
+        <nav className="mt-7 grid grid-cols-2 gap-3">
+          {truoc ? (
+            <Link href={`/ngay/${truoc.day_number}`} className="kinh p-4 active:opacity-70">
+              <span className="block text-[12px] font-medium text-faint">Trước</span>
+              <span className="mt-0.5 block truncate text-[15px] font-semibold">
+                Ngày {truoc.day_number}
+              </span>
+            </Link>
+          ) : (
+            <span />
+          )}
+          {sau && (
+            <Link href={`/ngay/${sau.day_number}`} className="kinh p-4 text-right active:opacity-70">
+              <span className="block text-[12px] font-medium text-faint">Tiếp theo</span>
+              <span className="mt-0.5 block truncate text-[15px] font-semibold">
+                Ngày {sau.day_number}
+              </span>
+            </Link>
+          )}
+        </nav>
+      </div>
     </div>
   );
 }

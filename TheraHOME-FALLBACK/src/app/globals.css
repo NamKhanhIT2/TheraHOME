@@ -1,81 +1,88 @@
 @import "tailwindcss";
 
-/* Màu lấy nguyên từ src/theme/colors.ts của app Expo (vốn port từ Claude
-   Design tokens), để bản web trông đúng là TheraHOME chứ không phải một
-   trang khác. Primary là xanh dương #007FD9, KHÔNG phải teal. (04/11/2026) */
+/* Màu lấy nguyên từ `homeGlassColors` trong TheraHOME-APP/src/theme/colors.ts.
+ *
+ * Đây KHÔNG phải lightColors/darkColors. App đọc trên nền ảnh tối phủ scrim
+ * gần đen, nên nó có bảng riêng không lật theo cài đặt sáng/tối của máy —
+ * chỉ có đúng một mặt. Lần trước tôi lấy nhầm lightColors nên ra một trang
+ * sáng chẳng giống app chỗ nào. (04/11/2026)
+ */
 @theme {
-  --color-primary: #007fd9;
-  --color-primary-dark: #0066ad;
-  --color-primary-tint10: #e5f2fc;
+  /* Nền màn Lộ trình: roadmapSky[2] */
+  --color-ground: #080d12;
+  --color-ground-2: #10171e;
+  --color-ground-1: #1a222a;
 
-  --color-bg-app: #eef3fb;
-  --color-bg-card: #ffffff;
-  --color-bg-card-alt: #f6f8fc;
+  /* surface / surfaceRaised / surfaceInset / surfaceAction */
+  --color-surface: rgba(20, 40, 56, 0.38);
+  --color-raised: rgba(255, 255, 255, 0.06);
+  --color-inset: rgba(255, 255, 255, 0.12);
+  --color-action: rgba(255, 255, 255, 0.16);
 
-  --color-text-primary: #16213a;
-  --color-text-secondary: #6b7480;
-  --color-text-muted: #a0a8b4;
+  --color-hairline: rgba(255, 255, 255, 0.12);
 
-  --color-accent-orange: #ffb648;
-  --color-accent-orange-tint: #fff1dc;
-  --color-success: #34c759;
+  --color-text: #ffffff;
+  --color-soft: rgba(255, 255, 255, 0.85);
+  --color-muted: rgba(255, 255, 255, 0.65);
+  --color-faint: rgba(255, 255, 255, 0.55);
 
-  --color-border-light: #e7ecf3;
-  --color-divider: #eef1f6;
+  /* focus = đỏ "hôm nay"/CTA chính; tick = xanh đã hoàn thành */
+  --color-focus: #e5484d;
+  --color-tick: #2f8fff;
 
-  /* radius.ts: sm 8, md 14, lg 20, xl 28 */
-  --radius-card: 20px;
-  --radius-chip: 999px;
-
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Thanh tab nổi */
+  --color-nav: #111920;
+  --color-nav-ground: #080e14;
+  --color-nav-icon: #7a8c9e;
+  --color-nav-active: #55bdf5;
 }
 
-/* App có dark mode (darkColors trong cùng file). Theo máy của người dùng. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-primary: #3aa1ff;
-    --color-primary-dark: #1e86e8;
-    --color-primary-tint10: #17273a;
-    --color-bg-app: #10151f;
-    --color-bg-card: #1b2230;
-    --color-bg-card-alt: #232b3b;
-    --color-text-primary: #f3f5f8;
-    --color-text-secondary: #a6afbf;
-    --color-text-muted: #6c7686;
-    --color-accent-orange-tint: #332310;
-    --color-border-light: #2a3242;
-    --color-divider: #262e3d;
-  }
-}
+/* KHÔNG khai báo --font-sans trong @theme: Tailwind 4 giải giá trị của @theme
+   lúc build, mà --font-inter thì next/font mới đặt ra lúc chạy, nên nó bỏ
+   luôn biến và cả trang rơi về Times. Đặt thẳng ở đây thì không qua Tailwind.
+   (04/11/2026) */
 
-html {
-  -webkit-text-size-adjust: 100%;
-  background: var(--color-bg-app);
+html,
+body {
+  background: var(--color-ground);
+  color: var(--color-text);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
-  background: var(--color-bg-app);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  /* Chạy ở chế độ standalone (đã cài lên màn hình chính) thì không có thanh
-     địa chỉ để kéo, nên chặn kéo-để-tải-lại cho giống app thật. */
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* shadows.card trong radius.ts: bóng mềm khuếch tán, KHÔNG viền cứng trên
-   thẻ cấp cao nhất — quy tắc ghi thẳng trong theme của app. */
-.the {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-card);
-  box-shadow: 0 4px 16px rgb(22 33 58 / 0.06);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .the {
-    box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
-  }
+/* Thẻ kính: nền tối trong, một đường tóc sáng viền quanh. */
+.kinh {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: 22px;
 }
 
-/* Vùng an toàn của iPhone khi chạy toàn màn hình. */
+/* Chip/nút nổi nằm TRÊN ảnh. */
+.noi {
+  background: var(--color-raised);
+  border: 1px solid var(--color-hairline);
+}
+
+/* Trời của màn Lộ trình: roadmapSky + roadmapSkyStops [0, 0.42, 1] */
+.troi-lotrinh {
+  background: linear-gradient(180deg, #1a222a 0%, #10171e 42%, #080d12 100%);
+}
+
+/* Trời của Home: 5 chặng, homeGlassColors.sky + skyStops */
+.troi-home {
+  background: linear-gradient(
+    180deg,
+    #2f86ae 0%,
+    #1d5f82 32%,
+    #123f58 58%,
+    #0a1f2d 80%,
+    #060d14 100%
+  );
+}
+
 .an-toan-tren { padding-top: env(safe-area-inset-top); }
-.an-toan-duoi { padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
+.an-toan-duoi { padding-bottom: env(safe-area-inset-bottom); }

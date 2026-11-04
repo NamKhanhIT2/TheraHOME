@@ -11,16 +11,28 @@ Workers + D1. Mục đích: **khi Supabase bị khoá vì vượt egress, khách
 ## Cài như ứng dụng (PWA)
 
 Hầu như không ai mở trang này trên máy tính, nên nó được làm cho điện thoại
-trước: giao diện lấy nguyên token từ `TheraHOME-APP/src/theme` (xanh #007FD9,
-nền #EEF3FB, thẻ trắng bóng mềm KHÔNG viền cứng, font Inter), có dark mode
-theo máy, và cài được lên màn hình chính.
+trước và trông phải giống app.
+
+Màu lấy từ **`homeGlassColors`** trong `TheraHOME-APP/src/theme/colors.ts`,
+KHÔNG phải `lightColors`/`darkColors`. App đọc trên nền ảnh tối phủ scrim gần
+đen nên nó có bảng riêng không lật theo cài đặt sáng/tối của máy — chỉ có đúng
+một mặt. Nền Lộ trình `#080D12`, thẻ kính `rgba(20,40,56,0.38)` + đường tóc
+`rgba(255,255,255,0.12)`, đỏ CTA `#E5484D`, xanh hoàn thành `#2F8FFF`, thanh
+tab nổi `#111920`. Ảnh hero là `assets/home-hero.webp` của app.
+
+Những gì app có mà bản này không làm, vì đều cần đăng nhập: vòng tròn Mức đau
+/ Giai đoạn / Luyện tập / Uống nước, lịch tiến độ, tab Cửa hàng và Cộng đồng.
+Thanh tab chỉ bày hai chỗ bấm được thật (Lộ trình, Gọi hỗ trợ) thay vì bày đủ
+năm rồi ba cái không làm gì.
 
 - `public/manifest.webmanifest` — `display: standalone`, khoá dọc, icon lấy từ
   `TheraHOME-APP/assets/icon.png`
 - `src/app/goi-y-cai-dat.tsx` — mời cài. Android/Chrome dùng
   `beforeinstallprompt` gọi hộp thoại thật; iOS Safari không có API nào nên chỉ
   hướng dẫn bấm Chia sẻ → Thêm vào MH chính. Đóng một lần thì nhớ, không hỏi lại.
-- `public/sw.js` — service worker, mạng trước / cache sau. Trang đã mở một lần
+- `public/sw.js` — service worker, mạng trước / cache sau. Đổi `PHIEN_BAN`
+  mỗi lần giao diện thay đổi hẳn, nếu không máy từng mở bản cũ sẽ kẹt bản cũ
+  khi offline. Trang đã mở một lần
   thì lần sau **mất mạng vẫn xem được chữ**. Next prefetch các link trong tầm
   nhìn nên lướt qua danh sách là đã lưu sẵn kha khá ngày.
 - Font nạp bằng `next/font`, tự host lúc build — không gọi fonts.googleapis.com
