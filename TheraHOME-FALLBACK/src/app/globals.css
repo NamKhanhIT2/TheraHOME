@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Màu lấy theo cảm giác của app: xanh teal trị liệu, nền sáng dịu. Trang này
+   người đau cổ mở trên điện thoại nên chữ to, tương phản cao, không hiệu ứng. */
+@theme {
+  --color-nen: #f6f8f8;
+  --color-muc: #10302f;
+  --color-muc-nhat: #5b7574;
+  --color-thuong: #0f766e;
+  --color-thuong-nhat: #ccfbf1;
+  --color-vien: #dde5e4;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-nen);
+  color: var(--color-muc);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

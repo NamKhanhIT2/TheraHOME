@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "therahome-duphong",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+
+  // Giống CRM: Next chạy trên Node runtime nên `nodejs_compat` là bắt buộc.
+  // `global_fetch_strictly_public` theo hướng dẫn của @opennextjs/cloudflare.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // Vùng APAC cho gần người dùng Việt Nam. Đây là bản SAO CHỈ ĐỌC của nội dung
+  // lộ trình trong Supabase — không có dữ liệu cá nhân, không ghi từ web.
+  // Lý do tồn tại: khi Supabase bị khoá vì vượt egress, khách vẫn mở được bài
+  // tập. Đồng bộ một chiều bằng `npm run dong-bo` (04/11/2026).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "therahome-duphong",
+      "database_id": "3f806c35-910b-4e68-89db-9da51da71b35"
+    }
+  ]
+}

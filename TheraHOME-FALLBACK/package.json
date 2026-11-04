@@ -1,0 +1,42 @@
+{
+  "name": "therahome-duphong",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "lint": "eslint",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:dryrun": "opennextjs-cloudflare build && wrangler deploy --dry-run",
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "db:tao": "wrangler d1 execute therahome-duphong --remote --file db/schema.sql",
+    "db:tao-local": "wrangler d1 execute therahome-duphong --local --file db/schema.sql",
+    "dong-bo": "node --env-file=.env.local scripts/dong-bo.mjs",
+    "dong-bo:local": "node --env-file=.env.local scripts/dong-bo.mjs --local"
+  },
+  "dependencies": {
+    "next": "16.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.13",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.5",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5",
+    "wrangler": "^4.154.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261103.1": true
+  }
+}

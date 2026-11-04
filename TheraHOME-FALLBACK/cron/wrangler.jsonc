@@ -1,0 +1,34 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "therahome-duphong-cron",
+  "main": "dong-bo.js",
+  "compatibility_date": "2026-10-01",
+
+  // Worker riêng, chỉ để chạy theo lịch. Lý do không gộp vào app Next:
+  // @opennextjs/cloudflare tự sinh `.open-next/worker.js` và không chừa chỗ
+  // cho export `scheduled`, nên nhét cron vào đó là đi sửa file sinh tự động —
+  // hỏng im lặng ở lần build sau. (04/11/2026)
+  "triggers": {
+    // 19:00 UTC = 02:00 giờ Việt Nam, lúc không ai tập.
+    "crons": ["0 19 * * *"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "therahome-duphong",
+      "database_id": "3f806c35-910b-4e68-89db-9da51da71b35"
+    }
+  ],
+
+  "vars": {
+    "SUPABASE_URL": "https://nyjvtvmllwbyfokldgtj.supabase.co"
+  },
+
+  // Worker này không có handler `fetch`, chỉ có `scheduled`. Không mở URL
+  // công khai để khỏi có một địa chỉ trả lỗi vô nghĩa ra internet.
+  "workers_dev": false,
+  "preview_urls": false,
+
+  "observability": { "enabled": true }
+}
