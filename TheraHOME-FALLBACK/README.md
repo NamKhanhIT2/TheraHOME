@@ -22,8 +22,8 @@ tab nổi `#111920`. Ảnh hero là `assets/home-hero.webp` của app.
 
 Những gì app có mà bản này không làm, vì đều cần đăng nhập: vòng tròn Mức đau
 / Giai đoạn / Luyện tập / Uống nước, lịch tiến độ, tab Cửa hàng và Cộng đồng.
-Thanh tab chỉ bày hai chỗ bấm được thật (Lộ trình, Gọi hỗ trợ) thay vì bày đủ
-năm rồi ba cái không làm gì.
+Không có thanh tab: app có 5 tab, ở đây chỉ còn đúng một đích đến nên một
+thanh tab là thừa và trông giả. Số hỗ trợ nằm ở chân trang.
 
 - `public/manifest.webmanifest` — `display: standalone`, khoá dọc, icon lấy từ
   `TheraHOME-APP/assets/icon.png`

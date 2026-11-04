@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { layMotNgay, layCacNgay, laySanPham, layGiaiDoan, maYouTube } from "@/lib/noi-dung";
+import { ChanTrang } from "../../chan-trang";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
 
   return (
     <div className="troi-lotrinh min-h-dvh">
-      <div className="mx-auto max-w-xl px-5">
+      <div className="mx-auto w-full max-w-xl px-5">
         {/* BackBar kiểu app: mũi tên + nhãn, trên nền kính. */}
         <div className="an-toan-tren flex items-center gap-2 pt-3">
           <Link
@@ -46,12 +47,12 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
           <span className="text-[17px] font-semibold">Ngày {ngay.day_number}</span>
         </div>
 
-        <h1 className="mt-5 text-[26px] font-bold leading-tight tracking-tight">
+        <h1 className="mt-6 text-[26px] font-bold leading-tight tracking-tight">
           {ten || `Ngày ${ngay.day_number}`}
         </h1>
 
         {gd && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
             <span className="noi rounded-full px-3 py-1.5 text-[13px] font-medium text-soft">
               {gd.name.split("·")[0].trim()}
             </span>
@@ -69,7 +70,7 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
         )}
 
         {ma ? (
-          <div className="noi mt-5 overflow-hidden rounded-[22px]">
+          <div className="noi mt-6 overflow-hidden rounded-[22px] shadow-[0_10px_34px_rgba(0,0,0,0.45)]">
             {/* Nhúng thẳng YouTube: video vốn đã ở YouTube chứ không phải
                 Supabase Storage, nên phần nặng nhất của buổi tập không phụ
                 thuộc vào thứ đang hỏng. */}
@@ -87,6 +88,24 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
           </p>
         )}
 
+        {ma && (
+          <div className="noi mt-4 flex items-start gap-3 rounded-[18px] p-4">
+            <svg className="mt-0.5 size-5 shrink-0 text-faint" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M10 2.6a5 5 0 0 0-2.8 9.1v1.6h5.6v-1.6A5 5 0 0 0 10 2.6ZM8 16.2h4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {/* Nguyên văn chuỗi `videoTip` trong src/lib/i18n.ts của app. */}
+            <p className="text-[14px] leading-relaxed text-muted">
+              Mẹo nhỏ: Chọn chỗ yên tĩnh, đủ rộng để duỗi tay và xoay người thoải mái.
+            </p>
+          </div>
+        )}
+
         {ngay.support_tools_url && (
           <a
             href={ngay.support_tools_url}
@@ -100,7 +119,10 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
 
         <nav className="mt-7 grid grid-cols-2 gap-3">
           {truoc ? (
-            <Link href={`/ngay/${truoc.day_number}`} className="kinh p-4 active:opacity-70">
+            <Link
+              href={`/ngay/${truoc.day_number}`}
+              className="kinh p-4 transition-colors active:bg-white/[0.07]"
+            >
               <span className="block text-[12px] font-medium text-faint">Trước</span>
               <span className="mt-0.5 block truncate text-[15px] font-semibold">
                 Ngày {truoc.day_number}
@@ -110,7 +132,10 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
             <span />
           )}
           {sau && (
-            <Link href={`/ngay/${sau.day_number}`} className="kinh p-4 text-right active:opacity-70">
+            <Link
+              href={`/ngay/${sau.day_number}`}
+              className="kinh p-4 text-right transition-colors active:bg-white/[0.07]"
+            >
               <span className="block text-[12px] font-medium text-faint">Tiếp theo</span>
               <span className="mt-0.5 block truncate text-[15px] font-semibold">
                 Ngày {sau.day_number}
@@ -118,7 +143,16 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
             </Link>
           )}
         </nav>
+
+        <Link
+          href="/"
+          className="mt-4 block rounded-full border border-white/10 py-3.5 text-center text-[15px] font-medium text-muted active:bg-white/[0.06]"
+        >
+          Xem tất cả {tatCa.length} ngày
+        </Link>
       </div>
+
+      <ChanTrang />
     </div>
   );
 }

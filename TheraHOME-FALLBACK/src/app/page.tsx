@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { laySanPham, layGiaiDoan, layCacNgay } from "@/lib/noi-dung";
 import { GoiYCaiDat } from "./goi-y-cai-dat";
+import { ChanTrang } from "./chan-trang";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ export default async function TrangChu() {
             </p>
             <Link
               href="/ngay/1"
-              className="noi mt-6 inline-flex items-center gap-2 rounded-full bg-action px-7 py-3.5 text-[16px] font-semibold text-text active:opacity-80"
+              className="mt-7 inline-flex items-center gap-2.5 rounded-full border border-white/25 bg-white/20 px-8 py-4 text-[16px] font-semibold text-text shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-sm active:opacity-80"
             >
               <svg className="size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M4.5 3.2 12 8l-7.5 4.8z" fill="currentColor" />
@@ -90,8 +91,8 @@ export default async function TrangChu() {
       </header>
 
       {/* Phần dưới là màn Lộ trình: trời riêng của nó, tối hơn. */}
-      <div className="troi-lotrinh min-h-dvh">
-        <div className="mx-auto max-w-xl px-5 pt-7">
+      <div className="troi-noi-tiep">
+        <div className="mx-auto max-w-xl px-5 pt-8">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-[28px] font-bold tracking-tight">Lộ trình</h1>
             <span className="kinh flex items-center gap-2 rounded-full px-3.5 py-2 text-[14px] font-semibold">
@@ -99,10 +100,13 @@ export default async function TrangChu() {
               {tenNganSP}
             </span>
           </div>
+          <p className="mt-1.5 text-[14px] text-faint">
+            {giaiDoan.length} giai đoạn · {cacNgay.length} buổi tập
+          </p>
 
           <GoiYCaiDat />
 
-          <div className="mt-6 space-y-7">
+          <div className="mt-7 space-y-8">
             {giaiDoan.map((gd) => {
               const ngayCuaGd = cacNgay.filter(
                 (n) => n.day_number >= gd.day_start && n.day_number <= gd.day_end,
@@ -123,13 +127,13 @@ export default async function TrangChu() {
                       <li key={n.day_number}>
                         <Link
                           href={`/ngay/${n.day_number}`}
-                          className="kinh flex items-center gap-4 p-3.5 active:opacity-70"
+                          className="kinh flex items-center gap-4 p-4 transition-colors active:bg-white/[0.07]"
                         >
-                          <span className="flex size-12 shrink-0 flex-col items-center justify-center rounded-2xl bg-inset">
-                            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-faint">
+                          <span className="flex size-[52px] shrink-0 flex-col items-center justify-center rounded-2xl bg-inset">
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-faint">
                               Ngày
                             </span>
-                            <span className="text-[18px] font-semibold leading-none text-text">
+                            <span className="mt-0.5 text-[19px] font-semibold leading-none text-text">
                               {n.day_number}
                             </span>
                           </span>
@@ -158,6 +162,8 @@ export default async function TrangChu() {
               );
             })}
           </div>
+
+          <ChanTrang />
         </div>
       </div>
     </div>

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { DangKySW } from "./dang-ky-sw";
-import { ThanhTab } from "./thanh-tab";
 import "./globals.css";
 
 // next/font tự host lúc build: không gọi fonts.googleapis.com khi chạy, nên
@@ -39,9 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi" className={inter.variable}>
       <body className="min-h-dvh antialiased">
         <DangKySW />
-        {/* pb-28 chừa chỗ cho thanh tab nổi, để nội dung cuối không bị che. */}
-        <div className="pb-28">{children}</div>
-        <ThanhTab />
+        {children}
       </body>
     </html>
   );

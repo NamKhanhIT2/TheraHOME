@@ -72,6 +72,13 @@ body {
   background: linear-gradient(180deg, #1a222a 0%, #10171e 42%, #080d12 100%);
 }
 
+/* Khi phần Lộ trình nối ngay dưới hero: bắt đầu đúng bằng màu đáy hero
+   (#060D14) rồi mới về nền Lộ trình, nếu không sẽ thấy một đường gờ vì trời
+   Lộ trình (#1A222A) sáng hơn đáy hero. */
+.troi-noi-tiep {
+  background: linear-gradient(180deg, #060d14 0%, #0d141b 18%, #080d12 100%);
+}
+
 /* Trời của Home: 5 chặng, homeGlassColors.sky + skyStops */
 .troi-home {
   background: linear-gradient(
