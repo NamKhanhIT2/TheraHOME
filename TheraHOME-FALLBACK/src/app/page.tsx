@@ -34,9 +34,11 @@ export default async function TrangChu() {
   // phần thương hiệu, viết hoa, giãn chữ.
   const tenNganSP = sanPham.name.split("·").pop()?.trim() ?? sanPham.name;
 
-  // `products.total_days` trong Supabase đang là 14, nhưng ba giai đoạn phủ
-  // tới ngày 28 và có đủ 28 buổi tập. Lấy theo số ngày thật, nếu không đầu
-  // trang in "NGÀY 14" còn ngay bên dưới lại ghi "28 buổi tập". (04/11/2026)
+  // Lộ trình mở là 14 ngày (giai đoạn 1 và 2). Giai đoạn 3 — ngày 15 đến 28 —
+  // là nội dung khách mua thêm trong app, nên khâu đồng bộ không chép sang
+  // đây; xem scripts/dong-bo.mjs. Vì vậy `cacNgay` chỉ có đúng 14 ngày và
+  // khớp với `total_days`. Lấy theo số ngày thật để nếu Admin có đổi thì đầu
+  // trang không nói một đằng, danh sách bên dưới một nẻo. (04/11/2026)
   const soNgay = cacNgay.length || sanPham.total_days;
 
   return (

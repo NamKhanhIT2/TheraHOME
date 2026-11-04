@@ -29,17 +29,36 @@ async function tieuDe(url) {
 
 export async function dongBo(env) {
   const products = await layBang(env, 'products', 'id,name,category,total_days,accent_color_key');
-  const phases = await layBang(env, 'program_phases', 'id,product_id,name,day_start,day_end,sort_order');
-  const days = await layBang(
+  const tatCaGiaiDoan = await layBang(env, 'program_phases', 'id,product_id,name,day_start,day_end,sort_order');
+  const tatCaNgay = await layBang(
     env,
     'program_days',
     'id,product_id,phase_id,day_number,day_type,video_url_vn,support_tools_label_vn,support_tools_url_vn',
   );
 
+  // Giai đoạn nào có apple_product_id hoặc google_product_id thì đó là nội
+  // dung khách phải mua thêm trong app (giai đoạn 3 của TheraNECK+, ngày
+  // 15–28). Trang dự phòng không có đăng nhập, không biết ai đã mua, nên
+  // chép nó sang đây là đem bán thành cho không. Lọc ngay từ khâu đồng bộ
+  // để nó không nằm trong D1 chứ không chỉ ẩn lúc hiển thị.
+  //
+  // Đọc phase_promos hỏng thì layBang ném lỗi và cả lần đồng bộ dừng — D1 giữ
+  // nguyên. Cố ý: thà bản dự phòng cũ còn hơn lỡ phát nội dung trả phí.
+  // (04/11/2026)
+  const promos = await layBang(env, 'phase_promos', 'phase_id,apple_product_id,google_product_id');
+  const phaiTra = new Set(
+    promos.filter((k) => k.apple_product_id || k.google_product_id).map((k) => k.phase_id),
+  );
+  const phases = tatCaGiaiDoan.filter((f) => !phaiTra.has(f.id));
+  const moCua = new Set(phases.map((f) => f.id));
+  // Ngày không gắn giai đoạn nào thì không biết nó có bị khoá hay không —
+  // bỏ qua, cùng một lý do.
+  const days = tatCaNgay.filter((d) => d.phase_id && moCua.has(d.phase_id));
+
   // Giống script chạy tay: Supabase bị khoá thì REST trả 200 với mảng rỗng chứ
   // không phải lỗi. Ghi đè lúc đó là tự tay xoá bản dự phòng đúng lúc cần nó.
   if (!products.length || !days.length) {
-    throw new Error(`Supabase trả ${products.length} sản phẩm / ${days.length} ngày — không ghi đè D1.`);
+    throw new Error(`Supabase trả ${products.length} sản phẩm / ${days.length} ngày mở — không ghi đè D1.`);
   }
 
   const ten = new Map();

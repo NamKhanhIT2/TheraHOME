@@ -101,6 +101,27 @@ lỗi — ghi đè lúc đó là tự tay xoá bản dự phòng đúng lúc c�
 Tên bài ("Mở vai & Thả lỏng lưng trên") lấy từ YouTube oEmbed lúc đồng bộ, vì
 Supabase không lưu tên bài — app chỉ hiện "Ngày N".
 
+## Chỉ chép phần lộ trình mở
+
+Giai đoạn 3 của TheraNECK+ (ngày 15–28) là nội dung khách mua thêm trong
+app — `phase_promos.apple_product_id` = `ai.therahome.neckplus.phase3unlock`,
+`google_product_id` = `neckplus_phase3`. App khoá nó cho tới khi có giao dịch
+đã xác minh.
+
+Trang này không có đăng nhập, nên nó không thể biết ai đã mua. Vì vậy khâu
+đồng bộ **bỏ hẳn** mọi giai đoạn có một trong hai id đó, cùng toàn bộ ngày
+thuộc giai đoạn ấy — lọc ngay lúc chép chứ không phải ẩn lúc hiển thị, để nội
+dung trả phí không nằm trong D1 (vốn phục vụ công khai) ngay từ đầu.
+
+Ngày không gắn giai đoạn nào cũng bị bỏ: không biết nó có bị khoá hay không.
+
+Nếu đọc `phase_promos` hỏng thì cả lần đồng bộ dừng và D1 giữ nguyên. Cố ý:
+thà bản dự phòng cũ đi vài ngày còn hơn một lần lỡ phát thứ đang bán.
+
+Hệ quả: bản dự phòng có 14 ngày, khớp `products.total_days`. Nếu sau này bán
+thêm giai đoạn nào thì không phải sửa gì ở đây — chỉ cần set id sản phẩm
+trong WEB Admin là lần đồng bộ sau tự bỏ nó ra.
+
 ## Deploy
 
 ```

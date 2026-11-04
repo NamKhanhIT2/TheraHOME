@@ -47,11 +47,30 @@ async function lay(bang, cot) {
 }
 
 const products = await lay('products', 'id,name,category,total_days,accent_color_key');
-const phases = await lay('program_phases', 'id,product_id,name,day_start,day_end,sort_order');
-const days = await lay(
+const tatCaGiaiDoan = await lay('program_phases', 'id,product_id,name,day_start,day_end,sort_order');
+const tatCaNgay = await lay(
   'program_days',
   'id,product_id,phase_id,day_number,day_type,video_url_vn,support_tools_label_vn,support_tools_url_vn',
 );
+
+// Giai đoạn có apple_product_id hoặc google_product_id là nội dung khách mua
+// thêm trong app (giai đoạn 3 của TheraNECK+, ngày 15–28). Trang dự phòng
+// không có đăng nhập nên không biết ai đã mua — chép sang đây là phát không
+// thứ đang bán. Lọc ngay từ khâu đồng bộ, để nó không nằm trong D1.
+// Đọc phase_promos hỏng thì `lay` ném lỗi, cả lần đồng bộ dừng, D1 giữ
+// nguyên. Cố ý. (04/11/2026)
+const promos = await lay('phase_promos', 'phase_id,apple_product_id,google_product_id');
+const phaiTra = new Set(
+  promos.filter((k) => k.apple_product_id || k.google_product_id).map((k) => k.phase_id),
+);
+const phases = tatCaGiaiDoan.filter((f) => !phaiTra.has(f.id));
+const moCua = new Set(phases.map((f) => f.id));
+// Ngày không gắn giai đoạn thì không biết có bị khoá hay không — bỏ qua.
+const days = tatCaNgay.filter((d) => d.phase_id && moCua.has(d.phase_id));
+
+if (phaiTra.size) {
+  console.log(`Bỏ qua ${phaiTra.size} giai đoạn trả phí (${tatCaNgay.length - days.length} ngày).`);
+}
 
 if (!products.length || !days.length) {
   // Thà dừng còn hơn xoá sạch D1 rồi chèn rỗng: nếu Supabase đang bị khoá thì
