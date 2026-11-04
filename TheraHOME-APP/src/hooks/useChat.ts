@@ -460,7 +460,14 @@ export function useAdminChatThreads() {
         })
         .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
     },
-    refetchInterval: 30000,
+    // A backstop, not the mechanism: the channel above delivers new messages
+    // live, and useRealtimeSync refetches on every rejoin, so this only has
+    // to cover a socket that died without ever reporting it. At 30s it was
+    // the last periodic request left outside a call — 2.880 a day per open
+    // staff screen, for a list that Realtime had already kept current.
+    // Three minutes still notices a dead socket well inside a CSKH shift
+    // (2026-11-04).
+    refetchInterval: 180000,
   });
 }
 
