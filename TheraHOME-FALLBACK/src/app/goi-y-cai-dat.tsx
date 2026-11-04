@@ -88,13 +88,13 @@ export function GoiYCaiDat() {
         </svg>
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-semibold">Cài lên màn hình chính</p>
+        <p className="text-base font-semibold text-text">Cài lên màn hình chính</p>
         {laIOS ? (
-          <p className="mt-1 text-[14px] leading-relaxed text-muted">
+          <p className="mt-1 text-sm text-muted">
             Bấm nút Chia sẻ ở thanh dưới, chọn <strong>Thêm vào MH chính</strong>. Mở ra là toàn màn hình, xem lại được cả khi mất mạng.
           </p>
         ) : (
-          <p className="mt-1 text-[14px] leading-relaxed text-muted">
+          <p className="mt-1 text-sm text-muted">
             Mở toàn màn hình, xem lại được cả khi mất mạng.
           </p>
         )}
@@ -106,7 +106,7 @@ export function GoiYCaiDat() {
                 void suKien.prompt();
                 setVuaDong(true);
               }}
-              className="rounded-full bg-tick px-4 py-2 text-[14px] font-semibold text-white active:opacity-80"
+              className="rounded-full bg-tick px-4 py-2 text-sm font-semibold text-white active:opacity-80"
             >
               Cài đặt
             </button>
@@ -114,7 +114,7 @@ export function GoiYCaiDat() {
           <button
             type="button"
             onClick={dong}
-            className="rounded-full px-3 py-2 text-[14px] font-medium text-muted active:opacity-70"
+            className="rounded-full px-3 py-2 text-sm font-medium text-muted active:opacity-70"
           >
             Để sau
           </button>

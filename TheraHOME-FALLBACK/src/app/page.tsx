@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { laySanPham, layGiaiDoan, layCacNgay } from "@/lib/noi-dung";
 import { GoiYCaiDat } from "./goi-y-cai-dat";
-import { ChanTrang } from "./chan-trang";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +21,7 @@ export default async function TrangChu() {
   const sanPham = await laySanPham();
   if (!sanPham) {
     return (
-      <div className="px-5 py-20 text-center text-muted">Chưa có nội dung lộ trình.</div>
+      <div className="khung py-20 text-center text-base text-muted">Chưa có nội dung lộ trình.</div>
     );
   }
 
@@ -35,11 +34,17 @@ export default async function TrangChu() {
   // phần thương hiệu, viết hoa, giãn chữ.
   const tenNganSP = sanPham.name.split("·").pop()?.trim() ?? sanPham.name;
 
+  // `products.total_days` trong Supabase đang là 14, nhưng ba giai đoạn phủ
+  // tới ngày 28 và có đủ 28 buổi tập. Lấy theo số ngày thật, nếu không đầu
+  // trang in "NGÀY 14" còn ngay bên dưới lại ghi "28 buổi tập". (04/11/2026)
+  const soNgay = cacNgay.length || sanPham.total_days;
+
   return (
     <div>
       {/* Đầu trang dựng theo màn Home: ảnh nền phủ trời 5 chặng, con số lớn
-          mảnh, nút viên thuốc. */}
-      <header className="troi-home relative isolate flex min-h-[92svh] flex-col overflow-hidden">
+          mảnh, nút viên thuốc. Cao đúng một màn hình nên máy nào cũng thấy
+          trọn bố cục, rồi mũi tên dưới cùng mời cuộn tiếp. */}
+      <header className="troi-home phu-anh relative isolate flex min-h-[100svh] flex-col overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element -- ảnh tĩnh trong
             public, không cần image optimization (vốn không chạy sẵn trên Workers) */}
         <img
@@ -48,15 +53,8 @@ export default async function TrangChu() {
           aria-hidden="true"
           className="absolute inset-0 -z-10 size-full object-cover"
         />
-        {/* Scrim chỉ ăn ở đáy, để phần trời xanh phía trên còn nguyên — trong
-            app ảnh mờ dần vào nền chứ không bị phủ tối từ đầu. */}
-        <div
-          className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent from-55% to-[#060D14]"
-          aria-hidden="true"
-        />
-
-        <div className="an-toan-tren mx-auto w-full max-w-xl px-5 pt-4">
-          <p className="text-center text-[17px] font-semibold uppercase tracking-[0.18em] text-text">
+        <div className="an-toan-tren khung pt-5">
+          <p className="chu-tren-anh gian-2 text-center text-md font-semibold uppercase text-text">
             {tenNganSP}
           </p>
         </div>
@@ -64,49 +62,56 @@ export default async function TrangChu() {
         {/* Đẩy khối số xuống dưới figure trong ảnh, như app. */}
         <div className="flex-1" aria-hidden="true" />
 
-        <div className="mx-auto w-full max-w-xl px-5 pb-10">
-          <div className="text-center">
-            <div className="flex items-end justify-center gap-3">
-              <span className="pb-3 text-[15px] font-medium uppercase tracking-[0.2em] text-muted">
-                Ngày
-              </span>
-              <span className="text-[86px] font-extralight leading-none tracking-tight text-text">
-                {sanPham.total_days}
-              </span>
-            </div>
-            <p className="mx-auto mt-4 max-w-[19rem] text-[15px] leading-relaxed text-soft">
-              TheraHOME đồng hành cùng bạn để chủ động chăm sóc bản thân mỗi ngày ngay tại nhà!
-            </p>
-            <Link
-              href="/ngay/1"
-              className="mt-7 inline-flex items-center gap-2.5 rounded-full border border-white/25 bg-white/20 px-8 py-4 text-[16px] font-semibold text-text shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-sm active:opacity-80"
-            >
-              <svg className="size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M4.5 3.2 12 8l-7.5 4.8z" fill="currentColor" />
-              </svg>
-              Bắt đầu
-            </Link>
-          </div>
+        <div className="chu-tren-anh khung flex flex-col items-center text-center">
+          <p className="gian-4 text-2xs font-semibold uppercase text-soft">Ngày</p>
+          <p className="text-so mt-[clamp(0.1rem,0.7vw,0.3rem)] font-extralight tracking-[-0.03em] text-text">
+            {soNgay}
+          </p>
+          <p className="mt-[clamp(0.8rem,2.6svh,1.25rem)] max-w-[20rem] text-base text-soft">
+            TheraHOME đồng hành cùng bạn để chủ động chăm sóc bản thân mỗi ngày ngay tại nhà!
+          </p>
+          <Link href="/ngay/1" className="nut-chinh mt-[clamp(1.25rem,3.6svh,1.75rem)] text-md">
+            <svg className="size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4.5 3.2 12 8l-7.5 4.8z" fill="currentColor" />
+            </svg>
+            Bắt đầu
+          </Link>
         </div>
+
+        <a
+          href="#lotrinh"
+          className="an-toan-duoi mt-[clamp(1.5rem,4.5svh,2.5rem)] flex flex-col items-center gap-2 pb-[clamp(0.9rem,2.2svh,1.4rem)] text-faint active:opacity-60"
+        >
+          <span className="gian-3 text-2xs font-semibold uppercase">Lộ trình</span>
+          <svg className="mui-xuong size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M3.5 6 8 10.5 12.5 6"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </a>
       </header>
 
       {/* Phần dưới là màn Lộ trình: trời riêng của nó, tối hơn. */}
-      <div className="troi-noi-tiep">
-        <div className="mx-auto max-w-xl px-5 pt-8">
+      <section id="lotrinh" className="troi-noi-tiep">
+        <div className="khung pt-[clamp(1.75rem,5svh,2.5rem)]">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-[28px] font-bold tracking-tight">Lộ trình</h1>
-            <span className="kinh flex items-center gap-2 rounded-full px-3.5 py-2 text-[14px] font-semibold">
+            <h1 className="text-2xl font-bold tracking-tight">Lộ trình</h1>
+            <span className="kinh flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold">
               <span className="size-2 rounded-full bg-tick" aria-hidden="true" />
               {tenNganSP}
             </span>
           </div>
-          <p className="mt-1.5 text-[14px] text-faint">
+          <p className="mt-1.5 text-sm text-faint">
             {giaiDoan.length} giai đoạn · {cacNgay.length} buổi tập
           </p>
 
           <GoiYCaiDat />
 
-          <div className="mt-7 space-y-8">
+          <div className="mt-8 space-y-9">
             {giaiDoan.map((gd) => {
               const ngayCuaGd = cacNgay.filter(
                 (n) => n.day_number >= gd.day_start && n.day_number <= gd.day_end,
@@ -115,29 +120,34 @@ export default async function TrangChu() {
               const { nhan, chuDe } = tachGiaiDoan(gd.name);
               return (
                 <section key={gd.id}>
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="text-[13px] font-semibold uppercase tracking-[0.12em] text-faint">
-                      {nhan}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">
+                        {nhan}
+                      </span>
+                      <span className="text-sm text-muted">{chuDe}</span>
+                    </div>
+                    <span className="shrink-0 text-2xs font-medium tabular-nums text-faint">
+                      Ngày {gd.day_start}–{gd.day_end}
                     </span>
-                    <span className="text-[14px] text-muted">{chuDe}</span>
                   </div>
 
-                  <ul className="mt-3 space-y-2.5">
+                  <ul className="mt-3.5 space-y-2.5">
                     {ngayCuaGd.map((n) => (
                       <li key={n.day_number}>
                         <Link
                           href={`/ngay/${n.day_number}`}
                           className="kinh flex items-center gap-4 p-4 transition-colors active:bg-white/[0.07]"
                         >
-                          <span className="flex size-[52px] shrink-0 flex-col items-center justify-center rounded-2xl bg-inset">
-                            <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-faint">
+                          <span className="flex size-[clamp(2.875rem,13.5vw,3.5rem)] shrink-0 flex-col items-center justify-center rounded-2xl bg-inset">
+                            <span className="text-2xs font-semibold uppercase tracking-[0.1em] text-faint">
                               Ngày
                             </span>
-                            <span className="mt-0.5 text-[19px] font-semibold leading-none text-text">
+                            <span className="mt-0.5 text-lg font-semibold leading-none tabular-nums text-text">
                               {n.day_number}
                             </span>
                           </span>
-                          <span className="min-w-0 flex-1 text-[16px] font-semibold leading-snug">
+                          <span className="min-w-0 flex-1 text-base font-semibold leading-snug text-text">
                             {tenNgan(n.title) ?? "Bài tập"}
                           </span>
                           <svg
@@ -163,9 +173,9 @@ export default async function TrangChu() {
             })}
           </div>
 
-          <ChanTrang />
+          <div className="an-toan-duoi h-[clamp(2.5rem,8svh,4rem)]" aria-hidden="true" />
         </div>
-      </div>
+      </section>
     </div>
   );
 }

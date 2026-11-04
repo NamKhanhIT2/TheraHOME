@@ -10,7 +10,7 @@
  */
 // Đổi tên mỗi lần giao diện thay đổi hẳn: activate xoá mọi cache khác tên,
 // nên máy từng mở bản cũ không bị kẹt bản cũ khi offline. (04/11/2026)
-const PHIEN_BAN = 'therahome-duphong-v2';
+const PHIEN_BAN = 'therahome-duphong-v3';
 const VO_APP = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/hero.webp'];
 
 self.addEventListener('install', (e) => {

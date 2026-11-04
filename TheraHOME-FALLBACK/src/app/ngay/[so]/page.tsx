@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { layMotNgay, layCacNgay, laySanPham, layGiaiDoan, maYouTube } from "@/lib/noi-dung";
-import { ChanTrang } from "../../chan-trang";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +25,13 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
 
   return (
     <div className="troi-lotrinh min-h-dvh">
-      <div className="mx-auto w-full max-w-xl px-5">
+      <div className="khung">
         {/* BackBar kiểu app: mũi tên + nhãn, trên nền kính. */}
-        <div className="an-toan-tren flex items-center gap-2 pt-3">
+        <div className="an-toan-tren flex items-center gap-2.5 pt-3.5">
           <Link
-            href="/"
+            href="/#lotrinh"
             aria-label="Quay lại lộ trình"
-            className="noi flex size-10 items-center justify-center rounded-full active:opacity-70"
+            className="noi flex size-10 shrink-0 items-center justify-center rounded-full active:opacity-70"
           >
             <svg className="size-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path
@@ -44,19 +43,19 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
               />
             </svg>
           </Link>
-          <span className="text-[17px] font-semibold">Ngày {ngay.day_number}</span>
+          <span className="text-md font-semibold tabular-nums">Ngày {ngay.day_number}</span>
         </div>
 
-        <h1 className="mt-6 text-[26px] font-bold leading-tight tracking-tight">
+        <h1 className="mt-6 text-xl font-bold leading-tight tracking-tight text-balance">
           {ten || `Ngày ${ngay.day_number}`}
         </h1>
 
         {gd && (
           <div className="mt-3.5 flex flex-wrap items-center gap-2">
-            <span className="noi rounded-full px-3 py-1.5 text-[13px] font-medium text-soft">
+            <span className="noi rounded-full px-3 py-1.5 text-xs font-medium text-soft">
               {gd.name.split("·")[0].trim()}
             </span>
-            <span className="noi flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-soft">
+            <span className="noi flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-soft">
               <svg className="size-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <circle cx="8" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.4" />
                 <path d="M8 5.8v3l1.8 1.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -70,7 +69,7 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
         )}
 
         {ma ? (
-          <div className="noi mt-6 overflow-hidden rounded-[22px] shadow-[0_10px_34px_rgba(0,0,0,0.45)]">
+          <div className="noi mt-6 overflow-hidden rounded-[clamp(1.125rem,5vw,1.375rem)] shadow-[0_10px_34px_rgba(0,0,0,0.45)]">
             {/* Nhúng thẳng YouTube: video vốn đã ở YouTube chứ không phải
                 Supabase Storage, nên phần nặng nhất của buổi tập không phụ
                 thuộc vào thứ đang hỏng. */}
@@ -83,13 +82,11 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
             />
           </div>
         ) : (
-          <p className="kinh mt-5 p-4 text-[15px] leading-relaxed text-muted">
-            Ngày này chưa có video.
-          </p>
+          <p className="kinh mt-5 p-4 text-base text-muted">Ngày này chưa có video.</p>
         )}
 
         {ma && (
-          <div className="noi mt-4 flex items-start gap-3 rounded-[18px] p-4">
+          <div className="noi mt-4 flex items-start gap-3 rounded-[clamp(0.9rem,4.2vw,1.125rem)] p-4">
             <svg className="mt-0.5 size-5 shrink-0 text-faint" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path
                 d="M10 2.6a5 5 0 0 0-2.8 9.1v1.6h5.6v-1.6A5 5 0 0 0 10 2.6ZM8 16.2h4"
@@ -100,7 +97,7 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
               />
             </svg>
             {/* Nguyên văn chuỗi `videoTip` trong src/lib/i18n.ts của app. */}
-            <p className="text-[14px] leading-relaxed text-muted">
+            <p className="text-sm text-muted">
               Mẹo nhỏ: Chọn chỗ yên tĩnh, đủ rộng để duỗi tay và xoay người thoải mái.
             </p>
           </div>
@@ -111,7 +108,7 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
             href={ngay.support_tools_url}
             target="_blank"
             rel="noreferrer"
-            className="mt-4 block rounded-full bg-focus px-5 py-4 text-center text-[16px] font-semibold text-white active:opacity-80"
+            className="mt-4 block rounded-full bg-focus px-5 py-4 text-center text-md font-semibold text-white active:opacity-80"
           >
             {ngay.support_tools_label ?? "Nội dung thêm"}
           </a>
@@ -123,8 +120,8 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
               href={`/ngay/${truoc.day_number}`}
               className="kinh p-4 transition-colors active:bg-white/[0.07]"
             >
-              <span className="block text-[12px] font-medium text-faint">Trước</span>
-              <span className="mt-0.5 block truncate text-[15px] font-semibold">
+              <span className="block text-2xs font-medium text-faint">Trước</span>
+              <span className="mt-0.5 block truncate text-sm font-semibold tabular-nums">
                 Ngày {truoc.day_number}
               </span>
             </Link>
@@ -136,23 +133,48 @@ export default async function TrangNgay({ params }: { params: Promise<{ so: stri
               href={`/ngay/${sau.day_number}`}
               className="kinh p-4 text-right transition-colors active:bg-white/[0.07]"
             >
-              <span className="block text-[12px] font-medium text-faint">Tiếp theo</span>
-              <span className="mt-0.5 block truncate text-[15px] font-semibold">
+              <span className="block text-2xs font-medium text-faint">Tiếp theo</span>
+              <span className="mt-0.5 block truncate text-sm font-semibold tabular-nums">
                 Ngày {sau.day_number}
               </span>
             </Link>
           )}
         </nav>
 
-        <Link
-          href="/"
-          className="mt-4 block rounded-full border border-white/10 py-3.5 text-center text-[15px] font-medium text-muted active:bg-white/[0.06]"
-        >
-          Xem tất cả {tatCa.length} ngày
-        </Link>
-      </div>
+        {/* Dải chọn nhanh các ngày cùng giai đoạn. Thay cho nút "Xem tất cả"
+            (mũi tên quay lại ở đầu trang đã làm đúng việc đó), và lấp chỗ
+            trống dưới đáy sau khi bỏ thẻ hỗ trợ. */}
+        {gd && (
+          <div className="kinh mt-4 p-4">
+            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-faint">
+              {gd.name.split("·")[0].trim()} · Ngày {gd.day_start}–{gd.day_end}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {tatCa
+                .filter((n) => n.day_number >= gd.day_start && n.day_number <= gd.day_end)
+                .map((n) => {
+                  const dangXem = n.day_number === ngay.day_number;
+                  return (
+                    <Link
+                      key={n.day_number}
+                      href={`/ngay/${n.day_number}`}
+                      aria-current={dangXem ? "page" : undefined}
+                      className={
+                        dangXem
+                          ? "flex size-9 items-center justify-center rounded-xl bg-tick text-sm font-semibold tabular-nums text-white"
+                          : "flex size-9 items-center justify-center rounded-xl bg-inset text-sm font-semibold tabular-nums text-soft active:opacity-70"
+                      }
+                    >
+                      {n.day_number}
+                    </Link>
+                  );
+                })}
+            </div>
+          </div>
+        )}
 
-      <ChanTrang />
+        <div className="an-toan-duoi h-[clamp(2.5rem,8svh,4rem)]" aria-hidden="true" />
+      </div>
     </div>
   );
 }
