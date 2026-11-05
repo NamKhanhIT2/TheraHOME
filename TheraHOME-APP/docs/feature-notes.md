@@ -9007,3 +9007,50 @@ thoại hệ thống; Cài đặt tài khoản; chạm vòng Nước trên Home 
 `Alert` của Android nên hiện **nền trắng** giữa một app nền tối. Muốn tối
 phải đụng tới theme Android của app, ảnh hưởng cả splash và các hộp thoại
 khác — để chủ máy quyết.
+
+## 2026-11-05 (lượt 3) — Luồng người dùng mới trên Android, và hai lời báo sai
+
+Đi nốt mảng chưa ai chạm tới: đăng xuất, form tạo tài khoản, đăng nhập bằng
+tài khoản `tester` (hành xử y hệt khách thật), kích hoạt thiết bị, khoá ngày.
+
+**Trước hết, hai lỗi về cách app nói với người dùng.** Cả hai cùng một họ:
+tài khoản không còn dùng được thì bị báo như gõ sai mật khẩu.
+
+1. **Tài khoản bị ban đọc ra "Email hoặc mật khẩu không chính xác."**
+   `supabase/functions/auth-sign-in/index.ts:83` gộp mọi lỗi không phải
+   `email_not_confirmed` thành `invalid_credentials`, nên mã `user_banned`
+   của Supabase biến mất trước khi tới app. Khách sẽ đi đổi mật khẩu, đổi
+   xong vẫn không vào được, rồi đổi tiếp.
+2. **Tài khoản đã xoá thì không nhận được gì cả.** Đăng nhập chạy đúng tới
+   cùng (`auth.users.last_sign_in_at` nhảy lên thật), app tải profile, thấy
+   `deleted_at` và tự đăng xuất ngay (`app/_layout.tsx:357`) — form tự
+   trắng, không một dòng chữ. Đúng về bảo mật, câm về giao tiếp.
+
+   Cả hai đều chưa sửa: sửa (1) phải deploy lại edge function.
+
+**Tài khoản QA `qatester@thera.local` hoá ra đã bị xoá từ 13/09** — ai đó
+dùng chính nó để thử luồng "Xoá tài khoản" (ban lúc 07:40, `deleted_at` lúc
+07:49, không đăng nhập lại lần nào). Chủ máy cho phép hồi sinh: bỏ
+`banned_until`, xoá `deleted_at`. Không đụng gì khác.
+
+**Rồi luồng chạy trơn, đúng như khách thật:**
+
+| bước | kết quả |
+|---|---|
+| Đăng xuất | về thẳng màn đăng nhập |
+| Form tạo tài khoản | hai mật khẩu khác nhau → "Mật khẩu nhập lại chưa khớp", nút Đăng ký mờ, không gọi server |
+| Đăng nhập `tester` | vào Home ở trạng thái **chưa kích hoạt**: "Mở khoá lộ trình của bạn", Mức đau và Giai đoạn đều là `—` |
+| Ô nhập kích hoạt | tự chuyển từ chế độ điện thoại (+84) sang email khi thấy ký tự `@` |
+| Kích hoạt bằng `qatester@thera.local` | **mở khoá thật**: Ngày 1/14, Giai đoạn 1, một thông báo mới |
+| Lộ trình | hôm nay là Ngày 1 "Giảm khó chịu & làm quen", 0/14, các ngày 6–18/11 chấm xám "Sắp tới" |
+| Bấm vào một ngày tương lai | **không có phản hồi nào** — `roadmap.tsx:476` `if (dayBlocked(d)) return;`. Đúng thiết kế, nhưng người dùng chạm vào mà màn hình im thì không biết vì sao |
+| Bắt đầu buổi chăm sóc | hiện đúng cổng "Ngày 1 · Mức độ khó chịu hôm nay" trước khi mở ngày |
+| Sau khi chấm điểm | mở Ngày 1 với đúng video "Ngày 1: Làm quen & Bắt đầu" |
+
+**Mẹo cho lần sau, đã mất gần một tiếng vì nó:** bàn phím Telex của emulator
+biến `thera` thành `thẻa` mỗi lần gõ bằng `adb shell input text`, và
+`ime disable` không trụ được qua một lần mở lại app. Cách ăn chắc: đặt
+`persist.sys.locale=en-US` rồi `stop; start` — bàn phím thành tiếng Anh,
+trong khi app vẫn tiếng Việt vì nó có cài đặt ngôn ngữ riêng. Ngoài ra ô
+kích hoạt đổi chế độ giữa chừng nên gõ cả email một phát sẽ rụng vài ký tự;
+gõ tách `qatester@` rồi nghỉ 3 giây rồi gõ phần còn lại.
