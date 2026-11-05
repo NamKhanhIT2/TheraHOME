@@ -73,6 +73,15 @@ implementation is wrong.
     Apple Watch has no activity summary; show what the phone itself counts
     (steps, distance, flights) and say why the other rings are missing.
 
+18b. **The card says "Apple Health" in every state, not just before it is
+    connected.** App Store Guideline 2.5.1 wants the HealthKit functionality
+    named in the app's own UI, and the permission sheet does not count.
+    The card hides itself where HealthKit does not exist (an iPad), which is
+    why the full explanation lives at Hồ sơ → Apple Health
+    (`app/profile/apple-health.tsx`) — that row is iOS-wide and must never be
+    gated on `isHealthDataAvailable()`. 1.0.3 (50) was rejected for exactly
+    that gap (App Review, 2026-11-04).
+
 ## Type and surface
 
 19. SF Pro on iOS for this screen (`heroFont`), Inter elsewhere.

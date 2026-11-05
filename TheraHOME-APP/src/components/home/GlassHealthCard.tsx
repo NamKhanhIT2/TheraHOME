@@ -154,11 +154,26 @@ export function GlassHealthCard({ userId }: { userId: string | undefined }) {
   return (
     <GlassCard style={styles.card}>
       <Reveal style={styles.header}>
-        <View style={styles.title}>
-          <Icon name="flame" size={17} color={homeGlassColors.ringMove} strokeWidth={2.2} />
-          <Text style={[styles.titleText, heroFont('600'), { color: homeGlassColors.text }]}>
-            {t('healthActivity')}
-          </Text>
+        <View>
+          <View style={styles.title}>
+            <Icon name="flame" size={17} color={homeGlassColors.ringMove} strokeWidth={2.2} />
+            <Text style={[styles.titleText, heroFont('600'), { color: homeGlassColors.text }]}>
+              {t('healthActivity')}
+            </Text>
+          </View>
+          {/* Guideline 2.5.1: an app that links HealthKit must say so in its
+              own UI, not only in the permission sheet. The card is the one
+              place these numbers are shown, so the attribution belongs here
+              — in every state, including before anyone has connected.
+              Profile › Apple Health carries the full explanation, and is
+              reachable on an iPad, where HealthKit does not exist and this
+              card renders nothing (App Review, 2026-11-04). */}
+          <View style={styles.source}>
+            <Icon name="heart" size={11} color={homeGlassColors.textFaint} strokeWidth={2.4} />
+            <Text style={[theme.type.captionSm, heroFont('400'), { color: homeGlassColors.textFaint }]}>
+              {t('healthSource')}
+            </Text>
+          </View>
         </View>
         <Text style={[theme.type.caption, heroFont('400'), { color: homeGlassColors.textFaint }]}>
           {t('today')}
@@ -273,8 +288,17 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // The title block is two lines now; the date keeps its line with the
+    // first of them rather than floating to the middle of the pair.
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+  },
+  source: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+    marginLeft: 1,
   },
   title: {
     flexDirection: 'row',

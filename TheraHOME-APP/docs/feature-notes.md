@@ -8677,3 +8677,64 @@ phone; one clip landed at 23 MB on 2026-09-11 and is 59% of everything in
 carry, and `videoQuality` in expo-image-picker is documented for RECORDED
 video, so it cannot be relied on for a clip picked from the library. Both
 community pickers now refuse a video over **12 MB** and say why.
+
+## 2026-11-04 — App Review 2.5.1: HealthKit chưa được nêu tên trong UI
+
+Apple từ chối 1.0.3 (50) theo Guideline 2.5.1 (Submission ID
+`6fecb666-7296-49a0-a4a8-4f4b13464ce6`): binary liên kết HealthKit nhưng
+reviewer không tìm thấy chỗ nào trong UI nói rõ chức năng HealthKit.
+
+**Vì sao reviewer không thấy gì.** Máy duyệt là **iPad Air 11-inch (M3)**.
+`app.json` đặt `supportsTablet: false`, nên app chạy ở chế độ tương thích
+iPhone trên iPad — và iPadOS **không có** ứng dụng Sức khoẻ, nên
+`isHealthDataAvailable()` trả về `false`, `useHealthActivity` trả `status =
+'unsupported'`, và `GlassHealthCard` `return null` (đúng theo quy tắc 10 của
+`home-ui-rules.md`: cái gì không có nội dung thì không vẽ gì). Trên iPad,
+toàn bộ dấu vết HealthKit trong app là… không có gì. Đó chính là lỗi.
+
+Thêm một điểm nữa: ngay cả trên iPhone, chữ "Apple Health" chỉ xuất hiện ở
+đúng một trạng thái — nút "Kết nối Apple Health" khi chưa cấp quyền. Sau khi
+đã kết nối, thẻ chỉ còn tiêu đề "Vận động" và các con số, không còn nói số
+liệu đến từ đâu.
+
+**Hai chỗ sửa.**
+
+1. `GlassHealthCard` — tiêu đề giờ có dòng thứ hai, hiện ở **mọi** trạng
+   thái: trái tim nhỏ + "Đọc từ Apple Health" (`healthSource`). Header đổi
+   sang `alignItems: 'flex-start'` để chữ "Hôm nay" vẫn ngang hàng với dòng
+   tiêu đề thứ nhất.
+
+2. `app/profile/apple-health.tsx` (mới) + một dòng mới trong `MENU` của
+   `app/profile/index.tsx`, **chỉ iOS nhưng cố tình KHÔNG kiểm tra
+   `isHealthDataAvailable()`**. Một màn hình tự ẩn đi trên đúng cái máy App
+   Review dùng chính là toàn bộ vấn đề. Màn hình nêu tên Apple Health, liệt
+   kê đúng bốn loại dữ liệu được đọc (bước chân, quãng đường, số tầng, vòng
+   vận động), nói rõ app **chỉ đọc, không ghi gì**, nói dữ liệu ở lại trên
+   máy, và chỉ chỗ xem trong app. Trên iPad nó hiện tình trạng "Máy này không
+   có ứng dụng Sức khoẻ" kèm câu giải thích Apple Health chỉ có trên iPhone —
+   nghĩa là reviewer vẫn **thấy** HealthKit được nêu tên ở nơi họ sẽ tìm.
+
+23 khoá i18n mới cho cả ba ngôn ngữ. `buildNumber` 50 → 51 (app.json +
+`CURRENT_PROJECT_VERSION` ở hai nơi trong pbxproj). Typecheck và lint sạch.
+
+**Lưu ý khi trả lời Apple.** Thư của họ cho hai đường: (a) trả lời rằng bản
+này là bug fix và xin được duyệt ngay, rồi sửa ở bản sau; hoặc (b) nộp lại
+bản đã sửa. Nếu nộp lại, nhớ dán đường dẫn đến màn hình (Hồ sơ → Apple
+Health) vào App Review Information → Notes, và kèm screen recording **trên
+máy thật** như họ yêu cầu — iPad không quay được thẻ "Vận động" vì trên iPad
+nó không tồn tại.
+
+**Android 16 three-button nav: measured, the app is fine.** Created AVD
+`therahome_a16` (API 36, google_apis arm64, 1080×2400 @420) and switched it
+with `cmd overlay enable com.android.internal.systemui.navbar.threebutton`:
+
+| | bar drawn | inset reported to apps |
+|---|---|---|
+| AVD Android 14 | 126px (48dp) | **63px (24dp)** |
+| AVD Android 16, three buttons | 126px, `frame=[0,2274][1080,2400]` | **126px**, `mInsetsHint bottom=126` |
+| SM-A125F, Android 11, three buttons | 90px (48dp) | 90px |
+
+Android 16 — where edge-to-edge is enforced for targetSdk 35+ — reports what
+it draws. Only the Android 14 AVD halves it. `navBottomOffset` stays as it
+is. The release APK installs and runs on API 36 with no crash, and content
+ends above the buttons.

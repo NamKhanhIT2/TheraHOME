@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { homeGlassColors, useTheme } from '@/theme';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +22,13 @@ const MENU: { icon: string; labelKey: TranslationKey; route: string }[] = [
   { icon: 'crown', labelKey: 'plansUpgrade', route: '/subscription' },
   { icon: 'pencil', labelKey: 'editProfile', route: '/profile/edit' },
   { icon: 'bell', labelKey: 'workoutReminders', route: '/profile/notifications-settings' },
+  // iOS only, and deliberately NOT gated on `isHealthDataAvailable()`:
+  // Guideline 2.5.1 wants HealthKit named in the UI, and the device App
+  // Review used (an iPad) is exactly the one where that check says no and
+  // the Home card hides itself. See app/profile/apple-health.tsx.
+  ...(Platform.OS === 'ios'
+    ? [{ icon: 'heart-pulse', labelKey: 'appleHealth' as TranslationKey, route: '/profile/apple-health' }]
+    : []),
   { icon: 'grid', labelKey: 'accountSettings', route: '/profile/account' },
   { icon: 'phone', labelKey: 'helpSupport', route: '/profile/help' },
 ];

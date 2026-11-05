@@ -531,6 +531,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="profile/index" />
           <Stack.Screen name="profile/edit" />
           <Stack.Screen name="profile/notifications-settings" />
+          <Stack.Screen name="profile/apple-health" />
           <Stack.Screen name="profile/account" />
           <Stack.Screen name="profile/help" />
           {/* transparentModal, not modal: the route itself draws nothing but
