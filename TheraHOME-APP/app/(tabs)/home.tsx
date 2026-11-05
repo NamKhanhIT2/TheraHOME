@@ -49,7 +49,7 @@ import { ArcGauge } from '@/components/home/ArcGauge';
 import { GlassArticleCard } from '@/components/home/GlassArticleCard';
 import { GlassPainCard } from '@/components/home/GlassPainCard';
 import { GlassHealthCard } from '@/components/home/GlassHealthCard';
-import { HomeGlassNav, navBottomOffset } from '@/components/home/HomeGlassNav';
+import { HomeGlassNav, NAV_BODY_HEIGHT, navBottomOffset } from '@/components/home/HomeGlassNav';
 import { MetricCircle } from '@/components/home/MetricCircle';
 import { HomeMascot } from '@/components/home/HomeMascot';
 import { endGlance, glanceAt } from '@/components/home/glanceStore';
@@ -503,7 +503,7 @@ export default function HomeScreen() {
   // Where the floating nav's top edge sits above the bottom of the screen —
   // HomeGlassNav's own offset plus its 60pt body (50pt pill + 5pt padding
   // either side). Content must be fully hidden by the time it reaches here.
-  const navTopFromBottom = navBottomOffset(insets.bottom) + 60;
+  const navTopFromBottom = navBottomOffset(insets.bottom) + NAV_BODY_HEIGHT;
   const bottomClearance = navTopFromBottom + 24;
   const tabTop = windowHeight - navTopFromBottom;
   // The hero's one elastic gap. Everything above the day block is a fixed

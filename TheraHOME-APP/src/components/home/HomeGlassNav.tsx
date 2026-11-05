@@ -53,6 +53,20 @@ export function navBottomOffset(bottomInset: number): number {
   return Math.max(16, bottomInset);
 }
 
+/**
+ * The floating bar's own body: the 50pt tab row plus the pill's 5pt padding
+ * top and bottom. Together with `navBottomOffset` it is where the bar's top
+ * edge lands, so anything that must not disappear under the bar adds both.
+ *
+ * It is NOT `TAB_BAR_BODY_HEIGHT` (`src/hooks/useTabBarInset.ts`), which
+ * belongs to the staff layout's platform tab bar — 64 on Android, 84 on iOS.
+ * The Store screen reserved its buy button's room with that number minus a
+ * fudge, which happens to be 14pt too much on iOS and 6pt too little on
+ * Android, and 6pt is exactly how much of the button the bar ate there
+ * (seen on the Android 16 emulator, 2026-11-05).
+ */
+export const NAV_BODY_HEIGHT = 60;
+
 /** One tab. Its own component so the swap between resting and selected can
  * be animated per tab: the well fades in, the lit icon crosses over the
  * quiet one, both in 200ms, and a press takes the icon to 0.97 without

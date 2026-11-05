@@ -15,7 +15,7 @@ import { usePhasePurchases, daysOpenAfterPurchase } from '@/hooks/usePhasePurcha
 import { useQuizResolvedMap } from '@/hooks/useQuiz';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { HomeGlassNav, navBottomOffset } from '@/components/home/HomeGlassNav';
+import { HomeGlassNav, NAV_BODY_HEIGHT, navBottomOffset } from '@/components/home/HomeGlassNav';
 import { HomeMascot } from '@/components/home/HomeMascot';
 import { VerticalGradient } from '@/components/home/VerticalGradient';
 import { heroFont } from '@/components/home/glass';
@@ -60,7 +60,7 @@ export default function RoadmapScreen() {
   // mechanism, as Home (docs/home-ui-rules.md).
   const maskStops = useMemo(() => {
     const height = windowHeight - insets.top;
-    const navTop = height - (navBottomOffset(insets.bottom) + 60);
+    const navTop = height - (navBottomOffset(insets.bottom) + NAV_BODY_HEIGHT);
     const at = (y: number) => Math.min(1, Math.max(0, y / height));
     const c = homeGlassColors.text;
     return [

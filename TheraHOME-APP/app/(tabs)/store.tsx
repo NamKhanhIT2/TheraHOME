@@ -1,16 +1,15 @@
 import { router, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions, type FlatList } from 'react-native';
 import Reanimated, { runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { storeColors, useTheme } from '@/theme';
-import { HomeGlassNav, navBottomOffset } from '@/components/home/HomeGlassNav';
+import { HomeGlassNav, NAV_BODY_HEIGHT, navBottomOffset } from '@/components/home/HomeGlassNav';
 import { HomeMascot } from '@/components/home/HomeMascot';
 import { VerticalGradient } from '@/components/home/VerticalGradient';
 import { heroFont } from '@/components/home/glass';
-import { TAB_BAR_BODY_HEIGHT } from '@/hooks/useTabBarInset';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/icons/Icon';
 import { ExpandableText } from '@/components/community/ExpandableText';
@@ -105,6 +104,13 @@ export default function StoreScreen() {
   const [cartVisible, setCartVisible] = useState(false);
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList<PageProduct>>(null);
+  // The copy scroller. It only scrolls when a product's words outgrow the
+  // panel, and when it does it has come up already scrolled — the title's
+  // top line cut off by the panel's edge (Android 16 emulator, 2026-11-05).
+  // Whatever decides that offset, the top of the name is the one thing this
+  // panel must open on, so it is pinned there whenever the tab is entered or
+  // the product changes.
+  const copyRef = useRef<ScrollView>(null);
 
   const cartProductIds = useStoreCart((state) => state.productIds);
   const addCartProduct = useStoreCart((state) => state.addProduct);
@@ -134,7 +140,12 @@ export default function StoreScreen() {
   // name, description, member card — scrolling its own panel. The photo
   // loses less by being smaller than the copy does by being cut.
   const heroHeight = Math.round(Math.max(180, available * 0.28));
-  const navClearance = navBottomOffset(insets.bottom) + TAB_BAR_BODY_HEIGHT - 10;
+  // The bar's own height, not the staff tab bar's: `TAB_BAR_BODY_HEIGHT` is
+  // 64 on Android and 84 on iOS, and minus the 10pt fudge that left 54 here,
+  // the buy button lost its bottom 6pt under the bar on every Android phone
+  // (Android 16 emulator, 2026-11-05) while iOS had 14pt to spare. 14 is that
+  // iOS gap kept as the deliberate one, now on both.
+  const navClearance = navBottomOffset(insets.bottom) + NAV_BODY_HEIGHT + 14;
 
   // The pager's offset drives both the fade and the swap, so the copy is
   // always at its faintest exactly when it changes.
@@ -155,12 +166,21 @@ export default function StoreScreen() {
   });
 
   useFocusEffect(useCallback(() => {
-    const frame = requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }));
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      copyRef.current?.scrollTo({ y: 0, animated: false });
+    });
     setIndex(0);
     settledPage.value = 0;
     scrollX.value = 0;
     return () => cancelAnimationFrame(frame);
   }, [scrollX, settledPage]));
+
+  // Swiping to another product swaps the words inside the same scroller, so
+  // a long product left scrolled would hand the next one its offset.
+  useEffect(() => {
+    copyRef.current?.scrollTo({ y: 0, animated: false });
+  }, [index]);
 
   const current = products[index] ?? null;
   const activeItem = current?.item ?? null;
@@ -247,6 +267,7 @@ export default function StoreScreen() {
                     card). Now the button owns its row and the copy gets
                     whatever is left. */}
                 <ScrollView
+                  ref={copyRef}
                   style={styles.copyScroll}
                   contentContainerStyle={styles.copyScrollContent}
                   showsVerticalScrollIndicator={false}

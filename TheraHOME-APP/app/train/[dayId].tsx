@@ -455,10 +455,15 @@ export default function TrainScreen() {
             identical sentence twice, once here and once below (seen on the
             device, 2026-10-19). One message, one place. */}
 
-        {cameraState === 'denied' ? (
+        {/* A camera that cannot open at all looks exactly like one that is
+            merely slow: a black rectangle. Without this the screen sat on
+            black and the footer cheered the customer on (seen on the
+            emulator, 2026-11-04, where CameraX reported "No available
+            camera can be found"). Say it instead. */}
+        {cameraState === 'denied' || cameraState === 'unavailable' ? (
           <View style={[styles.cover, { backgroundColor: homeGlassColors.sky[4] }]}>
             <Text style={[theme.type.body, styles.message, { color: homeGlassColors.textMuted }]}>
-              {t('trainCameraDenied')}
+              {cameraState === 'denied' ? t('trainCameraDenied') : t('trainCameraUnavailable')}
             </Text>
           </View>
         ) : null}
@@ -483,7 +488,15 @@ export default function TrainScreen() {
               )}
             </View>
             <Text style={[theme.type.bodyStrong, styles.hint, { color: homeGlassColors.text }]} numberOfLines={2}>
-              {lost
+              {/* No measurement yet is not the same as a good one. `verdict`
+                  is null for the first frames of every session — and for all
+                  of a session whose camera never opened — and the final
+                  branch below is praise. Saying "you are following closely"
+                  over a black rectangle is the one thing this screen must
+                  not do. */}
+              {verdict === null
+                ? t('trainGetReady')
+                : lost
                 ? t('trainLost')
                 : partial
                   ? t('trainPartial')
@@ -498,10 +511,19 @@ export default function TrainScreen() {
 
         {phase === 'done' && summary ? (
           <View style={styles.readout}>
+            {/* `frames` counts only the frames a body was actually measured
+                in, so zero means the camera never saw anybody — a dead
+                camera, a phone pointed at the ceiling, somebody out of
+                frame the whole time. "Đúng động tác 0% thời gian" reads as
+                a verdict on the customer, and it is the same mistake as
+                cheering them on over a black rectangle, just the other way
+                round (seen on the Android emulator, 2026-11-05). */}
             <Text style={[theme.type.h2, { color: homeGlassColors.text }]}>
-              {t('trainSummaryGood', { percent: Math.round(summary.goodRatio * 100) })}
+              {summary.frames === 0
+                ? t('trainSummaryNone')
+                : t('trainSummaryGood', { percent: Math.round(summary.goodRatio * 100) })}
             </Text>
-            {summary.worst ? (
+            {summary.frames > 0 && summary.worst ? (
               <Text style={[theme.type.caption, styles.hint, { color: homeGlassColors.textMuted }]}>
                 {t('trainSummaryWorst', { part: t(partOf(summary.worst)) })}
               </Text>

@@ -45,7 +45,7 @@ import { MediaGrid } from '@/components/community/MediaGrid';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { HomeGlassNav, navBottomOffset } from '@/components/home/HomeGlassNav';
+import { HomeGlassNav, NAV_BODY_HEIGHT, navBottomOffset } from '@/components/home/HomeGlassNav';
 import { HomeMascot } from '@/components/home/HomeMascot';
 import { VerticalGradient } from '@/components/home/VerticalGradient';
 import { heroFont } from '@/components/home/glass';
@@ -226,7 +226,7 @@ export default function CommunityScreen() {
   const focusFadeStyle = useTabFocusFade();
   const maskStops = useMemo(() => {
     const height = WINDOW_HEIGHT - insets.top;
-    const navTop = height - (navBottomOffset(insets.bottom) + 60);
+    const navTop = height - (navBottomOffset(insets.bottom) + NAV_BODY_HEIGHT);
     const at = (y: number) => Math.min(1, Math.max(0, y / height));
     const c = homeGlassColors.text;
     return [

@@ -8678,6 +8678,155 @@ carry, and `videoQuality` in expo-image-picker is documented for RECORDED
 video, so it cannot be relied on for a clip picked from the library. Both
 community pickers now refuse a video over **12 MB** and say why.
 
+## 2026-11-04 — App Store listing: a Vietnamese page, and the languages field
+
+**The listing now has two localizations.** `en-US` keeps the name "TheraHOME";
+`vi` had to be named **"TheraHOME Chăm sóc cổ vai gáy"** because Apple refuses
+the bare name in that locale — `POST /v1/appStoreVersionLocalizations` returns
+`409 STATE_ERROR.DUPLICATE_NAME.DIFFERENT_ACCOUNT`, another developer holds it.
+The owner picked that name from three candidates. Subtitle: "Lộ trình 14 ngày
+tại nhà". Each localization carries its own six screenshots, display type
+`APP_IPHONE_61` at **1206 × 2622** (Apple's current required "Dynamic Island
+medium" size), opaque PNG. The older `APP_IPHONE_65` / `APP_IPHONE_67` sets
+were deleted.
+
+Creating an `appInfoLocalization` **auto-creates** the matching
+`appStoreVersionLocalization`, so the second one must be PATCHed, not POSTed.
+
+**The store page's "Languages" field comes from the binary, not the listing.**
+Build 50 shipped `CFBundleDevelopmentRegion = en` and no
+`CFBundleLocalizations`, so the page read "NGÔN NGỮ: EN" even though the app
+opens in Vietnamese — the vi/en/ms switching is JS-level i18n in
+`src/lib/i18n.ts` (76 keys each, all three complete) and Apple cannot see it.
+
+`CFBundleLocalizations: ["vi", "en", "ms"]` is now declared in **both**
+`app.json` (`expo.ios.infoPlist`) and `ios/TheraHOME/Info.plist`. `/ios` is
+gitignored, so `app.json` is the tracked source of truth and prebuild
+regenerates the plist from it — but a local `xcodebuild` against the existing
+`ios/` folder skips prebuild entirely, so the plist was edited directly too.
+Whichever path the next build takes, it carries the key.
+**It needs a new build to take effect** and is deliberately NOT in build 50:
+the owner chose on 2026-11-04 to let 1.0.3 ship first, since that build carries
+the Realtime-loop egress fix that every App Store customer is waiting on. The
+languages field lands in 1.0.4.
+
+The page will read "VI · + 2 ngôn ngữ", not the "+30" of a comparable app —
+three is what the app actually translates, and declaring more than ships is the
+kind of mismatch Guideline 2.3 is about. Apple orders the list by the viewer's
+device language, so "VI" leads for a Vietnamese viewer without any ordering
+work on our side.
+
+
+## 2026-11-04 — Android: quyền gọi điện bị hỏi quá sớm, và lề thanh nav
+
+**The call permission is no longer asked at sign-in.**
+`useCallKeepBridge` called `setupCallKeep()` the moment the bridge armed,
+which is seconds after sign-in. On Android that registers the app's calling
+account with Telecom, and registering asks for `CALL_PHONE` — "Allow
+TheraHOME to make and manage phone calls?" — before the person has seen a
+single screen. While `CUSTOMER_CALLS_ENABLED` is false nobody can place or
+receive a call, so the prompt buys nothing and costs the most alarming
+permission a wellness app can ask for. It is also the telephony permission
+that made Play infer a SIM requirement and hide the app from 4.452 devices
+(`plugins/withAndroidOptionalHardware.js`).
+
+Deferring it loses nothing: `displayIncomingCall` calls `setupCallKeep()`
+itself, so if a specialist ever does ring an Android phone the account
+registers at that moment — the one moment the permission is worth asking
+for. Until then `<IncomingCallSheet>` is the in-app fallback, which is what
+a phone without the account gets anyway. iOS is untouched; CallKit's setup
+asks for nothing.
+
+Verified on a clean install of the release APK (versionCode 28), on the
+emulator and on the owner's SM-A125F:
+
+```
+CALL_PHONE        granted=false
+READ_PHONE_STATE  granted=false
+MANAGE_OWN_CALLS  granted=true   (install-time, never prompts)
+```
+
+**The tab bar overlapping the three navigation buttons is an emulator fault,
+not an app one.** The owner reported the bottom of the screen overlapping on
+the `therahome_cskh` AVD in three-button mode. Measured on both:
+
+| | AVD (Android 14) | SM-A125F (Android 11) |
+|---|---|---|
+| nav bar drawn | 48dp (`fillx126` window, y 2274–2400) | `navigation_bar_height = 90px` = 48dp |
+| inset reported to the app | **63px = 24dp** | `InsetsSource NAVIGATION_BAR frame=[0,1510][720,1600]` = **48dp** |
+
+The app honours the reported inset to the pixel — `navBottomOffset()` is
+`Math.max(16, bottomInset)` — so on the AVD it lands 24dp from the bottom
+and cuts through buttons that sit 48dp high. The AVD reports the same 63px
+in gesture mode and three-button mode and keeps reporting it across two
+reboots, so it is not a leftover of the `cmd overlay enable` switch. Nothing
+was changed: raising the floor would break the gesture-nav gap the owner
+tuned by eye on 2026-10-25. Android 15+ in three-button mode is still
+unmeasured — that is where edge-to-edge is enforced, and no device here runs
+it.
+
+**Two adb traps worth knowing, both cost time today.** The phone's 1.0.2 was
+installed from Play (`installerPackageName=com.android.vending`), so Play's
+signing key does not match the local upload key and `adb install -r` fails
+with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the Play build has to be
+uninstalled first. And a phone that has not been unlocked since boot is in
+Direct Boot (`dumpsys user` → `State: RUNNING_LOCKED`), where only
+`directBootAware` components exist: `am start` answers `Activity class
+{...MainActivity} does not exist` for our app, for Chrome and for Samsung's
+own launcher alike. It is not a broken APK — check the unlock state before
+believing that message.
+
+## 2026-11-04 — "Bạn đang theo rất sát" trên một khung hình đen
+
+Found while exercising "Tập cùng chuyên viên" on the Android emulator, which
+has only a back camera: CameraX fails with *"No available camera can be
+found. Cams:1 Id:10 Lens:1"* when the screen asks for the front one. The
+screen then showed a black rectangle, `— điểm`, and the footer line **"Bạn
+đang theo rất sát"**.
+
+Two separate faults, both in `app/train/[dayId].tsx`, neither specific to the
+emulator:
+
+**The footer praised a measurement that was never taken.** The score itself
+was careful — it prints `—` rather than `0` when `verdict === null`, with a
+comment explaining why — but the sentence under it fell through to the last
+branch of its chain, which is `trainOnTrack`. `verdict` is null for the first
+frames of *every* session on *every* device, so the app congratulated the
+customer each time before the camera had produced anything, and for the whole
+of any session whose camera never opened. Now `verdict === null` says
+`trainGetReady` ("Vào tư thế nhé").
+
+**A camera that cannot open looked exactly like one that is slow.** The native
+side does report it — `PoseCameraView.kt` emits `unavailable` when
+`ProcessCameraProvider` or `bindToLifecycle` throws — but the overlay only
+handled `denied`, so the status was received and dropped. Both states now draw
+the overlay, with a new string `trainCameraUnavailable` in all three locales:
+"Không mở được camera trên máy này. Bạn vẫn xem được bài mẫu ở khung trên."
+
+Verified on a rebuilt release APK on the emulator: the overlay appears and the
+footer reads "Vào tư thế nhé". 60/60 tests, typecheck and lint clean.
+
+Worth noting what was checked and was NOT wrong: all three locales carry the
+same 821 keys. An earlier count in this session said `en` was missing four —
+that was a regex that only matched single-quoted values, and `trainOnTrack` in
+`en` is `"You're following closely"`.
+
+**MediaPipe on Android: proven to run, 2026-11-04.** Never exercised on
+Android before (the AVD had no camera, see the memory note). With
+`hw.camera.front=emulated` the emulator feeds real frames to
+`PoseCameraView`, MediaPipe loads and infers, finds no person and the footer
+says so: *"Chưa thấy bạn trong khung hình — lùi ra xa một chút"*. That also
+exercises all three footer states the fix above introduced — no frames yet,
+frames but nobody in them, camera dead.
+
+Detecting an actual person is still unproven on Android. Pointing the AVD at
+the Mac's webcam (`hw.camera.front=webcam0`) opens the camera — `dumpsys
+media.camera` shows `Device 10 is open. Client package: ai.therahome` — but
+no frames arrive, and macOS appears never to have granted the camera to the
+emulator process: it is launched in the background, so the one-time
+permission dialog has nobody to click it. Grant it under System Settings →
+Privacy & Security → Camera, or use a real Android phone.
+
 ## 2026-11-04 — App Review 2.5.1: HealthKit chưa được nêu tên trong UI
 
 Apple từ chối 1.0.3 (50) theo Guideline 2.5.1 (Submission ID
@@ -8738,3 +8887,89 @@ Android 16 — where edge-to-edge is enforced for targetSdk 35+ — reports what
 it draws. Only the Android 14 AVD halves it. `navBottomOffset` stays as it
 is. The release APK installs and runs on API 36 with no crash, and content
 ends above the buttons.
+
+## 2026-11-05 — Android QA: nút mua bị thanh nav ăn mất, và lời tổng kết đổ lỗi
+
+Một lượt QA toàn app trên emulator `therahome_a16` (Android 16, API 36,
+1080×2400 @420, ba nút điều hướng), APK release 1.0.3 (28), tài khoản
+`uitester@thera.local`. Hai lỗi, cả hai đều không phải của riêng Android nhưng
+chỉ Android mới thấy.
+
+**Nút "Mua ngay" nằm dưới thanh nav 6dp.** Màn Cửa hàng chừa chỗ cho thanh
+bằng `TAB_BAR_BODY_HEIGHT - 10`, mà hằng số đó thuộc thanh tab của khu nhân
+viên (`src/hooks/useTabBarInset.ts`): 64 trên Android, 84 trên iOS. Thanh nổi
+của Home v3 cao 60 (50pt hàng tab + 5pt đệm mỗi bên). Thành ra iOS thừa 14pt,
+còn Android thiếu đúng 6pt — và 6pt đó là phần đáy nút bị nuốt, trên **mọi**
+máy Android, vì sai số này không phụ thuộc inset.
+
+`HomeGlassNav` giờ xuất `NAV_BODY_HEIGHT = 60` kèm lời giải thích vì sao nó
+không phải `TAB_BAR_BODY_HEIGHT`; Cửa hàng dùng
+`navBottomOffset(inset) + NAV_BODY_HEIGHT + 14`, giữ nguyên khoảng hở 14pt mà
+iOS vẫn có nên iOS không đổi một pixel nào. Home, Lộ trình và Cộng đồng vốn
+viết thẳng số 60 — nay đọc hằng số, đúng tinh thần quy tắc 30 trong
+`docs/home-ui-rules.md`.
+
+**"Đúng động tác 0% thời gian" nói với người mà máy chưa từng nhìn thấy.**
+`summary.frames` chỉ đếm những khung hình thực sự đo được một cơ thể, nên
+`frames === 0` nghĩa là camera chưa thấy ai: camera hỏng, điện thoại quay lên
+trần, hoặc người đứng ngoài khung suốt buổi. Màn hình vẫn kết luận 0% — đúng
+cái lỗi hôm qua vừa sửa (khen ngợi trên một khung hình đen), chỉ là lật
+ngược. Giờ `frames === 0` cho ra `trainSummaryNone` ("Chưa ghi nhận được động
+tác nào"), và dòng "chỗ nên chú ý" cũng im luôn vì không có gì để chú ý.
+
+**Và chỗ chừa thêm 20dp làm lộ một lỗi thứ ba.** Ô chữ trong panel Cửa hàng
+(`copyScroll`) chỉ cuộn khi chữ dài hơn chỗ trống; chừa thêm chỗ cho nút là
+đủ để nó cuộn được — và nó mở ra ở vị trí đã cuộn sẵn, cắt mất nửa trên dòng
+tên sản phẩm. Kéo xuống thì tên hiện đủ, tức bố cục không sai, chỉ cái
+offset. Ô chữ giờ có `ref` và được đưa về đầu mỗi khi vào tab hoặc đổi sản
+phẩm. Lỗi này vốn đã nằm sẵn ở đó cho bất kỳ sản phẩm nào có tên hai dòng,
+trên cả iOS.
+
+Kiểm lại trên APK release dựng lại: tên sản phẩm hiện đủ, nút "Mua ngay" nằm
+trên thanh nav, vuốt sang sản phẩm thứ hai vẫn đúng, và một buổi tập mà
+camera không thấy ai kết thúc bằng "Chưa ghi nhận được động tác nào".
+
+**Những thứ đã kiểm và không sai**, cũng trên bản release đó:
+
+- Đăng nhập xong **không** còn hỏi quyền gọi điện: `CALL_PHONE` và
+  `READ_PHONE_STATE` vẫn `granted=false`, chỉ `POST_NOTIFICATIONS` được hỏi
+  (bản sửa 2026-11-04).
+- Hồ sơ trên Android **không** có dòng "Apple Health" — cổng `Platform.OS`
+  chạy đúng.
+- Camera, MediaPipe và ba trạng thái chân trang: emulator cấp camera, màn
+  "Tập cùng chuyên viên" chạy và nói "Chưa thấy bạn trong khung hình".
+- Home, Lộ trình, Cộng đồng, Hồ sơ, chọn người trò chuyện và rào AI đều dựng
+  đúng ở chế độ tối, thanh nav không đè lên ba nút hệ thống.
+- Bàn phím Telex của emulator (khi đặt `persist.sys.locale=vi-VN`) biến
+  "thera" thành "thẻa" lúc gõ bằng `adb shell input text`. Tắt IME
+  (`adb shell ime disable …LatinIME`) thì chữ vào thẳng ô nhập.
+
+**Chấm động tác trên người thật: xong, 05/11/2026.** Đây là thứ từ tháng 10
+tới giờ chưa chứng minh được trên Android.
+
+Mấu chốt là **ai mở emulator**. Mở từ shell của agent (`nohup … -camera-front
+webcam0`) thì macOS chặn camera không một lời nào và máy ảo treo luôn:
+`dumpsys` không trả lời, `screencap` ra tệp 0 byte — đúng hiện tượng của lần
+thử trước. Mở đúng câu lệnh đó từ **terminal của chủ máy** thì khung hình
+webcam vào thẳng `PoseCameraView`:
+
+```
+~/Library/Android/sdk/emulator/emulator -avd therahome_a16 -camera-front webcam0 -no-snapshot-save
+```
+
+(`emulator -webcam-list` liệt kê `webcam0` = FaceTime HD, `webcam1` =
+Continuity Camera của iPhone.)
+
+Chạy ngày 14 với người thật ngồi trước máy, lần lượt thấy đủ bốn trạng thái:
+
+| thấy gì trong khung | màn hình nói |
+|---|---|
+| chỉ khuôn mặt | `— điểm`, "Chưa thấy bạn trong khung hình" — đúng: không có vai lẫn hông thì `push()` trả `LOST` ngay dòng đầu |
+| đầu + vai + tay | **79 điểm**, xương vẽ trên người, cạnh đo được tô xanh |
+| tay sai hẳn so với bài mẫu | **0 điểm**, cánh tay trái tô **đỏ**, các cạnh không đo được để xám |
+| suốt buổi chỉ thấy nửa người | "Chưa thấy hết người — lùi ra để lọt cả vai và chân" |
+| kết thúc | **"Đúng động tác 18% thời gian · Chỗ nên chú ý lần sau: tay phải"** |
+
+Tức là toàn bộ chuỗi — MediaPipe → `poseCompare` → điểm, màu khớp, câu nhắc,
+bảng tổng kết — chạy đúng trên Android với người thật, không chỉ trên hình
+test màu xanh của emulator. Emulator đã tắt sau khi xong.

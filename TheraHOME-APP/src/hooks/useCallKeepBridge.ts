@@ -5,9 +5,10 @@ import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
   bringAppToForeground, dismissCall, drainInitialCallKeepEvents,
-  getSystemRingingCalls, isCallDismissed, isCallKeepSupported,
+  getSystemRingingCalls, isAndroidCallKeep, isCallDismissed, isCallKeepSupported,
   listenToCallKeep, promptForPhoneAccount, setupCallKeep, wasAnsweredHere,
 } from '@/lib/callkeep';
+import { CUSTOMER_CALLS_ENABLED } from '@/lib/features';
 import { getCallSession, setSessionMicOn } from '@/lib/callSession';
 import { useAnswerCall, useEndCall, CALL_IS_OVER, RING_TIMEOUT_MS, type CallStatus } from '@/hooks/useCalls';
 import { registerCallBackgroundTask } from '@/lib/callBackgroundTask';
@@ -100,9 +101,29 @@ export function useCallKeepBridge(enabled: boolean, settledIn = true) {
       },
     };
     const unsubscribe = listenToCallKeep(handlers);
+    // Registering Android's calling account asks for CALL_PHONE —
+    // "Allow TheraHOME to make and manage phone calls?" — and CallKeep raises
+    // it the instant this bridge arms, which is seconds after sign-in, before
+    // the person has seen a single screen of the app. While calls are not
+    // released to customers that prompt buys nothing: nobody can place or
+    // receive one. It costs plenty, though. It is the most alarming
+    // permission a wellness app can ask for, and it is the same telephony
+    // permission that made Play infer a SIM requirement and hide the app from
+    // 4,452 devices (plugins/withAndroidOptionalHardware.js has the numbers).
+    //
+    // Deferring it loses nothing, because `displayIncomingCall` calls
+    // `setupCallKeep()` itself: if a specialist does ring an Android phone,
+    // the account registers then — the one moment the permission is worth
+    // asking for. Until then `<IncomingCallSheet>` is the in-app fallback,
+    // which is what a phone without the account gets anyway.
+    //
+    // iOS is untouched: CallKit's setup asks for nothing.
+    const deferAndroidCallSetup = isAndroidCallKeep() && !CUSTOMER_CALLS_ENABLED;
     void (async () => {
-      await setupCallKeep();
-      if (cancelled) return;
+      if (!deferAndroidCallSetup) {
+        await setupCallKeep();
+        if (cancelled) return;
+      }
       await registerCallBackgroundTask();
       if (cancelled) return;
       await drainInitialCallKeepEvents(handlers);
@@ -121,7 +142,7 @@ export function useCallKeepBridge(enabled: boolean, settledIn = true) {
           }
         }
       }
-      if (!cancelled && actions.current.settledIn && !getCallSession()
+      if (!deferAndroidCallSetup && !cancelled && actions.current.settledIn && !getCallSession()
         && !getSystemRingingCalls().length && !answering.size) {
         await promptForPhoneAccount();
       }

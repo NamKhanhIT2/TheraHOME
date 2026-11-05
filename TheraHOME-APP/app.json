@@ -14,6 +14,11 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleLocalizations": [
+          "vi",
+          "en",
+          "ms"
+        ],
         "NSMicrophoneUsageDescription": "TheraHOME cần quyền micro để bạn gọi thoại cho nhân viên chăm sóc khách hàng.",
         "UIBackgroundModes": [
           "audio"
@@ -26,7 +31,7 @@
     },
     "android": {
       "package": "ai.therahome",
-      "versionCode": 27,
+      "versionCode": 28,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0169ED",
