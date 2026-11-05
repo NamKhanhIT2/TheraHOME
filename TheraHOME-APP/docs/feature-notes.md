@@ -9054,3 +9054,31 @@ biến `thera` thành `thẻa` mỗi lần gõ bằng `adb shell input text`, v�
 trong khi app vẫn tiếng Việt vì nó có cài đặt ngôn ngữ riêng. Ngoài ra ô
 kích hoạt đổi chế độ giữa chừng nên gõ cả email một phát sẽ rụng vài ký tự;
 gõ tách `qatester@` rồi nghỉ 3 giây rồi gõ phần còn lại.
+
+## 2026-11-05 (lượt 4) — Nói đúng chuyện khi tài khoản không còn dùng được
+
+Sửa hai lỗi tìm ra ở lượt 3. Cả hai cùng một gốc: tài khoản hỏng theo kiểu
+nào cũng bị báo như gõ sai mật khẩu, nên người ta đi đổi mật khẩu — thứ
+không hề sai — rồi đổi mãi.
+
+**Bị khoá (banned).** `supabase/functions/auth-sign-in/index.ts` cho mã
+`user_banned` của Supabase đi xuyên qua, thay vì gộp vào
+`invalid_credentials`. Phía app có thêm mã lỗi `account_banned`
+(`src/lib/authAccount.ts`: kiểu, `classify()`, nhánh đọc payload, và
+`authErrorKey`) và câu `errAccountBanned` ở cả ba ngôn ngữ.
+
+**Đã xoá.** `app/_layout.tsx` vẫn đăng xuất như cũ, nhưng đặt
+`blockedReason = 'deleted'` trước, nên màn hình chặn sẵn có (vốn chỉ biết
+`locked` và `expired`) hiện câu `accountDeleted` thay vì để người dùng rơi
+về form trắng không một lời nào.
+
+**Chưa kiểm được trên máy, và lý do:**
+
+- Bản sửa *banned* cần **deploy lại edge function** — bộ phân loại an toàn
+  chặn lệnh deploy lên production. Cho tới khi deploy, app vẫn nhận
+  `invalid_credentials` nên vẫn hiện câu cũ. Code hai phía đã khớp sẵn.
+- Bản sửa *deleted* cần đánh dấu tạm một tài khoản là đã xoá để xem màn
+  hình — thao tác ghi vào production cũng bị chặn, và đó là chặn đúng.
+
+Đã kiểm: typecheck, lint, 68/68 test, và APK release dựng lại vẫn đăng nhập
+bình thường (đường đi thành công không bị ảnh hưởng bởi nhánh lỗi mới).

@@ -77,10 +77,19 @@ Deno.serve(async (req: Request) => {
   const { data, error } = await auth.auth.signInWithPassword({ email, password });
 
   if (error || !data.session) {
-    // `email_not_confirmed` is worth telling the user apart: they have the
-    // right password and just need to finish the code we already emailed
-    // them, and the app routes them straight to the OTP screen.
-    const code = error?.code === 'email_not_confirmed' ? 'email_not_confirmed' : 'invalid_credentials';
+    // Two conditions are worth telling the user apart, because for both of
+    // them "wrong email or password" is a lie that sends somebody round a
+    // loop they cannot leave: changing a password they typed correctly.
+    //
+    // `email_not_confirmed`: they have the right password and just need to
+    // finish the code we already emailed them, and the app routes them
+    // straight to the OTP screen.
+    //
+    // `user_banned`: the account has been shut off. Collapsing this into
+    // invalid_credentials cost a QA session on 2026-11-05 and would cost a
+    // customer far more, since no password will ever work again.
+    const passthrough = error?.code === 'email_not_confirmed' || error?.code === 'user_banned';
+    const code = passthrough ? error!.code! : 'invalid_credentials';
     return json({ error: code, email: code === 'email_not_confirmed' ? email : undefined }, 401);
   }
 

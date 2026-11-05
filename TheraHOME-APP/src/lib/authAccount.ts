@@ -22,6 +22,10 @@ import type { TranslationKey } from '@/lib/i18n';
 
 export type AuthErrorCode =
   | 'invalid_credentials'
+  // The account has been shut off. Kept apart from 'invalid_credentials'
+  // because no password will ever work again: told the wrong thing, the
+  // person changes a password they typed correctly, and changes it again.
+  | 'account_banned'
   | 'email_not_confirmed'
   | 'username_taken'
   | 'username_invalid'
@@ -60,6 +64,7 @@ function classify(raw: unknown): AuthErrorCode {
   if (message.includes('email not confirmed') || message.includes('email_not_confirmed')) return 'email_not_confirmed';
   if (message.includes('token has expired') || message.includes('invalid') && message.includes('otp')) return 'otp_invalid';
   if (message.includes('rate limit') || message.includes('too many')) return 'rate_limited';
+  if (message.includes('user is banned') || message.includes('user_banned')) return 'account_banned';
   if (message.includes('invalid login credentials')) return 'invalid_credentials';
   return 'unknown';
 }
@@ -173,6 +178,7 @@ export async function signInWithIdentifier({
       payload = null;
     }
     if (payload?.error === 'email_not_confirmed') throw new AuthError('email_not_confirmed', payload.email);
+    if (payload?.error === 'user_banned') throw new AuthError('account_banned');
     if (payload?.error === 'invalid_credentials') throw new AuthError('invalid_credentials');
     // No Response at all means the request never reached the function — that
     // is the only case here that is actually about the network.
@@ -234,6 +240,7 @@ export async function updatePassword(password: string): Promise<void> {
 export function authErrorKey(code: AuthErrorCode): TranslationKey {
   switch (code) {
     case 'invalid_credentials': return 'invalidCredentials';
+    case 'account_banned': return 'errAccountBanned';
     case 'email_not_confirmed': return 'errOtpInvalid';
     case 'username_taken': return 'errUsernameTaken';
     case 'username_invalid': return 'errUsernameInvalid';

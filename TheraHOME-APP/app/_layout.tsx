@@ -61,7 +61,7 @@ const APP_BOOT_TIME = Date.now();
 // feel like it "loads twice". Production keeps the branded minimum.
 const MIN_SPLASH_MS = __DEV__ ? 0 : 1820;
 
-type BlockedReason = 'locked' | 'expired' | null;
+type BlockedReason = 'locked' | 'expired' | 'deleted' | null;
 
 
 function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
@@ -354,8 +354,14 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     if (session) useAppStore.getState().markSignedInOnce();
   }, [session]);
 
+  // Signing out is right; doing it in silence is not. Until 2026-11-05 a
+  // deleted account signed in for real, loaded its profile, and was dropped
+  // back to a cleared login form with nothing said — indistinguishable from
+  // a typo, so the person retypes a password that was never wrong. The
+  // blocked screen says what happened first.
   useEffect(() => {
     if (!profile?.deletedAt) return;
+    setBlockedReason('deleted');
     void supabase.auth.signOut().catch((e: unknown) => { if (__DEV__) console.warn('signOut (deleted) failed:', e); });
   }, [profile?.deletedAt]);
 
@@ -489,7 +495,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
             buttons barely legible. No-op on iOS. */}
         <NavigationBar style={theme.dark ? 'light' : 'dark'} />
         <Text style={{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '600', textAlign: 'center', lineHeight: 24 }}>
-          {translate(language, blockedReason === 'locked' ? 'accountLocked' : 'accountExpired')}
+          {translate(language, blockedReason === 'locked' ? 'accountLocked' : blockedReason === 'deleted' ? 'accountDeleted' : 'accountExpired')}
         </Text>
         <Button
           onPress={() => {
