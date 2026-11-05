@@ -9082,3 +9082,17 @@ về form trắng không một lời nào.
 
 Đã kiểm: typecheck, lint, 68/68 test, và APK release dựng lại vẫn đăng nhập
 bình thường (đường đi thành công không bị ảnh hưởng bởi nhánh lỗi mới).
+
+**Cập nhật cùng ngày: edge function đã deploy** (`auth-sign-in` version 18,
+chủ máy mở quyền). Gọi thẳng endpoint để chắc không hỏng gì:
+
+| gọi với | trả về |
+|---|---|
+| sai mật khẩu | `401 invalid_credentials` |
+| email không tồn tại | `401 invalid_credentials` (giống hệt — vẫn không lộ ai có tài khoản) |
+| đúng mật khẩu | `200` kèm session |
+
+Riêng đường `user_banned` vẫn chưa nhìn thấy tận mắt: muốn thấy thì phải ban
+tạm một tài khoản, mà ghi vào `auth.users` vẫn bị bộ phân loại chặn. Chủ máy
+ban một tài khoản QA trên dashboard (Authentication → Users → Ban user) là
+kiểm được trong vài giây.
