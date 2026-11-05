@@ -3,7 +3,7 @@ import { useAppStore, type AppLanguage } from '@/store/useAppStore';
 const messages = {
   vi: {
     waterTapHint: 'Chạm vào cốc để thêm số lượng',
-    dayWord: 'NGÀY', metricPain: 'Mức đau', metricPhase: 'Giai đoạn', metricTraining: 'Luyện tập',
+    dayWord: 'NGÀY', metricPain: 'Mức đau', metricPhase: 'Giai đoạn', metricTraining: 'Luyện tập', minuteShort: 'p', weekdayMon: 'T2', weekdayTue: 'T3', weekdayWed: 'T4', weekdayThu: 'T5', weekdayFri: 'T6', weekdaySat: 'T7', weekdaySun: 'CN',
     homeTagline: 'TheraHOME đồng hành cùng bạn để chủ động chăm sóc bản thân mỗi ngày ngay tại nhà!',
     waterGoalReached: 'Bạn đã đạt mục tiêu hôm nay', waterRemind: 'Nhắc tôi uống nước', waterRemindOff: 'Bật thông báo cho TheraHOME trong Cài đặt thì mới nhắc được nhé.', waterReminderTitle: 'Uống nước', waterReminderBody: 'Dừng tay một chút, uống một cốc nhé.', waterRemaining: 'Còn {count} cốc để đạt mục tiêu',
     healthActivity: 'Vận động', healthMove: 'Di chuyển', healthExercise: 'Tập luyện', healthStand: 'Đứng dậy', healthKcal: 'KCAL', healthMinutes: 'PHÚT', healthHours: 'GIỜ', healthSteps: '{count} bước hôm nay', healthConnect: 'Kết nối Apple Health', healthConnectHint: 'Nối với Apple Health để xem hôm nay bạn đi được bao nhiêu.', healthEmpty: 'Hôm nay chưa ghi được gì', healthEmptyHint: 'Vào Cài đặt › Sức khoẻ › Truy cập & Thiết bị dữ liệu › TheraHOME, bật các mục lên rồi quay lại đây.', healthRetry: 'Thử lại', healthDistance: 'Quãng đường', healthFlights: 'Tầng cầu thang', healthStepsLabel: 'Bước chân', healthKm: 'KM', healthFloors: 'TẦNG', healthNoWatchHint: 'Không có Apple Watch thì iPhone chỉ đếm được bước chân, quãng đường và số tầng.',
@@ -82,7 +82,7 @@ const messages = {
   },
   en: {
     waterTapHint: 'Tap the glass to add one',
-    dayWord: 'DAY', metricPain: 'Discomfort', metricPhase: 'Phase', metricTraining: 'Training',
+    dayWord: 'DAY', metricPain: 'Discomfort', metricPhase: 'Phase', metricTraining: 'Training', minuteShort: 'm', weekdayMon: 'Mon', weekdayTue: 'Tue', weekdayWed: 'Wed', weekdayThu: 'Thu', weekdayFri: 'Fri', weekdaySat: 'Sat', weekdaySun: 'Sun',
     homeTagline: 'TheraHOME is here with you, so you can look after yourself at home, every day.',
     waterGoalReached: 'You’ve reached today’s goal', waterRemind: 'Remind me to drink', waterRemindOff: 'Turn notifications on for TheraHOME in Settings and we can remind you.', waterReminderTitle: 'Time for water', waterReminderBody: 'Take a break and have a glass.', waterRemaining: '{count} more cups to reach your goal',
     healthActivity: 'Activity', healthMove: 'Move', healthExercise: 'Exercise', healthStand: 'Stand', healthKcal: 'KCAL', healthMinutes: 'MIN', healthHours: 'HRS', healthSteps: '{count} steps today', healthConnect: 'Connect Apple Health', healthConnectHint: 'Connect Apple Health to see how far you have got today.', healthEmpty: 'Nothing recorded yet today', healthEmptyHint: 'Open Settings › Health › Data Access & Devices › TheraHOME, turn the categories on, then come back.', healthRetry: 'Try again', healthDistance: 'Distance', healthFlights: 'Flights climbed', healthStepsLabel: 'Steps', healthKm: 'KM', healthFloors: 'FLOORS', healthNoWatchHint: 'Without an Apple Watch your iPhone can only count steps, distance and floors.',
@@ -161,7 +161,7 @@ const messages = {
   },
   ms: {
     waterTapHint: 'Ketik gelas untuk menambah satu',
-    dayWord: 'HARI', metricPain: 'Rasa tidak selesa', metricPhase: 'Fasa', metricTraining: 'Latihan',
+    dayWord: 'HARI', metricPain: 'Rasa tidak selesa', metricPhase: 'Fasa', metricTraining: 'Latihan', minuteShort: 'm', weekdayMon: 'Isn', weekdayTue: 'Sel', weekdayWed: 'Rab', weekdayThu: 'Kha', weekdayFri: 'Jum', weekdaySat: 'Sab', weekdaySun: 'Ahd',
     homeTagline: 'TheraHOME menemani anda menjaga diri sendiri di rumah, setiap hari.',
     waterGoalReached: 'Anda sudah mencapai sasaran hari ini', waterRemind: 'Ingatkan saya minum', waterRemindOff: 'Hidupkan pemberitahuan untuk TheraHOME dalam Tetapan supaya kami boleh mengingatkan anda.', waterReminderTitle: 'Masa untuk minum', waterReminderBody: 'Rehat sebentar dan minum segelas.', waterRemaining: '{count} cawan lagi untuk mencapai sasaran',
     healthActivity: 'Aktiviti', healthMove: 'Gerak', healthExercise: 'Senaman', healthStand: 'Berdiri', healthKcal: 'KCAL', healthMinutes: 'MIN', healthHours: 'JAM', healthSteps: '{count} langkah hari ini', healthConnect: 'Sambung Apple Health', healthConnectHint: 'Sambung Apple Health untuk melihat aktiviti anda hari ini.', healthEmpty: 'Tiada data hari ini', healthEmptyHint: 'Buka Tetapan › Health › Akses Data & Peranti › TheraHOME, hidupkan kategori, kemudian tekan Cuba lagi.', healthRetry: 'Cuba lagi', healthDistance: 'Jarak', healthFlights: 'Tingkat didaki', healthStepsLabel: 'Langkah', healthKm: 'KM', healthFloors: 'TINGKAT', healthNoWatchHint: 'Tanpa Apple Watch, iPhone hanya boleh mengira langkah, jarak dan tingkat.',

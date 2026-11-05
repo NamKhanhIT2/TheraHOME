@@ -8973,3 +8973,37 @@ Chạy ngày 14 với người thật ngồi trước máy, lần lượt thấy
 Tức là toàn bộ chuỗi — MediaPipe → `poseCompare` → điểm, màu khớp, câu nhắc,
 bảng tổng kết — chạy đúng trên Android với người thật, không chỉ trên hình
 test màu xanh của emulator. Emulator đã tắt sau khi xong.
+
+## 2026-11-05 (lượt 2) — QA sâu Android: hai chỗ tiếng Việt lọt sang tiếng Anh
+
+Lượt QA thứ hai đi vào các luồng lượt đầu chưa đụng tới, vẫn trên
+`therahome_a16` với APK release. **Không đặt đơn, không đăng bài** — đây là
+dữ liệu thật, nên chỉ mở tới bước cuối rồi thoát.
+
+**Nhãn thứ trong lịch Lộ trình là tiếng Việt ở cả ba ngôn ngữ.** Một máy chạy
+tiếng Anh đọc `T2 T3 T4 T5 T6 T7 CN` trên đầu lịch —
+`RoadmapCalendar.tsx` có một hằng số `WEEKDAY_KEYS` viết thẳng. Giờ là bảy
+khoá i18n (`weekdayMon`…`weekdaySun`): vi giữ T2…CN, en Mon…Sun, ms
+Isn…Ahd, vẫn bắt đầu từ thứ Hai.
+
+**Vòng "Luyện tập" ở Home đọc "30p" trong mọi ngôn ngữ**, mà "p" là *phút*.
+Con số 30 là cố định có chủ ý (chủ máy chốt 2026-10-23, không có gì ghi lại
+thời lượng buổi tập), nhưng cái đuôi thì phải dịch: thêm `minuteShort`
+(vi `p`, en/ms `m`). Tiếng Anh giờ đọc "30m".
+
+Kiểm lại trên APK dựng lại: lịch tiếng Anh hiện Mon…Sun, vòng hiện 30m; đổi
+về tiếng Việt thì T2…CN và 30p trở lại.
+
+**Đi qua và không thấy lỗi:** form đặt hàng (mở từ "Mua ngay", tự điền tên từ
+hồ sơ, bàn phím số đẩy ô nhập lên, bỏ trống thì báo "Vui lòng điền đủ họ
+tên, số điện thoại và địa chỉ nhận hàng" và **không** tạo đơn); soạn bài
+Cộng đồng (nút Chia sẻ mờ khi trống, đếm 14/3000, hỏi "Bỏ bài viết đang
+soạn?" khi thoát); hộp thư thông báo (nhóm Mới/Trước đó, nút xoá từng cái);
+màn Thông báo trong Hồ sơ với bộ chọn giờ **tối màu tự vẽ**, không phải hộp
+thoại hệ thống; Cài đặt tài khoản; chạm vòng Nước trên Home ghi thêm một cốc
+(0/8 → 1/8).
+
+**Một chỗ chưa đẹp, chưa sửa:** hộp thoại xác nhận bỏ bài viết là
+`Alert` của Android nên hiện **nền trắng** giữa một app nền tối. Muốn tối
+phải đụng tới theme Android của app, ảnh hưởng cả splash và các hộp thoại
+khác — để chủ máy quyết.

@@ -3,11 +3,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { homeGlassColors, useTheme } from '@/theme';
 import { Icon } from '@/components/icons/Icon';
 import { heroFont } from '@/components/home/glass';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, type TranslationKey } from '@/lib/i18n';
 import type { DayRow } from '@/hooks/usePrograms';
 
-/** Monday-first, as every Vietnamese calendar is. */
-const WEEKDAY_KEYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+/** Monday-first, as every Vietnamese calendar is. The labels were the
+ * Vietnamese ones in every language until 2026-11-05 — an English phone
+ * read "T2 T3 T4 T5 T6 T7 CN" across the top of its calendar. */
+const WEEKDAY_KEYS: TranslationKey[] = [
+  'weekdayMon', 'weekdayTue', 'weekdayWed', 'weekdayThu', 'weekdayFri', 'weekdaySat', 'weekdaySun',
+];
 
 /**
  * The grid is always exactly five rows TALL, whatever month is showing.
@@ -156,9 +160,9 @@ export function RoadmapCalendar({ days, activatedAt, doneCount, totalDays, onSel
       </View>
 
       <View style={styles.weekRow}>
-        {WEEKDAY_KEYS.map((label) => (
-          <Text key={label} style={[theme.type.captionSm, styles.weekday, { color: homeGlassColors.textFaint }]}>
-            {label}
+        {WEEKDAY_KEYS.map((key) => (
+          <Text key={key} style={[theme.type.captionSm, styles.weekday, { color: homeGlassColors.textFaint }]}>
+            {t(key)}
           </Text>
         ))}
       </View>

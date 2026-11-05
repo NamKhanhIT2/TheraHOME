@@ -763,7 +763,9 @@ export default function HomeScreen() {
                   and the owner asked (2026-10-23) to keep the design's figure
                   rather than drop the metric or invent a number. Swap this
                   for real data the day a session logs its duration. */}
-              <MetricCircle icon="timer" value="30p" label={t('metricTraining')} />
+              {/* "p" is phút; an English or Malay phone read "30p" until
+                  2026-11-05. */}
+              <MetricCircle icon="timer" value={`30${t('minuteShort')}`} label={t('metricTraining')} />
               <MetricCircle
                 icon="droplet"
                 value={`${water}/${WATER_GOAL_CUPS}`}
